@@ -60,13 +60,29 @@ jobs:
           $version = "${env:GITHUB_REF_NAME}" -replace "v", ""
           if (-not $version) { $version = "latest" }
 
-          Compress-Archive -Path "dist/*" -DestinationPath "CodexMate-Windows-$version.zip" -Force
+          Compress-Archive -Path "dist/*" -DestinationPath "CodexMate-Portable-$version.zip" -Force
+
+      - name: Create installer
+        shell: pwsh
+        run: |
+          # 安装 Inno Setup
+          choco install innosetup -y
+
+          # 更新安装脚本中的版本号
+          $version = "${env:GITHUB_REF_NAME}" -replace "v", ""
+          if (-not $version) { $version = "0.0.1" }
+          (Get-Content "scripts/installer.iss") -replace "0\.0\.1", $version | Set-Content "scripts/installer.iss"
+
+          # 编译安装程序
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "scripts/installer.iss"
 
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: CodexMate-Windows-*.zip
+          files: |
+            CodexMate-Portable-*.zip
+            CodexMate-Setup-*.exe
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
