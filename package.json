@@ -1,0 +1,25 @@
+{
+  "name": "codexmate",
+  "version": "0.0.1",
+  "description": "Codex 提供商管理 CLI 工具",
+  "bin": {
+    "codexmate": "./cli.js"
+  },
+  "scripts": {
+    "start": "node cli.js"
+  },
+  "dependencies": {
+    "@iarna/toml": "^2.2.5"
+  },
+  "engines": {
+    "node": ">=14"
+  },
+  "keywords": [
+    "codex",
+    "ai",
+    "llm",
+    "cli"
+  ],
+  "author": "ymkiux",
+  "license": "Apache-2.0"
+}

@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+.npm/
+.pnpm-store/
+
+# Build outputs
+dist/
+dist-nw/
+out/
+build/
+cache/
+
+# NW.js specific
+nwjs-v0.106.1-win-x64/
+nwjs-v0.106.1-win-x64.zip
+.nwjs/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-*
+
+# Temporary files
+*.tmp
+*.bak
+*.backup.*
+
+# Runtime files
+NUL
+codex-switcher.exe
+
+# User configuration (may contain API keys)
+*.toml
+*.env
+.env.*
+
+# Package manager lockfiles (keep package-lock.json)
+# pnpm-lock.yaml
+# yarn.lock
