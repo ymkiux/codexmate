@@ -11,6 +11,9 @@ jobs:
   build-and-release:
     runs-on: windows-latest
 
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -57,32 +60,13 @@ jobs:
           $version = "${env:GITHUB_REF_NAME}" -replace "v", ""
           if (-not $version) { $version = "latest" }
 
-          Compress-Archive -Path "dist/*" -DestinationPath "CodexSwitcherPro-Windows-$version.zip" -Force
+          Compress-Archive -Path "dist/*" -DestinationPath "CodexMate-Windows-$version.zip" -Force
 
-      - name: Get version
-        id: get_version
-        shell: pwsh
-        run: |
-          $version = "${env:GITHUB_REF_NAME}" -replace "v", ""
-          if (-not $version) { $version = "latest" }
-          echo "version=$version" >> $env:GITHUB_OUTPUT
-
-      - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
-          draft: false
-          prerelease: false
-
-      - name: Upload to Release
+      - name: Release
         uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
+        if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: |
-            CodexSwitcherPro-Windows-${{ steps.get_version.outputs.version }}.zip
+          files: CodexMate-Windows-*.zip
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
