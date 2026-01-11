@@ -764,10 +764,9 @@
                 <div class="config-group">
                     <label class="form-label">API Key</label>
                     <div class="api-key-display">
-                        {{ claudeConfigs[currentClaudeConfig].apiKey || '(未设置)' }}
+                        {{ displayApiKey(currentClaudeConfig) }}
                         <button class="btn-change-key" @click="changeApiKey">更改</button>
                     </div>
-                    <div class="form-hint">应用环境变量时需要输入完整的 API Key</div>
                 </div>
                 <div class="config-group">
                     <label class="form-label">ANTHROPIC_BASE_URL</label>
@@ -959,7 +958,8 @@
                         '智谱GLM': {
                             apiKey: '',
                             baseUrl: 'https://open.bigmodel.cn/api/anthropic',
-                            model: 'glm-4.7'
+                            model: 'glm-4.7',
+                            hasKey: false
                         }
                     },
                     newClaudeConfig: {
@@ -1100,11 +1100,17 @@
 
                 formatKey(key) {
                     if (!key) return '(未设置)';
-                    // 始终返回脱敏版本，不显示真实 key
+                    // 返回脱敏版本用于显示
                     if (key.length > 10) {
                         return key.substring(0, 3) + '****' + key.substring(key.length - 3);
                     }
                     return '****';
+                },
+
+                // 获取用于显示的脱敏 key（完整 key 仍保存在 config.apiKey 中）
+                displayApiKey(configName) {
+                    const key = this.claudeConfigs[configName]?.apiKey;
+                    return this.formatKey(key);
                 },
 
                 // Claude Code 配置方法
@@ -1113,63 +1119,39 @@
                 },
 
                 changeApiKey() {
-                    // 使用 prompt 让用户输入新的 API Key，但不保存完整版本
-                    const newKey = prompt('请输入新的 API Key（不会保存在浏览器中）:');
+                    // 使用 prompt 让用户输入新的 API Key
+                    const newKey = prompt('请输入新的 API Key:');
                     if (newKey) {
-                        // 只保存脱敏版本
-                        this.claudeConfigs[this.currentClaudeConfig].apiKey = this.formatKey(newKey);
+                        // 直接保存完整 key 到配置
+                        this.claudeConfigs[this.currentClaudeConfig].apiKey = newKey;
                         this.claudeConfigs[this.currentClaudeConfig].hasKey = true;
                         this.saveCurrentClaudeConfig();
-                        this.showMessage('API Key 已更新（仅脱敏版本已保存）', 'success');
+                        this.showMessage('API Key 已更新', 'success');
                     }
                 },
 
                 saveCurrentClaudeConfig() {
-                    // 保存时对 apiKey 进行脱敏，不存储完整 key
-                    const configsToSave = {};
-                    for (const [name, config] of Object.entries(this.claudeConfigs)) {
-                        configsToSave[name] = {
-                            apiKey: config.apiKey ? this.formatKey(config.apiKey) : '',
-                            baseUrl: config.baseUrl,
-                            model: config.model,
-                            hasKey: !!config.apiKey // 标记是否有 key
-                        };
-                    }
-                    localStorage.setItem('claudeConfigs', JSON.stringify(configsToSave));
+                    // 直接保存完整配置到 localStorage（包含完整的 apiKey）
+                    localStorage.setItem('claudeConfigs', JSON.stringify(this.claudeConfigs));
                 },
 
                 async applyToSystemEnv() {
                     const config = this.claudeConfigs[this.currentClaudeConfig];
-                    // 检查是否有完整的 apiKey
-                    if (!config.apiKey || config.apiKey.includes('****')) {
-                        // 需要用户输入 apiKey
+
+                    // 如果没有配置 API Key，提示用户输入
+                    if (!config.apiKey) {
                         const inputKey = prompt('请输入 API Key（用于设置环境变量）:');
                         if (!inputKey) return;
+                        config.apiKey = inputKey;
+                        this.saveCurrentClaudeConfig();
+                    }
 
-                        const res = await api('apply-env', {
-                            config: {
-                                ...config,
-                                apiKey: inputKey // 只发送这一次，不存储
-                            }
-                        });
-                        if (res.error) {
-                            this.showMessage(res.error, 'error');
-                        } else {
-                            this.showMessage('已应用到系统环境变量', 'success');
-                            // 清空输入的 key，不保存
-                            config.apiKey = this.formatKey(inputKey);
-                            this.saveCurrentClaudeConfig();
-                        }
+                    const res = await api('apply-env', { config });
+
+                    if (res.error) {
+                        this.showMessage(res.error, 'error');
                     } else {
-                        const res = await api('apply-env', { config });
-                        if (res.error) {
-                            this.showMessage(res.error, 'error');
-                        } else {
-                            this.showMessage('已应用到系统环境变量', 'success');
-                            // 应用后清空 apiKey，只保留脱敏版本
-                            config.apiKey = this.formatKey(config.apiKey);
-                            this.saveCurrentClaudeConfig();
-                        }
+                        this.showMessage('已应用到系统环境变量', 'success');
                     }
                 },
 
@@ -1190,10 +1172,6 @@
                     };
 
                     this.currentClaudeConfig = name;
-                    // 添加后立即脱敏 apiKey，不保存完整版本
-                    if (this.claudeConfigs[name].apiKey) {
-                        this.claudeConfigs[name].apiKey = this.formatKey(this.claudeConfigs[name].apiKey);
-                    }
                     this.saveCurrentClaudeConfig();
                     this.showMessage('配置已添加', 'success');
                     this.closeClaudeConfigModal();
