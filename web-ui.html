@@ -987,6 +987,16 @@
                 if (savedConfigs) {
                     try {
                         this.claudeConfigs = JSON.parse(savedConfigs);
+                        // 清理旧版本的脱敏 key（包含 **** 的无效 key）
+                        for (const [name, config] of Object.entries(this.claudeConfigs)) {
+                            if (config.apiKey && config.apiKey.includes('****')) {
+                                config.apiKey = '';
+                                config.hasKey = false;
+                            }
+                        }
+                        // 保存清理后的配置
+                        localStorage.setItem('claudeConfigs', JSON.stringify(this.claudeConfigs));
+
                         const configNames = Object.keys(this.claudeConfigs);
                         if (configNames.length > 0) {
                             this.currentClaudeConfig = configNames[0];
