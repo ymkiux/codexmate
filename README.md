@@ -14,11 +14,11 @@ Codex Mate 是一个简洁的命令行工具，提供两大核心功能：
 
 ## 功能特性
 
-- 🔄 **快速切换** - 一键切换 AI 模型提供商
-- 🎯 **模型管理** - 统一管理所有可用模型
-- 🌐 **Web 界面** - 内置简洁的可视化界面
-- 🔒 **安全可靠** - API key 本地存储，脱敏显示
-- ⚡ **轻量高效** - 仅依赖 Node.js 和一个 TOML 解析库
+- **快速切换** - 一键切换 AI 模型提供商
+- **模型管理** - 统一管理所有可用模型
+- **Web 界面** - 内置简洁的可视化界面
+- **安全可靠** - API key 本地存储，脱敏显示
+- **轻量高效** - 仅依赖 Node.js 和一个 TOML 解析库
 
 ## 安装
 
@@ -91,15 +91,15 @@ codexmate start
 **Web 界面功能：**
 
 #### Codex 配置模式
-- 📊 查看当前提供商和模型状态
-- 🔄 快速切换提供商
-- 🎯 切换和管理可用模型
-- ➕ 添加/删除自定义提供商
+- 查看当前提供商和模型状态
+- 快速切换提供商
+- 切换和管理可用模型
+- 添加/删除自定义提供商
 
 #### Claude Code 配置模式（仅限 Windows）
-- 🔑 管理多个 Claude Code 配置方案
-- ⚙️ 配置 API Key、Base URL 和模型
-- 🚀 一键应用到系统环境变量：
+- 管理多个 Claude Code 配置方案
+- 配置 API Key、Base URL 和模型
+- 一键应用到系统环境变量：
   - `ANTHROPIC_API_KEY`
   - `ANTHROPIC_AUTH_TOKEN`
   - `ANTHROPIC_BASE_URL`
@@ -191,4 +191,4 @@ Apache-2.0 © [ymkiux](https://github.com/ymkiux)
 
 ---
 
-Made with ❤️ by [ymkiux](https://github.com/ymkiux)
+Made with [ymkiux](https://github.com/ymkiux)

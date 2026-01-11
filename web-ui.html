@@ -13,14 +13,15 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-            background-color: #FFFFFF;
-            color: #000000;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', Arial, sans-serif;
+            background-color: #F7F1E8;
+            color: #1F1A17;
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
             padding: 40px 20px;
+            -webkit-font-smoothing: antialiased;
         }
 
         .container {
@@ -30,28 +31,28 @@
 
         /* 主标题 */
         .main-title {
-            font-size: 56px;
-            font-weight: 900;
-            line-height: 1.1;
-            margin-bottom: 40px;
-            letter-spacing: -0.02em;
+            font-size: 52px;
+            font-weight: 600;
+            line-height: 1.15;
+            margin-bottom: 32px;
+            letter-spacing: -0.01em;
         }
 
         .main-title .accent {
-            color: #666666;
+            color: #D26B5A;
         }
 
         /* 当前状态卡片 */
         .status-cards {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-bottom: 32px;
+            gap: 16px;
+            margin-bottom: 28px;
         }
 
         .status-card {
-            background-color: #F5F5F5;
-            border-radius: 16px;
+            background-color: #EBDCCD;
+            border-radius: 8px;
             padding: 20px;
             display: flex;
             flex-direction: column;
@@ -59,16 +60,17 @@
         }
 
         .status-label {
-            font-size: 11px;
-            color: #666666;
+            font-size: 12px;
+            font-weight: 500;
+            color: #5C5046;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.04em;
         }
 
         .status-value {
-            font-size: 18px;
-            font-weight: 700;
-            color: #000000;
+            font-size: 16px;
+            font-weight: 600;
+            color: #1F1A17;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -76,26 +78,25 @@
 
         /* 模型选择器 */
         .model-selector {
-            background-color: #FAFAFA;
-            border: 1px solid #E5E5E5;
-            border-radius: 16px;
+            background-color: #EBDCCD;
+            border-radius: 8px;
             padding: 20px;
-            margin-bottom: 32px;
+            margin-bottom: 28px;
         }
 
         .selector-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 16px;
+            margin-bottom: 14px;
         }
 
         .selector-title {
-            font-size: 13px;
-            font-weight: 600;
-            color: #666666;
+            font-size: 12px;
+            font-weight: 500;
+            color: #5C5046;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.04em;
         }
 
         .selector-actions {
@@ -106,44 +107,43 @@
         .btn-icon {
             width: 28px;
             height: 28px;
-            border-radius: 8px;
-            border: 1px solid #E5E5E5;
-            background: #FFFFFF;
+            border-radius: 6px;
+            border: none;
+            background: #D26B5A;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
             font-size: 14px;
+            color: #FFFFFF;
             transition: all 0.2s ease;
         }
 
         .btn-icon:hover {
-            border-color: #000000;
-            background: #000000;
-            color: #FFFFFF;
+            background: #B85A4A;
         }
 
         .model-select {
             width: 100%;
             padding: 14px 16px;
-            border: 1px solid #E5E5E5;
-            border-radius: 12px;
+            border: none;
+            border-radius: 6px;
             font-size: 15px;
-            font-weight: 600;
+            font-weight: 500;
             background-color: #FFFFFF;
-            color: #000000;
+            color: #1F1A17;
             outline: none;
             cursor: pointer;
             transition: all 0.2s ease;
             appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23000000' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%231F1A17' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
             background-position: right 16px center;
             padding-right: 40px;
         }
 
         .model-select:focus {
-            border-color: #000000;
+            box-shadow: 0 0 0 2px #D26B5A;
         }
 
         /* 提供商列表 */
@@ -157,22 +157,20 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 18px 20px;
-            border: 1px solid #E5E5E5;
-            border-radius: 16px;
+            padding: 16px 18px;
+            border-radius: 8px;
             cursor: pointer;
             transition: all 0.2s ease;
             background-color: #FFFFFF;
         }
 
         .provider-item:hover {
-            border-color: #000000;
             transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(31, 26, 23, 0.08);
         }
 
         .provider-item.active {
-            border-color: #000000;
-            background-color: #FAFAFA;
+            background-color: #EBDCCD;
         }
 
         .provider-item:active {
@@ -182,56 +180,58 @@
         .provider-left {
             display: flex;
             align-items: center;
-            gap: 14px;
+            gap: 12px;
             flex: 1;
             min-width: 0;
         }
 
         .provider-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 12px;
-            background-color: #F5F5F5;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background-color: #F0E6D8;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
-            font-weight: 700;
+            font-size: 16px;
+            font-weight: 600;
             flex-shrink: 0;
+            color: #5C5046;
         }
 
         .provider-item.active .provider-icon {
-            background-color: #000000;
+            background-color: #D26B5A;
             color: #FFFFFF;
         }
 
         .provider-name {
             font-size: 15px;
-            font-weight: 600;
+            font-weight: 500;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            color: #1F1A17;
         }
 
         .provider-right {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
         }
 
         .api-key {
             font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
             font-size: 11px;
-            color: #999999;
-            background-color: #F5F5F5;
+            color: #5C5046;
+            background-color: #F0E6D8;
             padding: 6px 10px;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
             transition: all 0.2s ease;
         }
 
         .api-key:hover {
-            background-color: #000000;
+            background-color: #D26B5A;
             color: #FFFFFF;
         }
 
@@ -239,20 +239,20 @@
             font-family: inherit;
             font-size: inherit;
             background-color: #FFFFFF;
-            border: 2px solid #000000;
-            border-radius: 8px;
+            border: 2px solid #D26B5A;
+            border-radius: 6px;
             padding: 4px 8px;
             width: 120px;
-            color: #000000;
+            color: #1F1A17;
             outline: none;
         }
 
         .btn-delete {
-            font-size: 11px;
-            font-weight: 600;
-            color: #999999;
+            font-size: 12px;
+            font-weight: 500;
+            color: #8B7668;
             padding: 4px 8px;
-            border-radius: 6px;
+            border-radius: 4px;
             cursor: pointer;
             opacity: 0;
             transition: all 0.2s ease;
@@ -263,28 +263,28 @@
         }
 
         .btn-delete:hover {
-            background-color: #000000;
+            background-color: #D26B5A;
             color: #FFFFFF;
         }
 
         /* 添加按钮 */
         .btn-add {
             width: 100%;
-            padding: 18px 20px;
+            padding: 16px 18px;
             margin-top: 16px;
-            border: 2px dashed #E5E5E5;
-            border-radius: 16px;
+            border: 2px dashed #D0C4B6;
+            border-radius: 8px;
             background-color: transparent;
             font-size: 14px;
-            font-weight: 600;
-            color: #999999;
+            font-weight: 500;
+            color: #8B7668;
             cursor: pointer;
             transition: all 0.2s ease;
         }
 
         .btn-add:hover {
-            border-color: #000000;
-            color: #000000;
+            border-color: #D26B5A;
+            color: #D26B5A;
         }
 
         /* 模态框 */
@@ -294,7 +294,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: rgba(0, 0, 0, 0.5);
+            background-color: rgba(31, 26, 23, 0.4);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -306,16 +306,17 @@
             background-color: #FFFFFF;
             width: 90%;
             max-width: 420px;
-            border-radius: 24px;
-            padding: 32px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            border-radius: 12px;
+            padding: 28px;
+            box-shadow: 0 12px 40px rgba(31, 26, 23, 0.12);
             animation: slideUp 0.3s ease;
         }
 
         .modal-title {
-            font-size: 20px;
-            font-weight: 700;
+            font-size: 18px;
+            font-weight: 600;
             margin-bottom: 24px;
+            color: #1F1A17;
         }
 
         .form-group {
@@ -324,32 +325,34 @@
 
         .form-label {
             display: block;
-            font-size: 11px;
-            font-weight: 600;
-            color: #666666;
+            font-size: 12px;
+            font-weight: 500;
+            color: #5C5046;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.04em;
             margin-bottom: 8px;
         }
 
         .form-input {
             width: 100%;
-            padding: 14px 16px;
-            border: 1px solid #E5E5E5;
-            border-radius: 12px;
+            padding: 12px 14px;
+            border: 1px solid #D0C4B6;
+            border-radius: 6px;
             font-size: 14px;
             background-color: #FAFAFA;
             outline: none;
             transition: all 0.2s ease;
+            color: #1F1A17;
         }
 
         .form-input:focus {
-            border-color: #000000;
+            border-color: #D26B5A;
             background-color: #FFFFFF;
+            box-shadow: 0 0 0 2px rgba(210, 107, 90, 0.15);
         }
 
         .form-input::placeholder {
-            color: #CCCCCC;
+            color: #A89888;
         }
 
         .btn-group {
@@ -361,9 +364,9 @@
         .btn {
             flex: 1;
             padding: 14px 16px;
-            border-radius: 12px;
+            border-radius: 6px;
             font-size: 14px;
-            font-weight: 600;
+            font-weight: 500;
             cursor: pointer;
             transition: all 0.2s ease;
             border: none;
@@ -374,29 +377,29 @@
         }
 
         .btn-cancel {
-            background-color: #F5F5F5;
-            color: #666666;
+            background-color: #EBDCCD;
+            color: #1F1A17;
         }
 
         .btn-cancel:hover {
-            background-color: #E5E5E5;
+            background-color: #D0C4B6;
         }
 
         .btn-confirm {
-            background-color: #000000;
+            background-color: #D26B5A;
             color: #FFFFFF;
         }
 
         .btn-confirm:hover {
-            background-color: #333333;
+            background-color: #B85A4A;
         }
 
         /* 模型列表 */
         .model-list {
             max-height: 200px;
             overflow-y: auto;
-            border: 1px solid #E5E5E5;
-            border-radius: 12px;
+            border: 1px solid #D0C4B6;
+            border-radius: 6px;
             margin-bottom: 20px;
             scrollbar-width: none;
         }
@@ -410,8 +413,9 @@
             justify-content: space-between;
             align-items: center;
             padding: 10px 14px;
-            border-bottom: 1px solid #E5E5E5;
+            border-bottom: 1px solid #D0C4B6;
             font-size: 13px;
+            color: #1F1A17;
         }
 
         .model-item:last-child {
@@ -419,19 +423,20 @@
         }
 
         .model-item:hover {
-            background-color: #FAFAFA;
+            background-color: #F0E6D8;
         }
 
         .btn-remove-model {
-            font-size: 11px;
-            color: #999999;
+            font-size: 12px;
+            font-weight: 500;
+            color: #8B7668;
             cursor: pointer;
             padding: 2px 6px;
             border-radius: 4px;
         }
 
         .btn-remove-model:hover {
-            background-color: #000000;
+            background-color: #D26B5A;
             color: #FFFFFF;
         }
 
@@ -441,64 +446,65 @@
             bottom: 32px;
             left: 50%;
             transform: translateX(-50%);
-            background-color: #000000;
+            background-color: #1F1A17;
             color: #FFFFFF;
             padding: 12px 24px;
             border-radius: 50px;
             font-size: 13px;
             font-weight: 500;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 8px 24px rgba(31, 26, 23, 0.15);
             z-index: 200;
             animation: slideUp 0.3s ease;
         }
 
         .toast.error {
-            background-color: #FF3B30;
+            background-color: #C84A3A;
         }
 
         .toast.success {
-            background-color: #34C759;
+            background-color: #5A8B6A;
         }
 
         /* 加载/错误状态 */
         .state-message {
             text-align: center;
             padding: 60px 20px;
-            color: #999999;
+            color: #8B7668;
             font-size: 14px;
         }
 
         .state-message.error {
-            color: #FF3B30;
+            color: #C84A3A;
         }
 
         /* 配置模式切换器 */
         .mode-switcher {
             display: flex;
             gap: 12px;
-            margin-bottom: 32px;
+            margin-bottom: 28px;
         }
 
         .mode-btn {
             flex: 1;
-            padding: 14px 20px;
-            border: 2px solid #E5E5E5;
-            border-radius: 12px;
+            padding: 12px 16px;
+            border: 2px solid #D0C4B6;
+            border-radius: 8px;
             background-color: #FFFFFF;
             font-size: 14px;
-            font-weight: 600;
-            color: #666666;
+            font-weight: 500;
+            color: #5C5046;
             cursor: pointer;
             transition: all 0.2s ease;
         }
 
         .mode-btn:hover {
-            border-color: #000000;
+            border-color: #D26B5A;
+            color: #D26B5A;
         }
 
         .mode-btn.active {
-            background-color: #000000;
-            border-color: #000000;
+            background-color: #D26B5A;
+            border-color: #D26B5A;
             color: #FFFFFF;
         }
 
@@ -506,7 +512,7 @@
         .claude-config {
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 18px;
         }
 
         .config-group {
@@ -517,18 +523,20 @@
 
         .config-group .form-input {
             width: 100%;
-            padding: 14px 16px;
-            border: 1px solid #E5E5E5;
-            border-radius: 12px;
+            padding: 12px 14px;
+            border: 1px solid #D0C4B6;
+            border-radius: 6px;
             font-size: 14px;
             background-color: #FAFAFA;
             outline: none;
             transition: all 0.2s ease;
+            color: #1F1A17;
         }
 
         .config-group .form-input:focus {
-            border-color: #000000;
+            border-color: #D26B5A;
             background-color: #FFFFFF;
+            box-shadow: 0 0 0 2px rgba(210, 107, 90, 0.15);
         }
 
         .config-group select.form-input {
@@ -536,8 +544,8 @@
         }
 
         .form-hint {
-            font-size: 11px;
-            color: #999999;
+            font-size: 12px;
+            color: #8B7668;
             margin-top: 4px;
         }
 
@@ -545,28 +553,30 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 14px 16px;
-            border: 1px solid #E5E5E5;
-            border-radius: 12px;
+            padding: 12px 14px;
+            border: 1px solid #D0C4B6;
+            border-radius: 6px;
             background-color: #FAFAFA;
             font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
             font-size: 14px;
+            color: #1F1A17;
         }
 
         .btn-change-key {
             padding: 6px 12px;
-            border: 1px solid #E5E5E5;
-            border-radius: 8px;
+            border: 1px solid #D0C4B6;
+            border-radius: 6px;
             background: #FFFFFF;
             font-size: 12px;
-            font-weight: 600;
+            font-weight: 500;
+            color: #5C5046;
             cursor: pointer;
             transition: all 0.2s ease;
         }
 
         .btn-change-key:hover {
-            border-color: #000000;
-            background: #000000;
+            border-color: #D26B5A;
+            background: #D26B5A;
             color: #FFFFFF;
         }
 
@@ -582,46 +592,45 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 18px 20px;
-            border: 1px solid #E5E5E5;
-            border-radius: 16px;
+            padding: 16px 18px;
+            border-radius: 8px;
             cursor: pointer;
             transition: all 0.2s ease;
             background-color: #FFFFFF;
         }
 
         .config-item:hover {
-            border-color: #000000;
             transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(31, 26, 23, 0.08);
         }
 
         .config-item.active {
-            border-color: #000000;
-            background-color: #FAFAFA;
+            background-color: #EBDCCD;
         }
 
         .config-left {
             display: flex;
             align-items: center;
-            gap: 14px;
+            gap: 12px;
             flex: 1;
         }
 
         .config-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 12px;
-            background-color: #F5F5F5;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background-color: #F0E6D8;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
-            font-weight: 700;
+            font-size: 16px;
+            font-weight: 600;
             flex-shrink: 0;
+            color: #5C5046;
         }
 
         .config-item.active .config-icon {
-            background-color: #000000;
+            background-color: #D26B5A;
             color: #FFFFFF;
         }
 
@@ -633,12 +642,13 @@
 
         .config-name {
             font-size: 15px;
-            font-weight: 600;
+            font-weight: 500;
+            color: #1F1A17;
         }
 
         .config-model {
             font-size: 12px;
-            color: #999999;
+            color: #8B7668;
         }
 
         .config-right {
@@ -648,28 +658,29 @@
 
         .config-section-title {
             font-size: 16px;
-            font-weight: 700;
-            margin-bottom: 20px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid #E5E5E5;
+            font-weight: 600;
+            margin-bottom: 18px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #D0C4B6;
+            color: #1F1A17;
         }
 
         .btn-apply-env {
             width: 100%;
-            padding: 16px 20px;
+            padding: 14px 18px;
             margin-top: 20px;
-            background-color: #000000;
+            background-color: #D26B5A;
             color: #FFFFFF;
             border: none;
-            border-radius: 12px;
+            border-radius: 8px;
             font-size: 14px;
-            font-weight: 600;
+            font-weight: 500;
             cursor: pointer;
             transition: all 0.2s ease;
         }
 
         .btn-apply-env:hover {
-            background-color: #333333;
+            background-color: #B85A4A;
         }
 
         .btn-apply-env:active {
