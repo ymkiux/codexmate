@@ -785,12 +785,7 @@
                 </div>
                 <div class="config-group">
                     <label class="form-label">ANTHROPIC_MODEL</label>
-                    <select v-model="claudeConfigs[currentClaudeConfig].model" class="form-input" @change="saveCurrentClaudeConfig">
-                        <option value="glm-4.7">glm-4.7</option>
-                        <option value="claude-sonnet-4-20250514">claude-sonnet-4-20250514</option>
-                        <option value="claude-opus-4-20250514">claude-opus-4-20250514</option>
-                        <option value="claude-3-5-sonnet-20241022">claude-3-5-sonnet-20241022</option>
-                    </select>
+                    <input v-model="claudeConfigs[currentClaudeConfig].model" class="form-input" placeholder="例如: claude-sonnet-4-20250514" @blur="saveCurrentClaudeConfig">
                 </div>
                 <button class="btn-apply-env" @click="applyToSystemEnv">
                     应用到系统环境变量
@@ -914,12 +909,7 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">ANTHROPIC_MODEL</label>
-                    <select v-model="newClaudeConfig.model" class="form-input">
-                        <option value="glm-4.7">glm-4.7</option>
-                        <option value="claude-sonnet-4-20250514">claude-sonnet-4-20250514</option>
-                        <option value="claude-opus-4-20250514">claude-opus-4-20250514</option>
-                        <option value="claude-3-5-sonnet-20241022">claude-3-5-sonnet-20241022</option>
-                    </select>
+                    <input v-model="newClaudeConfig.model" class="form-input" placeholder="例如: claude-sonnet-4-20250514">
                 </div>
 
                 <div class="btn-group">
