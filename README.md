@@ -19,6 +19,7 @@ Codex Mate 是一个简洁的命令行工具，提供两大核心功能：
 - **Web 界面** - 内置简洁的可视化界面
 - **安全可靠** - API key 本地存储，脱敏显示
 - **轻量高效** - 仅依赖 Node.js 和一个 TOML 解析库
+- **文件压缩** - 基于 7-Zip 的多线程压缩/解压
 
 ## 安装
 
@@ -173,6 +174,47 @@ A: 点击"应用到系统环境变量"后，需要重启 Claude Code 才能使�
 
 ### Q: 如何卸载？
 A: 运行 `npm uninstall -g codexmate`
+
+## 附属功能
+
+### 多线程压缩/解压
+
+基于 7-Zip 的多线程文件压缩和解压功能。
+
+```bash
+# 压缩文件或文件夹（默认压缩级别 5）
+codexmate zip <文件或文件夹路径>
+
+# 指定压缩级别（0-9，0=仅存储，9=极限压缩）
+codexmate zip <路径> --max:9
+
+# 解压 zip 文件（默认解压到同级目录下同名文件夹）
+codexmate unzip <zip文件路径>
+
+# 解压到指定目录
+codexmate unzip <zip文件路径> <输出目录>
+```
+
+**使用示例：**
+
+```bash
+# 压缩项目文件夹
+codexmate zip ./my-project
+
+# 极限压缩
+codexmate zip ./my-project --max:9
+
+# 快速压缩（仅存储）
+codexmate zip ./large-folder --max:0
+
+# 解压文件
+codexmate unzip ./my-project.zip
+
+# 解压到指定位置
+codexmate unzip ./backup.zip D:/restored
+```
+
+**注意：** 需要系统安装 [7-Zip](https://www.7-zip.org/)。
 
 ## 技术栈
 
