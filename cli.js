@@ -320,6 +320,69 @@ function cmdDelete(name, silent = false) {
     }
 }
 
+// 更新提供商
+function cmdUpdate(name, baseUrl, apiKey, silent = false) {
+    if (!name) {
+        if (!silent) console.error('错误: 提供商名称必填');
+        throw new Error('提供商名称必填');
+    }
+
+    const config = readConfig();
+    if (!config.model_providers || !config.model_providers[name]) {
+        if (!silent) console.error('错误: 提供商不存在:', name);
+        throw new Error('提供商不存在');
+    }
+
+    const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
+    const safeName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const sectionRegex = new RegExp(`\\[\\s*model_providers\\s*\\.\\s*${safeName}\\s*\\]`);
+    const match = content.match(sectionRegex);
+    if (!match) {
+        if (!silent) console.error('错误: 无法找到提供商配置块');
+        throw new Error('无法找到提供商配置块');
+    }
+
+    const startIdx = match.index;
+    const rest = content.slice(startIdx + match[0].length);
+    const nextIdx = rest.indexOf('[');
+    const endIdx = nextIdx === -1 ? content.length : (startIdx + match[0].length + nextIdx);
+
+    // 提取该提供商的配置块
+    const providerBlock = content.slice(startIdx, endIdx);
+
+    // 替换 base_url
+    let updatedBlock = providerBlock;
+    if (baseUrl) {
+        updatedBlock = updatedBlock.replace(
+            /^(base_url\s*=\s*)(["']).*?\2/m,
+            `$1$2${baseUrl}$2`
+        );
+    }
+
+    // 替换 preferred_auth_method (API Key)
+    if (apiKey !== undefined) {
+        updatedBlock = updatedBlock.replace(
+            /^(preferred_auth_method\s*=\s*)(["']).*?\2/m,
+            `$1$2${apiKey}$2`
+        );
+    }
+
+    // 组合新的内容
+    const newContent = content.slice(0, startIdx) + updatedBlock + content.slice(endIdx);
+    writeConfig(newContent.trim());
+
+    // 如果更新了 API Key 且该提供商是当前激活的，同步更新 auth.json
+    const currentProvider = config.model_provider;
+    if (apiKey !== undefined && name === currentProvider) {
+        updateAuthJson(apiKey);
+    }
+
+    if (!silent) {
+        console.log('✓ 已更新提供商:', name);
+        console.log();
+    }
+}
+
 // 添加模型
 function cmdAddModel(modelName, silent = false) {
     if (!modelName) {
@@ -617,7 +680,9 @@ function cmdStart() {
                             result = {
                                 providers: Object.entries(providers).map(([name, p]) => ({
                                     name,
+                                    url: p.base_url || '',
                                     key: maskKey(p.preferred_auth_method || ''),
+                                    hasKey: !!(p.preferred_auth_method && p.preferred_auth_method.trim()),
                                     current: name === current
                                 }))
                             };
@@ -639,6 +704,10 @@ function cmdStart() {
                             break;
                         case 'delete':
                             cmdDelete(params.name, true);
+                            result = { success: true };
+                            break;
+                        case 'update':
+                            cmdUpdate(params.name, params.url, params.key, true);
                             result = { success: true };
                             break;
                         case 'add-model':
