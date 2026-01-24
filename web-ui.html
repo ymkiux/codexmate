@@ -6,6 +6,91 @@
     <title>Codex Mate</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
+        /* ============================================
+           设计系统 - Design Tokens
+           ============================================ */
+        :root {
+            /* 色彩系统 */
+            --color-brand: #D26B5A;
+            --color-brand-dark: #B85A4A;
+            --color-brand-light: rgba(210, 107, 90, 0.08);
+            --color-brand-subtle: rgba(210, 107, 90, 0.12);
+
+            --color-bg: #F7F1E8;
+            --color-surface: #FFFFFF;
+            --color-surface-alt: #FAFAFA;
+            --color-text-primary: #1F1A17;
+            --color-text-secondary: #5C5046;
+            --color-text-tertiary: #8B7668;
+            --color-border: #D0C4B6;
+
+            --color-success: #5A8B6A;
+            --color-error: #C84A3A;
+
+            /* 字体系统 */
+            --font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+
+            --font-size-display: 48px;
+            --font-size-title: 17px;
+            --font-size-body: 15px;
+            --font-size-secondary: 13px;
+            --font-size-caption: 11px;
+
+            --font-weight-display: 600;
+            --font-weight-title: 600;
+            --font-weight-body: 400;
+            --font-weight-secondary: 500;
+            --font-weight-caption: 500;
+
+            --line-height-tight: 1.15;
+            --line-height-normal: 1.4;
+
+            /* 间距系统 */
+            --spacing-xs: 8px;
+            --spacing-sm: 16px;
+            --spacing-md: 24px;
+            --spacing-lg: 40px;
+            --spacing-xl: 64px;
+
+            /* 圆角系统 */
+            --radius-sm: 8px;
+            --radius-lg: 12px;
+            --radius-full: 50px;
+
+            /* 阴影系统 - 多层叠加提升真实感 */
+            --shadow-subtle:
+                0 1px 2px rgba(31, 26, 23, 0.04),
+                0 1px 3px rgba(31, 26, 23, 0.02);
+            --shadow-card:
+                0 1px 3px rgba(31, 26, 23, 0.04),
+                0 4px 12px rgba(31, 26, 23, 0.03);
+            --shadow-card-hover:
+                0 2px 4px rgba(31, 26, 23, 0.04),
+                0 8px 20px rgba(31, 26, 23, 0.06);
+            --shadow-raised:
+                0 4px 12px rgba(31, 26, 23, 0.06),
+                0 12px 32px rgba(31, 26, 23, 0.04);
+            --shadow-modal:
+                0 8px 24px rgba(31, 26, 23, 0.08),
+                0 24px 64px rgba(31, 26, 23, 0.06);
+            --shadow-input-focus:
+                0 0 0 3px var(--color-brand-light),
+                0 1px 3px rgba(31, 26, 23, 0.04);
+
+            /* 动画 - 更细腻的曲线 */
+            --transition-instant: 100ms;
+            --transition-fast: 150ms;
+            --transition-normal: 250ms;
+            --transition-slow: 350ms;
+            --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-spring-soft: cubic-bezier(0.25, 1, 0.5, 1);
+            --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+            --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
+        }
+
+        /* ============================================
+           基础重置
+           ============================================ */
         * {
             margin: 0;
             padding: 0;
@@ -13,395 +98,581 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', Arial, sans-serif;
-            background-color: #F7F1E8;
-            color: #1F1A17;
+            font-family: var(--font-family);
+            background-color: var(--color-bg);
+            color: var(--color-text-primary);
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            padding: 40px 20px;
+            padding: var(--spacing-lg) var(--spacing-md);
             -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
+        /* ============================================
+           容器
+           ============================================ */
         .container {
             width: 100%;
-            max-width: 580px;
+            max-width: 520px;
         }
 
-        /* 主标题 */
+        /* ============================================
+           主标题
+           ============================================ */
         .main-title {
-            font-size: 52px;
-            font-weight: 600;
-            line-height: 1.15;
-            margin-bottom: 32px;
-            letter-spacing: -0.01em;
+            font-size: var(--font-size-display);
+            font-weight: var(--font-weight-display);
+            line-height: var(--line-height-tight);
+            letter-spacing: -0.03em;
+            margin-bottom: 12px;
+            color: var(--color-text-primary);
+            background: linear-gradient(135deg, var(--color-text-primary) 0%, rgba(31, 26, 23, 0.85) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
         .main-title .accent {
-            color: #D26B5A;
+            color: var(--color-brand);
+            -webkit-text-fill-color: var(--color-brand);
+            position: relative;
         }
 
-        /* 当前状态卡片 */
-        .status-cards {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-            margin-bottom: 28px;
+        /* ============================================
+           模式切换器 - Segmented Control
+           ============================================ */
+        .segmented-control {
+            display: flex;
+            background: linear-gradient(to bottom, var(--color-bg) 0%, rgba(247, 241, 232, 0.8) 100%);
+            border-radius: var(--radius-sm);
+            padding: 4px;
+            margin-bottom: 12px;
+            position: relative;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.04);
         }
 
-        .status-card {
-            background-color: #EBDCCD;
-            border-radius: 8px;
-            padding: 20px;
+        .segment {
+            flex: 1;
+            padding: 10px 16px;
+            border: none;
+            background: transparent;
+            font-size: var(--font-size-body);
+            font-weight: var(--font-weight-secondary);
+            color: var(--color-text-secondary);
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all var(--transition-normal) var(--ease-spring);
+            position: relative;
+            z-index: 2;
+            letter-spacing: -0.01em;
+        }
+
+        .segment:hover {
+            color: var(--color-text-primary);
+        }
+
+        .segment.active {
+            color: var(--color-text-primary);
+            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.9) 100%);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        }
+
+        /* ============================================
+           卡片列表
+           ============================================ */
+        .card-list {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 12px;
+            margin-bottom: 12px;
         }
 
-        .status-label {
-            font-size: 12px;
-            font-weight: 500;
-            color: #5C5046;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
+        /* ============================================
+           卡片
+           ============================================ */
+        .card {
+            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.95) 100%);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-sm);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            transition:
+                transform var(--transition-normal) var(--ease-spring),
+                box-shadow var(--transition-normal) var(--ease-spring),
+                background-color var(--transition-fast) var(--ease-smooth);
+            box-shadow: var(--shadow-card);
+            user-select: none;
+            will-change: transform;
+            border: 1px solid rgba(255, 255, 255, 0.6);
         }
 
-        .status-value {
-            font-size: 16px;
-            font-weight: 600;
-            color: #1F1A17;
+        .card:hover {
+            transform: translateY(-2px) scale(1.005);
+            box-shadow: var(--shadow-card-hover);
+        }
+
+        .card:active {
+            transform: translateY(0) scale(0.995);
+            transition: transform var(--transition-instant) var(--ease-smooth);
+        }
+
+        .card.active {
+            background-color: var(--color-brand-light);
+        }
+
+        .card.active .card-icon {
+            transform: scale(1.05);
+        }
+
+        .card-leading {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            flex: 1;
+            min-width: 0;
+        }
+
+        .card-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-sm);
+            background: linear-gradient(135deg, var(--color-bg) 0%, rgba(247, 241, 232, 0.8) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: var(--font-size-title);
+            font-weight: var(--font-weight-title);
+            color: var(--color-text-secondary);
+            flex-shrink: 0;
+            transition: all var(--transition-normal) var(--ease-spring-soft);
+            box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.5);
+        }
+
+        .card.active .card-icon {
+            background: linear-gradient(135deg, var(--color-brand) 0%, var(--color-brand-dark) 100%);
+            color: white;
+            box-shadow: 0 2px 8px rgba(210, 107, 90, 0.3);
+        }
+
+        .card-content {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+
+        .card-title {
+            font-size: var(--font-size-body);
+            font-weight: var(--font-weight-secondary);
+            color: var(--color-text-primary);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            letter-spacing: -0.01em;
         }
 
-        /* 模型选择器 */
-        .model-selector {
-            background-color: #EBDCCD;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 28px;
+        .card-subtitle {
+            font-size: var(--font-size-secondary);
+            color: var(--color-text-tertiary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            opacity: 0.8;
+        }
+
+        .card-trailing {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+        }
+
+        /* 卡片操作按钮 - hover 显示 */
+        .card-actions {
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            transform: translateX(4px);
+            transition: all var(--transition-normal) var(--ease-spring);
+        }
+
+        .card:hover .card-actions {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .card-action-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: var(--radius-sm);
+            border: none;
+            background: transparent;
+            color: var(--color-text-tertiary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition-fast) var(--ease-spring);
+        }
+
+        .card-action-btn:hover {
+            background: linear-gradient(135deg, var(--color-bg) 0%, rgba(247, 241, 232, 0.8) 100%);
+            color: var(--color-text-secondary);
+            transform: scale(1.08);
+        }
+
+        .card-action-btn.delete:hover {
+            background: linear-gradient(135deg, rgba(200, 74, 58, 0.1) 0%, rgba(200, 74, 58, 0.05) 100%);
+            color: var(--color-error);
+        }
+
+        .card-action-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* ============================================
+           状态徽章
+           ============================================ */
+        .pill {
+            padding: 5px 11px;
+            border-radius: var(--radius-full);
+            font-size: var(--font-size-caption);
+            font-weight: var(--font-weight-caption);
+            background-color: var(--color-bg);
+            color: var(--color-text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            transition: all var(--transition-fast) var(--ease-smooth);
+            box-shadow: inset 0 0.5px 1px rgba(0, 0, 0, 0.04);
+        }
+
+        .pill.configured {
+            background: linear-gradient(135deg, rgba(90, 139, 106, 0.15) 0%, rgba(90, 139, 106, 0.08) 100%);
+            color: var(--color-success);
+            box-shadow: inset 0 0.5px 1px rgba(90, 139, 106, 0.2);
+        }
+
+        .pill.empty {
+            background: linear-gradient(135deg, rgba(200, 74, 58, 0.1) 0%, rgba(200, 74, 58, 0.05) 100%);
+            color: var(--color-error);
+            box-shadow: inset 0 0.5px 1px rgba(200, 74, 58, 0.15);
+        }
+
+        /* ============================================
+           图标 - SVG 优化
+           ============================================ */
+        .icon {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .icon-chevron-right {
+            color: var(--color-text-tertiary);
+            opacity: 0.5;
+        }
+
+        /* ============================================
+           选择器 - 用于模型选择
+           ============================================ */
+        .selector-section {
+            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.8) 100%);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-sm);
+            margin-bottom: 12px;
+            box-shadow: var(--shadow-card);
+            border: 1px solid rgba(255, 255, 255, 0.5);
         }
 
         .selector-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 14px;
+            margin-bottom: var(--spacing-xs);
         }
 
         .selector-title {
-            font-size: 12px;
-            font-weight: 500;
-            color: #5C5046;
+            font-size: var(--font-size-secondary);
+            font-weight: var(--font-weight-secondary);
+            color: var(--color-text-tertiary);
             text-transform: uppercase;
-            letter-spacing: 0.04em;
+            letter-spacing: 0.06em;
+            opacity: 0.8;
         }
 
         .selector-actions {
             display: flex;
-            gap: 8px;
+            gap: var(--spacing-xs);
         }
 
         .btn-icon {
             width: 28px;
             height: 28px;
-            border-radius: 6px;
+            border-radius: var(--radius-sm);
             border: none;
-            background: #D26B5A;
+            background: linear-gradient(135deg, var(--color-brand) 0%, var(--color-brand-dark) 100%);
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
-            cursor: pointer;
-            font-size: 14px;
-            color: #FFFFFF;
-            transition: all 0.2s ease;
+            transition: all var(--transition-fast) var(--ease-spring);
+            box-shadow: 0 2px 4px rgba(210, 107, 90, 0.2);
         }
 
         .btn-icon:hover {
-            background: #B85A4A;
+            transform: translateY(-1px) scale(1.05);
+            box-shadow: 0 4px 8px rgba(210, 107, 90, 0.25);
+        }
+
+        .btn-icon:active {
+            transform: translateY(0) scale(0.98);
         }
 
         .model-select {
             width: 100%;
-            padding: 14px 16px;
-            border: none;
-            border-radius: 6px;
-            font-size: 15px;
-            font-weight: 500;
-            background-color: #FFFFFF;
-            color: #1F1A17;
+            padding: 12px var(--spacing-sm);
+            padding-right: 40px;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            font-size: var(--font-size-body);
+            font-weight: var(--font-weight-body);
+            background-color: var(--color-surface-alt);
+            color: var(--color-text-primary);
             outline: none;
             cursor: pointer;
-            transition: all 0.2s ease;
             appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%231F1A17' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='none' stroke='%235C5046' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
-            background-position: right 16px center;
-            padding-right: 40px;
+            background-position: right 14px center;
+            background-size: 12px;
+            transition: all var(--transition-fast) var(--ease-smooth);
+        }
+
+        .model-select:hover {
+            border-color: var(--color-text-tertiary);
+            background-color: var(--color-surface);
         }
 
         .model-select:focus {
-            box-shadow: 0 0 0 2px #D26B5A;
+            background-color: var(--color-surface);
+            border-color: var(--color-brand);
+            box-shadow: var(--shadow-input-focus);
         }
 
-        /* 提供商列表 */
-        .provider-list {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .provider-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 16px 18px;
-            border-radius: 8px;
+        /* ============================================
+           按钮
+           ============================================ */
+        .btn-add {
+            width: 100%;
+            padding: 14px var(--spacing-sm);
+            border: 1.5px dashed rgba(208, 196, 182, 0.6);
+            border-radius: var(--radius-lg);
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.1) 100%);
+            font-size: var(--font-size-body);
+            font-weight: var(--font-weight-secondary);
+            color: var(--color-text-tertiary);
             cursor: pointer;
-            transition: all 0.2s ease;
-            background-color: #FFFFFF;
-        }
-
-        .provider-item:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 2px 8px rgba(31, 26, 23, 0.08);
-        }
-
-        .provider-item.active {
-            background-color: #EBDCCD;
-        }
-
-        .provider-item:active {
-            transform: scale(0.99);
-        }
-
-        .provider-left {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            flex: 1;
-            min-width: 0;
-        }
-
-        .provider-icon {
-            width: 36px;
-            height: 36px;
-            border-radius: 8px;
-            background-color: #F0E6D8;
+            transition: all var(--transition-normal) var(--ease-spring);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 16px;
-            font-weight: 600;
-            flex-shrink: 0;
-            color: #5C5046;
+            gap: var(--spacing-xs);
         }
 
-        .provider-item.active .provider-icon {
-            background-color: #D26B5A;
-            color: #FFFFFF;
-        }
-
-        .provider-name {
-            font-size: 15px;
-            font-weight: 500;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            color: #1F1A17;
-        }
-
-        .provider-right {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .api-key {
-            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-            font-size: 11px;
-            color: #5C5046;
-            background-color: #F0E6D8;
-            padding: 6px 10px;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .api-key:hover {
-            background-color: #D26B5A;
-            color: #FFFFFF;
-        }
-
-        .api-key input {
-            font-family: inherit;
-            font-size: inherit;
-            background-color: #FFFFFF;
-            border: 2px solid #D26B5A;
-            border-radius: 6px;
-            padding: 4px 8px;
-            width: 120px;
-            color: #1F1A17;
-            outline: none;
-        }
-
-        .btn-delete {
-            font-size: 12px;
-            font-weight: 500;
-            color: #8B7668;
-            padding: 4px 8px;
-            border-radius: 4px;
-            cursor: pointer;
-            opacity: 0;
-            transition: all 0.2s ease;
-        }
-
-        .provider-item:hover .btn-delete {
-            opacity: 1;
-        }
-
-        .btn-delete:hover {
-            background-color: #D26B5A;
-            color: #FFFFFF;
-        }
-
-        /* 添加按钮 */
-        .btn-add {
-            width: 100%;
-            padding: 16px 18px;
-            margin-top: 16px;
-            border: 2px dashed #D0C4B6;
-            border-radius: 8px;
-            background-color: transparent;
-            font-size: 14px;
-            font-weight: 500;
-            color: #8B7668;
-            cursor: pointer;
-            transition: all 0.2s ease;
+        .btn-add + .selector-section,
+        .selector-section + .btn-add,
+        .btn-add + .card-list,
+        .card-list + .btn-add {
+            margin-top: 12px;
         }
 
         .btn-add:hover {
-            border-color: #D26B5A;
-            color: #D26B5A;
+            border-color: var(--color-brand);
+            color: var(--color-brand);
+            background: linear-gradient(to bottom, rgba(210, 107, 90, 0.05) 0%, rgba(210, 107, 90, 0.02) 100%);
+            transform: translateY(-1px);
         }
 
-        /* 模态框 */
+        .btn-add:active {
+            transform: translateY(0) scale(0.99);
+        }
+
+        .btn-add .icon {
+            width: 18px;
+            height: 18px;
+            transition: transform var(--transition-normal) var(--ease-spring);
+        }
+
+        .btn-add:hover .icon {
+            transform: rotate(90deg);
+        }
+
+        /* ============================================
+           模态框
+           ============================================ */
         .modal-overlay {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: rgba(31, 26, 23, 0.4);
+            background: linear-gradient(to bottom, rgba(31, 26, 23, 0.3) 0%, rgba(31, 26, 23, 0.5) 100%);
             display: flex;
             justify-content: center;
             align-items: center;
             z-index: 100;
-            animation: fadeIn 0.2s ease;
+            backdrop-filter: blur(8px) saturate(180%);
+            -webkit-backdrop-filter: blur(8px) saturate(180%);
+            animation: fadeIn var(--transition-normal) var(--ease-out-expo);
         }
 
         .modal {
-            background-color: #FFFFFF;
+            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.98) 100%);
             width: 90%;
-            max-width: 420px;
-            border-radius: 12px;
-            padding: 28px;
-            box-shadow: 0 12px 40px rgba(31, 26, 23, 0.12);
-            animation: slideUp 0.3s ease;
+            max-width: 400px;
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-md);
+            box-shadow: var(--shadow-modal);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            animation: slideUp var(--transition-slow) var(--ease-spring);
         }
 
         .modal-title {
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 24px;
-            color: #1F1A17;
+            font-size: var(--font-size-title);
+            font-weight: var(--font-weight-title);
+            margin-bottom: var(--spacing-md);
+            color: var(--color-text-primary);
+            letter-spacing: -0.01em;
         }
 
         .form-group {
-            margin-bottom: 16px;
+            margin-bottom: var(--spacing-sm);
         }
 
         .form-label {
             display: block;
-            font-size: 12px;
-            font-weight: 500;
-            color: #5C5046;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            margin-bottom: 8px;
+            font-size: var(--font-size-secondary);
+            font-weight: var(--font-weight-secondary);
+            color: var(--color-text-secondary);
+            margin-bottom: 7px;
+            letter-spacing: 0.01em;
         }
 
         .form-input {
             width: 100%;
-            padding: 12px 14px;
-            border: 1px solid #D0C4B6;
-            border-radius: 6px;
-            font-size: 14px;
-            background-color: #FAFAFA;
+            padding: 13px var(--spacing-sm);
+            border: 1.5px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            font-size: var(--font-size-body);
+            background-color: var(--color-surface-alt);
+            color: var(--color-text-primary);
             outline: none;
-            transition: all 0.2s ease;
-            color: #1F1A17;
+            transition: all var(--transition-fast) var(--ease-spring);
+            font-family: var(--font-family);
+        }
+
+        .form-input:hover {
+            border-color: var(--color-text-tertiary);
         }
 
         .form-input:focus {
-            border-color: #D26B5A;
-            background-color: #FFFFFF;
-            box-shadow: 0 0 0 2px rgba(210, 107, 90, 0.15);
+            border-color: var(--color-brand);
+            background-color: var(--color-surface);
+            box-shadow: var(--shadow-input-focus);
         }
 
         .form-input::placeholder {
-            color: #A89888;
+            color: var(--color-text-tertiary);
+            opacity: 0.7;
+        }
+
+        .form-input:disabled,
+        .form-input[readonly] {
+            background: linear-gradient(to right, var(--color-bg) 0%, rgba(247, 241, 232, 0.5) 100%);
+            color: var(--color-text-tertiary);
+            cursor: not-allowed;
+            border-color: transparent;
+        }
+
+        .form-hint {
+            font-size: var(--font-size-caption);
+            color: var(--color-text-tertiary);
+            margin-top: 5px;
+            opacity: 0.8;
         }
 
         .btn-group {
             display: flex;
-            gap: 12px;
-            margin-top: 24px;
+            gap: var(--spacing-sm);
+            margin-top: var(--spacing-md);
         }
 
         .btn {
             flex: 1;
-            padding: 14px 16px;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 500;
+            padding: 14px var(--spacing-sm);
+            border-radius: var(--radius-sm);
+            font-size: var(--font-size-body);
+            font-weight: var(--font-weight-secondary);
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all var(--transition-fast) var(--ease-spring);
             border: none;
         }
 
         .btn:active {
-            transform: scale(0.98);
+            transform: scale(0.97);
         }
 
         .btn-cancel {
-            background-color: #EBDCCD;
-            color: #1F1A17;
+            background: linear-gradient(to bottom, var(--color-bg) 0%, rgba(247, 241, 232, 0.8) 100%);
+            color: var(--color-text-primary);
+            border: 1px solid var(--color-border);
         }
 
         .btn-cancel:hover {
-            background-color: #D0C4B6;
+            background: linear-gradient(to bottom, var(--color-border) 0%, rgba(208, 196, 182, 0.5) 100%);
         }
 
         .btn-confirm {
-            background-color: #D26B5A;
-            color: #FFFFFF;
+            background: linear-gradient(135deg, var(--color-brand) 0%, var(--color-brand-dark) 100%);
+            color: white;
+            box-shadow: 0 2px 4px rgba(210, 107, 90, 0.2);
         }
 
         .btn-confirm:hover {
-            background-color: #B85A4A;
+            box-shadow: 0 4px 8px rgba(210, 107, 90, 0.25);
+            filter: brightness(1.05);
         }
 
-        /* 模型列表 */
+        .btn-confirm.secondary {
+            background: linear-gradient(135deg, var(--color-success) 0%, rgba(90, 139, 106, 0.85) 100%);
+            box-shadow: 0 2px 4px rgba(90, 139, 106, 0.2);
+        }
+
+        .btn-confirm.secondary:hover {
+            box-shadow: 0 4px 8px rgba(90, 139, 106, 0.25);
+            filter: brightness(1.05);
+        }
+
+        /* ============================================
+           模型列表
+           ============================================ */
         .model-list {
             max-height: 200px;
             overflow-y: auto;
-            border: 1px solid #D0C4B6;
-            border-radius: 6px;
-            margin-bottom: 20px;
+            border: 1px solid rgba(208, 196, 182, 0.4);
+            border-radius: var(--radius-sm);
+            margin-bottom: var(--spacing-sm);
             scrollbar-width: none;
+            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.8) 100%);
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
         }
 
         .model-list::-webkit-scrollbar {
@@ -412,10 +683,12 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 10px 14px;
-            border-bottom: 1px solid #D0C4B6;
-            font-size: 13px;
-            color: #1F1A17;
+            padding: 11px var(--spacing-sm);
+            border-bottom: 1px solid rgba(208, 196, 182, 0.3);
+            font-size: var(--font-size-body);
+            color: var(--color-text-primary);
+            transition: all var(--transition-fast) var(--ease-spring);
+            letter-spacing: -0.005em;
         }
 
         .model-item:last-child {
@@ -423,282 +696,136 @@
         }
 
         .model-item:hover {
-            background-color: #F0E6D8;
+            background: linear-gradient(to right, rgba(247, 241, 232, 0.6) 0%, rgba(247, 241, 232, 0.3) 100%);
         }
 
         .btn-remove-model {
-            font-size: 12px;
-            font-weight: 500;
-            color: #8B7668;
+            font-size: var(--font-size-caption);
+            font-weight: var(--font-weight-caption);
+            color: var(--color-text-tertiary);
             cursor: pointer;
-            padding: 2px 6px;
-            border-radius: 4px;
+            padding: 5px 10px;
+            border-radius: var(--radius-full);
+            transition: all var(--transition-fast) var(--ease-spring);
+            background: transparent;
+            border: 1px solid rgba(139, 118, 104, 0.2);
+            letter-spacing: 0.03em;
         }
 
         .btn-remove-model:hover {
-            background-color: #D26B5A;
-            color: #FFFFFF;
+            background: linear-gradient(135deg, var(--color-error) 0%, rgba(200, 74, 58, 0.9) 100%);
+            color: white;
+            transform: scale(1.08);
+            box-shadow: 0 2px 6px rgba(200, 74, 58, 0.25);
+            border-color: transparent;
         }
 
-        /* Toast通知 */
+        /* ============================================
+           Toast - 顶部横幅
+           ============================================ */
         .toast {
             position: fixed;
-            bottom: 32px;
+            top: 16px;
             left: 50%;
             transform: translateX(-50%);
-            background-color: #1F1A17;
-            color: #FFFFFF;
+            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.95) 100%);
             padding: 12px 24px;
-            border-radius: 50px;
-            font-size: 13px;
-            font-weight: 500;
-            box-shadow: 0 8px 24px rgba(31, 26, 23, 0.15);
+            border-radius: var(--radius-full);
+            box-shadow: var(--shadow-raised);
             z-index: 200;
-            animation: slideUp 0.3s ease;
+            animation: slideDown var(--transition-slow) var(--ease-spring);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+            font-size: var(--font-size-body);
+            font-weight: var(--font-weight-body);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
         }
 
         .toast.error {
-            background-color: #C84A3A;
+            border-left: 3px solid var(--color-error);
         }
 
         .toast.success {
-            background-color: #5A8B6A;
+            border-left: 3px solid var(--color-success);
         }
 
-        /* 加载/错误状态 */
+        /* ============================================
+           状态消息
+           ============================================ */
         .state-message {
             text-align: center;
-            padding: 60px 20px;
-            color: #8B7668;
-            font-size: 14px;
+            padding: 60px var(--spacing-md);
+            color: var(--color-text-tertiary);
+            font-size: var(--font-size-body);
+            opacity: 0.7;
+            letter-spacing: -0.005em;
         }
 
         .state-message.error {
-            color: #C84A3A;
+            color: var(--color-error);
         }
 
-        /* 配置模式切换器 */
-        .mode-switcher {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 28px;
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 48px var(--spacing-md);
+            color: var(--color-text-tertiary);
         }
 
-        .mode-btn {
-            flex: 1;
-            padding: 12px 16px;
-            border: 2px solid #D0C4B6;
-            border-radius: 8px;
-            background-color: #FFFFFF;
-            font-size: 14px;
-            font-weight: 500;
-            color: #5C5046;
-            cursor: pointer;
-            transition: all 0.2s ease;
+        .empty-state-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto var(--spacing-sm);
+            opacity: 0.3;
         }
 
-        .mode-btn:hover {
-            border-color: #D26B5A;
-            color: #D26B5A;
+        .empty-state-title {
+            font-size: var(--font-size-body);
+            font-weight: var(--font-weight-secondary);
+            color: var(--color-text-secondary);
+            margin-bottom: 4px;
         }
 
-        .mode-btn.active {
-            background-color: #D26B5A;
-            border-color: #D26B5A;
-            color: #FFFFFF;
+        .empty-state-subtitle {
+            font-size: var(--font-size-secondary);
+            color: var(--color-text-tertiary);
+            opacity: 0.8;
         }
 
-        /* Claude Code 配置 */
-        .claude-config {
-            display: flex;
-            flex-direction: column;
-            gap: 18px;
-        }
-
-        .config-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .config-group .form-input {
-            width: 100%;
-            padding: 12px 14px;
-            border: 1px solid #D0C4B6;
-            border-radius: 6px;
-            font-size: 14px;
-            background-color: #FAFAFA;
-            outline: none;
-            transition: all 0.2s ease;
-            color: #1F1A17;
-        }
-
-        .config-group .form-input:focus {
-            border-color: #D26B5A;
-            background-color: #FFFFFF;
-            box-shadow: 0 0 0 2px rgba(210, 107, 90, 0.15);
-        }
-
-        .config-group select.form-input {
-            cursor: pointer;
-        }
-
-        .form-hint {
-            font-size: 12px;
-            color: #8B7668;
-            margin-top: 4px;
-        }
-
-        .api-key-display {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 12px 14px;
-            border: 1px solid #D0C4B6;
-            border-radius: 6px;
-            background-color: #FAFAFA;
-            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-            font-size: 14px;
-            color: #1F1A17;
-        }
-
-        .btn-change-key {
-            padding: 6px 12px;
-            border: 1px solid #D0C4B6;
-            border-radius: 6px;
-            background: #FFFFFF;
-            font-size: 12px;
-            font-weight: 500;
-            color: #5C5046;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .btn-change-key:hover {
-            border-color: #D26B5A;
-            background: #D26B5A;
-            color: #FFFFFF;
-        }
-
-        /* Claude Code 配置列表 */
-        .claude-config-list {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            margin-bottom: 24px;
-        }
-
-        .config-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 16px 18px;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            background-color: #FFFFFF;
-        }
-
-        .config-item:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 2px 8px rgba(31, 26, 23, 0.08);
-        }
-
-        .config-item.active {
-            background-color: #EBDCCD;
-        }
-
-        .config-left {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            flex: 1;
-        }
-
-        .config-icon {
-            width: 36px;
-            height: 36px;
-            border-radius: 8px;
-            background-color: #F0E6D8;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 16px;
-            font-weight: 600;
-            flex-shrink: 0;
-            color: #5C5046;
-        }
-
-        .config-item.active .config-icon {
-            background-color: #D26B5A;
-            color: #FFFFFF;
-        }
-
-        .config-info {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .config-name {
-            font-size: 15px;
-            font-weight: 500;
-            color: #1F1A17;
-        }
-
-        .config-model {
-            font-size: 12px;
-            color: #8B7668;
-        }
-
-        .config-right {
-            display: flex;
-            align-items: center;
-        }
-
-        .config-section-title {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 18px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #D0C4B6;
-            color: #1F1A17;
-        }
-
-        .btn-apply-env {
-            width: 100%;
-            padding: 14px 18px;
-            margin-top: 20px;
-            background-color: #D26B5A;
-            color: #FFFFFF;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .btn-apply-env:hover {
-            background-color: #B85A4A;
-        }
-
-        .btn-apply-env:active {
-            transform: scale(0.98);
-        }
-
+        /* ============================================
+           动画
+           ============================================ */
         @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
         }
 
         @keyframes slideUp {
-            from { transform: translateY(20px); opacity: 0; }
+            from { transform: translateY(24px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
+        }
+
+        @keyframes slideDown {
+            from { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+            to { transform: translateX(-50%) translateY(0); opacity: 1; }
         }
 
         [v-cloak] {
             display: none !important;
+        }
+
+        /* 模式内容容器 */
+        .mode-content {
+            animation: fadeIn var(--transition-normal) var(--ease-spring);
+        }
+
+        /* 内容区域包裹器 - 稳定高度 */
+        .content-wrapper {
+            min-height: 300px;
+            position: relative;
         }
     </style>
 </head>
@@ -710,125 +837,131 @@
             <span class="accent">Mate.</span>
         </h1>
 
-        <!-- 配置模式切换 -->
-        <div class="mode-switcher">
-            <button :class="['mode-btn', { active: configMode === 'codex' }]" @click="switchConfigMode('codex')">
+        <!-- 模式切换器 -->
+        <div class="segmented-control">
+            <button :class="['segment', { active: configMode === 'codex' }]" @click="switchConfigMode('codex')">
                 Codex 配置
             </button>
-            <button :class="['mode-btn', { active: configMode === 'claude' }]" @click="switchConfigMode('claude')">
+            <button :class="['segment', { active: configMode === 'claude' }]" @click="switchConfigMode('claude')">
                 Claude Code 配置
             </button>
         </div>
 
-        <!-- Codex 配置模式 -->
-        <template v-if="configMode === 'codex'">
-            <!-- 当前状态卡片 -->
-            <div class="status-cards">
-                <div class="status-card">
-                    <div class="status-label">提供商</div>
-                    <div class="status-value" :title="currentProvider">{{ currentProvider || '未选择' }}</div>
-                </div>
-                <div class="status-card">
-                    <div class="status-label">模型</div>
-                    <div class="status-value" :title="currentModel">{{ currentModel }}</div>
-                </div>
-            </div>
+        <!-- 内容包裹器 - 稳定布局 -->
+        <div class="content-wrapper">
+            <!-- Codex 配置模式 -->
+            <div v-show="configMode === 'codex'" class="mode-content">
+                <!-- 添加提供商按钮 -->
+                <button class="btn-add" @click="showAddModal = true" v-if="!loading && !initError">
+                    <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10 4v12M4 10h12"/>
+                    </svg>
+                    添加提供商
+                </button>
 
-            <!-- 模型选择器 -->
-            <div class="model-selector">
-                <div class="selector-header">
-                    <span class="selector-title">选择模型</span>
-                    <div class="selector-actions">
-                        <button class="btn-icon" @click="showModelModal = true" title="添加模型">+</button>
-                        <button class="btn-icon" @click="showModelListModal = true" title="管理模型">≡</button>
-                    </div>
-                </div>
-                <select class="model-select" v-model="currentModel" @change="onModelChange">
-                    <option v-for="model in models" :key="model" :value="model">{{ model }}</option>
-                </select>
-            </div>
-        </template>
-
-        <!-- Claude Code 配置模式 -->
-        <template v-else-if="configMode === 'claude'">
-            <!-- Claude Code 配置列表 -->
-            <div class="claude-config-list">
-                <div v-for="(config, name) in claudeConfigs" :key="name"
-                     :class="['config-item', { active: currentClaudeConfig === name }]"
-                     @click="switchClaudeConfig(name)">
-                    <div class="config-left">
-                        <div class="config-icon">{{ name.charAt(0).toUpperCase() }}</div>
-                        <div class="config-info">
-                            <div class="config-name">{{ name }}</div>
-                            <div class="config-model">{{ config.model }}</div>
+                <!-- 模型选择器 -->
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">模型</span>
+                        <div class="selector-actions">
+                            <button class="btn-icon" @click="showModelModal = true" title="添加模型">+</button>
+                            <button class="btn-icon" @click="showModelListModal = true" title="管理模型">≡</button>
                         </div>
                     </div>
-                    <div class="config-right">
-                        <div class="btn-delete" @click.stop="deleteClaudeConfig(name)">删除</div>
+                    <select class="model-select" v-model="currentModel" @change="onModelChange">
+                        <option v-for="model in models" :key="model" :value="model">{{ model }}</option>
+                    </select>
+                </div>
+
+                <!-- 提供商列表 -->
+                <div v-if="!loading && !initError" class="card-list">
+                    <div v-for="provider in providersList" :key="provider.name"
+                         :class="['card', { active: currentProvider === provider.name }]"
+                         @click="switchProvider(provider.name)">
+                        <div class="card-leading">
+                            <div class="card-icon">{{ provider.name.charAt(0).toUpperCase() }}</div>
+                            <div class="card-content">
+                                <div class="card-title">{{ provider.name }}</div>
+                                <div class="card-subtitle">{{ provider.url || '未设置 URL' }}</div>
+                            </div>
+                        </div>
+                        <div class="card-trailing">
+                            <span :class="['pill', provider.hasKey ? 'configured' : 'empty']">
+                                {{ provider.hasKey ? '已配置' : '未配置' }}
+                            </span>
+                            <div class="card-actions" @click.stop>
+                                <button class="card-action-btn" @click="openEditModal(provider)" title="编辑">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                    </svg>
+                                </button>
+                                <button class="card-action-btn delete" @click="deleteProvider(provider.name)" title="删除">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M3 6h18"/>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- 当前配置详情 -->
-            <div v-if="currentClaudeConfig" class="claude-config">
-                <h3 class="config-section-title">{{ currentClaudeConfig }} - 配置详情</h3>
-                <div class="config-group">
-                    <label class="form-label">API Key</label>
-                    <div class="api-key-display">
-                        {{ displayApiKey(currentClaudeConfig) }}
-                        <button class="btn-change-key" @click="changeApiKey">更改</button>
-                    </div>
-                </div>
-                <div class="config-group">
-                    <label class="form-label">ANTHROPIC_BASE_URL</label>
-                    <input v-model="claudeConfigs[currentClaudeConfig].baseUrl" class="form-input" placeholder="https://open.bigmodel.cn/api/anthropic" @blur="saveCurrentClaudeConfig">
-                </div>
-                <div class="config-group">
-                    <label class="form-label">ANTHROPIC_MODEL</label>
-                    <input v-model="claudeConfigs[currentClaudeConfig].model" class="form-input" placeholder="例如: claude-sonnet-4-20250514" @blur="saveCurrentClaudeConfig">
-                </div>
-                <button class="btn-apply-env" @click="applyToSystemEnv">
-                    应用到系统环境变量
+            <!-- Claude Code 配置模式 -->
+            <div v-show="configMode === 'claude'" class="mode-content">
+                <!-- 添加提供商按钮 -->
+                <button class="btn-add" @click="showClaudeConfigModal = true" v-if="!loading && !initError">
+                    <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10 4v12M4 10h12"/>
+                    </svg>
+                    添加提供商
                 </button>
-            </div>
-        </template>
 
-        <!-- 加载状态 -->
-        <div v-if="loading" class="state-message">
-            加载配置中...
-        </div>
-
-        <!-- 错误状态 -->
-        <div v-else-if="initError" class="state-message error">
-            {{ initError }}
-        </div>
-
-        <!-- 提供商列表 (仅Codex模式) -->
-        <div v-else-if="configMode === 'codex'" class="provider-list">
-            <div v-for="provider in providersList" :key="provider.name"
-                 :class="['provider-item', { active: currentProvider === provider.name }]"
-                 @click="switchProvider(provider.name)">
-                <div class="provider-left">
-                    <div class="provider-icon">{{ provider.name.charAt(0).toUpperCase() }}</div>
-                    <span class="provider-name">{{ provider.name }}</span>
-                </div>
-                <div class="provider-right">
-                    <div class="api-key" :title="provider.key">
-                        {{ provider.key ? formatKey(provider.key) : '(无密钥)' }}
+                <div class="card-list">
+                    <div v-for="(config, name) in claudeConfigs" :key="name"
+                         :class="['card', { active: currentClaudeConfig === name }]"
+                         @click="applyClaudeConfig(name)">
+                        <div class="card-leading">
+                            <div class="card-icon">{{ name.charAt(0).toUpperCase() }}</div>
+                            <div class="card-content">
+                                <div class="card-title">{{ name }}</div>
+                                <div class="card-subtitle">{{ config.model || '未设置模型' }}</div>
+                            </div>
+                        </div>
+                        <div class="card-trailing">
+                            <span :class="['pill', config.hasKey ? 'configured' : 'empty']">
+                                {{ config.hasKey ? '已配置' : '未配置' }}
+                            </span>
+                            <div class="card-actions" @click.stop>
+                                <button class="card-action-btn" @click="openEditConfigModal(name)" title="编辑">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                    </svg>
+                                </button>
+                                <button class="card-action-btn delete" @click="deleteClaudeConfig(name)" title="删除">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M3 6h18"/>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                    <div class="btn-delete" @click.stop="deleteProvider(provider.name)">删除</div>
                 </div>
             </div>
+
+            <!-- 加载状态 -->
+            <div v-if="loading" class="state-message">
+                加载配置中...
+            </div>
+
+            <!-- 错误状态 -->
+            <div v-else-if="initError" class="state-message error">
+                {{ initError }}
+            </div>
         </div>
-
-        <!-- 添加按钮 -->
-        <button class="btn-add" @click="showAddModal = true" v-if="!loading && !initError && configMode === 'codex'">
-            + 添加提供商
-        </button>
-
-        <button class="btn-add" @click="showClaudeConfigModal = true" v-if="!loading && !initError && configMode === 'claude'">
-            + 添加配置方案
-        </button>
 
         <!-- 添加提供商模态框 -->
         <div v-if="showAddModal" class="modal-overlay" @click.self="showAddModal = false">
@@ -851,6 +984,32 @@
                 <div class="btn-group">
                     <button class="btn btn-cancel" @click="closeAddModal">取消</button>
                     <button class="btn btn-confirm" @click="addProvider">添加</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 编辑提供商模态框 -->
+        <div v-if="showEditModal" class="modal-overlay" @click.self="closeEditModal">
+            <div class="modal">
+                <div class="modal-title">编辑提供商</div>
+
+                <div class="form-group">
+                    <label class="form-label">名称</label>
+                    <input v-model="editingProvider.name" class="form-input" placeholder="提供商名称" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">API 端点</label>
+                    <input v-model="editingProvider.url" class="form-input" placeholder="https://api.example.com/v1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">认证密钥</label>
+                    <input v-model="editingProvider.key" class="form-input" placeholder="留空则保持不变">
+                    <div class="form-hint">留空表示不修改密钥</div>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-cancel" @click="closeEditModal">取消</button>
+                    <button class="btn btn-confirm" @click="updateProvider">保存</button>
                 </div>
             </div>
         </div>
@@ -893,7 +1052,7 @@
         <!-- 添加Claude配置模态框 -->
         <div v-if="showClaudeConfigModal" class="modal-overlay" @click.self="showClaudeConfigModal = false">
             <div class="modal">
-                <div class="modal-title">添加Claude Code配置</div>
+                <div class="modal-title">添加 Claude Code 配置</div>
 
                 <div class="form-group">
                     <label class="form-label">配置名称</label>
@@ -904,17 +1063,47 @@
                     <input v-model="newClaudeConfig.apiKey" class="form-input" placeholder="sk-ant-...">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">ANTHROPIC_BASE_URL</label>
+                    <label class="form-label">Base URL</label>
                     <input v-model="newClaudeConfig.baseUrl" class="form-input" placeholder="https://open.bigmodel.cn/api/anthropic">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">ANTHROPIC_MODEL</label>
+                    <label class="form-label">模型</label>
                     <input v-model="newClaudeConfig.model" class="form-input" placeholder="例如: claude-sonnet-4-20250514">
                 </div>
 
                 <div class="btn-group">
                     <button class="btn btn-cancel" @click="closeClaudeConfigModal">取消</button>
                     <button class="btn btn-confirm" @click="addClaudeConfig">添加</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 编辑Claude配置模态框 -->
+        <div v-if="showEditConfigModal" class="modal-overlay" @click.self="closeEditConfigModal">
+            <div class="modal">
+                <div class="modal-title">编辑 Claude Code 配置</div>
+
+                <div class="form-group">
+                    <label class="form-label">配置名称</label>
+                    <input v-model="editingConfig.name" class="form-input" placeholder="配置名称" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">API Key</label>
+                    <input v-model="editingConfig.apiKey" class="form-input" placeholder="sk-ant-...">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Base URL</label>
+                    <input v-model="editingConfig.baseUrl" class="form-input" placeholder="https://open.bigmodel.cn/api/anthropic">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">模型</label>
+                    <input v-model="editingConfig.model" class="form-input" placeholder="例如: claude-sonnet-4-20250514">
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-cancel" @click="closeEditConfigModal">取消</button>
+                    <button class="btn btn-confirm" @click="updateConfig">保存</button>
+                    <button class="btn btn-confirm secondary" @click="saveAndApplyConfig">保存并应用</button>
                 </div>
             </div>
         </div>
@@ -949,12 +1138,16 @@
                     message: '',
                     messageType: '',
                     showAddModal: false,
+                    showEditModal: false,
                     showModelModal: false,
                     showModelListModal: false,
                     showClaudeConfigModal: false,
+                    showEditConfigModal: false,
                     newProvider: { name: '', url: '', key: '' },
+                    editingProvider: { name: '', url: '', key: '' },
                     newModelName: '',
                     currentClaudeConfig: '',
+                    editingConfig: { name: '', apiKey: '', baseUrl: '', model: '' },
                     claudeConfigs: {
                         '智谱GLM': {
                             apiKey: '',
@@ -972,19 +1165,16 @@
                 }
             },
             mounted() {
-                // 从 localStorage 加载 Claude 配置
                 const savedConfigs = localStorage.getItem('claudeConfigs');
                 if (savedConfigs) {
                     try {
                         this.claudeConfigs = JSON.parse(savedConfigs);
-                        // 清理旧版本的脱敏 key（包含 **** 的无效 key）
                         for (const [name, config] of Object.entries(this.claudeConfigs)) {
                             if (config.apiKey && config.apiKey.includes('****')) {
                                 config.apiKey = '';
                                 config.hasKey = false;
                             }
                         }
-                        // 保存清理后的配置
                         localStorage.setItem('claudeConfigs', JSON.stringify(this.claudeConfigs));
 
                         const configNames = Object.keys(this.claudeConfigs);
@@ -1074,6 +1264,40 @@
                     }
                 },
 
+                openEditModal(provider) {
+                    this.editingProvider = {
+                        name: provider.name,
+                        url: provider.url || '',
+                        key: ''
+                    };
+                    this.showEditModal = true;
+                },
+
+                async updateProvider() {
+                    if (!this.editingProvider.url) {
+                        return this.showMessage('URL 必填', 'error');
+                    }
+
+                    const res = await api('update', {
+                        name: this.editingProvider.name,
+                        url: this.editingProvider.url,
+                        key: this.editingProvider.key || undefined
+                    });
+
+                    if (res.error) {
+                        this.showMessage(res.error, 'error');
+                    } else {
+                        this.showMessage('已更新', 'success');
+                        this.closeEditModal();
+                        await this.loadAll();
+                    }
+                },
+
+                closeEditModal() {
+                    this.showEditModal = false;
+                    this.editingProvider = { name: '', url: '', key: '' };
+                },
+
                 async addModel() {
                     if (!this.newModelName || !this.newModelName.trim()) {
                         return this.showMessage('请输入模型名称', 'error');
@@ -1111,58 +1335,75 @@
 
                 formatKey(key) {
                     if (!key) return '(未设置)';
-                    // 返回脱敏版本用于显示
                     if (key.length > 10) {
                         return key.substring(0, 3) + '****' + key.substring(key.length - 3);
                     }
                     return '****';
                 },
 
-                // 获取用于显示的脱敏 key（完整 key 仍保存在 config.apiKey 中）
                 displayApiKey(configName) {
                     const key = this.claudeConfigs[configName]?.apiKey;
                     return this.formatKey(key);
                 },
 
-                // Claude Code 配置方法
                 switchClaudeConfig(name) {
                     this.currentClaudeConfig = name;
                 },
 
-                changeApiKey() {
-                    // 使用 prompt 让用户输入新的 API Key
-                    const newKey = prompt('请输入新的 API Key:');
-                    if (newKey) {
-                        // 直接保存完整 key 到配置
-                        this.claudeConfigs[this.currentClaudeConfig].apiKey = newKey;
-                        this.claudeConfigs[this.currentClaudeConfig].hasKey = true;
-                        this.saveCurrentClaudeConfig();
-                        this.showMessage('API Key 已更新', 'success');
-                    }
-                },
-
-                saveCurrentClaudeConfig() {
-                    // 直接保存完整配置到 localStorage（包含完整的 apiKey）
+                saveClaudeConfigs() {
                     localStorage.setItem('claudeConfigs', JSON.stringify(this.claudeConfigs));
                 },
 
-                async applyToSystemEnv() {
-                    const config = this.claudeConfigs[this.currentClaudeConfig];
+                openEditConfigModal(name) {
+                    const config = this.claudeConfigs[name];
+                    this.editingConfig = {
+                        name: name,
+                        apiKey: config.apiKey || '',
+                        baseUrl: config.baseUrl || '',
+                        model: config.model || ''
+                    };
+                    this.showEditConfigModal = true;
+                },
 
-                    // 如果没有配置 API Key，提示用户输入
+                updateConfig() {
+                    const name = this.editingConfig.name;
+                    this.claudeConfigs[name] = {
+                        apiKey: this.editingConfig.apiKey,
+                        baseUrl: this.editingConfig.baseUrl,
+                        model: this.editingConfig.model,
+                        hasKey: !!this.editingConfig.apiKey
+                    };
+                    this.saveClaudeConfigs();
+                    this.showMessage('配置已更新', 'success');
+                    this.closeEditConfigModal();
+                },
+
+                closeEditConfigModal() {
+                    this.showEditConfigModal = false;
+                    this.editingConfig = { name: '', apiKey: '', baseUrl: '', model: '' };
+                },
+
+                async saveAndApplyConfig() {
+                    const name = this.editingConfig.name;
+                    this.claudeConfigs[name] = {
+                        apiKey: this.editingConfig.apiKey,
+                        baseUrl: this.editingConfig.baseUrl,
+                        model: this.editingConfig.model,
+                        hasKey: !!this.editingConfig.apiKey
+                    };
+                    this.saveClaudeConfigs();
+
+                    const config = this.claudeConfigs[name];
                     if (!config.apiKey) {
-                        const inputKey = prompt('请输入 API Key（用于设置环境变量）:');
-                        if (!inputKey) return;
-                        config.apiKey = inputKey;
-                        this.saveCurrentClaudeConfig();
+                        return this.showMessage('请先输入 API Key', 'error');
                     }
 
                     const res = await api('apply-env', { config });
-
                     if (res.error) {
                         this.showMessage(res.error, 'error');
                     } else {
-                        this.showMessage('已应用到系统环境变量', 'success');
+                        this.showMessage('已保存并应用到系统环境变量', 'success');
+                        this.closeEditConfigModal();
                     }
                 },
 
@@ -1183,7 +1424,7 @@
                     };
 
                     this.currentClaudeConfig = name;
-                    this.saveCurrentClaudeConfig();
+                    this.saveClaudeConfigs();
                     this.showMessage('配置已添加', 'success');
                     this.closeClaudeConfigModal();
                 },
@@ -1193,12 +1434,30 @@
                         return this.showMessage('至少保留一个配置', 'error');
                     }
 
+                    if (!confirm(`确定删除配置 "${name}"?`)) return;
+
                     delete this.claudeConfigs[name];
                     if (this.currentClaudeConfig === name) {
                         this.currentClaudeConfig = Object.keys(this.claudeConfigs)[0];
                     }
-                    this.saveCurrentClaudeConfig();
+                    this.saveClaudeConfigs();
                     this.showMessage('配置已删除', 'success');
+                },
+
+                async applyClaudeConfig(name) {
+                    this.currentClaudeConfig = name;
+                    const config = this.claudeConfigs[name];
+
+                    if (!config.apiKey) {
+                        return this.showMessage('该配置未设置 API Key，请先编辑', 'error');
+                    }
+
+                    const res = await api('apply-env', { config });
+                    if (res.error) {
+                        this.showMessage(res.error, 'error');
+                    } else {
+                        this.showMessage(`已应用配置: ${name}`, 'success');
+                    }
                 },
 
                 closeClaudeConfigModal() {

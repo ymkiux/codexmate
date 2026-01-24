@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>测试 hover 效果</title>
+    <style>
+        .btn-delete {
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            opacity: 0;
+            transition: all 0.2s ease;
+            background: #eee;
+            color: #333;
+        }
+
+        .config-item {
+            padding: 20px;
+            background: #fff;
+            border: 1px solid #ccc;
+            margin: 10px 0;
+            cursor: pointer;
+        }
+
+        /* 关键样式：测试 hover 是否生效 */
+        .config-item:hover .btn-delete {
+            opacity: 1;
+            background: #D26B5A;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <h1>测试：鼠标悬停在下方卡片上，删除按钮应该出现</h1>
+
+    <div class="config-item">
+        <span>配置项 1</span>
+        <span class="btn-delete">删除</span>
+    </div>
+
+    <div class="config-item">
+        <span>配置项 2</span>
+        <span class="btn-delete">删除</span>
+    </div>
+
+    <p style="color: #666; font-size: 14px;">
+        预期行为：鼠标悬停在灰色框上时，右侧的"删除"按钮会显示出来
+    </p>
+</body>
+</html>
