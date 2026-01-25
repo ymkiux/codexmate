@@ -464,14 +464,20 @@ function applyToSystemEnv(config) {
                 ['ANTHROPIC_MODEL', config.model || 'glm-4.7']
             ];
 
+            const errors = [];
             for (const [key, value] of envVars) {
                 try {
-                    execSync(`setx ${key} "${value}"`, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
+                    // 转义值中的双引号，防止命令注入
+                    const safeValue = value.replace(/"/g, '""');
+                    execSync(`setx ${key} "${safeValue}"`, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
                 } catch (e) {
-                    // 静默处理错误
+                    errors.push(`${key}: ${e.message || '设置失败'}`);
                 }
             }
 
+            if (errors.length > 0) {
+                return { success: false, error: `部分环境变量设置失败:\n${errors.join('\n')}` };
+            }
             return { success: true };
         } else {
             return { success: false, error: '仅支持 Windows 系统' };
