@@ -1,4 +1,4 @@
-# Codex Mate
+﻿# Codex Mate
 
 > 轻量级 AI 工具配置助手，支持 Codex 提供商管理和 Claude Code 环境配置
 
@@ -107,6 +107,16 @@ codexmate start
   - `ANTHROPIC_MODEL`
   - `CLAUDE_CODE_USE_KEY`
 
+#### 会话浏览模式
+- 在同一 Web 页面查看 Codex 与 Claude Code 的本地会话列表
+- 支持按来源筛选（Codex / Claude / 全部）
+- 支持一键导出指定会话为 Markdown，便于提供给其他 AI 继续分析
+
+#### Codex 模板确认模式
+- Web 中的 Codex 配置改动默认进入 `config.toml` 模板编辑器
+- 仅在用户点击“确认应用模板”后才写入 `config.toml`
+- 不再通过前端一键操作直接改写 `config.toml`
+
 ## 配置文件
 
 配置文件位于 `~/.codex/` 目录：
@@ -115,6 +125,16 @@ codexmate start
 - `auth.json` - API 认证信息
 - `models.json` - 可用模型列表
 - `provider-current-models.json` - 提供商当前模型配置
+- `codexmate-init.json` - 首次初始化标记（用于避免重复重置）
+- `config.toml.codexmate-backup-*.bak` - 首次初始化时自动备份的旧配置（若存在）
+
+### 首次运行初始化说明
+
+- 首次运行 `codexmate` 时，如果检测到已有 `~/.codex/config.toml` 且不是 Codex Mate 管理的配置：
+  - 会先自动备份原文件为 `config.toml.codexmate-backup-时间戳.bak`
+  - 默认保留原 `config.toml` 不覆盖，并写入初始化标记
+- 仅在显式设置环境变量 `CODEXMATE_FORCE_RESET_EXISTING_CONFIG=1` 时，才会重建默认配置
+- 后续运行不会重复处理，避免影响已稳定使用的用户配置
 
 ## 使用示例
 
@@ -234,3 +254,8 @@ Apache-2.0 © [ymkiux](https://github.com/ymkiux)
 ---
 
 Made with [ymkiux](https://github.com/ymkiux)
+
+
+
+
+

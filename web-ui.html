@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -115,7 +115,7 @@
            ============================================ */
         .container {
             width: 100%;
-            max-width: 520px;
+            max-width: 1120px;
         }
 
         /* ============================================
@@ -362,6 +362,30 @@
             box-shadow: inset 0 0.5px 1px rgba(200, 74, 58, 0.15);
         }
 
+        .latency {
+            padding: 4px 10px;
+            border-radius: var(--radius-full);
+            font-size: var(--font-size-caption);
+            font-weight: var(--font-weight-caption);
+            background: var(--color-bg);
+            color: var(--color-text-tertiary);
+            letter-spacing: 0.02em;
+        }
+
+        .latency.ok {
+            color: var(--color-success);
+            background: rgba(90, 139, 106, 0.1);
+        }
+
+        .latency.error {
+            color: var(--color-error);
+            background: rgba(200, 74, 58, 0.08);
+        }
+
+        .card-action-btn.loading svg {
+            animation: spin 0.9s linear infinite;
+        }
+
         /* ============================================
            图标 - SVG 优化
            ============================================ */
@@ -467,6 +491,19 @@
             box-shadow: var(--shadow-input-focus);
         }
 
+        .config-template-hint {
+            margin-top: 8px;
+            margin-bottom: 10px;
+            font-size: var(--font-size-caption);
+            color: var(--color-text-tertiary);
+            line-height: 1.4;
+        }
+
+        .btn-template-editor {
+            width: 100%;
+            margin-top: 2px;
+        }
+
         /* ============================================
            按钮
            ============================================ */
@@ -515,6 +552,380 @@
             transform: rotate(90deg);
         }
 
+        .btn-tool {
+            padding: 12px var(--spacing-sm);
+            border-radius: var(--radius-sm);
+            border: 1px solid rgba(208, 196, 182, 0.6);
+            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.9) 100%);
+            font-size: var(--font-size-body);
+            font-weight: var(--font-weight-secondary);
+            color: var(--color-text-secondary);
+            cursor: pointer;
+            transition: all var(--transition-fast) var(--ease-spring);
+        }
+
+        .btn-tool:hover {
+            border-color: var(--color-brand);
+            color: var(--color-brand);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(210, 107, 90, 0.12);
+        }
+
+        .session-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--spacing-xs);
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .session-source-select {
+            flex: 1;
+            min-width: 180px;
+            padding: 10px 12px;
+            border-radius: var(--radius-sm);
+            border: 1px solid rgba(208, 196, 182, 0.6);
+            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.9) 100%);
+            color: var(--color-text-secondary);
+            font-size: var(--font-size-body);
+            font-family: var(--font-family);
+            outline: none;
+        }
+
+        .session-source-select:focus {
+            border-color: var(--color-brand);
+            box-shadow: var(--shadow-input-focus);
+        }
+
+        .session-hint {
+            font-size: var(--font-size-secondary);
+            color: var(--color-text-tertiary);
+            margin-bottom: 12px;
+            line-height: 1.45;
+        }
+
+        .session-card {
+            align-items: flex-start;
+            cursor: default;
+        }
+
+        .session-card:hover {
+            transform: none;
+            box-shadow: var(--shadow-card);
+        }
+
+        .session-card .card-leading {
+            align-items: flex-start;
+        }
+
+        .session-meta {
+            margin-top: 6px;
+            font-size: var(--font-size-caption);
+            color: var(--color-text-tertiary);
+            line-height: 1.4;
+            word-break: break-all;
+        }
+
+        .session-actions {
+            display: flex;
+            gap: var(--spacing-xs);
+            align-items: center;
+            margin-left: var(--spacing-sm);
+            flex-shrink: 0;
+        }
+
+        .session-source {
+            font-size: var(--font-size-caption);
+            color: var(--color-brand);
+            border: 1px solid rgba(210, 107, 90, 0.25);
+            border-radius: 999px;
+            padding: 2px 8px;
+            background: rgba(210, 107, 90, 0.08);
+            white-space: nowrap;
+        }
+
+        .btn-session-export {
+            border: 1px solid rgba(208, 196, 182, 0.6);
+            border-radius: var(--radius-sm);
+            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.9) 100%);
+            color: var(--color-text-secondary);
+            padding: 8px 12px;
+            font-size: var(--font-size-secondary);
+            font-weight: var(--font-weight-secondary);
+            cursor: pointer;
+            transition: all var(--transition-fast) var(--ease-spring);
+            white-space: nowrap;
+        }
+
+        .btn-session-export:hover {
+            border-color: var(--color-brand);
+            color: var(--color-brand);
+            transform: translateY(-1px);
+        }
+
+        .btn-session-export:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .session-empty {
+            padding: 28px var(--spacing-sm);
+            text-align: center;
+            border: 1px dashed rgba(208, 196, 182, 0.6);
+            border-radius: var(--radius-lg);
+            color: var(--color-text-tertiary);
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.12) 100%);
+        }
+
+        .session-layout {
+            display: grid;
+            grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+            gap: var(--spacing-sm);
+            align-items: start;
+            height: min(72vh, 760px);
+            min-height: 520px;
+        }
+
+        .session-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-xs);
+            position: sticky;
+            top: 12px;
+            height: 100%;
+            max-height: none;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-right: 4px;
+            min-width: 0;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(166, 149, 130, 0.85) transparent;
+        }
+
+        .session-list::-webkit-scrollbar,
+        .session-preview-body::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        .session-list::-webkit-scrollbar-track,
+        .session-preview-body::-webkit-scrollbar-track {
+            background: transparent;
+            border-radius: 999px;
+        }
+
+        .session-list::-webkit-scrollbar-thumb,
+        .session-preview-body::-webkit-scrollbar-thumb {
+            background: linear-gradient(to bottom, rgba(191, 174, 154, 0.95) 0%, rgba(160, 141, 121, 0.95) 100%);
+            border-radius: 999px;
+            border: 2px solid rgba(255, 255, 255, 0.9);
+        }
+
+        .session-list::-webkit-scrollbar-thumb:hover,
+        .session-preview-body::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(to bottom, rgba(175, 156, 136, 0.95) 0%, rgba(145, 126, 107, 0.95) 100%);
+        }
+
+        .session-item {
+            border: 1px solid rgba(208, 196, 182, 0.55);
+            border-radius: var(--radius-sm);
+            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.9) 100%);
+            padding: 10px 12px;
+            cursor: pointer;
+            transition: all var(--transition-fast) var(--ease-spring);
+            user-select: none;
+            min-width: 0;
+        }
+
+        .session-item:hover {
+            border-color: var(--color-brand);
+            transform: translateY(-1px);
+        }
+
+        .session-item:active {
+            transform: scale(0.99);
+        }
+
+        .session-item.active {
+            border-color: var(--color-brand);
+            background: linear-gradient(to bottom, rgba(210, 107, 90, 0.1) 0%, rgba(255, 255, 255, 0.98) 100%);
+            box-shadow: 0 6px 16px rgba(210, 107, 90, 0.12);
+        }
+
+        .session-item-title {
+            font-size: var(--font-size-body);
+            font-weight: var(--font-weight-secondary);
+            color: var(--color-text-primary);
+            line-height: 1.35;
+            margin-bottom: 4px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            word-break: break-word;
+        }
+
+        .session-item-sub {
+            font-size: var(--font-size-caption);
+            color: var(--color-text-tertiary);
+            line-height: 1.35;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .session-preview {
+            border: 1px solid rgba(208, 196, 182, 0.55);
+            border-radius: var(--radius-lg);
+            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.96) 100%);
+            box-shadow: var(--shadow-card);
+            min-height: 0;
+            max-height: none;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .session-preview-header {
+            padding: 12px var(--spacing-sm);
+            border-bottom: 1px solid rgba(208, 196, 182, 0.45);
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: var(--spacing-sm);
+        }
+
+        .session-preview-header > div:first-child {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .session-preview-title {
+            font-size: var(--font-size-body);
+            font-weight: var(--font-weight-title);
+            color: var(--color-text-primary);
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            word-break: break-word;
+        }
+
+        .session-preview-sub {
+            margin-top: 4px;
+            font-size: var(--font-size-caption);
+            color: var(--color-text-tertiary);
+            line-height: 1.35;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .session-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+            margin-left: 0;
+        }
+
+        .session-preview-body {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: var(--spacing-sm);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(166, 149, 130, 0.85) transparent;
+        }
+
+        .session-msg {
+            border-radius: 10px;
+            padding: 10px 12px;
+            border: 1px solid rgba(208, 196, 182, 0.45);
+            background: rgba(255, 255, 255, 0.75);
+        }
+
+        .session-msg.user {
+            border-color: rgba(210, 107, 90, 0.35);
+            background: rgba(210, 107, 90, 0.08);
+        }
+
+        .session-msg-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--spacing-xs);
+            margin-bottom: 6px;
+            font-size: var(--font-size-caption);
+            color: var(--color-text-tertiary);
+        }
+
+        .session-msg-role {
+            font-weight: var(--font-weight-secondary);
+            color: var(--color-text-secondary);
+        }
+
+        .session-msg-content {
+            font-size: var(--font-size-secondary);
+            line-height: 1.55;
+            color: var(--color-text-primary);
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .session-preview-empty {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--color-text-tertiary);
+            font-size: var(--font-size-secondary);
+            padding: var(--spacing-md);
+            text-align: center;
+        }
+
+        @media (max-width: 900px) {
+            .session-layout {
+                grid-template-columns: 1fr;
+                height: auto;
+                min-height: 0;
+            }
+
+            .session-list {
+                position: static;
+                max-height: 300px;
+                height: auto;
+            }
+
+            .session-preview {
+                min-height: 360px;
+                max-height: none;
+                height: auto;
+            }
+
+            .session-preview-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .session-actions {
+                justify-content: flex-start;
+            }
+        }
+
+        .btn[disabled] {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
         /* ============================================
            模态框
            ============================================ */
@@ -543,6 +954,10 @@
             box-shadow: var(--shadow-modal);
             border: 1px solid rgba(255, 255, 255, 0.8);
             animation: slideUp var(--transition-slow) var(--ease-spring);
+        }
+
+        .modal-wide {
+            max-width: 980px;
         }
 
         .modal-title {
@@ -592,6 +1007,24 @@
         .form-input::placeholder {
             color: var(--color-text-tertiary);
             opacity: 0.7;
+        }
+
+        .template-editor {
+            min-height: min(60vh, 520px);
+            max-height: min(65vh, 620px);
+            resize: vertical;
+            overflow: auto;
+            white-space: pre;
+            font-family: Consolas, 'SFMono-Regular', Menlo, Monaco, monospace;
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .template-editor-warning {
+            margin-top: 8px;
+            color: #8d5b31;
+            font-size: var(--font-size-caption);
+            line-height: 1.4;
         }
 
         .form-input:disabled,
@@ -813,6 +1246,11 @@
             to { transform: translateX(-50%) translateY(0); opacity: 1; }
         }
 
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
         [v-cloak] {
             display: none !important;
         }
@@ -845,6 +1283,9 @@
             <button :class="['segment', { active: configMode === 'claude' }]" @click="switchConfigMode('claude')">
                 Claude Code 配置
             </button>
+            <button :class="['segment', { active: configMode === 'sessions' }]" @click="switchConfigMode('sessions')">
+                会话浏览
+            </button>
         </div>
 
         <!-- 内容包裹器 - 稳定布局 -->
@@ -871,9 +1312,14 @@
                     <select class="model-select" v-model="currentModel" @change="onModelChange">
                         <option v-for="model in models" :key="model" :value="model">{{ model }}</option>
                     </select>
+                    <div class="config-template-hint">
+                        Codex 配置改动采用模板确认模式：请先编辑模板，再手动确认应用。
+                    </div>
+                    <button class="btn-tool btn-template-editor" @click="openConfigTemplateEditor" :disabled="loading || !!initError">
+                        打开 Config 模板编辑器
+                    </button>
                 </div>
 
-                <!-- 提供商列表 -->
                 <div v-if="!loading && !initError" class="card-list">
                     <div v-for="provider in providersList" :key="provider.name"
                          :class="['card', { active: currentProvider === provider.name }]"
@@ -889,7 +1335,15 @@
                             <span :class="['pill', provider.hasKey ? 'configured' : 'empty']">
                                 {{ provider.hasKey ? '已配置' : '未配置' }}
                             </span>
+                            <span v-if="speedResults[provider.name]" :class="['latency', speedResults[provider.name].ok ? 'ok' : 'error']">
+                                {{ formatLatency(speedResults[provider.name]) }}
+                            </span>
                             <div class="card-actions" @click.stop>
+                                <button class="card-action-btn" :class="{ loading: speedLoading[provider.name] }" @click="runSpeedTest(provider.name)" title="Speed Test">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M13 2L3 14h7l-1 8 12-14h-7l-1-6z"/>
+                                    </svg>
+                                </button>
                                 <button class="card-action-btn" @click="openEditModal(provider)" title="编辑">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -947,6 +1401,107 @@
                                     </svg>
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 会话浏览模式 -->
+            <div v-show="configMode === 'sessions'" class="mode-content">
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">会话来源</span>
+                    </div>
+                    <div class="session-toolbar">
+                        <select class="session-source-select" v-model="sessionFilterSource" @change="loadSessions">
+                            <option value="all">全部（Codex + Claude）</option>
+                            <option value="codex">仅 Codex</option>
+                            <option value="claude">仅 Claude Code</option>
+                        </select>
+                        <button class="btn-tool" @click="loadSessions" :disabled="sessionsLoading">
+                            {{ sessionsLoading ? '刷新中...' : '刷新会话' }}
+                        </button>
+                    </div>
+                    <div class="session-hint">
+                        左侧点击会话查看内容，右侧预览区可直接导出当前会话。
+                    </div>
+                </div>
+
+                <div v-if="sessionsLoading" class="state-message">
+                    会话加载中...
+                </div>
+
+                <div v-else-if="sessionsList.length === 0" class="session-empty">
+                    暂无可用会话记录
+                </div>
+
+                <div v-else class="session-layout">
+                    <div class="session-list">
+                        <div
+                            v-for="session in sessionsList"
+                            :key="session.source + '-' + session.sessionId + '-' + session.filePath"
+                            :class="['session-item', { active: activeSession && activeSession.filePath === session.filePath }]"
+                            @click="selectSession(session)">
+                            <div class="session-item-title">{{ session.title || session.sessionId }}</div>
+                            <div class="session-item-sub">{{ session.sourceLabel }} · {{ session.updatedAt || 'unknown time' }}</div>
+                            <div class="session-item-sub">{{ session.messageCount || 0 }} 条消息</div>
+                        </div>
+                    </div>
+
+                    <div class="session-preview">
+                        <template v-if="activeSession">
+                            <div class="session-preview-header">
+                                <div>
+                                    <div class="session-preview-title">{{ activeSession.title || activeSession.sessionId }}</div>
+                                    <div class="session-preview-sub">
+                                        {{ activeSession.sourceLabel }} · {{ activeSession.updatedAt || 'unknown time' }}
+                                    </div>
+                                    <div class="session-preview-sub" v-if="activeSession.cwd">{{ activeSession.cwd }}</div>
+                                </div>
+                                <div class="session-actions">
+                                    <button class="btn-tool" @click="loadActiveSessionDetail" :disabled="sessionDetailLoading || !activeSession">
+                                        {{ sessionDetailLoading ? '加载中...' : '刷新内容' }}
+                                    </button>
+                                    <button
+                                        class="btn-session-export"
+                                        @click="exportSession(activeSession)"
+                                        :disabled="!activeSession || sessionExporting[getSessionExportKey(activeSession)]">
+                                        {{ (activeSession && sessionExporting[getSessionExportKey(activeSession)]) ? '导出中...' : '导出记录' }}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div v-if="sessionDetailLoading" class="session-preview-empty">
+                                正在加载会话内容...
+                            </div>
+
+                            <div v-else-if="activeSessionDetailError" class="session-preview-empty">
+                                {{ activeSessionDetailError }}
+                            </div>
+
+                            <div v-else-if="!activeSessionMessages.length" class="session-preview-empty">
+                                当前会话暂无可展示消息
+                            </div>
+
+                            <div v-else class="session-preview-body">
+                                <div v-if="activeSessionDetailClipped" class="session-item-sub">
+                                    仅展示最近 {{ activeSessionMessages.length }} 条消息，完整内容可直接导出。
+                                </div>
+                                <div
+                                    v-for="(msg, idx) in activeSessionMessages"
+                                    :key="idx + '-' + (msg.timestamp || '')"
+                                    :class="['session-msg', msg.role === 'user' ? 'user' : 'assistant']">
+                                    <div class="session-msg-header">
+                                        <span class="session-msg-role">{{ msg.role === 'user' ? 'User' : 'Assistant' }}</span>
+                                        <span>{{ msg.timestamp || '' }}</span>
+                                    </div>
+                                    <div class="session-msg-content">{{ msg.text || '' }}</div>
+                                </div>
+                            </div>
+                        </template>
+
+                        <div v-else class="session-preview-empty">
+                            请先在左侧选择一个会话
                         </div>
                     </div>
                 </div>
@@ -1108,7 +1663,34 @@
             </div>
         </div>
 
+        <div v-if="showConfigTemplateModal" class="modal-overlay" @click.self="closeConfigTemplateModal">
+            <div class="modal modal-wide">
+                <div class="modal-title">Config 模板编辑器（手动确认应用）</div>
+
+                <div class="form-group">
+                    <label class="form-label">config.toml 模板</label>
+                    <textarea
+                        v-model="configTemplateContent"
+                        class="form-input template-editor"
+                        spellcheck="false"
+                        placeholder="在这里编辑 config.toml 模板内容"></textarea>
+                    <div class="template-editor-warning">
+                        工具不会自动改动 `config.toml`；只有点击“确认应用模板”后才写入。
+                    </div>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-cancel" @click="closeConfigTemplateModal">取消</button>
+                    <button class="btn btn-confirm" @click="applyConfigTemplate" :disabled="configTemplateApplying">
+                        {{ configTemplateApplying ? '应用中...' : '确认应用模板' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Toast通知 -->
+        
+        <!-- Toast -->
         <div v-if="message" :class="['toast', messageType]">{{ message }}</div>
     </div>
 
@@ -1143,6 +1725,21 @@
                     showModelListModal: false,
                     showClaudeConfigModal: false,
                     showEditConfigModal: false,
+                    showConfigTemplateModal: false,
+                    configTemplateContent: '',
+                    configTemplateApplying: false,
+                    sessionsList: [],
+                    sessionsLoading: false,
+                    sessionFilterSource: 'all',
+                    sessionExporting: {},
+                    activeSession: null,
+                    activeSessionMessages: [],
+                    activeSessionDetailError: '',
+                    activeSessionDetailClipped: false,
+                    sessionDetailLoading: false,
+                    sessionDetailRequestSeq: 0,
+                    speedResults: {},
+                    speedLoading: {},
                     newProvider: { name: '', url: '', key: '' },
                     editingProvider: { name: '', url: '', key: '' },
                     newModelName: '',
@@ -1190,6 +1787,7 @@
             methods: {
                 async loadAll() {
                     this.loading = true;
+                    this.initError = '';
                     try {
                         const [statusRes, listRes, modelsRes] = await Promise.all([
                             api('status'),
@@ -1204,6 +1802,12 @@
                             this.currentModel = statusRes.model;
                             this.providersList = listRes.providers;
                             this.models = modelsRes.models;
+                            if (statusRes.configReady === false) {
+                                this.showMessage(statusRes.configNotice || '未检测到 config.toml，已加载默认模板；请在模板编辑器确认后创建。', 'info');
+                            }
+                            if (statusRes.initNotice) {
+                                this.showMessage(statusRes.initNotice, 'info');
+                            }
                         }
                     } catch (e) {
                         this.initError = '连接失败: ' + e.message;
@@ -1214,24 +1818,221 @@
 
                 switchConfigMode(mode) {
                     this.configMode = mode;
-                },
-
-                async switchProvider(name) {
-                    const res = await api('switch', { name });
-                    if (res.error) {
-                        this.showMessage(res.error, 'error');
-                    } else {
-                        await this.loadAll();
-                        this.showMessage('已切换到 ' + name, 'success');
+                    if (mode === 'sessions' && this.sessionsList.length === 0) {
+                        this.loadSessions();
                     }
                 },
 
+                getSessionExportKey(session) {
+                    return `${session.source || 'unknown'}:${session.sessionId || ''}:${session.filePath || ''}`;
+                },
+
+                async loadSessions() {
+                    if (this.sessionsLoading) return;
+                    this.sessionsLoading = true;
+                    this.activeSessionDetailError = '';
+                    try {
+                        const res = await api('list-sessions', {
+                            source: this.sessionFilterSource,
+                            limit: 200,
+                            forceRefresh: true
+                        });
+                        if (res.error) {
+                            this.showMessage(res.error, 'error');
+                            this.sessionsList = [];
+                            this.activeSession = null;
+                            this.activeSessionMessages = [];
+                            this.activeSessionDetailClipped = false;
+                        } else {
+                            this.sessionsList = Array.isArray(res.sessions) ? res.sessions : [];
+                            if (this.sessionsList.length === 0) {
+                                this.activeSession = null;
+                                this.activeSessionMessages = [];
+                                this.activeSessionDetailClipped = false;
+                            } else {
+                                const oldPath = this.activeSession ? this.activeSession.filePath : '';
+                                const matched = this.sessionsList.find(item => item.filePath === oldPath);
+                                this.activeSession = matched || this.sessionsList[0];
+                                await this.loadActiveSessionDetail();
+                            }
+                        }
+                    } catch (e) {
+                        this.sessionsList = [];
+                        this.activeSession = null;
+                        this.activeSessionMessages = [];
+                        this.activeSessionDetailClipped = false;
+                        this.showMessage('加载会话失败: ' + e.message, 'error');
+                    } finally {
+                        this.sessionsLoading = false;
+                    }
+                },
+
+                async selectSession(session) {
+                    if (!session) return;
+                    if (this.activeSession && this.activeSession.filePath === session.filePath) return;
+                    this.activeSession = session;
+                    this.activeSessionMessages = [];
+                    this.activeSessionDetailError = '';
+                    this.activeSessionDetailClipped = false;
+                    await this.loadActiveSessionDetail();
+                },
+
+                async loadActiveSessionDetail() {
+                    if (!this.activeSession) {
+                        this.activeSessionMessages = [];
+                        this.activeSessionDetailError = '';
+                        this.activeSessionDetailClipped = false;
+                        return;
+                    }
+
+                    const requestSeq = ++this.sessionDetailRequestSeq;
+                    this.sessionDetailLoading = true;
+                    this.activeSessionDetailError = '';
+                    try {
+                        const res = await api('session-detail', {
+                            source: this.activeSession.source,
+                            sessionId: this.activeSession.sessionId,
+                            filePath: this.activeSession.filePath,
+                            messageLimit: 300
+                        });
+
+                        if (requestSeq !== this.sessionDetailRequestSeq) {
+                            return;
+                        }
+
+                        if (res.error) {
+                            this.activeSessionMessages = [];
+                            this.activeSessionDetailClipped = false;
+                            this.activeSessionDetailError = res.error;
+                            return;
+                        }
+
+                        this.activeSessionMessages = Array.isArray(res.messages) ? res.messages : [];
+                        this.activeSessionDetailClipped = !!res.clipped;
+                        if (res.updatedAt) {
+                            this.activeSession.updatedAt = res.updatedAt;
+                        }
+                        if (res.cwd) {
+                            this.activeSession.cwd = res.cwd;
+                        }
+                    } catch (e) {
+                        if (requestSeq !== this.sessionDetailRequestSeq) {
+                            return;
+                        }
+                        this.activeSessionMessages = [];
+                        this.activeSessionDetailClipped = false;
+                        this.activeSessionDetailError = '加载会话内容失败: ' + e.message;
+                    } finally {
+                        if (requestSeq === this.sessionDetailRequestSeq) {
+                            this.sessionDetailLoading = false;
+                        }
+                    }
+                },
+
+                downloadTextFile(fileName, content) {
+                    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = fileName;
+                    link.click();
+                    URL.revokeObjectURL(url);
+                },
+
+                async exportSession(session) {
+                    const key = this.getSessionExportKey(session);
+                    if (this.sessionExporting[key]) return;
+
+                    this.sessionExporting[key] = true;
+                    try {
+                        const res = await api('export-session', {
+                            source: session.source,
+                            sessionId: session.sessionId,
+                            filePath: session.filePath
+                        });
+                        if (res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+
+                        const fileName = res.fileName || `${session.source || 'session'}-${session.sessionId || Date.now()}.md`;
+                        this.downloadTextFile(fileName, res.content || '');
+                        this.showMessage('会话导出完成', 'success');
+                    } catch (e) {
+                        this.showMessage('导出失败: ' + e.message, 'error');
+                    } finally {
+                        this.sessionExporting[key] = false;
+                    }
+                },
+
+                async switchProvider(name) {
+                    this.currentProvider = name;
+                    await this.openConfigTemplateEditor();
+                },
+
                 async onModelChange() {
-                    const res = await api('use', { model: this.currentModel });
-                    if (res.error) {
-                        this.showMessage(res.error, 'error');
-                    } else {
-                        this.showMessage('已切换到 ' + this.currentModel, 'success');
+                    await this.openConfigTemplateEditor();
+                },
+
+                escapeTomlString(value) {
+                    return String(value || '')
+                        .replace(/\\/g, '\\\\')
+                        .replace(/"/g, '\\"');
+                },
+
+                async openConfigTemplateEditor(options = {}) {
+                    try {
+                        const res = await api('get-config-template', {
+                            provider: this.currentProvider,
+                            model: this.currentModel
+                        });
+                        if (res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        let template = res.template || '';
+                        const appendHint = typeof options.appendHint === 'string' ? options.appendHint.trim() : '';
+                        const appendBlock = typeof options.appendBlock === 'string' ? options.appendBlock.trim() : '';
+                        if (appendHint) {
+                            template = `${template.trimEnd()}\n\n# -------------------------------\n# ${appendHint}\n# -------------------------------\n`;
+                        }
+                        if (appendBlock) {
+                            template = `${template.trimEnd()}\n\n${appendBlock}\n`;
+                        }
+                        this.configTemplateContent = template;
+                        this.showConfigTemplateModal = true;
+                    } catch (e) {
+                        this.showMessage('加载模板失败: ' + e.message, 'error');
+                    }
+                },
+
+                closeConfigTemplateModal() {
+                    this.showConfigTemplateModal = false;
+                    this.configTemplateContent = '';
+                },
+
+                async applyConfigTemplate() {
+                    if (!this.configTemplateContent || !this.configTemplateContent.trim()) {
+                        this.showMessage('模板内容不能为空', 'error');
+                        return;
+                    }
+
+                    this.configTemplateApplying = true;
+                    try {
+                        const res = await api('apply-config-template', {
+                            template: this.configTemplateContent
+                        });
+                        if (res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        this.showMessage('模板已应用到 config.toml', 'success');
+                        this.closeConfigTemplateModal();
+                        await this.loadAll();
+                    } catch (e) {
+                        this.showMessage('应用模板失败: ' + e.message, 'error');
+                    } finally {
+                        this.configTemplateApplying = false;
                     }
                 },
 
@@ -1239,29 +2040,34 @@
                     if (!this.newProvider.name || !this.newProvider.url) {
                         return this.showMessage('名称和URL必填', 'error');
                     }
-                    const res = await api('add', {
-                        name: this.newProvider.name,
-                        url: this.newProvider.url,
-                        key: this.newProvider.key
-                    });
-                    if (res.error) {
-                        this.showMessage(res.error, 'error');
-                    } else {
-                        this.showMessage('已添加', 'success');
-                        this.closeAddModal();
-                        await this.loadAll();
+                    const name = this.newProvider.name.trim();
+                    if (!name) {
+                        return this.showMessage('名称不能为空', 'error');
                     }
+                    if (this.providersList.some(item => item.name === name)) {
+                        return this.showMessage('提供商已存在', 'error');
+                    }
+
+                    const safeName = this.escapeTomlString(name);
+                    const safeUrl = this.escapeTomlString(this.newProvider.url.trim());
+                    const safeKey = this.escapeTomlString(this.newProvider.key || '');
+                    const newProviderBlock = `[model_providers.${safeName}]\nname = "${safeName}"\nbase_url = "${safeUrl}"\nwire_api = "responses"\nrequires_openai_auth = false\npreferred_auth_method = "${safeKey}"\nrequest_max_retries = 4\nstream_max_retries = 10\nstream_idle_timeout_ms = 300000`;
+
+                    this.currentProvider = name;
+                    this.showMessage('已生成新增模板，请确认后应用', 'info');
+                    this.closeAddModal();
+                    await this.openConfigTemplateEditor({
+                        appendHint: `新增 provider: ${name}（请检查字段后应用）`,
+                        appendBlock: newProviderBlock
+                    });
                 },
 
                 async deleteProvider(name) {
                     if (!confirm(`确定删除提供商 "${name}"?`)) return;
-                    const res = await api('delete', { name });
-                    if (res.error) {
-                        this.showMessage(res.error, 'error');
-                    } else {
-                        this.showMessage('已删除', 'success');
-                        await this.loadAll();
-                    }
+                    this.showMessage('请在模板中手动删除该 provider 配置块后应用', 'info');
+                    await this.openConfigTemplateEditor({
+                        appendHint: `请手动删除 [model_providers.${name}] 配置块，并确认 model_provider 指向有效 provider`
+                    });
                 },
 
                 openEditModal(provider) {
@@ -1278,19 +2084,14 @@
                         return this.showMessage('URL 必填', 'error');
                     }
 
-                    const res = await api('update', {
-                        name: this.editingProvider.name,
-                        url: this.editingProvider.url,
-                        key: this.editingProvider.key || undefined
+                    const name = this.editingProvider.name;
+                    const safeUrl = this.escapeTomlString(this.editingProvider.url.trim());
+                    const safeKey = this.escapeTomlString(this.editingProvider.key || '');
+                    this.closeEditModal();
+                    this.showMessage('已生成更新模板，请确认后应用', 'info');
+                    await this.openConfigTemplateEditor({
+                        appendHint: `请将 [model_providers.${name}] 中 base_url 更新为 ${safeUrl}${safeKey ? '，并更新 preferred_auth_method' : ''}`
                     });
-
-                    if (res.error) {
-                        this.showMessage(res.error, 'error');
-                    } else {
-                        this.showMessage('已更新', 'success');
-                        this.closeEditModal();
-                        await this.loadAll();
-                    }
                 },
 
                 closeEditModal() {
@@ -1470,6 +2271,28 @@
                     };
                 },
 
+                formatLatency(result) {
+                    if (!result) return '';
+                    if (!result.ok) return result.status ? `ERR ${result.status}` : 'ERR';
+                    const ms = typeof result.durationMs === 'number' ? result.durationMs : 0;
+                    return `${ms}ms`;
+                },
+
+                async runSpeedTest(name) {
+                    if (!name || this.speedLoading[name]) return;
+                    this.speedLoading[name] = true;
+                    const res = await api('speed-test', { name });
+                    if (res.error) {
+                        this.speedResults[name] = { ok: false, error: res.error };
+                        this.showMessage(res.error, 'error');
+                    } else {
+                        this.speedResults[name] = res;
+                        const status = res.status ? ` (${res.status})` : '';
+                        this.showMessage(`Speed ${name}: ${this.formatLatency(res)}${status}`, 'success');
+                    }
+                    this.speedLoading[name] = false;
+                },
+
                 showMessage(text, type) {
                     this.message = text;
                     this.messageType = type || 'info';
@@ -1484,3 +2307,10 @@
     </script>
 </body>
 </html>
+
+
+
+
+
+
+
