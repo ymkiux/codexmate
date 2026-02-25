@@ -111,6 +111,7 @@ codexmate start
 - 在同一 Web 页面查看 Codex 与 Claude Code 的本地会话列表
 - 支持按来源筛选（Codex / Claude / 全部）
 - 支持一键导出指定会话为 Markdown，便于提供给其他 AI 继续分析
+- 支持直接删除指定会话（本地 jsonl 记录）
 
 #### Codex 模板确认模式
 - Web 中的 Codex 配置改动默认进入 `config.toml` 模板编辑器
