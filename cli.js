@@ -766,6 +766,10 @@ function setSessionListCache(cacheKey, value) {
     }
 }
 
+function invalidateSessionListCache() {
+    g_sessionListCache.clear();
+}
+
 function parseCodexSessionSummary(filePath) {
     const records = parseJsonlHeadRecords(filePath);
     if (records.length === 0) {
@@ -1381,6 +1385,48 @@ async function exportSessionData(params = {}) {
         sessionId,
         fileName: `${source}-session-${safeSessionId}.md`,
         content: markdown
+    };
+}
+
+function deleteSessionFile(params = {}) {
+    const source = params.source === 'claude' ? 'claude' : (params.source === 'codex' ? 'codex' : '');
+    if (!source) {
+        return { error: 'Invalid source' };
+    }
+
+    const filePath = resolveSessionFilePath(source, params.filePath, params.sessionId);
+    if (!filePath) {
+        return { error: 'Session file not found' };
+    }
+
+    if (!filePath.toLowerCase().endsWith('.jsonl')) {
+        return { error: 'Invalid session file' };
+    }
+
+    let stat;
+    try {
+        stat = fs.statSync(filePath);
+    } catch (e) {
+        return { error: 'Session file not found' };
+    }
+
+    if (!stat.isFile()) {
+        return { error: 'Session path is not a file' };
+    }
+
+    try {
+        fs.unlinkSync(filePath);
+    } catch (e) {
+        return { error: `Failed to delete session: ${e.message}` };
+    }
+
+    invalidateSessionListCache();
+
+    return {
+        success: true,
+        source,
+        sessionId: params.sessionId || path.basename(filePath, '.jsonl'),
+        filePath
     };
 }
 
@@ -2258,6 +2304,9 @@ function cmdStart() {
                             break;
                         case 'session-detail':
                             result = await readSessionDetail(params);
+                            break;
+                        case 'delete-session':
+                            result = deleteSessionFile(params);
                             break;
                         default:
                             result = { error: '未知操作' };
