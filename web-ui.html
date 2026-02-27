@@ -578,6 +578,22 @@
             margin-bottom: var(--spacing-sm);
         }
 
+        .session-batch-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: var(--spacing-xs);
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .session-batch-count {
+            font-size: var(--font-size-caption);
+            color: var(--color-text-tertiary);
+            line-height: 1.35;
+            white-space: nowrap;
+            padding: 0 2px;
+        }
+
         .session-source-select {
             flex: 1;
             min-width: 180px;
@@ -765,8 +781,36 @@
         .session-item-header {
             display: flex;
             align-items: flex-start;
-            gap: 8px;
+            justify-content: space-between;
+            gap: 10px;
             margin-bottom: 4px;
+        }
+
+        .session-item-main {
+            min-width: 0;
+            flex: 1;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .session-item-checkbox {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+            cursor: pointer;
+            margin-top: 1px;
+        }
+
+        .session-item-checkbox input {
+            width: 16px;
+            height: 16px;
+            margin: 0;
+            cursor: pointer;
+            accent-color: var(--color-brand);
         }
 
         .session-item:hover {
@@ -782,6 +826,11 @@
             border-color: var(--color-brand);
             background: linear-gradient(to bottom, rgba(210, 107, 90, 0.1) 0%, rgba(255, 255, 255, 0.98) 100%);
             box-shadow: 0 6px 16px rgba(210, 107, 90, 0.12);
+        }
+
+        .session-item.selected {
+            border-color: rgba(210, 107, 90, 0.6);
+            box-shadow: 0 4px 10px rgba(210, 107, 90, 0.08);
         }
 
         .session-item-title {
@@ -965,6 +1014,10 @@
                 position: static;
                 max-height: 300px;
                 height: auto;
+            }
+
+            .session-batch-toolbar {
+                align-items: stretch;
             }
 
             .session-preview {
@@ -1477,17 +1530,38 @@
                         <span class="selector-title">会话来源</span>
                     </div>
                     <div class="session-toolbar">
-                        <select class="session-source-select" v-model="sessionFilterSource" @change="loadSessions">
+                        <select class="session-source-select" v-model="sessionFilterSource" @change="onSessionSourceChange" :disabled="sessionsLoading || batchDeleting">
                             <option value="all">全部（Codex + Claude）</option>
                             <option value="codex">仅 Codex</option>
                             <option value="claude">仅 Claude Code</option>
                         </select>
-                        <button class="btn-tool" @click="loadSessions" :disabled="sessionsLoading">
+                        <button class="btn-tool" @click="loadSessions" :disabled="sessionsLoading || batchDeleting">
                             {{ sessionsLoading ? '刷新中...' : '刷新会话' }}
                         </button>
                     </div>
+                    <div v-if="sessionsList.length > 0" class="session-batch-toolbar">
+                        <button
+                            class="btn-tool"
+                            @click="toggleSelectAllSessions"
+                            :disabled="sessionsLoading || batchDeleting || sessionsList.length === 0">
+                            {{ isAllSessionsSelected ? '取消全选' : '全选当前列表' }}
+                        </button>
+                        <button
+                            class="btn-tool"
+                            @click="clearSessionSelection"
+                            :disabled="batchDeleting || selectedCount === 0">
+                            清空选择
+                        </button>
+                        <span class="session-batch-count">已选 {{ selectedCount }} 条</span>
+                        <button
+                            class="btn-session-delete"
+                            @click="deleteSelectedSessions"
+                            :disabled="batchDeleting || selectedCount === 0">
+                            {{ batchDeleting ? '批量删除中...' : '批量删除' }}
+                        </button>
+                    </div>
                     <div class="session-hint">
-                        左侧可直接删除会话，右侧预览区支持导出或删除当前会话。
+                        左侧支持勾选多条会话后批量删除，也可继续单条删除；右侧预览区支持导出或删除当前会话。
                     </div>
                 </div>
 
@@ -1504,14 +1578,29 @@
                         <div
                             v-for="session in sessionsList"
                             :key="session.source + '-' + session.sessionId + '-' + session.filePath"
-                            :class="['session-item', { active: activeSession && activeSession.filePath === session.filePath }]"
+                            :class="[
+                                'session-item',
+                                {
+                                    active: activeSession && getSessionExportKey(activeSession) === getSessionExportKey(session),
+                                    selected: isSessionSelected(session)
+                                }
+                            ]"
                             @click="selectSession(session)">
                             <div class="session-item-header">
-                                <div class="session-item-title">{{ session.title || session.sessionId }}</div>
+                                <div class="session-item-main">
+                                    <label class="session-item-checkbox" @click.stop title="选择会话">
+                                        <input
+                                            type="checkbox"
+                                            :checked="isSessionSelected(session)"
+                                            :disabled="batchDeleting || sessionDeleting[getSessionExportKey(session)]"
+                                            @change.stop="toggleSessionSelection(session, $event)">
+                                    </label>
+                                    <div class="session-item-title">{{ session.title || session.sessionId }}</div>
+                                </div>
                                 <button
                                     class="session-item-delete"
                                     @click.stop="deleteSession(session)"
-                                    :disabled="sessionDeleting[getSessionExportKey(session)]"
+                                    :disabled="batchDeleting || sessionDeleting[getSessionExportKey(session)]"
                                     title="删除会话">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M3 6h18"/>
@@ -1541,13 +1630,13 @@
                                     <button
                                         class="btn-session-export"
                                         @click="exportSession(activeSession)"
-                                        :disabled="!activeSession || sessionExporting[getSessionExportKey(activeSession)]">
+                                        :disabled="!activeSession || batchDeleting || sessionExporting[getSessionExportKey(activeSession)]">
                                         {{ (activeSession && sessionExporting[getSessionExportKey(activeSession)]) ? '导出中...' : '导出记录' }}
                                     </button>
                                     <button
                                         class="btn-session-delete"
                                         @click="deleteSession(activeSession)"
-                                        :disabled="!activeSession || sessionDeleting[getSessionExportKey(activeSession)]">
+                                        :disabled="!activeSession || batchDeleting || sessionDeleting[getSessionExportKey(activeSession)]">
                                         {{ (activeSession && sessionDeleting[getSessionExportKey(activeSession)]) ? '删除中...' : '删除会话' }}
                                     </button>
                                 </div>
@@ -1821,6 +1910,8 @@
                     activeSessionDetailClipped: false,
                     sessionDetailLoading: false,
                     sessionDetailRequestSeq: 0,
+                    selectedSessionMap: {},
+                    batchDeleting: false,
                     speedResults: {},
                     speedLoading: {},
                     newProvider: { name: '', url: '', key: '' },
@@ -1867,6 +1958,25 @@
                 }
                 this.loadAll();
             },
+            computed: {
+                selectedSessions() {
+                    if (!Array.isArray(this.sessionsList) || this.sessionsList.length === 0) {
+                        return [];
+                    }
+                    return this.sessionsList.filter(session => this.isSessionSelected(session));
+                },
+
+                selectedCount() {
+                    return this.selectedSessions.length;
+                },
+
+                isAllSessionsSelected() {
+                    if (!Array.isArray(this.sessionsList) || this.sessionsList.length === 0) {
+                        return false;
+                    }
+                    return this.sessionsList.every(session => this.isSessionSelected(session));
+                }
+            },
             methods: {
                 async loadAll() {
                     this.loading = true;
@@ -1910,6 +2020,85 @@
                     return `${session.source || 'unknown'}:${session.sessionId || ''}:${session.filePath || ''}`;
                 },
 
+                async onSessionSourceChange() {
+                    this.clearSessionSelection();
+                    await this.loadSessions();
+                },
+
+                isSessionSelected(session) {
+                    if (!session) return false;
+                    return !!this.selectedSessionMap[this.getSessionExportKey(session)];
+                },
+
+                toggleSessionSelection(session, event) {
+                    if (!session) return;
+                    const key = this.getSessionExportKey(session);
+                    const checked = event && event.target ? !!event.target.checked : !this.isSessionSelected(session);
+                    const next = { ...this.selectedSessionMap };
+                    if (checked) {
+                        next[key] = true;
+                    } else {
+                        delete next[key];
+                    }
+                    this.selectedSessionMap = next;
+                },
+
+                toggleSelectAllSessions() {
+                    if (!Array.isArray(this.sessionsList) || this.sessionsList.length === 0) return;
+                    if (this.isAllSessionsSelected) {
+                        this.clearSessionSelection();
+                        return;
+                    }
+                    const next = {};
+                    for (const session of this.sessionsList) {
+                        next[this.getSessionExportKey(session)] = true;
+                    }
+                    this.selectedSessionMap = next;
+                },
+
+                clearSessionSelection() {
+                    this.selectedSessionMap = {};
+                },
+
+                removeSessionSelection(session) {
+                    if (!session) return;
+                    const key = this.getSessionExportKey(session);
+                    if (!this.selectedSessionMap[key]) return;
+                    const next = { ...this.selectedSessionMap };
+                    delete next[key];
+                    this.selectedSessionMap = next;
+                },
+
+                pruneSessionSelection() {
+                    if (!Array.isArray(this.sessionsList) || this.sessionsList.length === 0) {
+                        this.clearSessionSelection();
+                        return;
+                    }
+                    const next = {};
+                    for (const session of this.sessionsList) {
+                        const key = this.getSessionExportKey(session);
+                        if (this.selectedSessionMap[key]) {
+                            next[key] = true;
+                        }
+                    }
+                    this.selectedSessionMap = next;
+                },
+
+                formatBatchDeleteFailureSummary(results, limit = 3) {
+                    const failed = Array.isArray(results)
+                        ? results.filter(item => item && !item.success)
+                        : [];
+                    if (failed.length === 0) return '';
+                    const text = failed.slice(0, limit).map(item => {
+                        const label = item.sessionId || item.filePath || 'unknown';
+                        return `${label}: ${item.error || '未知错误'}`;
+                    }).join('；');
+                    if (failed.length > limit) {
+                        return `${text}；其余 ${failed.length - limit} 条请重试`;
+                    }
+                    return text;
+                },
+
                 async loadSessions() {
                     if (this.sessionsLoading) return;
                     this.sessionsLoading = true;
@@ -1923,24 +2112,27 @@
                         if (res.error) {
                             this.showMessage(res.error, 'error');
                             this.sessionsList = [];
+                            this.clearSessionSelection();
                             this.activeSession = null;
                             this.activeSessionMessages = [];
                             this.activeSessionDetailClipped = false;
                         } else {
                             this.sessionsList = Array.isArray(res.sessions) ? res.sessions : [];
+                            this.pruneSessionSelection();
                             if (this.sessionsList.length === 0) {
                                 this.activeSession = null;
                                 this.activeSessionMessages = [];
                                 this.activeSessionDetailClipped = false;
                             } else {
-                                const oldPath = this.activeSession ? this.activeSession.filePath : '';
-                                const matched = this.sessionsList.find(item => item.filePath === oldPath);
+                                const oldKey = this.activeSession ? this.getSessionExportKey(this.activeSession) : '';
+                                const matched = this.sessionsList.find(item => this.getSessionExportKey(item) === oldKey);
                                 this.activeSession = matched || this.sessionsList[0];
                                 await this.loadActiveSessionDetail();
                             }
                         }
                     } catch (e) {
                         this.sessionsList = [];
+                        this.clearSessionSelection();
                         this.activeSession = null;
                         this.activeSessionMessages = [];
                         this.activeSessionDetailClipped = false;
@@ -1952,7 +2144,7 @@
 
                 async selectSession(session) {
                     if (!session) return;
-                    if (this.activeSession && this.activeSession.filePath === session.filePath) return;
+                    if (this.activeSession && this.getSessionExportKey(this.activeSession) === this.getSessionExportKey(session)) return;
                     this.activeSession = session;
                     this.activeSessionMessages = [];
                     this.activeSessionDetailError = '';
@@ -2048,8 +2240,83 @@
                     }
                 },
 
+                async deleteSelectedSessions() {
+                    if (this.batchDeleting) return;
+                    const sessions = this.selectedSessions.slice();
+                    const total = sessions.length;
+                    if (total === 0) return;
+
+                    if (!confirm(`确定删除选中的 ${total} 个会话？\n删除后无法恢复。`)) return;
+
+                    this.batchDeleting = true;
+                    const pendingKeys = sessions.map(session => this.getSessionExportKey(session));
+                    for (const key of pendingKeys) {
+                        this.sessionDeleting[key] = true;
+                    }
+
+                    try {
+                        const items = sessions.map(session => ({
+                            source: session.source,
+                            sessionId: session.sessionId,
+                            filePath: session.filePath
+                        }));
+                        const res = await api('delete-sessions', { items });
+                        if (res.error) {
+                            this.showMessage('批量删除失败: ' + res.error, 'error');
+                            return;
+                        }
+
+                        const results = Array.isArray(res.results) ? res.results : [];
+                        const deletedSet = new Set(
+                            results
+                                .filter(item => item && item.success)
+                                .map(item => this.getSessionExportKey(item))
+                        );
+
+                        if (deletedSet.size > 0) {
+                            const activeKey = this.activeSession ? this.getSessionExportKey(this.activeSession) : '';
+                            this.sessionsList = this.sessionsList.filter(item => !deletedSet.has(this.getSessionExportKey(item)));
+                            this.pruneSessionSelection();
+
+                            if (activeKey && deletedSet.has(activeKey)) {
+                                this.activeSession = null;
+                                this.activeSessionMessages = [];
+                                this.activeSessionDetailError = '';
+                                this.activeSessionDetailClipped = false;
+                                this.sessionDetailRequestSeq += 1;
+                                this.sessionDetailLoading = false;
+
+                                if (this.sessionsList.length > 0) {
+                                    this.activeSession = this.sessionsList[0];
+                                    await this.loadActiveSessionDetail();
+                                }
+                            }
+                        } else {
+                            this.pruneSessionSelection();
+                        }
+
+                        const deleted = Number.isFinite(res.deleted) ? res.deleted : deletedSet.size;
+                        const failed = Number.isFinite(res.failed) ? res.failed : Math.max(0, total - deleted);
+                        if (failed > 0) {
+                            const detail = this.formatBatchDeleteFailureSummary(results);
+                            const summary = `批量删除完成：成功 ${deleted}，失败 ${failed}`;
+                            this.showMessage(detail ? `${summary}（${detail}）` : summary, 'error');
+                        } else {
+                            this.showMessage(`已删除 ${deleted} 个会话`, 'success');
+                        }
+                    } catch (e) {
+                        this.showMessage('批量删除失败: ' + e.message, 'error');
+                    } finally {
+                        this.batchDeleting = false;
+                        for (const key of pendingKeys) {
+                            this.sessionDeleting[key] = false;
+                        }
+                    }
+                },
+
                 async deleteSession(session) {
                     if (!session) return;
+                    if (this.batchDeleting) return;
                     const title = session.title || session.sessionId || session.filePath || '当前会话';
                     if (!confirm(`确定删除会话 "${title}"?\n删除后无法恢复。`)) return;
                     const key = this.getSessionExportKey(session);
@@ -2067,9 +2334,9 @@
                             return;
                         }
 
-                        const removedPath = session.filePath;
-                        this.sessionsList = this.sessionsList.filter(item => item.filePath !== removedPath);
-                        if (this.activeSession && this.activeSession.filePath === removedPath) {
+                        this.sessionsList = this.sessionsList.filter(item => this.getSessionExportKey(item) !== key);
+                        this.removeSessionSelection(session);
+                        if (this.activeSession && this.getSessionExportKey(this.activeSession) === key) {
                             this.activeSession = null;
                             this.activeSessionMessages = [];
                             this.activeSessionDetailError = '';

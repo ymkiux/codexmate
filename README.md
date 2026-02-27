@@ -112,6 +112,7 @@ codexmate start
 - 支持按来源筛选（Codex / Claude / 全部）
 - 支持一键导出指定会话为 Markdown，便于提供给其他 AI 继续分析
 - 支持直接删除指定会话（本地 jsonl 记录）
+- 支持勾选多条会话并批量删除，部分失败会汇总提示
 
 #### Codex 模板确认模式
 - Web 中的 Codex 配置改动默认进入 `config.toml` 模板编辑器
