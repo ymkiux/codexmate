@@ -35,6 +35,7 @@ const SESSION_SUMMARY_READ_BYTES = 256 * 1024;
 const SESSION_SCAN_FACTOR = 4;
 const SESSION_SCAN_MIN_FILES = 800;
 const MAX_BATCH_DELETE_SESSIONS = 500;
+const MAX_BATCH_DELETE_RECORDS = 2000;
 const BOOTSTRAP_TEXT_MARKERS = [
     'agents.md instructions',
     '<instructions>',
@@ -1162,7 +1163,31 @@ function buildSessionMarkdown(payload) {
     return lines.join('\n');
 }
 
-function extractCodexMessageFromRecord(record, state) {
+function resolveStateMaxMessages(state) {
+    if (!state || typeof state !== 'object') {
+        return MAX_EXPORT_MESSAGES;
+    }
+
+    if (state.maxMessages === Infinity) {
+        return Infinity;
+    }
+
+    const rawMax = Number(state.maxMessages);
+    if (Number.isFinite(rawMax) && rawMax > 0) {
+        return Math.floor(rawMax);
+    }
+    return MAX_EXPORT_MESSAGES;
+}
+
+function canAppendMessage(state) {
+    const maxMessages = resolveStateMaxMessages(state);
+    if (maxMessages === Infinity) {
+        return true;
+    }
+    return state.messages.length < maxMessages;
+}
+
+function extractCodexMessageFromRecord(record, state, lineIndex = -1) {
     if (record.timestamp) {
         state.updatedAt = toIsoTime(record.timestamp, state.updatedAt);
     }
@@ -1177,18 +1202,19 @@ function extractCodexMessageFromRecord(record, state) {
         const role = normalizeRole(record.payload.role);
         if (role === 'user' || role === 'assistant' || role === 'system') {
             const text = extractMessageText(record.payload.content);
-            if (text && state.messages.length < MAX_EXPORT_MESSAGES) {
+            if (text && canAppendMessage(state)) {
                 state.messages.push({
                     role,
                     text,
-                    timestamp: toIsoTime(record.timestamp, '')
+                    timestamp: toIsoTime(record.timestamp, ''),
+                    recordLineIndex: Number.isInteger(lineIndex) ? lineIndex : -1
                 });
             }
         }
     }
 }
 
-function extractClaudeMessageFromRecord(record, state) {
+function extractClaudeMessageFromRecord(record, state, lineIndex = -1) {
     if (record.timestamp) {
         state.updatedAt = toIsoTime(record.timestamp, state.updatedAt);
     }
@@ -1205,32 +1231,40 @@ function extractClaudeMessageFromRecord(record, state) {
     if (role === 'user' || role === 'assistant' || role === 'system') {
         const content = record.message ? record.message.content : '';
         const text = extractMessageText(content);
-        if (text && state.messages.length < MAX_EXPORT_MESSAGES) {
+        if (text && canAppendMessage(state)) {
             state.messages.push({
                 role,
                 text,
-                timestamp: toIsoTime(record.timestamp, '')
+                timestamp: toIsoTime(record.timestamp, ''),
+                recordLineIndex: Number.isInteger(lineIndex) ? lineIndex : -1
             });
         }
     }
 }
 
-function extractMessagesFromRecords(records, source) {
+function extractMessagesFromRecords(records, source, options = {}) {
+    const maxMessages = options.maxMessages === Infinity
+        ? Infinity
+        : (Number.isFinite(Number(options.maxMessages)) ? Math.max(1, Number(options.maxMessages)) : MAX_EXPORT_MESSAGES);
     const state = {
         sessionId: '',
         cwd: '',
         updatedAt: '',
-        messages: []
+        messages: [],
+        maxMessages
     };
 
+    let lineIndex = 0;
     for (const record of records) {
         if (source === 'codex') {
-            extractCodexMessageFromRecord(record, state);
+            extractCodexMessageFromRecord(record, state, lineIndex);
         } else {
-            extractClaudeMessageFromRecord(record, state);
+            extractClaudeMessageFromRecord(record, state, lineIndex);
         }
 
-        if (state.messages.length >= MAX_EXPORT_MESSAGES) {
+        lineIndex += 1;
+
+        if (state.maxMessages !== Infinity && state.messages.length >= state.maxMessages) {
             break;
         }
     }
@@ -1238,12 +1272,16 @@ function extractMessagesFromRecords(records, source) {
     return state;
 }
 
-async function extractMessagesFromFile(filePath, source) {
+async function extractMessagesFromFile(filePath, source, options = {}) {
+    const maxMessages = options.maxMessages === Infinity
+        ? Infinity
+        : (Number.isFinite(Number(options.maxMessages)) ? Math.max(1, Number(options.maxMessages)) : MAX_EXPORT_MESSAGES);
     const state = {
         sessionId: '',
         cwd: '',
         updatedAt: '',
-        messages: []
+        messages: [],
+        maxMessages
     };
 
     let stream;
@@ -1252,7 +1290,11 @@ async function extractMessagesFromFile(filePath, source) {
         stream = fs.createReadStream(filePath, { encoding: 'utf-8' });
         rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
 
+        let lineIndex = 0;
         for await (const line of rl) {
+            const currentLineIndex = lineIndex;
+            lineIndex += 1;
+
             const trimmed = line.trim();
             if (!trimmed) continue;
 
@@ -1264,12 +1306,12 @@ async function extractMessagesFromFile(filePath, source) {
             }
 
             if (source === 'codex') {
-                extractCodexMessageFromRecord(record, state);
+                extractCodexMessageFromRecord(record, state, currentLineIndex);
             } else {
-                extractClaudeMessageFromRecord(record, state);
+                extractClaudeMessageFromRecord(record, state, currentLineIndex);
             }
 
-            if (state.messages.length >= MAX_EXPORT_MESSAGES) {
+            if (state.maxMessages !== Infinity && state.messages.length >= state.maxMessages) {
                 rl.close();
                 if (stream.destroy) {
                     stream.destroy();
@@ -1279,7 +1321,7 @@ async function extractMessagesFromFile(filePath, source) {
         }
     } catch (e) {
         const fallbackRecords = readJsonlRecords(filePath);
-        return extractMessagesFromRecords(fallbackRecords, source);
+        return extractMessagesFromRecords(fallbackRecords, source, { maxMessages });
     } finally {
         if (rl) {
             try { rl.close(); } catch (e) {}
@@ -1311,7 +1353,11 @@ async function readSessionDetail(params = {}) {
     const extracted = await extractMessagesFromFile(filePath, source);
     const sessionId = extracted.sessionId || params.sessionId || path.basename(filePath, '.jsonl');
     const sourceLabel = source === 'codex' ? 'Codex' : 'Claude Code';
-    const allMessages = removeLeadingSystemMessage(Array.isArray(extracted.messages) ? extracted.messages : []);
+    const allMessages = removeLeadingSystemMessage(Array.isArray(extracted.messages) ? extracted.messages : [])
+        .map((message, messageIndex) => ({
+            ...message,
+            messageIndex
+        }));
     const startIndex = Math.max(0, allMessages.length - messageLimit);
     const clippedMessages = allMessages.slice(startIndex);
 
@@ -1487,6 +1533,156 @@ function deleteSessionFilesBatch(params = {}) {
         total: results.length,
         deleted,
         failed,
+        results
+    };
+}
+
+async function deleteSessionRecords(params = {}) {
+    const source = params.source === 'claude' ? 'claude' : (params.source === 'codex' ? 'codex' : '');
+    if (!source) {
+        return { error: 'Invalid source' };
+    }
+
+    const filePath = resolveSessionFilePath(source, params.filePath, params.sessionId);
+    if (!filePath) {
+        return { error: 'Session file not found' };
+    }
+
+    if (!filePath.toLowerCase().endsWith('.jsonl')) {
+        return { error: 'Invalid session file' };
+    }
+
+    let stat;
+    try {
+        stat = fs.statSync(filePath);
+    } catch (e) {
+        return { error: 'Session file not found' };
+    }
+
+    if (!stat.isFile()) {
+        return { error: 'Session path is not a file' };
+    }
+
+    const rawIndices = Array.isArray(params.recordLineIndices) ? params.recordLineIndices : [];
+    if (rawIndices.length === 0) {
+        return { error: 'No records provided' };
+    }
+
+    if (rawIndices.length > MAX_BATCH_DELETE_RECORDS) {
+        return { error: `Too many records, max ${MAX_BATCH_DELETE_RECORDS}` };
+    }
+
+    const extracted = await extractMessagesFromFile(filePath, source, { maxMessages: Infinity });
+    const visibleMessages = removeLeadingSystemMessage(Array.isArray(extracted.messages) ? extracted.messages : []);
+    const visibleLineSet = new Set();
+    for (const message of visibleMessages) {
+        if (message && Number.isInteger(message.recordLineIndex) && message.recordLineIndex >= 0) {
+            visibleLineSet.add(message.recordLineIndex);
+        }
+    }
+
+    const normalizedIndices = [];
+    const seenIndices = new Set();
+    const results = [];
+
+    for (const raw of rawIndices) {
+        const parsed = Number(raw);
+        if (!Number.isInteger(parsed) || parsed < 0) {
+            results.push({
+                recordLineIndex: Number.isInteger(parsed) ? parsed : -1,
+                success: false,
+                error: 'Invalid record line index'
+            });
+            continue;
+        }
+
+        if (seenIndices.has(parsed)) {
+            continue;
+        }
+        seenIndices.add(parsed);
+        normalizedIndices.push(parsed);
+    }
+
+    const deleteSet = new Set();
+    for (const recordLineIndex of normalizedIndices) {
+        if (!visibleLineSet.has(recordLineIndex)) {
+            results.push({
+                recordLineIndex,
+                success: false,
+                error: 'Record not found'
+            });
+            continue;
+        }
+
+        deleteSet.add(recordLineIndex);
+        results.push({
+            recordLineIndex,
+            success: true
+        });
+    }
+
+    const requested = results.length;
+    const deleted = deleteSet.size;
+    const failed = requested - deleted;
+
+    if (deleteSet.size === 0) {
+        return {
+            success: failed === 0,
+            requested,
+            deleted,
+            failed,
+            remainingMessages: visibleMessages.length,
+            results
+        };
+    }
+
+    let rawContent = '';
+    try {
+        rawContent = fs.readFileSync(filePath, 'utf-8');
+    } catch (e) {
+        return { error: `Failed to read session file: ${e.message}` };
+    }
+
+    const newline = rawContent.includes('\r\n') ? '\r\n' : '\n';
+    const hasTrailingNewline = /\r?\n$/.test(rawContent);
+    let lines = rawContent === '' ? [] : rawContent.split(/\r?\n/);
+    if (hasTrailingNewline && lines.length > 0 && lines[lines.length - 1] === '') {
+        lines.pop();
+    }
+
+    const nextLines = [];
+    for (let i = 0; i < lines.length; i += 1) {
+        if (!deleteSet.has(i)) {
+            nextLines.push(lines[i]);
+        }
+    }
+
+    let nextContent = nextLines.join(newline);
+    if (hasTrailingNewline && nextLines.length > 0) {
+        nextContent += newline;
+    }
+
+    const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
+    try {
+        fs.writeFileSync(tmpPath, nextContent, 'utf-8');
+        fs.renameSync(tmpPath, filePath);
+    } catch (e) {
+        try {
+            if (fs.existsSync(tmpPath)) {
+                fs.unlinkSync(tmpPath);
+            }
+        } catch (_) {}
+        return { error: `Failed to rewrite session file: ${e.message}` };
+    }
+
+    invalidateSessionListCache();
+
+    return {
+        success: failed === 0,
+        requested,
+        deleted,
+        failed,
+        remainingMessages: Math.max(0, visibleMessages.length - deleted),
         results
     };
 }
@@ -2371,6 +2567,9 @@ function cmdStart() {
                             break;
                         case 'delete-sessions':
                             result = deleteSessionFilesBatch(params);
+                            break;
+                        case 'delete-session-records':
+                            result = await deleteSessionRecords(params);
                             break;
                         default:
                             result = { error: '未知操作' };

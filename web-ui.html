@@ -957,6 +957,22 @@
             scrollbar-color: rgba(166, 149, 130, 0.85) transparent;
         }
 
+        .session-record-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: var(--spacing-xs);
+            margin-bottom: 4px;
+        }
+
+        .session-record-count {
+            font-size: var(--font-size-caption);
+            color: var(--color-text-tertiary);
+            line-height: 1.35;
+            white-space: nowrap;
+            padding: 0 2px;
+        }
+
         .session-msg {
             border-radius: 10px;
             padding: 10px 12px;
@@ -969,9 +985,14 @@
             background: rgba(210, 107, 90, 0.08);
         }
 
+        .session-msg.selected {
+            border-color: rgba(210, 107, 90, 0.62);
+            box-shadow: 0 4px 10px rgba(210, 107, 90, 0.12);
+        }
+
         .session-msg-header {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: space-between;
             gap: var(--spacing-xs);
             margin-bottom: 6px;
@@ -979,9 +1000,66 @@
             color: var(--color-text-tertiary);
         }
 
+        .session-msg-meta {
+            min-width: 0;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .session-msg-checkbox {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+            cursor: pointer;
+        }
+
+        .session-msg-checkbox input {
+            width: 16px;
+            height: 16px;
+            margin: 0;
+            cursor: pointer;
+            accent-color: var(--color-brand);
+        }
+
         .session-msg-role {
             font-weight: var(--font-weight-secondary);
             color: var(--color-text-secondary);
+        }
+
+        .session-msg-time {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .session-msg-delete {
+            border: 1px solid rgba(210, 107, 90, 0.4);
+            background: rgba(210, 107, 90, 0.08);
+            color: var(--color-brand);
+            border-radius: 8px;
+            padding: 4px 8px;
+            font-size: var(--font-size-caption);
+            line-height: 1.1;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: all var(--transition-fast) var(--ease-spring);
+        }
+
+        .session-msg-delete:hover {
+            border-color: var(--color-brand);
+            background: rgba(210, 107, 90, 0.15);
+            transform: translateY(-1px);
+        }
+
+        .session-msg-delete:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
         }
 
         .session-msg-content {
@@ -1017,6 +1095,10 @@
             }
 
             .session-batch-toolbar {
+                align-items: stretch;
+            }
+
+            .session-record-toolbar {
                 align-items: stretch;
             }
 
@@ -1530,12 +1612,12 @@
                         <span class="selector-title">会话来源</span>
                     </div>
                     <div class="session-toolbar">
-                        <select class="session-source-select" v-model="sessionFilterSource" @change="onSessionSourceChange" :disabled="sessionsLoading || batchDeleting">
+                        <select class="session-source-select" v-model="sessionFilterSource" @change="onSessionSourceChange" :disabled="sessionsLoading || batchDeleting || recordsBatchDeleting">
                             <option value="all">全部（Codex + Claude）</option>
                             <option value="codex">仅 Codex</option>
                             <option value="claude">仅 Claude Code</option>
                         </select>
-                        <button class="btn-tool" @click="loadSessions" :disabled="sessionsLoading || batchDeleting">
+                        <button class="btn-tool" @click="loadSessions" :disabled="sessionsLoading || batchDeleting || recordsBatchDeleting">
                             {{ sessionsLoading ? '刷新中...' : '刷新会话' }}
                         </button>
                     </div>
@@ -1543,20 +1625,20 @@
                         <button
                             class="btn-tool"
                             @click="toggleSelectAllSessions"
-                            :disabled="sessionsLoading || batchDeleting || sessionsList.length === 0">
+                            :disabled="sessionsLoading || batchDeleting || recordsBatchDeleting || sessionsList.length === 0">
                             {{ isAllSessionsSelected ? '取消全选' : '全选当前列表' }}
                         </button>
                         <button
                             class="btn-tool"
                             @click="clearSessionSelection"
-                            :disabled="batchDeleting || selectedCount === 0">
+                            :disabled="batchDeleting || recordsBatchDeleting || selectedCount === 0">
                             清空选择
                         </button>
                         <span class="session-batch-count">已选 {{ selectedCount }} 条</span>
                         <button
                             class="btn-session-delete"
                             @click="deleteSelectedSessions"
-                            :disabled="batchDeleting || selectedCount === 0">
+                            :disabled="batchDeleting || recordsBatchDeleting || selectedCount === 0">
                             {{ batchDeleting ? '批量删除中...' : '批量删除' }}
                         </button>
                     </div>
@@ -1592,7 +1674,7 @@
                                         <input
                                             type="checkbox"
                                             :checked="isSessionSelected(session)"
-                                            :disabled="batchDeleting || sessionDeleting[getSessionExportKey(session)]"
+                                            :disabled="batchDeleting || recordsBatchDeleting || sessionDeleting[getSessionExportKey(session)]"
                                             @change.stop="toggleSessionSelection(session, $event)">
                                     </label>
                                     <div class="session-item-title">{{ session.title || session.sessionId }}</div>
@@ -1600,7 +1682,7 @@
                                 <button
                                     class="session-item-delete"
                                     @click.stop="deleteSession(session)"
-                                    :disabled="batchDeleting || sessionDeleting[getSessionExportKey(session)]"
+                                    :disabled="batchDeleting || recordsBatchDeleting || sessionDeleting[getSessionExportKey(session)]"
                                     title="删除会话">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M3 6h18"/>
@@ -1624,19 +1706,19 @@
                                     <div class="session-preview-sub" v-if="activeSession.cwd">{{ activeSession.cwd }}</div>
                                 </div>
                                 <div class="session-actions">
-                                    <button class="btn-tool" @click="loadActiveSessionDetail" :disabled="sessionDetailLoading || !activeSession">
+                                    <button class="btn-tool" @click="loadActiveSessionDetail" :disabled="sessionDetailLoading || recordsBatchDeleting || !activeSession">
                                         {{ sessionDetailLoading ? '加载中...' : '刷新内容' }}
                                     </button>
                                     <button
                                         class="btn-session-export"
                                         @click="exportSession(activeSession)"
-                                        :disabled="!activeSession || batchDeleting || sessionExporting[getSessionExportKey(activeSession)]">
+                                        :disabled="!activeSession || batchDeleting || recordsBatchDeleting || sessionExporting[getSessionExportKey(activeSession)]">
                                         {{ (activeSession && sessionExporting[getSessionExportKey(activeSession)]) ? '导出中...' : '导出记录' }}
                                     </button>
                                     <button
                                         class="btn-session-delete"
                                         @click="deleteSession(activeSession)"
-                                        :disabled="!activeSession || batchDeleting || sessionDeleting[getSessionExportKey(activeSession)]">
+                                        :disabled="!activeSession || batchDeleting || recordsBatchDeleting || sessionDeleting[getSessionExportKey(activeSession)]">
                                         {{ (activeSession && sessionDeleting[getSessionExportKey(activeSession)]) ? '删除中...' : '删除会话' }}
                                     </button>
                                 </div>
@@ -1655,16 +1737,52 @@
                             </div>
 
                             <div v-else class="session-preview-body">
+                                <div class="session-record-toolbar">
+                                    <button
+                                        class="btn-tool"
+                                        @click="toggleSelectAllRecords"
+                                        :disabled="recordsBatchDeleting || activeSessionMessages.length === 0">
+                                        {{ isAllRecordsSelected ? '取消全选记录' : '全选当前记录' }}
+                                    </button>
+                                    <button
+                                        class="btn-tool"
+                                        @click="clearRecordSelection"
+                                        :disabled="recordsBatchDeleting || selectedRecordCount === 0">
+                                        清空记录选择
+                                    </button>
+                                    <span class="session-record-count">已选 {{ selectedRecordCount }} 条记录</span>
+                                    <button
+                                        class="btn-session-delete"
+                                        @click="deleteSelectedRecords"
+                                        :disabled="recordsBatchDeleting || selectedRecordCount === 0">
+                                        {{ recordsBatchDeleting ? '删除记录中...' : '批量删除记录' }}
+                                    </button>
+                                </div>
                                 <div v-if="activeSessionDetailClipped" class="session-item-sub">
-                                    仅展示最近 {{ activeSessionMessages.length }} 条消息，完整内容可直接导出。
+                                    仅展示最近 {{ activeSessionMessages.length }} 条消息；记录批量删除仅作用于当前已加载内容。
                                 </div>
                                 <div
                                     v-for="(msg, idx) in activeSessionMessages"
-                                    :key="idx + '-' + (msg.timestamp || '')"
-                                    :class="['session-msg', msg.role === 'user' ? 'user' : 'assistant']">
+                                    :key="getRecordRenderKey(msg, idx)"
+                                    :class="['session-msg', msg.role === 'user' ? 'user' : 'assistant', { selected: isRecordSelected(msg) }]">
                                     <div class="session-msg-header">
-                                        <span class="session-msg-role">{{ msg.role === 'user' ? 'User' : 'Assistant' }}</span>
-                                        <span>{{ msg.timestamp || '' }}</span>
+                                        <div class="session-msg-meta">
+                                            <label class="session-msg-checkbox" @click.stop title="选择记录">
+                                                <input
+                                                    type="checkbox"
+                                                    :checked="isRecordSelected(msg)"
+                                                    :disabled="recordsBatchDeleting || !isRecordSelectable(msg) || recordDeletingMap[getRecordKey(msg)]"
+                                                    @change.stop="toggleRecordSelection(msg, $event)">
+                                            </label>
+                                            <span class="session-msg-role">{{ msg.role === 'user' ? 'User' : 'Assistant' }}</span>
+                                            <span class="session-msg-time">{{ msg.timestamp || '' }}</span>
+                                        </div>
+                                        <button
+                                            class="session-msg-delete"
+                                            @click.stop="deleteSingleRecord(msg)"
+                                            :disabled="recordsBatchDeleting || !isRecordSelectable(msg) || recordDeletingMap[getRecordKey(msg)]">
+                                            {{ recordDeletingMap[getRecordKey(msg)] ? '删除中...' : '删除记录' }}
+                                        </button>
                                     </div>
                                     <div class="session-msg-content">{{ msg.text || '' }}</div>
                                 </div>
@@ -1912,6 +2030,9 @@
                     sessionDetailRequestSeq: 0,
                     selectedSessionMap: {},
                     batchDeleting: false,
+                    selectedRecordMap: {},
+                    recordDeletingMap: {},
+                    recordsBatchDeleting: false,
                     speedResults: {},
                     speedLoading: {},
                     newProvider: { name: '', url: '', key: '' },
@@ -1975,6 +2096,29 @@
                         return false;
                     }
                     return this.sessionsList.every(session => this.isSessionSelected(session));
+                },
+
+                selectedRecords() {
+                    if (!Array.isArray(this.activeSessionMessages) || this.activeSessionMessages.length === 0) {
+                        return [];
+                    }
+                    return this.activeSessionMessages.filter(message => this.isRecordSelected(message));
+                },
+
+                selectedRecordCount() {
+                    return this.selectedRecords.length;
+                },
+
+                isAllRecordsSelected() {
+                    if (!Array.isArray(this.activeSessionMessages) || this.activeSessionMessages.length === 0) {
+                        return false;
+                    }
+                    const selectableMessages = this.activeSessionMessages
+                        .filter(message => this.isRecordSelectable(message));
+                    if (selectableMessages.length === 0) {
+                        return false;
+                    }
+                    return selectableMessages.every(message => this.isRecordSelected(message));
                 }
             },
             methods: {
@@ -2022,6 +2166,8 @@
 
                 async onSessionSourceChange() {
                     this.clearSessionSelection();
+                    this.clearRecordSelection();
+                    this.recordDeletingMap = {};
                     await this.loadSessions();
                 },
 
@@ -2099,10 +2245,122 @@
                     return text;
                 },
 
+                getRecordKey(message) {
+                    if (!message || !Number.isInteger(message.recordLineIndex) || message.recordLineIndex < 0) {
+                        return '';
+                    }
+                    return String(message.recordLineIndex);
+                },
+
+                getRecordRenderKey(message, idx) {
+                    const recordKey = this.getRecordKey(message);
+                    if (recordKey) {
+                        return `record-${recordKey}`;
+                    }
+                    return `record-fallback-${idx}-${message && message.timestamp ? message.timestamp : ''}`;
+                },
+
+                isRecordSelectable(message) {
+                    return !!this.getRecordKey(message);
+                },
+
+                isRecordSelected(message) {
+                    const key = this.getRecordKey(message);
+                    if (!key) return false;
+                    return !!this.selectedRecordMap[key];
+                },
+
+                toggleRecordSelection(message, event) {
+                    const key = this.getRecordKey(message);
+                    if (!key) return;
+
+                    const checked = event && event.target ? !!event.target.checked : !this.isRecordSelected(message);
+                    const next = { ...this.selectedRecordMap };
+                    if (checked) {
+                        next[key] = true;
+                    } else {
+                        delete next[key];
+                    }
+                    this.selectedRecordMap = next;
+                },
+
+                clearRecordSelection() {
+                    this.selectedRecordMap = {};
+                },
+
+                pruneRecordSelection() {
+                    if (!Array.isArray(this.activeSessionMessages) || this.activeSessionMessages.length === 0) {
+                        this.clearRecordSelection();
+                        return;
+                    }
+
+                    const next = {};
+                    for (const message of this.activeSessionMessages) {
+                        const key = this.getRecordKey(message);
+                        if (key && this.selectedRecordMap[key]) {
+                            next[key] = true;
+                        }
+                    }
+                    this.selectedRecordMap = next;
+                },
+
+                toggleSelectAllRecords() {
+                    const selectable = Array.isArray(this.activeSessionMessages)
+                        ? this.activeSessionMessages.filter(message => this.isRecordSelectable(message))
+                        : [];
+                    if (selectable.length === 0) return;
+
+                    if (this.isAllRecordsSelected) {
+                        this.clearRecordSelection();
+                        return;
+                    }
+
+                    const next = {};
+                    for (const message of selectable) {
+                        const key = this.getRecordKey(message);
+                        if (key) {
+                            next[key] = true;
+                        }
+                    }
+                    this.selectedRecordMap = next;
+                },
+
+                formatRecordDeleteFailureSummary(results, limit = 3) {
+                    const failed = Array.isArray(results)
+                        ? results.filter(item => item && !item.success)
+                        : [];
+                    if (failed.length === 0) return '';
+                    const text = failed.slice(0, limit).map(item => {
+                        const label = Number.isInteger(item.recordLineIndex) && item.recordLineIndex >= 0
+                            ? `行${item.recordLineIndex}`
+                            : '未知行';
+                        return `${label}: ${item.error || '未知错误'}`;
+                    }).join('；');
+                    if (failed.length > limit) {
+                        return `${text}；其余 ${failed.length - limit} 条请重试`;
+                    }
+                    return text;
+                },
+
+                syncActiveSessionMessageCount(messageCount) {
+                    if (!Number.isFinite(messageCount) || messageCount < 0) return;
+                    if (this.activeSession) {
+                        this.activeSession.messageCount = messageCount;
+                    }
+                    const activeKey = this.activeSession ? this.getSessionExportKey(this.activeSession) : '';
+                    if (!activeKey) return;
+                    const matched = this.sessionsList.find(item => this.getSessionExportKey(item) === activeKey);
+                    if (matched) {
+                        matched.messageCount = messageCount;
+                    }
+                },
+
                 async loadSessions() {
                     if (this.sessionsLoading) return;
                     this.sessionsLoading = true;
                     this.activeSessionDetailError = '';
+                    this.clearRecordSelection();
+                    this.recordDeletingMap = {};
                     try {
                         const res = await api('list-sessions', {
                             source: this.sessionFilterSource,
@@ -2123,6 +2381,7 @@
                                 this.activeSession = null;
                                 this.activeSessionMessages = [];
                                 this.activeSessionDetailClipped = false;
+                                this.clearRecordSelection();
                             } else {
                                 const oldKey = this.activeSession ? this.getSessionExportKey(this.activeSession) : '';
                                 const matched = this.sessionsList.find(item => this.getSessionExportKey(item) === oldKey);
@@ -2136,6 +2395,7 @@
                         this.activeSession = null;
                         this.activeSessionMessages = [];
                         this.activeSessionDetailClipped = false;
+                        this.clearRecordSelection();
                         this.showMessage('加载会话失败: ' + e.message, 'error');
                     } finally {
                         this.sessionsLoading = false;
@@ -2149,6 +2409,8 @@
                     this.activeSessionMessages = [];
                     this.activeSessionDetailError = '';
                     this.activeSessionDetailClipped = false;
+                    this.clearRecordSelection();
+                    this.recordDeletingMap = {};
                     await this.loadActiveSessionDetail();
                 },
 
@@ -2157,12 +2419,15 @@
                         this.activeSessionMessages = [];
                         this.activeSessionDetailError = '';
                         this.activeSessionDetailClipped = false;
+                        this.clearRecordSelection();
+                        this.recordDeletingMap = {};
                         return;
                     }
 
                     const requestSeq = ++this.sessionDetailRequestSeq;
                     this.sessionDetailLoading = true;
                     this.activeSessionDetailError = '';
+                    this.recordDeletingMap = {};
                     try {
                         const res = await api('session-detail', {
                             source: this.activeSession.source,
@@ -2179,16 +2444,21 @@
                             this.activeSessionMessages = [];
                             this.activeSessionDetailClipped = false;
                             this.activeSessionDetailError = res.error;
+                            this.clearRecordSelection();
                             return;
                         }
 
                         this.activeSessionMessages = Array.isArray(res.messages) ? res.messages : [];
                         this.activeSessionDetailClipped = !!res.clipped;
+                        this.pruneRecordSelection();
                         if (res.updatedAt) {
                             this.activeSession.updatedAt = res.updatedAt;
                         }
                         if (res.cwd) {
                             this.activeSession.cwd = res.cwd;
+                        }
+                        if (Number.isFinite(res.totalMessages)) {
+                            this.syncActiveSessionMessageCount(res.totalMessages);
                         }
                     } catch (e) {
                         if (requestSeq !== this.sessionDetailRequestSeq) {
@@ -2197,6 +2467,7 @@
                         this.activeSessionMessages = [];
                         this.activeSessionDetailClipped = false;
                         this.activeSessionDetailError = '加载会话内容失败: ' + e.message;
+                        this.clearRecordSelection();
                     } finally {
                         if (requestSeq === this.sessionDetailRequestSeq) {
                             this.sessionDetailLoading = false;
@@ -2240,8 +2511,101 @@
                     }
                 },
 
+                async deleteSessionRecordsByLine(recordLineIndices, options = {}) {
+                    if (!this.activeSession) return;
+                    if (this.recordsBatchDeleting) return;
+
+                    const normalizedIndices = Array.from(new Set(
+                        (Array.isArray(recordLineIndices) ? recordLineIndices : [])
+                            .map(item => Number(item))
+                            .filter(item => Number.isInteger(item) && item >= 0)
+                    ));
+                    if (normalizedIndices.length === 0) return;
+
+                    this.recordsBatchDeleting = true;
+                    const pendingMap = { ...this.recordDeletingMap };
+                    for (const lineIndex of normalizedIndices) {
+                        pendingMap[String(lineIndex)] = true;
+                    }
+                    this.recordDeletingMap = pendingMap;
+
+                    try {
+                        const res = await api('delete-session-records', {
+                            source: this.activeSession.source,
+                            sessionId: this.activeSession.sessionId,
+                            filePath: this.activeSession.filePath,
+                            recordLineIndices: normalizedIndices
+                        });
+                        if (res.error) {
+                            this.showMessage('删除记录失败: ' + res.error, 'error');
+                            return;
+                        }
+
+                        const deleted = Number.isFinite(res.deleted) ? res.deleted : 0;
+                        const failed = Number.isFinite(res.failed)
+                            ? res.failed
+                            : Math.max(0, normalizedIndices.length - deleted);
+                        const results = Array.isArray(res.results) ? res.results : [];
+
+                        if (deleted > 0) {
+                            this.clearRecordSelection();
+                            await this.loadActiveSessionDetail();
+                            if (Number.isFinite(res.remainingMessages)) {
+                                this.syncActiveSessionMessageCount(res.remainingMessages);
+                            }
+                        } else {
+                            this.pruneRecordSelection();
+                        }
+
+                        if (failed > 0) {
+                            const detail = this.formatRecordDeleteFailureSummary(results);
+                            const summary = `记录删除完成：成功 ${deleted}，失败 ${failed}`;
+                            this.showMessage(detail ? `${summary}（${detail}）` : summary, 'error');
+                            return;
+                        }
+
+                        if (options && options.single === true) {
+                            this.showMessage('记录已删除', 'success');
+                        } else {
+                            this.showMessage(`已删除 ${deleted} 条记录`, 'success');
+                        }
+                    } catch (e) {
+                        this.showMessage('删除记录失败: ' + e.message, 'error');
+                    } finally {
+                        this.recordsBatchDeleting = false;
+                        this.recordDeletingMap = {};
+                    }
+                },
+
+                async deleteSingleRecord(message) {
+                    const key = this.getRecordKey(message);
+                    if (!key) {
+                        this.showMessage('当前记录暂不支持删除', 'error');
+                        return;
+                    }
+                    if (this.recordsBatchDeleting || this.recordDeletingMap[key]) return;
+                    if (!confirm('确定删除该条记录？\n删除后无法恢复。')) return;
+                    await this.deleteSessionRecordsByLine([Number(key)], { single: true });
+                },
+
+                async deleteSelectedRecords() {
+                    if (this.recordsBatchDeleting) return;
+                    const records = this.selectedRecords.slice();
+                    if (records.length === 0) return;
+
+                    const keys = records.map(message => this.getRecordKey(message)).filter(Boolean);
+                    const indices = Array.from(new Set(keys.map(key => Number(key)).filter(num => Number.isInteger(num) && num >= 0)));
+                    if (indices.length === 0) {
+                        this.showMessage('当前没有可删除的记录', 'error');
+                        return;
+                    }
+
+                    if (!confirm(`确定删除选中的 ${indices.length} 条记录？\n删除后无法恢复。`)) return;
+                    await this.deleteSessionRecordsByLine(indices, { single: false });
+                },
+
                 async deleteSelectedSessions() {
-                    if (this.batchDeleting) return;
+                    if (this.batchDeleting || this.recordsBatchDeleting) return;
                     const sessions = this.selectedSessions.slice();
                     const total = sessions.length;
                     if (total === 0) return;
@@ -2283,6 +2647,8 @@
                                 this.activeSessionMessages = [];
                                 this.activeSessionDetailError = '';
                                 this.activeSessionDetailClipped = false;
+                                this.clearRecordSelection();
+                                this.recordDeletingMap = {};
                                 this.sessionDetailRequestSeq += 1;
                                 this.sessionDetailLoading = false;
 
@@ -2316,7 +2682,7 @@
 
                 async deleteSession(session) {
                     if (!session) return;
-                    if (this.batchDeleting) return;
+                    if (this.batchDeleting || this.recordsBatchDeleting) return;
                     const title = session.title || session.sessionId || session.filePath || '当前会话';
                     if (!confirm(`确定删除会话 "${title}"?\n删除后无法恢复。`)) return;
                     const key = this.getSessionExportKey(session);
@@ -2341,6 +2707,8 @@
                             this.activeSessionMessages = [];
                             this.activeSessionDetailError = '';
                             this.activeSessionDetailClipped = false;
+                            this.clearRecordSelection();
+                            this.recordDeletingMap = {};
                             this.sessionDetailRequestSeq += 1;
                             this.sessionDetailLoading = false;
 
