@@ -672,6 +672,31 @@
             white-space: nowrap;
         }
 
+        .btn-session-refresh {
+            border: 1px solid rgba(208, 196, 182, 0.6);
+            border-radius: var(--radius-sm);
+            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.9) 100%);
+            color: var(--color-text-secondary);
+            padding: 8px 12px;
+            font-size: var(--font-size-secondary);
+            font-weight: var(--font-weight-secondary);
+            cursor: pointer;
+            transition: all var(--transition-fast) var(--ease-spring);
+            white-space: nowrap;
+        }
+
+        .btn-session-refresh:hover {
+            border-color: var(--color-brand);
+            color: var(--color-brand);
+            transform: translateY(-1px);
+        }
+
+        .btn-session-refresh:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         .btn-session-export:hover {
             border-color: var(--color-brand);
             color: var(--color-brand);
@@ -1706,7 +1731,7 @@
                                     <div class="session-preview-sub" v-if="activeSession.cwd">{{ activeSession.cwd }}</div>
                                 </div>
                                 <div class="session-actions">
-                                    <button class="btn-tool" @click="loadActiveSessionDetail" :disabled="sessionDetailLoading || recordsBatchDeleting || !activeSession">
+                                    <button class="btn-session-refresh" @click="loadActiveSessionDetail" :disabled="sessionDetailLoading || recordsBatchDeleting || !activeSession">
                                         {{ sessionDetailLoading ? '加载中...' : '刷新内容' }}
                                     </button>
                                     <button
