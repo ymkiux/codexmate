@@ -34,6 +34,7 @@ const SESSION_LIST_CACHE_TTL_MS = 4000;
 const SESSION_SUMMARY_READ_BYTES = 256 * 1024;
 const SESSION_SCAN_FACTOR = 4;
 const SESSION_SCAN_MIN_FILES = 800;
+const MAX_BATCH_DELETE_SESSIONS = 500;
 const BOOTSTRAP_TEXT_MARKERS = [
     'agents.md instructions',
     '<instructions>',
@@ -1388,7 +1389,7 @@ async function exportSessionData(params = {}) {
     };
 }
 
-function deleteSessionFile(params = {}) {
+function deleteSessionFile(params = {}, options = {}) {
     const source = params.source === 'claude' ? 'claude' : (params.source === 'codex' ? 'codex' : '');
     if (!source) {
         return { error: 'Invalid source' };
@@ -1420,13 +1421,73 @@ function deleteSessionFile(params = {}) {
         return { error: `Failed to delete session: ${e.message}` };
     }
 
-    invalidateSessionListCache();
+    if (!options.skipCacheInvalidate) {
+        invalidateSessionListCache();
+    }
 
     return {
         success: true,
         source,
         sessionId: params.sessionId || path.basename(filePath, '.jsonl'),
         filePath
+    };
+}
+
+function deleteSessionFilesBatch(params = {}) {
+    const items = Array.isArray(params.items) ? params.items : [];
+    if (items.length === 0) {
+        return { error: 'No sessions provided' };
+    }
+
+    if (items.length > MAX_BATCH_DELETE_SESSIONS) {
+        return { error: `Too many sessions, max ${MAX_BATCH_DELETE_SESSIONS}` };
+    }
+
+    const results = [];
+    let deleted = 0;
+
+    for (const item of items) {
+        const payload = (item && typeof item === 'object') ? item : {};
+        const source = typeof payload.source === 'string' ? payload.source : '';
+        const sessionId = typeof payload.sessionId === 'string' ? payload.sessionId : '';
+        const filePath = typeof payload.filePath === 'string' ? payload.filePath : '';
+
+        const single = deleteSessionFile(
+            { source, sessionId, filePath },
+            { skipCacheInvalidate: true }
+        );
+
+        if (single.error) {
+            results.push({
+                success: false,
+                source: source || 'unknown',
+                sessionId,
+                filePath,
+                error: single.error
+            });
+            continue;
+        }
+
+        deleted += 1;
+        results.push({
+            success: true,
+            source: single.source,
+            sessionId: single.sessionId,
+            filePath: single.filePath
+        });
+    }
+
+    if (deleted > 0) {
+        invalidateSessionListCache();
+    }
+
+    const failed = results.length - deleted;
+    return {
+        success: failed === 0,
+        total: results.length,
+        deleted,
+        failed,
+        results
     };
 }
 
@@ -2307,6 +2368,9 @@ function cmdStart() {
                             break;
                         case 'delete-session':
                             result = deleteSessionFile(params);
+                            break;
+                        case 'delete-sessions':
+                            result = deleteSessionFilesBatch(params);
                             break;
                         default:
                             result = { error: '未知操作' };
