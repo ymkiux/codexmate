@@ -10,6 +10,8 @@ Codex Mate 是一个简洁的命令行工具，提供两大核心功能：
 1. **Codex 提供商管理** - 快速切换 Codex 的 AI 模型提供商和模型
 2. **Claude Code 配置** - 一键配置 Claude Code 环境变量（仅限 Windows）
 
+其中 **Codex 配置功能支持 Linux 和 Windows**，可通过 CLI 或 Web 统一管理。
+
 支持通过 CLI 或 Web 界面进行可视化操作，让 AI 工具的配置管理变得简单高效。
 
 ## 功能特性
@@ -96,6 +98,7 @@ codexmate start
 - 快速切换提供商
 - 切换和管理可用模型
 - 添加/删除自定义提供商
+- 支持 Linux / Windows 环境下的 Codex 配置管理
 
 #### Claude Code 配置模式（仅限 Windows）
 - 管理多个 Claude Code 配置方案
@@ -184,7 +187,7 @@ codexmate start
 ## 常见问题
 
 ### Q: 支持哪些操作系统？
-A: 支持 Windows、macOS 和 Linux。Claude Code 环境变量配置功能仅限 Windows。
+A: Codex 功能支持 Windows 和 Linux（CLI 与 Web）。Claude Code 环境变量配置功能仅限 Windows。
 
 ### Q: API key 存储在哪里？
 A: API key 存储在本地配置文件 `~/.codex/config.toml` 中，不会上传到任何服务器。
