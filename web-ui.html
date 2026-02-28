@@ -594,7 +594,8 @@
             padding: 0 2px;
         }
 
-        .session-source-select {
+        .session-source-select,
+        .session-path-select {
             flex: 1;
             min-width: 180px;
             padding: 10px 12px;
@@ -607,7 +608,8 @@
             outline: none;
         }
 
-        .session-source-select:focus {
+        .session-source-select:focus,
+        .session-path-select:focus {
             border-color: var(--color-brand);
             box-shadow: var(--shadow-input-focus);
         }
@@ -1645,6 +1647,14 @@
                             <option value="codex">仅 Codex</option>
                             <option value="claude">仅 Claude Code</option>
                         </select>
+                        <select
+                            class="session-path-select"
+                            v-model="sessionPathFilter"
+                            @change="onSessionPathFilterChange"
+                            :disabled="sessionsLoading || batchDeleting || recordsBatchDeleting">
+                            <option value="">全部路径</option>
+                            <option v-for="cwd in sessionPathOptions" :key="cwd" :value="cwd">{{ cwd }}</option>
+                        </select>
                         <button class="btn-tool" @click="loadSessions" :disabled="sessionsLoading || batchDeleting || recordsBatchDeleting">
                             {{ sessionsLoading ? '刷新中...' : '刷新会话' }}
                         </button>
@@ -1671,7 +1681,7 @@
                         </button>
                     </div>
                     <div class="session-hint">
-                        左侧支持勾选多条会话后批量删除，也可继续单条删除；右侧预览区支持导出或删除当前会话。
+                        支持按路径下拉筛选当前会话列表。左侧可勾选多条会话批量删除；右侧预览区支持导出或删除当前会话。
                     </div>
                 </div>
 
@@ -2049,6 +2059,20 @@
                     sessionsList: [],
                     sessionsLoading: false,
                     sessionFilterSource: 'all',
+                    sessionPathFilter: '',
+                    sessionPathOptions: [],
+                    sessionPathOptionsLoading: false,
+                    sessionPathOptionsMap: {
+                        all: [],
+                        codex: [],
+                        claude: []
+                    },
+                    sessionPathOptionsLoadedMap: {
+                        all: false,
+                        codex: false,
+                        claude: false
+                    },
+                    sessionPathRequestSeq: 0,
                     sessionExporting: {},
                     sessionDeleting: {},
                     activeSession: null,
@@ -2193,7 +2217,124 @@
                     return `${session.source || 'unknown'}:${session.sessionId || ''}:${session.filePath || ''}`;
                 },
 
+                normalizeSessionPathValue(value) {
+                    if (typeof value !== 'string') return '';
+                    return value.trim();
+                },
+
+                mergeSessionPathOptions(baseList = [], incomingList = []) {
+                    const merged = [];
+                    const seen = new Set();
+                    const append = (items) => {
+                        if (!Array.isArray(items)) return;
+                        for (const item of items) {
+                            const value = this.normalizeSessionPathValue(item);
+                            if (!value) continue;
+                            const key = value.toLowerCase();
+                            if (seen.has(key)) continue;
+                            seen.add(key);
+                            merged.push(value);
+                        }
+                    };
+
+                    append(baseList);
+                    append(incomingList);
+                    return merged;
+                },
+
+                extractPathOptionsFromSessions(sessions) {
+                    const paths = [];
+                    if (!Array.isArray(sessions)) {
+                        return paths;
+                    }
+
+                    const seen = new Set();
+                    for (const session of sessions) {
+                        const value = this.normalizeSessionPathValue(session && session.cwd ? session.cwd : '');
+                        if (!value) continue;
+                        const key = value.toLowerCase();
+                        if (seen.has(key)) continue;
+                        seen.add(key);
+                        paths.push(value);
+                    }
+                    return paths;
+                },
+
+                syncSessionPathOptionsForSource(source, nextOptions, mergeWithExisting = false) {
+                    const targetSource = source === 'codex' || source === 'claude' ? source : 'all';
+                    const current = Array.isArray(this.sessionPathOptionsMap[targetSource])
+                        ? this.sessionPathOptionsMap[targetSource]
+                        : [];
+                    const merged = mergeWithExisting
+                        ? this.mergeSessionPathOptions(current, nextOptions)
+                        : this.mergeSessionPathOptions([], nextOptions);
+                    this.sessionPathOptionsMap = {
+                        ...this.sessionPathOptionsMap,
+                        [targetSource]: merged
+                    };
+                    this.refreshSessionPathOptions(targetSource);
+                },
+
+                refreshSessionPathOptions(source) {
+                    const targetSource = source === 'codex' || source === 'claude' ? source : 'all';
+                    const base = Array.isArray(this.sessionPathOptionsMap[targetSource])
+                        ? [...this.sessionPathOptionsMap[targetSource]]
+                        : [];
+                    const selected = this.normalizeSessionPathValue(this.sessionPathFilter);
+                    if (selected && !base.some(item => item.toLowerCase() === selected.toLowerCase())) {
+                        base.unshift(selected);
+                    }
+                    if (targetSource === this.sessionFilterSource) {
+                        this.sessionPathOptions = base;
+                    }
+                },
+
+                async loadSessionPathOptions(options = {}) {
+                    const source = options.source === 'codex' || options.source === 'claude'
+                        ? options.source
+                        : 'all';
+                    const forceRefresh = !!options.forceRefresh;
+                    const loaded = !!this.sessionPathOptionsLoadedMap[source];
+                    if (!forceRefresh && loaded) {
+                        return;
+                    }
+
+                    const requestSeq = ++this.sessionPathRequestSeq;
+                    this.sessionPathOptionsLoading = true;
+                    try {
+                        const res = await api('list-session-paths', {
+                            source,
+                            limit: 500,
+                            forceRefresh
+                        });
+                        if (requestSeq !== this.sessionPathRequestSeq) {
+                            return;
+                        }
+                        if (res && !res.error && Array.isArray(res.paths)) {
+                            this.syncSessionPathOptionsForSource(source, res.paths, true);
+                            this.sessionPathOptionsLoadedMap = {
+                                ...this.sessionPathOptionsLoadedMap,
+                                [source]: true
+                            };
+                        }
+                    } catch (_) {
+                        // 路径补全失败不影响会话主流程
+                    } finally {
+                        if (requestSeq === this.sessionPathRequestSeq) {
+                            this.sessionPathOptionsLoading = false;
+                        }
+                    }
+                },
+
                 async onSessionSourceChange() {
+                    this.clearSessionSelection();
+                    this.clearRecordSelection();
+                    this.recordDeletingMap = {};
+                    this.refreshSessionPathOptions(this.sessionFilterSource);
+                    await this.loadSessions();
+                },
+
+                async onSessionPathFilterChange() {
                     this.clearSessionSelection();
                     this.clearRecordSelection();
                     this.recordDeletingMap = {};
@@ -2393,6 +2534,7 @@
                     try {
                         const res = await api('list-sessions', {
                             source: this.sessionFilterSource,
+                            pathFilter: this.sessionPathFilter,
                             limit: 200,
                             forceRefresh: true
                         });
@@ -2405,6 +2547,11 @@
                             this.activeSessionDetailClipped = false;
                         } else {
                             this.sessionsList = Array.isArray(res.sessions) ? res.sessions : [];
+                            this.syncSessionPathOptionsForSource(
+                                this.sessionFilterSource,
+                                this.extractPathOptionsFromSessions(this.sessionsList),
+                                true
+                            );
                             this.pruneSessionSelection();
                             if (this.sessionsList.length === 0) {
                                 this.activeSession = null;
@@ -2417,6 +2564,7 @@
                                 this.activeSession = matched || this.sessionsList[0];
                                 await this.loadActiveSessionDetail();
                             }
+                            void this.loadSessionPathOptions({ source: this.sessionFilterSource });
                         }
                     } catch (e) {
                         this.sessionsList = [];
