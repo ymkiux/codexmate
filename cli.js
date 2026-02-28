@@ -36,6 +36,7 @@ const SESSION_LIST_CACHE_TTL_MS = 4000;
 const SESSION_SUMMARY_READ_BYTES = 256 * 1024;
 const SESSION_SCAN_FACTOR = 4;
 const SESSION_SCAN_MIN_FILES = 800;
+const MAX_SESSION_PATH_LIST_SIZE = 2000;
 const MAX_BATCH_DELETE_SESSIONS = 500;
 const MAX_BATCH_DELETE_RECORDS = 2000;
 const BOOTSTRAP_TEXT_MARKERS = [
@@ -768,6 +769,26 @@ function mergeAndLimitSessions(items, limit) {
     return sortSessionsByUpdatedAt(deduped).slice(0, limit);
 }
 
+function normalizeSessionPathFilter(pathFilter) {
+    if (typeof pathFilter !== 'string') {
+        return '';
+    }
+    const trimmed = pathFilter.trim();
+    return trimmed ? trimmed.toLowerCase() : '';
+}
+
+function matchesSessionPathFilter(session, normalizedFilter) {
+    if (!normalizedFilter) {
+        return true;
+    }
+    if (!session || typeof session !== 'object') {
+        return false;
+    }
+
+    const cwd = typeof session.cwd === 'string' ? session.cwd.toLowerCase() : '';
+    return cwd.includes(normalizedFilter);
+}
+
 function collectRecentJsonlFiles(rootDir, options = {}) {
     if (!fs.existsSync(rootDir)) {
         return [];
@@ -1029,14 +1050,25 @@ function parseClaudeSessionSummary(filePath) {
     };
 }
 
-function listCodexSessions(limit) {
-    const scanCount = Math.max(
-        limit * SESSION_SCAN_FACTOR,
-        Math.min(SESSION_SCAN_MIN_FILES, MAX_SESSION_LIST_SIZE * SESSION_SCAN_FACTOR)
-    );
+function listCodexSessions(limit, options = {}) {
+    const scanFactor = Number.isFinite(Number(options.scanFactor))
+        ? Math.max(1, Number(options.scanFactor))
+        : SESSION_SCAN_FACTOR;
+    const minFiles = Number.isFinite(Number(options.minFiles))
+        ? Math.max(1, Number(options.minFiles))
+        : Math.min(SESSION_SCAN_MIN_FILES, MAX_SESSION_LIST_SIZE * SESSION_SCAN_FACTOR);
+    const targetCount = Number.isFinite(Number(options.targetCount))
+        ? Math.max(1, Math.floor(Number(options.targetCount)))
+        : Math.max(1, Math.floor(limit * scanFactor));
+    const scanCount = Number.isFinite(Number(options.scanCount))
+        ? Math.max(targetCount, Math.floor(Number(options.scanCount)))
+        : Math.max(targetCount, minFiles);
+    const maxFilesScanned = Number.isFinite(Number(options.maxFilesScanned))
+        ? Math.max(scanCount, Math.floor(Number(options.maxFilesScanned)))
+        : Math.max(scanCount * 2, minFiles);
     const files = collectRecentJsonlFiles(CODEX_SESSIONS_DIR, {
         returnCount: scanCount,
-        maxFilesScanned: Math.max(scanCount * 2, SESSION_SCAN_MIN_FILES)
+        maxFilesScanned
     });
     const sessions = [];
 
@@ -1046,7 +1078,7 @@ function listCodexSessions(limit) {
             sessions.push(summary);
         }
 
-        if (sessions.length >= limit * SESSION_SCAN_FACTOR) {
+        if (sessions.length >= targetCount) {
             break;
         }
     }
@@ -1054,10 +1086,26 @@ function listCodexSessions(limit) {
     return mergeAndLimitSessions(sessions, limit);
 }
 
-function listClaudeSessions(limit) {
+function listClaudeSessions(limit, options = {}) {
     if (!fs.existsSync(CLAUDE_PROJECTS_DIR)) {
         return [];
     }
+
+    const scanFactor = Number.isFinite(Number(options.scanFactor))
+        ? Math.max(1, Number(options.scanFactor))
+        : SESSION_SCAN_FACTOR;
+    const minFiles = Number.isFinite(Number(options.minFiles))
+        ? Math.max(1, Number(options.minFiles))
+        : Math.min(SESSION_SCAN_MIN_FILES, MAX_SESSION_LIST_SIZE * SESSION_SCAN_FACTOR);
+    const targetCount = Number.isFinite(Number(options.targetCount))
+        ? Math.max(1, Math.floor(Number(options.targetCount)))
+        : Math.max(1, Math.floor(limit * scanFactor));
+    const scanCount = Number.isFinite(Number(options.scanCount))
+        ? Math.max(targetCount, Math.floor(Number(options.scanCount)))
+        : Math.max(targetCount, minFiles);
+    const maxFilesScanned = Number.isFinite(Number(options.maxFilesScanned))
+        ? Math.max(scanCount, Math.floor(Number(options.maxFilesScanned)))
+        : Math.max(scanCount * 2, minFiles);
 
     const sessions = [];
     let projectDirs = [];
@@ -1128,24 +1176,20 @@ function listClaudeSessions(limit) {
                 filePath
             });
 
-            if (sessions.length >= limit * SESSION_SCAN_FACTOR) {
+            if (sessions.length >= targetCount) {
                 break;
             }
         }
 
-        if (sessions.length >= limit * SESSION_SCAN_FACTOR) {
+        if (sessions.length >= targetCount) {
             break;
         }
     }
 
     if (sessions.length === 0) {
-        const scanCount = Math.max(
-            limit * SESSION_SCAN_FACTOR,
-            Math.min(SESSION_SCAN_MIN_FILES, MAX_SESSION_LIST_SIZE * SESSION_SCAN_FACTOR)
-        );
         const fallbackFiles = collectRecentJsonlFiles(CLAUDE_PROJECTS_DIR, {
             returnCount: scanCount,
-            maxFilesScanned: Math.max(scanCount * 2, SESSION_SCAN_MIN_FILES),
+            maxFilesScanned,
             ignoreSubPath: `${path.sep}subagents${path.sep}`
         });
         for (const filePath of fallbackFiles) {
@@ -1154,7 +1198,7 @@ function listClaudeSessions(limit) {
                 sessions.push(summary);
             }
 
-            if (sessions.length >= limit * SESSION_SCAN_FACTOR) {
+            if (sessions.length >= targetCount) {
                 break;
             }
         }
@@ -1172,23 +1216,89 @@ function listAllSessions(params = {}) {
         ? Math.max(1, Math.min(rawLimit, MAX_SESSION_LIST_SIZE))
         : 120;
     const forceRefresh = !!params.forceRefresh;
-    const cacheKey = `${source}:${limit}`;
+    const normalizedPathFilter = normalizeSessionPathFilter(params.pathFilter);
+    const hasPathFilter = !!normalizedPathFilter;
+    const cacheKey = `${source}:${limit}:${normalizedPathFilter}`;
     const cached = getSessionListCache(cacheKey, forceRefresh);
     if (cached) {
         return cached;
     }
 
+    const scanOptions = hasPathFilter
+        ? {
+            scanFactor: SESSION_SCAN_FACTOR * 2,
+            minFiles: SESSION_SCAN_MIN_FILES * 2
+        }
+        : {};
+
     let sessions = [];
     if (source === 'all' || source === 'codex') {
-        sessions = sessions.concat(listCodexSessions(limit));
+        sessions = sessions.concat(listCodexSessions(limit, scanOptions));
     }
     if (source === 'all' || source === 'claude') {
-        sessions = sessions.concat(listClaudeSessions(limit));
+        sessions = sessions.concat(listClaudeSessions(limit, scanOptions));
+    }
+
+    if (hasPathFilter) {
+        sessions = sessions.filter(item => matchesSessionPathFilter(item, normalizedPathFilter));
     }
 
     const result = mergeAndLimitSessions(sessions, limit);
     setSessionListCache(cacheKey, result);
     return result;
+}
+
+function listSessionPaths(params = {}) {
+    const source = params.source === 'codex' || params.source === 'claude'
+        ? params.source
+        : 'all';
+    const rawLimit = Number(params.limit);
+    const limit = Number.isFinite(rawLimit)
+        ? Math.max(1, Math.min(rawLimit, MAX_SESSION_PATH_LIST_SIZE))
+        : 500;
+    const forceRefresh = !!params.forceRefresh;
+    const cacheKey = `paths:${source}:${limit}`;
+    const cached = getSessionListCache(cacheKey, forceRefresh);
+    if (cached) {
+        return cached;
+    }
+
+    const gatherLimit = Math.min(MAX_SESSION_PATH_LIST_SIZE, Math.max(limit * 4, 800));
+    const scanOptions = {
+        scanFactor: SESSION_SCAN_FACTOR * 2,
+        minFiles: SESSION_SCAN_MIN_FILES * 2,
+        targetCount: Math.max(gatherLimit * 2, 1000)
+    };
+
+    let sessions = [];
+    if (source === 'all' || source === 'codex') {
+        sessions = sessions.concat(listCodexSessions(gatherLimit, scanOptions));
+    }
+    if (source === 'all' || source === 'claude') {
+        sessions = sessions.concat(listClaudeSessions(gatherLimit, scanOptions));
+    }
+
+    const dedupedPaths = [];
+    const seen = new Set();
+    const sorted = sortSessionsByUpdatedAt(sessions);
+    for (const session of sorted) {
+        const cwd = typeof session.cwd === 'string' ? session.cwd.trim() : '';
+        if (!cwd) {
+            continue;
+        }
+        const key = cwd.toLowerCase();
+        if (seen.has(key)) {
+            continue;
+        }
+        seen.add(key);
+        dedupedPaths.push(cwd);
+        if (dedupedPaths.length >= limit) {
+            break;
+        }
+    }
+
+    setSessionListCache(cacheKey, dedupedPaths);
+    return dedupedPaths;
 }
 
 function resolveSessionFilePath(source, filePath, sessionId) {
@@ -2713,6 +2823,11 @@ function cmdStart() {
                         case 'list-sessions':
                             result = {
                                 sessions: listAllSessions(params)
+                            };
+                            break;
+                        case 'list-session-paths':
+                            result = {
+                                paths: listSessionPaths(params)
                             };
                             break;
                         case 'export-session':
