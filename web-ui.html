@@ -1595,6 +1595,9 @@
                     </svg>
                     添加提供商
                 </button>
+                <div class="config-template-hint">
+                    默认应用到 <code>~/.claude/settings.json</code>；编辑弹窗中可使用兼容模式写入系统环境变量。
+                </div>
 
                 <div class="card-list">
                     <div v-for="(config, name) in claudeConfigs" :key="name"
@@ -1972,7 +1975,8 @@
                 <div class="btn-group">
                     <button class="btn btn-cancel" @click="closeEditConfigModal">取消</button>
                     <button class="btn btn-confirm" @click="updateConfig">保存</button>
-                    <button class="btn btn-confirm secondary" @click="saveAndApplyConfig">保存并应用</button>
+                    <button class="btn btn-confirm secondary" @click="saveAndApplyConfig">保存并应用到 Claude 配置</button>
+                    <button class="btn btn-confirm secondary" @click="saveAndApplyEnvCompat">兼容模式应用到环境变量</button>
                 </div>
             </div>
         </div>
@@ -2984,11 +2988,36 @@
                         return this.showMessage('请先输入 API Key', 'error');
                     }
 
-                    const res = await api('apply-env', { config });
-                    if (res.error) {
-                        this.showMessage(res.error, 'error');
+                    const res = await api('apply-claude-config', { config });
+                    if (res.error || res.success === false) {
+                        this.showMessage(res.error || '应用 Claude 配置失败', 'error');
                     } else {
-                        this.showMessage('已保存并应用到系统环境变量', 'success');
+                        const targetTip = res.targetPath ? `（${res.targetPath}）` : '';
+                        this.showMessage(`已保存并应用到 Claude 配置${targetTip}`, 'success');
+                        this.closeEditConfigModal();
+                    }
+                },
+
+                async saveAndApplyEnvCompat() {
+                    const name = this.editingConfig.name;
+                    this.claudeConfigs[name] = {
+                        apiKey: this.editingConfig.apiKey,
+                        baseUrl: this.editingConfig.baseUrl,
+                        model: this.editingConfig.model,
+                        hasKey: !!this.editingConfig.apiKey
+                    };
+                    this.saveClaudeConfigs();
+
+                    const config = this.claudeConfigs[name];
+                    if (!config.apiKey) {
+                        return this.showMessage('请先输入 API Key', 'error');
+                    }
+
+                    const res = await api('apply-env', { config });
+                    if (res.error || res.success === false) {
+                        this.showMessage(res.error || '应用环境变量失败', 'error');
+                    } else {
+                        this.showMessage('已保存并应用到系统环境变量（兼容模式）', 'success');
                         this.closeEditConfigModal();
                     }
                 },
@@ -3038,11 +3067,12 @@
                         return this.showMessage('该配置未设置 API Key，请先编辑', 'error');
                     }
 
-                    const res = await api('apply-env', { config });
-                    if (res.error) {
-                        this.showMessage(res.error, 'error');
+                    const res = await api('apply-claude-config', { config });
+                    if (res.error || res.success === false) {
+                        this.showMessage(res.error || '应用 Claude 配置失败', 'error');
                     } else {
-                        this.showMessage(`已应用配置: ${name}`, 'success');
+                        const targetTip = res.targetPath ? `（${res.targetPath}）` : '';
+                        this.showMessage(`已应用配置到 Claude 设置: ${name}${targetTip}`, 'success');
                     }
                 },
 

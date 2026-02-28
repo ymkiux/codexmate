@@ -20,6 +20,8 @@ const MODELS_FILE = path.join(CONFIG_DIR, 'models.json');
 const CURRENT_MODELS_FILE = path.join(CONFIG_DIR, 'provider-current-models.json');
 const INIT_MARK_FILE = path.join(CONFIG_DIR, 'codexmate-init.json');
 const CODEX_SESSIONS_DIR = path.join(CONFIG_DIR, 'sessions');
+const CLAUDE_DIR = path.join(os.homedir(), '.claude');
+const CLAUDE_SETTINGS_FILE = path.join(CLAUDE_DIR, 'settings.json');
 const CLAUDE_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
 
 const DEFAULT_MODELS = ['gpt-5.3-codex', 'gpt-5.1-codex-max', 'gpt-4-turbo', 'gpt-4'];
@@ -142,6 +144,89 @@ function readJsonFile(filePath, fallback = null) {
         return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
     } catch (e) {
         return fallback;
+    }
+}
+
+function ensureDir(dirPath) {
+    if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
+    }
+}
+
+function readJsonObjectFromFile(filePath, fallback = {}) {
+    if (!fs.existsSync(filePath)) {
+        return { ok: true, exists: false, data: { ...fallback } };
+    }
+
+    try {
+        const content = fs.readFileSync(filePath, 'utf-8');
+        if (!content.trim()) {
+            return { ok: true, exists: true, data: { ...fallback } };
+        }
+
+        const parsed = JSON.parse(content);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            return {
+                ok: false,
+                exists: true,
+                error: `配置文件格式错误（根节点必须是对象）: ${filePath}`
+            };
+        }
+        return { ok: true, exists: true, data: parsed };
+    } catch (e) {
+        return {
+            ok: false,
+            exists: true,
+            error: `配置文件解析失败: ${e.message}`
+        };
+    }
+}
+
+function backupFileIfNeededOnce(filePath, backupPrefix = 'codexmate-backup') {
+    if (!fs.existsSync(filePath)) {
+        return '';
+    }
+
+    const dirPath = path.dirname(filePath);
+    const baseName = path.basename(filePath);
+    const existingPrefix = `${baseName}.${backupPrefix}-`;
+    const hasBackup = fs.readdirSync(dirPath).some(fileName =>
+        fileName.startsWith(existingPrefix) && fileName.endsWith('.bak')
+    );
+
+    if (hasBackup) {
+        return '';
+    }
+
+    const backupPath = path.join(dirPath, `${existingPrefix}${formatTimestampForFileName()}.bak`);
+    fs.copyFileSync(filePath, backupPath);
+    return backupPath;
+}
+
+function writeJsonAtomic(filePath, data) {
+    const dirPath = path.dirname(filePath);
+    ensureDir(dirPath);
+
+    const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
+    const content = `${JSON.stringify(data, null, 2)}\n`;
+
+    try {
+        fs.writeFileSync(tmpPath, content, 'utf-8');
+        try {
+            fs.renameSync(tmpPath, filePath);
+        } catch (renameError) {
+            if (process.platform === 'win32') {
+                fs.copyFileSync(tmpPath, filePath);
+                fs.unlinkSync(tmpPath);
+            } else {
+                throw renameError;
+            }
+        }
+    } catch (e) {
+        if (fs.existsSync(tmpPath)) {
+            try { fs.unlinkSync(tmpPath); } catch (_) {}
+        }
+        throw new Error(`写入 JSON 文件失败: ${e.message}`);
     }
 }
 
@@ -2258,7 +2343,7 @@ function maskKey(key) {
 }
 
 // 应用到系统环境变量
-function applyToSystemEnv(config) {
+function applyToSystemEnv(config = {}) {
     try {
         const apiKey = config.apiKey || '';
 
@@ -2284,14 +2369,85 @@ function applyToSystemEnv(config) {
             }
 
             if (errors.length > 0) {
-                return { success: false, error: `部分环境变量设置失败:\n${errors.join('\n')}` };
+                return {
+                    success: false,
+                    mode: 'env-vars',
+                    error: `部分环境变量设置失败:\n${errors.join('\n')}`
+                };
             }
-            return { success: true };
+            return {
+                success: true,
+                mode: 'env-vars',
+                updatedKeys: envVars.map(([key]) => key)
+            };
         } else {
-            return { success: false, error: '仅支持 Windows 系统' };
+            return { success: false, mode: 'env-vars', error: '仅支持 Windows 系统' };
         }
     } catch (e) {
-        return { success: false, error: e.message };
+        return { success: false, mode: 'env-vars', error: e.message };
+    }
+}
+
+// 应用到 Claude Code settings.json（跨平台）
+function applyToClaudeSettings(config = {}) {
+    try {
+        const apiKey = (config.apiKey || '').trim();
+        if (!apiKey) {
+            return { success: false, mode: 'settings-file', error: '请先输入 API Key' };
+        }
+
+        const baseUrl = (config.baseUrl || 'https://open.bigmodel.cn/api/anthropic').trim();
+        const model = (config.model || 'glm-4.7').trim();
+        const readResult = readJsonObjectFromFile(CLAUDE_SETTINGS_FILE, {});
+        if (!readResult.ok) {
+            return { success: false, mode: 'settings-file', error: readResult.error };
+        }
+
+        const currentSettings = readResult.data;
+        const currentEnv = (currentSettings.env && typeof currentSettings.env === 'object' && !Array.isArray(currentSettings.env))
+            ? currentSettings.env
+            : {};
+
+        const nextEnv = {
+            ...currentEnv,
+            ANTHROPIC_API_KEY: apiKey,
+            ANTHROPIC_AUTH_TOKEN: apiKey,
+            ANTHROPIC_BASE_URL: baseUrl,
+            ANTHROPIC_MODEL: model,
+            CLAUDE_CODE_USE_KEY: '1'
+        };
+
+        const nextSettings = {
+            ...currentSettings,
+            env: nextEnv
+        };
+
+        ensureDir(CLAUDE_DIR);
+        const backupPath = backupFileIfNeededOnce(CLAUDE_SETTINGS_FILE);
+        writeJsonAtomic(CLAUDE_SETTINGS_FILE, nextSettings);
+
+        const result = {
+            success: true,
+            mode: 'settings-file',
+            targetPath: CLAUDE_SETTINGS_FILE,
+            updatedKeys: [
+                'env.ANTHROPIC_API_KEY',
+                'env.ANTHROPIC_AUTH_TOKEN',
+                'env.ANTHROPIC_BASE_URL',
+                'env.ANTHROPIC_MODEL',
+                'env.CLAUDE_CODE_USE_KEY'
+            ]
+        };
+        if (backupPath) {
+            result.backupPath = backupPath;
+        }
+        return result;
+    } catch (e) {
+        return {
+            success: false,
+            mode: 'settings-file',
+            error: e.message || '应用 Claude 配置失败'
+        };
     }
 }
 
@@ -2530,6 +2686,9 @@ function cmdStart() {
                         case 'delete-model':
                             cmdDeleteModel(params.model, true);
                             result = { success: true };
+                            break;
+                        case 'apply-claude-config':
+                            result = applyToClaudeSettings(params.config);
                             break;
                         case 'apply-env':
                             result = applyToSystemEnv(params.config);

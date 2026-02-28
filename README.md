@@ -8,9 +8,9 @@
 Codex Mate 是一个简洁的命令行工具，提供两大核心功能：
 
 1. **Codex 提供商管理** - 快速切换 Codex 的 AI 模型提供商和模型
-2. **Claude Code 配置** - 一键配置 Claude Code 环境变量（仅限 Windows）
+2. **Claude Code 配置** - 一键写入 Claude Code 配置（默认 `~/.claude/settings.json`）
 
-其中 **Codex 配置功能支持 Linux 和 Windows**，可通过 CLI 或 Web 统一管理。
+其中 **Codex 配置功能支持 Linux 和 Windows**，Claude 配置应用支持 Windows / macOS / Linux，可通过 Web 统一管理。
 
 支持通过 CLI 或 Web 界面进行可视化操作，让 AI 工具的配置管理变得简单高效。
 
@@ -100,15 +100,16 @@ codexmate start
 - 添加/删除自定义提供商
 - 支持 Linux / Windows 环境下的 Codex 配置管理
 
-#### Claude Code 配置模式（仅限 Windows）
+#### Claude Code 配置模式（Windows / macOS / Linux）
 - 管理多个 Claude Code 配置方案
 - 配置 API Key、Base URL 和模型
-- 一键应用到系统环境变量：
-  - `ANTHROPIC_API_KEY`
-  - `ANTHROPIC_AUTH_TOKEN`
-  - `ANTHROPIC_BASE_URL`
-  - `ANTHROPIC_MODEL`
-  - `CLAUDE_CODE_USE_KEY`
+- 默认一键应用到 `~/.claude/settings.json` 的 `env` 字段：
+  - `env.ANTHROPIC_API_KEY`
+  - `env.ANTHROPIC_AUTH_TOKEN`
+  - `env.ANTHROPIC_BASE_URL`
+  - `env.ANTHROPIC_MODEL`
+  - `env.CLAUDE_CODE_USE_KEY`
+- 提供“兼容模式”可回退为系统环境变量写入（适合旧习惯或特定 Windows 场景）
 
 #### 会话浏览模式
 - 在同一 Web 页面查看 Codex 与 Claude Code 的本地会话列表
@@ -134,6 +135,11 @@ codexmate start
 - `codexmate-init.json` - 首次初始化标记（用于避免重复重置）
 - `config.toml.codexmate-backup-*.bak` - 首次初始化时自动备份的旧配置（若存在）
 
+Claude Code 配置应用涉及：
+
+- `~/.claude/settings.json` - Claude Code 运行时配置（默认写入目标）
+- `~/.claude/settings.json.codexmate-backup-*.bak` - 首次改写前自动备份（若存在旧文件）
+
 ### 首次运行初始化说明
 
 - 首次运行 `codexmate` 时，如果检测到已有 `~/.codex/config.toml` 且不是 Codex Mate 管理的配置：
@@ -157,7 +163,7 @@ codexmate switch myapi
 codexmate use gpt-4-turbo
 ```
 
-### 配置 Claude Code（Windows）
+### 配置 Claude Code（跨平台）
 
 1. 启动 Web 界面：
 ```bash
@@ -172,7 +178,9 @@ codexmate start
    - Base URL：`https://open.bigmodel.cn/api/anthropic`
    - 模型：`glm-4.7`
 
-4. 点击"应用到系统环境变量"
+4. 点击配置卡片直接应用，或在编辑弹窗点击“保存并应用到 Claude 配置”
+   - 默认写入：`~/.claude/settings.json`
+   - 兼容模式：写入系统环境变量
 
 5. 重启 Claude Code，新的配置即生效
 
@@ -187,7 +195,7 @@ codexmate start
 ## 常见问题
 
 ### Q: 支持哪些操作系统？
-A: Codex 功能支持 Windows 和 Linux（CLI 与 Web）。Claude Code 环境变量配置功能仅限 Windows。
+A: Codex 功能支持 Windows 和 Linux（CLI 与 Web）。Claude Code 配置应用默认支持 Windows / macOS / Linux（写入 `~/.claude/settings.json`），兼容模式环境变量写入仅支持 Windows。
 
 ### Q: API key 存储在哪里？
 A: API key 存储在本地配置文件 `~/.codex/config.toml` 中，不会上传到任何服务器。
@@ -196,7 +204,7 @@ A: API key 存储在本地配置文件 `~/.codex/config.toml` 中，不会上传
 A: Web 界面运行在本地，所有操作都在本地完成。API key 在界面中仅显示脱敏版本。
 
 ### Q: Claude Code 配置后如何生效？
-A: 点击"应用到系统环境变量"后，需要重启 Claude Code 才能使用新配置。环境变量会永久保存，无需每次都应用。
+A: 点击“应用到 Claude 配置”后会写入 `~/.claude/settings.json`，重启 Claude Code 即生效；如果使用兼容模式写系统环境变量，也建议重启 Claude Code。
 
 ### Q: 如何卸载？
 A: 运行 `npm uninstall -g codexmate`
