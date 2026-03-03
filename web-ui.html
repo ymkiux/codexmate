@@ -19,13 +19,23 @@
             --color-bg: #F7F1E8;
             --color-surface: #FFFFFF;
             --color-surface-alt: #FAFAFA;
+            --color-surface-elevated: #FFFFFF;
+            --color-surface-tint: rgba(255, 255, 255, 0.75);
             --color-text-primary: #1F1A17;
             --color-text-secondary: #5C5046;
             --color-text-tertiary: #8B7668;
+            --color-text-muted: #766458;
             --color-border: #D0C4B6;
+            --color-border-soft: rgba(208, 196, 182, 0.35);
+            --color-border-strong: rgba(208, 196, 182, 0.7);
 
             --color-success: #5A8B6A;
             --color-error: #C84A3A;
+
+            --bg-warm-gradient:
+                radial-gradient(circle at 18% 12%, rgba(210, 107, 90, 0.12), transparent 45%),
+                radial-gradient(circle at 85% 0%, rgba(247, 241, 232, 0.9), transparent 40%),
+                linear-gradient(135deg, #F7F1E8 0%, #F2E6D7 45%, #F7F1E8 100%);
 
             /* 字体系统 */
             --font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
@@ -55,6 +65,7 @@
             /* 圆角系统 */
             --radius-sm: 8px;
             --radius-lg: 12px;
+            --radius-xl: 18px;
             --radius-full: 50px;
 
             /* 阴影系统 - 多层叠加提升真实感 */
@@ -67,6 +78,9 @@
             --shadow-card-hover:
                 0 2px 4px rgba(31, 26, 23, 0.04),
                 0 8px 20px rgba(31, 26, 23, 0.06);
+            --shadow-float:
+                0 6px 16px rgba(31, 26, 23, 0.08),
+                0 18px 36px rgba(31, 26, 23, 0.06);
             --shadow-raised:
                 0 4px 12px rgba(31, 26, 23, 0.06),
                 0 12px 32px rgba(31, 26, 23, 0.04);
@@ -100,6 +114,7 @@
         body {
             font-family: var(--font-family);
             background-color: var(--color-bg);
+            background: var(--bg-warm-gradient);
             color: var(--color-text-primary);
             display: flex;
             justify-content: center;
@@ -115,7 +130,9 @@
            ============================================ */
         .container {
             width: 100%;
-            max-width: 1120px;
+            max-width: 1160px;
+            margin: 0 auto;
+            padding-bottom: var(--spacing-lg);
         }
 
         /* ============================================
@@ -151,6 +168,7 @@
             margin-bottom: 12px;
             position: relative;
             box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.04);
+            border: 1px solid var(--color-border-soft);
         }
 
         .segment {
@@ -176,7 +194,7 @@
         .segment.active {
             color: var(--color-text-primary);
             background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.9) 100%);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            box-shadow: var(--shadow-subtle), inset 0 1px 0 rgba(255, 255, 255, 0.8);
         }
 
         /* ============================================
@@ -207,12 +225,12 @@
             box-shadow: var(--shadow-card);
             user-select: none;
             will-change: transform;
-            border: 1px solid rgba(255, 255, 255, 0.6);
+            border: 1px solid var(--color-border-soft);
         }
 
         .card:hover {
             transform: translateY(-2px) scale(1.005);
-            box-shadow: var(--shadow-card-hover);
+            box-shadow: var(--shadow-float);
         }
 
         .card:active {
@@ -221,7 +239,9 @@
         }
 
         .card.active {
-            background-color: var(--color-brand-light);
+            background: linear-gradient(to bottom, rgba(210, 107, 90, 0.12) 0%, rgba(255, 255, 255, 0.98) 100%);
+            border-color: rgba(210, 107, 90, 0.35);
+            box-shadow: var(--shadow-float);
         }
 
         .card.active .card-icon {
@@ -406,12 +426,12 @@
            选择器 - 用于模型选择
            ============================================ */
         .selector-section {
-            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.8) 100%);
+            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.92) 100%);
             border-radius: var(--radius-lg);
-            padding: var(--spacing-sm);
-            margin-bottom: 12px;
+            padding: calc(var(--spacing-sm) + 2px);
+            margin-bottom: 14px;
             box-shadow: var(--shadow-card);
-            border: 1px solid rgba(255, 255, 255, 0.5);
+            border: 1px solid var(--color-border-soft);
         }
 
         .selector-header {
@@ -422,12 +442,12 @@
         }
 
         .selector-title {
-            font-size: var(--font-size-secondary);
+            font-size: var(--font-size-caption);
             font-weight: var(--font-weight-secondary);
-            color: var(--color-text-tertiary);
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            opacity: 0.8;
+            color: var(--color-text-muted);
+            text-transform: none;
+            letter-spacing: 0.04em;
+            opacity: 0.9;
         }
 
         .selector-actions {
@@ -464,7 +484,7 @@
             width: 100%;
             padding: 12px var(--spacing-sm);
             padding-right: 40px;
-            border: 1px solid var(--color-border);
+            border: 1px solid var(--color-border-soft);
             border-radius: var(--radius-sm);
             font-size: var(--font-size-body);
             font-weight: var(--font-weight-body);
@@ -478,10 +498,11 @@
             background-position: right 14px center;
             background-size: 12px;
             transition: all var(--transition-fast) var(--ease-smooth);
+            box-shadow: inset 0 1px 2px rgba(31, 26, 23, 0.04);
         }
 
         .model-select:hover {
-            border-color: var(--color-text-tertiary);
+            border-color: var(--color-border-strong);
             background-color: var(--color-surface);
         }
 
@@ -555,13 +576,15 @@
         .btn-tool {
             padding: 12px var(--spacing-sm);
             border-radius: var(--radius-sm);
-            border: 1px solid rgba(208, 196, 182, 0.6);
-            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.9) 100%);
+            border: 1px solid var(--color-border-soft);
+            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.95) 100%);
             font-size: var(--font-size-body);
             font-weight: var(--font-weight-secondary);
             color: var(--color-text-secondary);
             cursor: pointer;
             transition: all var(--transition-fast) var(--ease-spring);
+            box-shadow: var(--shadow-subtle);
+            letter-spacing: -0.01em;
         }
 
         .btn-tool:hover {
@@ -572,10 +595,27 @@
         }
 
         .session-toolbar {
-            display: flex;
-            flex-wrap: wrap;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: var(--spacing-xs);
             margin-bottom: var(--spacing-sm);
+            align-items: end;
+        }
+
+        .session-toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+            flex-wrap: wrap;
+            min-width: 0;
+        }
+
+        .session-toolbar-grow {
+            grid-column: span 2;
+        }
+
+        .session-toolbar-actions {
+            justify-content: flex-end;
         }
 
         .session-batch-toolbar {
@@ -595,21 +635,42 @@
         }
 
         .session-source-select,
-        .session-path-select {
+        .session-path-select,
+        .session-query-input,
+        .session-role-select,
+        .session-time-select {
             flex: 1;
-            min-width: 180px;
+            min-width: 160px;
             padding: 10px 12px;
             border-radius: var(--radius-sm);
-            border: 1px solid rgba(208, 196, 182, 0.6);
-            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.9) 100%);
+            border: 1px solid var(--color-border-soft);
+            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.92) 100%);
             color: var(--color-text-secondary);
             font-size: var(--font-size-body);
             font-family: var(--font-family);
             outline: none;
+            transition: all var(--transition-fast) var(--ease-spring);
+            box-shadow: inset 0 1px 2px rgba(31, 26, 23, 0.04);
+        }
+
+        .session-query-input {
+            flex: 2;
+            min-width: 220px;
+        }
+
+        .session-source-select:hover,
+        .session-path-select:hover,
+        .session-query-input:hover,
+        .session-role-select:hover,
+        .session-time-select:hover {
+            border-color: var(--color-border-strong);
         }
 
         .session-source-select:focus,
-        .session-path-select:focus {
+        .session-path-select:focus,
+        .session-query-input:focus,
+        .session-role-select:focus,
+        .session-time-select:focus {
             border-color: var(--color-brand);
             box-shadow: var(--shadow-input-focus);
         }
@@ -661,8 +722,19 @@
             white-space: nowrap;
         }
 
+        .session-count-pill {
+            font-size: var(--font-size-caption);
+            color: var(--color-text-secondary);
+            border: 1px solid var(--color-border-soft);
+            border-radius: 999px;
+            padding: 2px 8px;
+            background: rgba(247, 241, 232, 0.7);
+            white-space: nowrap;
+            margin-left: auto;
+        }
+
         .btn-session-export {
-            border: 1px solid rgba(208, 196, 182, 0.6);
+            border: 1px solid var(--color-border-soft);
             border-radius: var(--radius-sm);
             background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.9) 100%);
             color: var(--color-text-secondary);
@@ -672,10 +744,12 @@
             cursor: pointer;
             transition: all var(--transition-fast) var(--ease-spring);
             white-space: nowrap;
+            box-shadow: var(--shadow-subtle);
+            letter-spacing: -0.01em;
         }
 
         .btn-session-refresh {
-            border: 1px solid rgba(208, 196, 182, 0.6);
+            border: 1px solid var(--color-border-soft);
             border-radius: var(--radius-sm);
             background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.9) 100%);
             color: var(--color-text-secondary);
@@ -685,6 +759,8 @@
             cursor: pointer;
             transition: all var(--transition-fast) var(--ease-spring);
             white-space: nowrap;
+            box-shadow: var(--shadow-subtle);
+            letter-spacing: -0.01em;
         }
 
         .btn-session-refresh:hover {
@@ -712,7 +788,7 @@
         }
 
         .btn-session-delete {
-            border: 1px solid rgba(210, 107, 90, 0.45);
+            border: 1px solid rgba(210, 107, 90, 0.5);
             border-radius: var(--radius-sm);
             background: linear-gradient(to bottom, rgba(210, 107, 90, 0.12) 0%, rgba(210, 107, 90, 0.04) 100%);
             color: var(--color-brand);
@@ -722,6 +798,8 @@
             cursor: pointer;
             transition: all var(--transition-fast) var(--ease-spring);
             white-space: nowrap;
+            box-shadow: var(--shadow-subtle);
+            letter-spacing: -0.01em;
         }
 
         .btn-session-delete:hover {
@@ -739,10 +817,23 @@
         .session-empty {
             padding: 28px var(--spacing-sm);
             text-align: center;
-            border: 1px dashed rgba(208, 196, 182, 0.6);
+            border: 1px dashed var(--color-border-soft);
             border-radius: var(--radius-lg);
             color: var(--color-text-tertiary);
-            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.12) 100%);
+            background: var(--bg-warm-gradient);
+            position: relative;
+            box-shadow: var(--shadow-subtle);
+        }
+
+        .session-empty::before {
+            content: "";
+            display: block;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            margin: 0 auto 10px;
+            background: rgba(210, 107, 90, 0.12);
+            box-shadow: inset 0 0 0 6px rgba(255, 255, 255, 0.7);
         }
 
         .session-layout {
@@ -771,33 +862,33 @@
         }
 
         .session-list::-webkit-scrollbar,
-        .session-preview-body::-webkit-scrollbar {
+        .session-preview-scroll::-webkit-scrollbar {
             width: 10px;
             height: 10px;
         }
 
         .session-list::-webkit-scrollbar-track,
-        .session-preview-body::-webkit-scrollbar-track {
+        .session-preview-scroll::-webkit-scrollbar-track {
             background: transparent;
             border-radius: 999px;
         }
 
         .session-list::-webkit-scrollbar-thumb,
-        .session-preview-body::-webkit-scrollbar-thumb {
+        .session-preview-scroll::-webkit-scrollbar-thumb {
             background: linear-gradient(to bottom, rgba(191, 174, 154, 0.95) 0%, rgba(160, 141, 121, 0.95) 100%);
             border-radius: 999px;
             border: 2px solid rgba(255, 255, 255, 0.9);
         }
 
         .session-list::-webkit-scrollbar-thumb:hover,
-        .session-preview-body::-webkit-scrollbar-thumb:hover {
+        .session-preview-scroll::-webkit-scrollbar-thumb:hover {
             background: linear-gradient(to bottom, rgba(175, 156, 136, 0.95) 0%, rgba(145, 126, 107, 0.95) 100%);
         }
 
         .session-item {
-            border: 1px solid rgba(208, 196, 182, 0.55);
+            border: 1px solid var(--color-border-soft);
             border-radius: var(--radius-sm);
-            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.9) 100%);
+            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.92) 100%);
             padding: 10px 12px;
             cursor: pointer;
             transition: all var(--transition-fast) var(--ease-spring);
@@ -842,6 +933,7 @@
 
         .session-item:hover {
             border-color: var(--color-brand);
+            background: linear-gradient(to bottom, rgba(210, 107, 90, 0.08) 0%, rgba(255, 255, 255, 0.98) 100%);
             transform: translateY(-1px);
         }
 
@@ -914,10 +1006,38 @@
             text-overflow: ellipsis;
         }
 
+        .session-item-sub.session-item-wrap {
+            white-space: normal;
+        }
+
+        .session-item-meta {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+            margin-top: 2px;
+            margin-bottom: 2px;
+        }
+
+        .session-item-time {
+            font-size: var(--font-size-caption);
+            color: var(--color-text-tertiary);
+            white-space: nowrap;
+        }
+
+        .session-item-snippet {
+            color: var(--color-text-secondary);
+            white-space: normal;
+            background: rgba(210, 107, 90, 0.08);
+            border-radius: 8px;
+            padding: 6px 8px;
+            border: 1px solid rgba(210, 107, 90, 0.15);
+        }
+
         .session-preview {
-            border: 1px solid rgba(208, 196, 182, 0.55);
-            border-radius: var(--radius-lg);
-            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.96) 100%);
+            border: 1px solid var(--color-border-soft);
+            border-radius: var(--radius-xl);
+            background: linear-gradient(to bottom, var(--color-surface-elevated) 0%, rgba(255, 255, 255, 0.96) 100%);
             box-shadow: var(--shadow-card);
             min-height: 0;
             max-height: none;
@@ -927,13 +1047,29 @@
             overflow: hidden;
         }
 
+        .session-preview-scroll {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(166, 149, 130, 0.85) transparent;
+        }
+
         .session-preview-header {
             padding: 12px var(--spacing-sm);
-            border-bottom: 1px solid rgba(208, 196, 182, 0.45);
+            border-bottom: 1px solid var(--color-border-soft);
             display: flex;
             align-items: flex-start;
             justify-content: space-between;
             gap: var(--spacing-sm);
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.92) 100%);
+            backdrop-filter: blur(6px);
         }
 
         .session-preview-header > div:first-child {
@@ -963,25 +1099,46 @@
             text-overflow: ellipsis;
         }
 
+        .session-preview-meta {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-top: 4px;
+        }
+
+        .session-preview-meta-item {
+            font-size: var(--font-size-caption);
+            color: var(--color-text-tertiary);
+            line-height: 1.35;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .session-preview-meta-item:not(:last-child)::after {
+            content: "·";
+            margin: 0 6px;
+            color: var(--color-text-tertiary);
+            opacity: 0.7;
+        }
+
         .session-actions {
             display: flex;
             align-items: center;
             gap: 8px;
             flex-shrink: 0;
             margin-left: 0;
+            flex-wrap: wrap;
+            justify-content: flex-end;
         }
 
         .session-preview-body {
             flex: 1;
             min-height: 0;
-            overflow-y: auto;
-            overflow-x: hidden;
             padding: var(--spacing-sm);
             display: flex;
             flex-direction: column;
             gap: 10px;
-            scrollbar-width: thin;
-            scrollbar-color: rgba(166, 149, 130, 0.85) transparent;
         }
 
         .session-record-toolbar {
@@ -1002,14 +1159,35 @@
 
         .session-msg {
             border-radius: 10px;
-            padding: 10px 12px;
+            padding: 10px 12px 10px 18px;
             border: 1px solid rgba(208, 196, 182, 0.45);
             background: rgba(255, 255, 255, 0.75);
+            position: relative;
+            box-shadow: 0 2px 6px rgba(31, 26, 23, 0.04);
         }
 
         .session-msg.user {
             border-color: rgba(210, 107, 90, 0.35);
             background: rgba(210, 107, 90, 0.08);
+        }
+
+        .session-msg::before {
+            content: "";
+            position: absolute;
+            left: 8px;
+            top: 10px;
+            bottom: 10px;
+            width: 3px;
+            border-radius: 999px;
+            background: rgba(139, 118, 104, 0.45);
+        }
+
+        .session-msg.user::before {
+            background: rgba(210, 107, 90, 0.85);
+        }
+
+        .session-msg.assistant::before {
+            background: rgba(90, 139, 106, 0.6);
         }
 
         .session-msg.selected {
@@ -1062,6 +1240,7 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            color: var(--color-text-tertiary);
         }
 
         .session-msg-delete {
@@ -1106,6 +1285,17 @@
             font-size: var(--font-size-secondary);
             padding: var(--spacing-md);
             text-align: center;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .session-preview-empty::before {
+            content: "";
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: rgba(210, 107, 90, 0.12);
+            box-shadow: inset 0 0 0 6px rgba(255, 255, 255, 0.7);
         }
 
         @media (max-width: 900px) {
@@ -1113,6 +1303,14 @@
                 grid-template-columns: 1fr;
                 height: auto;
                 min-height: 0;
+            }
+
+            .session-toolbar {
+                grid-template-columns: 1fr;
+            }
+
+            .session-toolbar-actions {
+                justify-content: flex-start;
             }
 
             .session-list {
@@ -1210,7 +1408,7 @@
         .form-input {
             width: 100%;
             padding: 13px var(--spacing-sm);
-            border: 1.5px solid var(--color-border);
+            border: 1.5px solid var(--color-border-soft);
             border-radius: var(--radius-sm);
             font-size: var(--font-size-body);
             background-color: var(--color-surface-alt);
@@ -1218,10 +1416,11 @@
             outline: none;
             transition: all var(--transition-fast) var(--ease-spring);
             font-family: var(--font-family);
+            box-shadow: inset 0 1px 2px rgba(31, 26, 23, 0.04);
         }
 
         .form-input:hover {
-            border-color: var(--color-text-tertiary);
+            border-color: var(--color-border-strong);
         }
 
         .form-input:focus {
@@ -1282,7 +1481,11 @@
             font-weight: var(--font-weight-secondary);
             cursor: pointer;
             transition: all var(--transition-fast) var(--ease-spring);
-            border: none;
+            border: 1px solid var(--color-border-soft);
+            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.95) 100%);
+            color: var(--color-text-secondary);
+            box-shadow: var(--shadow-subtle);
+            letter-spacing: -0.01em;
         }
 
         .btn:active {
@@ -1292,7 +1495,7 @@
         .btn-cancel {
             background: linear-gradient(to bottom, var(--color-bg) 0%, rgba(247, 241, 232, 0.8) 100%);
             color: var(--color-text-primary);
-            border: 1px solid var(--color-border);
+            border: 1px solid var(--color-border-soft);
         }
 
         .btn-cancel:hover {
@@ -1303,6 +1506,7 @@
             background: linear-gradient(135deg, var(--color-brand) 0%, var(--color-brand-dark) 100%);
             color: white;
             box-shadow: 0 2px 4px rgba(210, 107, 90, 0.2);
+            border: none;
         }
 
         .btn-confirm:hover {
@@ -1313,6 +1517,7 @@
         .btn-confirm.secondary {
             background: linear-gradient(135deg, var(--color-success) 0%, rgba(90, 139, 106, 0.85) 100%);
             box-shadow: 0 2px 4px rgba(90, 139, 106, 0.2);
+            border: none;
         }
 
         .btn-confirm.secondary:hover {
@@ -1642,22 +1847,59 @@
                         <span class="selector-title">会话来源</span>
                     </div>
                     <div class="session-toolbar">
-                        <select class="session-source-select" v-model="sessionFilterSource" @change="onSessionSourceChange" :disabled="sessionsLoading || batchDeleting || recordsBatchDeleting">
-                            <option value="all">全部（Codex + Claude）</option>
-                            <option value="codex">仅 Codex</option>
-                            <option value="claude">仅 Claude Code</option>
-                        </select>
-                        <select
-                            class="session-path-select"
-                            v-model="sessionPathFilter"
-                            @change="onSessionPathFilterChange"
-                            :disabled="sessionsLoading || batchDeleting || recordsBatchDeleting">
-                            <option value="">全部路径</option>
-                            <option v-for="cwd in sessionPathOptions" :key="cwd" :value="cwd">{{ cwd }}</option>
-                        </select>
-                        <button class="btn-tool" @click="loadSessions" :disabled="sessionsLoading || batchDeleting || recordsBatchDeleting">
-                            {{ sessionsLoading ? '刷新中...' : '刷新会话' }}
-                        </button>
+                        <div class="session-toolbar-group">
+                            <select class="session-source-select" v-model="sessionFilterSource" @change="onSessionSourceChange" :disabled="sessionsLoading || batchDeleting || recordsBatchDeleting">
+                                <option value="all">全部（Codex + Claude）</option>
+                                <option value="codex">仅 Codex</option>
+                                <option value="claude">仅 Claude Code</option>
+                            </select>
+                            <select
+                                class="session-path-select"
+                                v-model="sessionPathFilter"
+                                @change="onSessionPathFilterChange"
+                                :disabled="sessionsLoading || batchDeleting || recordsBatchDeleting">
+                                <option value="">全部路径</option>
+                                <option v-for="cwd in sessionPathOptions" :key="cwd" :value="cwd">{{ cwd }}</option>
+                            </select>
+                        </div>
+                        <div class="session-toolbar-group session-toolbar-grow">
+                            <input
+                                class="session-query-input"
+                                v-model="sessionQuery"
+                                @keyup.enter="loadSessions"
+                                :disabled="sessionsLoading || batchDeleting || recordsBatchDeleting"
+                                placeholder="关键词检索（空格=AND）">
+                        </div>
+                        <div class="session-toolbar-group">
+                            <select
+                                class="session-role-select"
+                                v-model="sessionRoleFilter"
+                                @change="onSessionFilterChange"
+                                :disabled="sessionsLoading || batchDeleting || recordsBatchDeleting">
+                                <option value="all">全部角色</option>
+                                <option value="user">仅 User</option>
+                                <option value="assistant">仅 Assistant</option>
+                                <option value="system">仅 System</option>
+                            </select>
+                            <select
+                                class="session-time-select"
+                                v-model="sessionTimePreset"
+                                @change="onSessionFilterChange"
+                                :disabled="sessionsLoading || batchDeleting || recordsBatchDeleting">
+                                <option value="all">全部时间</option>
+                                <option value="7d">近 7 天</option>
+                                <option value="30d">近 30 天</option>
+                                <option value="90d">近 90 天</option>
+                            </select>
+                        </div>
+                        <div class="session-toolbar-group session-toolbar-actions">
+                            <button class="btn-tool" @click="loadSessions" :disabled="sessionsLoading || batchDeleting || recordsBatchDeleting">
+                                {{ sessionsLoading ? '刷新中...' : '刷新会话' }}
+                            </button>
+                            <button class="btn-tool" @click="clearSessionFilters" :disabled="sessionsLoading || batchDeleting || recordsBatchDeleting">
+                                清空筛选
+                            </button>
+                        </div>
                     </div>
                     <div v-if="sessionsList.length > 0" class="session-batch-toolbar">
                         <button
@@ -1681,7 +1923,7 @@
                         </button>
                     </div>
                     <div class="session-hint">
-                        支持按路径下拉筛选当前会话列表。左侧可勾选多条会话批量删除；右侧预览区支持导出或删除当前会话。
+                        支持关键词、角色与时间预设筛选会话列表。左侧可勾选多条会话批量删除；右侧预览区支持导出或删除当前会话。
                     </div>
                 </div>
 
@@ -1728,101 +1970,113 @@
                                     </svg>
                                 </button>
                             </div>
-                            <div class="session-item-sub">{{ session.sourceLabel }} · {{ session.updatedAt || 'unknown time' }}</div>
-                            <div class="session-item-sub">{{ session.messageCount || 0 }} 条消息</div>
+                            <div class="session-item-meta">
+                                <span class="session-source">{{ session.sourceLabel }}</span>
+                                <span class="session-item-time">{{ session.updatedAt || 'unknown time' }}</span>
+                                <span class="session-count-pill">{{ session.messageCount || 0 }} 条</span>
+                            </div>
+                            <div v-if="session.match && session.match.hit" class="session-item-sub session-item-snippet">
+                                <span v-if="session.match.snippets && session.match.snippets.length">{{ session.match.snippets.join(' · ') }}</span>
+                                <span v-else>命中 {{ session.match.count || 1 }} 处</span>
+                            </div>
                         </div>
                     </div>
 
                     <div class="session-preview">
                         <template v-if="activeSession">
-                            <div class="session-preview-header">
-                                <div>
-                                    <div class="session-preview-title">{{ activeSession.title || activeSession.sessionId }}</div>
-                                    <div class="session-preview-sub">
-                                        {{ activeSession.sourceLabel }} · {{ activeSession.updatedAt || 'unknown time' }}
-                                    </div>
-                                    <div class="session-preview-sub" v-if="activeSession.cwd">{{ activeSession.cwd }}</div>
-                                </div>
-                                <div class="session-actions">
-                                    <button class="btn-session-refresh" @click="loadActiveSessionDetail" :disabled="sessionDetailLoading || recordsBatchDeleting || !activeSession">
-                                        {{ sessionDetailLoading ? '加载中...' : '刷新内容' }}
-                                    </button>
-                                    <button
-                                        class="btn-session-export"
-                                        @click="exportSession(activeSession)"
-                                        :disabled="!activeSession || batchDeleting || recordsBatchDeleting || sessionExporting[getSessionExportKey(activeSession)]">
-                                        {{ (activeSession && sessionExporting[getSessionExportKey(activeSession)]) ? '导出中...' : '导出记录' }}
-                                    </button>
-                                    <button
-                                        class="btn-session-delete"
-                                        @click="deleteSession(activeSession)"
-                                        :disabled="!activeSession || batchDeleting || recordsBatchDeleting || sessionDeleting[getSessionExportKey(activeSession)]">
-                                        {{ (activeSession && sessionDeleting[getSessionExportKey(activeSession)]) ? '删除中...' : '删除会话' }}
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div v-if="sessionDetailLoading" class="session-preview-empty">
-                                正在加载会话内容...
-                            </div>
-
-                            <div v-else-if="activeSessionDetailError" class="session-preview-empty">
-                                {{ activeSessionDetailError }}
-                            </div>
-
-                            <div v-else-if="!activeSessionMessages.length" class="session-preview-empty">
-                                当前会话暂无可展示消息
-                            </div>
-
-                            <div v-else class="session-preview-body">
-                                <div class="session-record-toolbar">
-                                    <button
-                                        class="btn-tool"
-                                        @click="toggleSelectAllRecords"
-                                        :disabled="recordsBatchDeleting || activeSessionMessages.length === 0">
-                                        {{ isAllRecordsSelected ? '取消全选记录' : '全选当前记录' }}
-                                    </button>
-                                    <button
-                                        class="btn-tool"
-                                        @click="clearRecordSelection"
-                                        :disabled="recordsBatchDeleting || selectedRecordCount === 0">
-                                        清空记录选择
-                                    </button>
-                                    <span class="session-record-count">已选 {{ selectedRecordCount }} 条记录</span>
-                                    <button
-                                        class="btn-session-delete"
-                                        @click="deleteSelectedRecords"
-                                        :disabled="recordsBatchDeleting || selectedRecordCount === 0">
-                                        {{ recordsBatchDeleting ? '删除记录中...' : '批量删除记录' }}
-                                    </button>
-                                </div>
-                                <div v-if="activeSessionDetailClipped" class="session-item-sub">
-                                    仅展示最近 {{ activeSessionMessages.length }} 条消息；记录批量删除仅作用于当前已加载内容。
-                                </div>
-                                <div
-                                    v-for="(msg, idx) in activeSessionMessages"
-                                    :key="getRecordRenderKey(msg, idx)"
-                                    :class="['session-msg', msg.role === 'user' ? 'user' : 'assistant', { selected: isRecordSelected(msg) }]">
-                                    <div class="session-msg-header">
-                                        <div class="session-msg-meta">
-                                            <label class="session-msg-checkbox" @click.stop title="选择记录">
-                                                <input
-                                                    type="checkbox"
-                                                    :checked="isRecordSelected(msg)"
-                                                    :disabled="recordsBatchDeleting || !isRecordSelectable(msg) || recordDeletingMap[getRecordKey(msg)]"
-                                                    @change.stop="toggleRecordSelection(msg, $event)">
-                                            </label>
-                                            <span class="session-msg-role">{{ msg.role === 'user' ? 'User' : 'Assistant' }}</span>
-                                            <span class="session-msg-time">{{ msg.timestamp || '' }}</span>
+                            <div class="session-preview-scroll">
+                                <div class="session-preview-header">
+                                    <div>
+                                        <div class="session-preview-title">{{ activeSession.title || activeSession.sessionId }}</div>
+                                        <div class="session-preview-meta">
+                                            <span class="session-preview-meta-item">{{ activeSession.sourceLabel }}</span>
+                                            <span class="session-preview-meta-item">{{ activeSession.updatedAt || 'unknown time' }}</span>
                                         </div>
+                                        <div class="session-preview-meta" v-if="activeSession.cwd">
+                                            <span class="session-preview-meta-item">{{ activeSession.cwd }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="session-actions">
+                                        <button class="btn-session-refresh" @click="loadActiveSessionDetail" :disabled="sessionDetailLoading || recordsBatchDeleting || !activeSession">
+                                            {{ sessionDetailLoading ? '加载中...' : '刷新内容' }}
+                                        </button>
                                         <button
-                                            class="session-msg-delete"
-                                            @click.stop="deleteSingleRecord(msg)"
-                                            :disabled="recordsBatchDeleting || !isRecordSelectable(msg) || recordDeletingMap[getRecordKey(msg)]">
-                                            {{ recordDeletingMap[getRecordKey(msg)] ? '删除中...' : '删除记录' }}
+                                            class="btn-session-export"
+                                            @click="exportSession(activeSession)"
+                                            :disabled="!activeSession || batchDeleting || recordsBatchDeleting || sessionExporting[getSessionExportKey(activeSession)]">
+                                            {{ (activeSession && sessionExporting[getSessionExportKey(activeSession)]) ? '导出中...' : '导出记录' }}
+                                        </button>
+                                        <button
+                                            class="btn-session-delete"
+                                            @click="deleteSession(activeSession)"
+                                            :disabled="!activeSession || batchDeleting || recordsBatchDeleting || sessionDeleting[getSessionExportKey(activeSession)]">
+                                            {{ (activeSession && sessionDeleting[getSessionExportKey(activeSession)]) ? '删除中...' : '删除会话' }}
                                         </button>
                                     </div>
-                                    <div class="session-msg-content">{{ msg.text || '' }}</div>
+                                </div>
+
+                                <div v-if="sessionDetailLoading" class="session-preview-empty">
+                                    正在加载会话内容...
+                                </div>
+
+                                <div v-else-if="activeSessionDetailError" class="session-preview-empty">
+                                    {{ activeSessionDetailError }}
+                                </div>
+
+                                <div v-else-if="!activeSessionMessages.length" class="session-preview-empty">
+                                    当前会话暂无可展示消息
+                                </div>
+
+                                <div v-else class="session-preview-body">
+                                    <div class="session-record-toolbar">
+                                        <button
+                                            class="btn-tool"
+                                            @click="toggleSelectAllRecords"
+                                            :disabled="recordsBatchDeleting || activeSessionMessages.length === 0">
+                                            {{ isAllRecordsSelected ? '取消全选记录' : '全选当前记录' }}
+                                        </button>
+                                        <button
+                                            class="btn-tool"
+                                            @click="clearRecordSelection"
+                                            :disabled="recordsBatchDeleting || selectedRecordCount === 0">
+                                            清空记录选择
+                                        </button>
+                                        <span class="session-record-count">已选 {{ selectedRecordCount }} 条记录</span>
+                                        <button
+                                            class="btn-session-delete"
+                                            @click="deleteSelectedRecords"
+                                            :disabled="recordsBatchDeleting || selectedRecordCount === 0">
+                                            {{ recordsBatchDeleting ? '删除记录中...' : '批量删除记录' }}
+                                        </button>
+                                    </div>
+                                    <div v-if="activeSessionDetailClipped" class="session-item-sub session-item-wrap">
+                                        仅展示最近 {{ activeSessionMessages.length }} 条消息；记录批量删除仅作用于当前已加载内容。
+                                    </div>
+                                    <div
+                                        v-for="(msg, idx) in activeSessionMessages"
+                                        :key="getRecordRenderKey(msg, idx)"
+                                        :class="['session-msg', msg.role === 'user' ? 'user' : 'assistant', { selected: isRecordSelected(msg) }]">
+                                        <div class="session-msg-header">
+                                            <div class="session-msg-meta">
+                                                <label class="session-msg-checkbox" @click.stop title="选择记录">
+                                                    <input
+                                                        type="checkbox"
+                                                        :checked="isRecordSelected(msg)"
+                                                        :disabled="recordsBatchDeleting || !isRecordSelectable(msg) || recordDeletingMap[getRecordKey(msg)]"
+                                                        @change.stop="toggleRecordSelection(msg, $event)">
+                                                </label>
+                                                <span class="session-msg-role">{{ msg.role === 'user' ? 'User' : 'Assistant' }}</span>
+                                                <span class="session-msg-time">{{ msg.timestamp || '' }}</span>
+                                            </div>
+                                            <button
+                                                class="session-msg-delete"
+                                                @click.stop="deleteSingleRecord(msg)"
+                                                :disabled="recordsBatchDeleting || !isRecordSelectable(msg) || recordDeletingMap[getRecordKey(msg)]">
+                                                {{ recordDeletingMap[getRecordKey(msg)] ? '删除中...' : '删除记录' }}
+                                            </button>
+                                        </div>
+                                        <div class="session-msg-content">{{ msg.text || '' }}</div>
+                                    </div>
                                 </div>
                             </div>
                         </template>
@@ -2060,6 +2314,9 @@
                     sessionsLoading: false,
                     sessionFilterSource: 'all',
                     sessionPathFilter: '',
+                    sessionQuery: '',
+                    sessionRoleFilter: 'all',
+                    sessionTimePreset: 'all',
                     sessionPathOptions: [],
                     sessionPathOptionsLoading: false,
                     sessionPathOptionsMap: {
@@ -2341,6 +2598,22 @@
                     await this.loadSessions();
                 },
 
+                async onSessionFilterChange() {
+                    this.clearSessionSelection();
+                    this.clearRecordSelection();
+                    this.recordDeletingMap = {};
+                    await this.loadSessions();
+                },
+
+                async clearSessionFilters() {
+                    this.sessionFilterSource = 'all';
+                    this.sessionPathFilter = '';
+                    this.sessionQuery = '';
+                    this.sessionRoleFilter = 'all';
+                    this.sessionTimePreset = 'all';
+                    await this.onSessionSourceChange();
+                },
+
                 isSessionSelected(session) {
                     if (!session) return false;
                     return !!this.selectedSessionMap[this.getSessionExportKey(session)];
@@ -2531,10 +2804,16 @@
                     this.activeSessionDetailError = '';
                     this.clearRecordSelection();
                     this.recordDeletingMap = {};
+                    const query = this.sessionQuery ? this.sessionQuery.trim() : '';
                     try {
                         const res = await api('list-sessions', {
                             source: this.sessionFilterSource,
                             pathFilter: this.sessionPathFilter,
+                            query,
+                            queryMode: 'and',
+                            queryScope: 'summary',
+                            roleFilter: this.sessionRoleFilter,
+                            timeRangePreset: this.sessionTimePreset,
                             limit: 200,
                             forceRefresh: true
                         });
