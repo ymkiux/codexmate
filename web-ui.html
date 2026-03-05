@@ -1620,6 +1620,18 @@
                     </button>
                 </div>
 
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">AGENTS.md</span>
+                    </div>
+                    <div class="config-template-hint">
+                        管理 Codex 指令文件，默认读写 <code>~/.codex/AGENTS.md</code>（与 <code>config.toml</code> 同级）。
+                    </div>
+                    <button class="btn-tool" @click="openAgentsEditor" :disabled="loading || !!initError || agentsLoading">
+                        {{ agentsLoading ? '加载中...' : '打开 AGENTS.md 编辑器' }}
+                    </button>
+                </div>
+
                 <div v-if="!loading && !initError" class="card-list">
                     <div v-for="provider in providersList" :key="provider.name"
                          :class="['card', { active: currentProvider === provider.name }]"
@@ -2074,6 +2086,42 @@
             </div>
         </div>
 
+        <div v-if="showAgentsModal" class="modal-overlay" @click.self="closeAgentsModal">
+            <div class="modal modal-wide">
+                <div class="modal-title">AGENTS.md 编辑器</div>
+
+                <div class="form-group">
+                    <label class="form-label">目标文件</label>
+                    <div class="form-hint">
+                        {{ agentsPath || '未加载' }}
+                        <span v-if="agentsPath">
+                            （{{ agentsExists ? '已存在' : '不存在，将在保存时创建' }}）
+                        </span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">AGENTS.md 内容</label>
+                    <textarea
+                        v-model="agentsContent"
+                        class="form-input template-editor"
+                        spellcheck="false"
+                        :readonly="agentsLoading"
+                        placeholder="在这里编辑 AGENTS.md 内容"></textarea>
+                    <div class="template-editor-warning">
+                        保存后会写入目标 AGENTS.md（与 config.toml 同级）。
+                    </div>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-cancel" @click="closeAgentsModal">取消</button>
+                    <button class="btn btn-confirm" @click="applyAgentsContent" :disabled="agentsSaving || agentsLoading">
+                        {{ agentsSaving ? '保存中...' : '保存' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Toast通知 -->
         
         <!-- Toast -->
@@ -2112,8 +2160,15 @@
                     showClaudeConfigModal: false,
                     showEditConfigModal: false,
                     showConfigTemplateModal: false,
+                    showAgentsModal: false,
                     configTemplateContent: '',
                     configTemplateApplying: false,
+                    agentsContent: '',
+                    agentsPath: '',
+                    agentsExists: false,
+                    agentsLineEnding: '\n',
+                    agentsLoading: false,
+                    agentsSaving: false,
                     sessionsList: [],
                     sessionsLoading: false,
                     sessionFilterSource: 'all',
@@ -2677,6 +2732,55 @@
                         this.showMessage('应用模板失败: ' + e.message, 'error');
                     } finally {
                         this.configTemplateApplying = false;
+                    }
+                },
+
+                async openAgentsEditor() {
+                    this.agentsLoading = true;
+                    try {
+                        const res = await api('get-agents-file');
+                        if (res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        this.agentsContent = res.content || '';
+                        this.agentsPath = res.path || '';
+                        this.agentsExists = !!res.exists;
+                        this.agentsLineEnding = res.lineEnding === '\r\n' ? '\r\n' : '\n';
+                        this.showAgentsModal = true;
+                    } catch (e) {
+                        this.showMessage('加载 AGENTS.md 失败: ' + e.message, 'error');
+                    } finally {
+                        this.agentsLoading = false;
+                    }
+                },
+
+                closeAgentsModal() {
+                    this.showAgentsModal = false;
+                    this.agentsContent = '';
+                    this.agentsPath = '';
+                    this.agentsExists = false;
+                    this.agentsLineEnding = '\n';
+                    this.agentsSaving = false;
+                },
+
+                async applyAgentsContent() {
+                    this.agentsSaving = true;
+                    try {
+                        const res = await api('apply-agents-file', {
+                            content: this.agentsContent,
+                            lineEnding: this.agentsLineEnding
+                        });
+                        if (res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        this.showMessage('AGENTS.md 已保存', 'success');
+                        this.closeAgentsModal();
+                    } catch (e) {
+                        this.showMessage('保存 AGENTS.md 失败: ' + e.message, 'error');
+                    } finally {
+                        this.agentsSaving = false;
                     }
                 },
 
