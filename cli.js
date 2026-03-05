@@ -34,6 +34,7 @@ const SESSION_TITLE_READ_BYTES = 64 * 1024;
 const CODEXMATE_MANAGED_MARKER = '# codexmate-managed: true';
 const SESSION_LIST_CACHE_TTL_MS = 4000;
 const SESSION_SUMMARY_READ_BYTES = 256 * 1024;
+const SESSION_CONTENT_READ_BYTES = 512 * 1024;
 const SESSION_SCAN_FACTOR = 4;
 const SESSION_SCAN_MIN_FILES = 800;
 const MAX_SESSION_PATH_LIST_SIZE = 2000;
@@ -789,6 +790,210 @@ function matchesSessionPathFilter(session, normalizedFilter) {
     return cwd.includes(normalizedFilter);
 }
 
+function normalizeQueryTokens(query) {
+    if (typeof query !== 'string') {
+        return [];
+    }
+    return query
+        .split(/\s+/)
+        .map(item => item.trim())
+        .map(item => item.toLowerCase())
+        .filter(Boolean);
+}
+
+function normalizeQueryMode(mode) {
+    return mode === 'or' ? 'or' : 'and';
+}
+
+function normalizeQueryScope(scope) {
+    if (scope === 'content' || scope === 'all' || scope === 'summary') {
+        return scope;
+    }
+    return 'summary';
+}
+
+function normalizeRoleFilter(roleFilter) {
+    if (roleFilter === 'all' || roleFilter === undefined || roleFilter === null) {
+        return 'all';
+    }
+    const normalized = normalizeRole(String(roleFilter));
+    return normalized || 'all';
+}
+
+function matchTokensInText(text, tokens, mode = 'and') {
+    if (!Array.isArray(tokens) || tokens.length === 0) {
+        return true;
+    }
+    const haystack = String(text || '').toLowerCase();
+    if (!haystack) {
+        return false;
+    }
+    if (mode === 'or') {
+        return tokens.some(token => haystack.includes(token));
+    }
+    return tokens.every(token => haystack.includes(token));
+}
+
+function buildSessionSummaryText(session) {
+    if (!session) {
+        return '';
+    }
+    return [
+        session.title,
+        session.sessionId,
+        session.cwd,
+        session.filePath,
+        session.sourceLabel
+    ].filter(Boolean).join(' ');
+}
+
+function extractMessageFromRecord(record, source) {
+    if (!record) {
+        return null;
+    }
+    if (source === 'codex') {
+        if (record.type === 'response_item' && record.payload && record.payload.type === 'message') {
+            const role = normalizeRole(record.payload.role);
+            const text = extractMessageText(record.payload.content);
+            if (!role || !text) {
+                return null;
+            }
+            return { role, text };
+        }
+        return null;
+    }
+
+    const role = normalizeRole(record.type);
+    if (!role) {
+        return null;
+    }
+    const content = record.message ? record.message.content : '';
+    const text = extractMessageText(content);
+    if (!text) {
+        return null;
+    }
+    return { role, text };
+}
+
+function scanSessionContentForQuery(session, tokens, options = {}) {
+    if (!session || !Array.isArray(tokens) || tokens.length === 0) {
+        return { hit: false, count: 0, snippets: [] };
+    }
+
+    const filePath = resolveSessionFilePath(session.source, session.filePath, session.sessionId);
+    if (!filePath) {
+        return { hit: false, count: 0, snippets: [] };
+    }
+
+    const maxBytes = Number.isFinite(Number(options.maxBytes))
+        ? Math.max(1024, Number(options.maxBytes))
+        : SESSION_CONTENT_READ_BYTES;
+    const headText = getFileHeadText(filePath, maxBytes);
+    if (!headText) {
+        return { hit: false, count: 0, snippets: [] };
+    }
+
+    const records = parseJsonlContent(headText);
+    const mode = normalizeQueryMode(options.mode);
+    const roleFilter = normalizeRoleFilter(options.roleFilter);
+    const maxMatches = Number.isFinite(Number(options.maxMatches))
+        ? Math.max(1, Number(options.maxMatches))
+        : 1;
+    const snippetLimit = Number.isFinite(Number(options.snippetLimit))
+        ? Math.max(0, Number(options.snippetLimit))
+        : 0;
+
+    let count = 0;
+    const snippets = [];
+
+    for (const record of records) {
+        const message = extractMessageFromRecord(record, session.source);
+        if (!message || !message.text) {
+            continue;
+        }
+        if (roleFilter !== 'all' && message.role !== roleFilter) {
+            continue;
+        }
+        if (!matchTokensInText(message.text, tokens, mode)) {
+            continue;
+        }
+
+        count += 1;
+        if (snippetLimit > 0 && snippets.length < snippetLimit) {
+            snippets.push(truncateText(message.text));
+        }
+        if (count >= maxMatches) {
+            break;
+        }
+    }
+
+    return { hit: count > 0, count, snippets };
+}
+
+function applySessionQueryFilter(sessions, options = {}) {
+    const tokens = Array.isArray(options.tokens) ? options.tokens : [];
+    if (tokens.length === 0) {
+        return sessions;
+    }
+
+    const mode = normalizeQueryMode(options.queryMode);
+    const scope = normalizeQueryScope(options.queryScope);
+    const roleFilter = normalizeRoleFilter(options.roleFilter);
+    const contentScanLimit = Number.isFinite(Number(options.contentScanLimit))
+        ? Math.max(1, Number(options.contentScanLimit))
+        : 2;
+    const contentScanBytes = Number.isFinite(Number(options.contentScanBytes))
+        ? Math.max(1024, Number(options.contentScanBytes))
+        : SESSION_CONTENT_READ_BYTES;
+
+    let scanned = 0;
+    const results = [];
+
+    for (const session of sessions) {
+        if (scope === 'content' && scanned >= contentScanLimit) {
+            break;
+        }
+
+        const summaryText = buildSessionSummaryText(session);
+        const summaryHit = scope !== 'content' && matchTokensInText(summaryText, tokens, mode);
+        let contentHit = false;
+        let contentInfo = null;
+
+        if (scope !== 'summary' && (!summaryHit || scope === 'content')) {
+            if (scanned < contentScanLimit) {
+                scanned += 1;
+                contentInfo = scanSessionContentForQuery(session, tokens, {
+                    mode,
+                    roleFilter,
+                    maxBytes: contentScanBytes,
+                    maxMatches: 1,
+                    snippetLimit: 2
+                });
+                contentHit = contentInfo.hit;
+            }
+        }
+
+        const hit = scope === 'summary'
+            ? summaryHit
+            : (scope === 'content' ? contentHit : (summaryHit || contentHit));
+        if (!hit) {
+            continue;
+        }
+
+        const matchInfo = contentInfo && contentInfo.hit
+            ? contentInfo
+            : { hit: true, count: 1, snippets: [] };
+        session.match = {
+            hit: true,
+            count: matchInfo.count || 1,
+            snippets: Array.isArray(matchInfo.snippets) ? matchInfo.snippets : []
+        };
+        results.push(session);
+    }
+
+    return results;
+}
+
 function collectRecentJsonlFiles(rootDir, options = {}) {
     if (!fs.existsSync(rootDir)) {
         return [];
@@ -1218,10 +1423,14 @@ function listAllSessions(params = {}) {
     const forceRefresh = !!params.forceRefresh;
     const normalizedPathFilter = normalizeSessionPathFilter(params.pathFilter);
     const hasPathFilter = !!normalizedPathFilter;
-    const cacheKey = `${source}:${limit}:${normalizedPathFilter}`;
-    const cached = getSessionListCache(cacheKey, forceRefresh);
-    if (cached) {
-        return cached;
+    const queryTokens = normalizeQueryTokens(params.query);
+    const hasQuery = queryTokens.length > 0;
+    const cacheKey = hasQuery ? '' : `${source}:${limit}:${normalizedPathFilter}`;
+    if (!hasQuery) {
+        const cached = getSessionListCache(cacheKey, forceRefresh);
+        if (cached) {
+            return cached;
+        }
     }
 
     const scanOptions = hasPathFilter
@@ -1243,8 +1452,20 @@ function listAllSessions(params = {}) {
         sessions = sessions.filter(item => matchesSessionPathFilter(item, normalizedPathFilter));
     }
 
-    const result = mergeAndLimitSessions(sessions, limit);
-    setSessionListCache(cacheKey, result);
+    let result = mergeAndLimitSessions(sessions, limit);
+    if (hasQuery) {
+        result = applySessionQueryFilter(result, {
+            tokens: queryTokens,
+            queryMode: params.queryMode,
+            queryScope: params.queryScope,
+            roleFilter: params.roleFilter,
+            contentScanLimit: params.contentScanLimit,
+            contentScanBytes: params.contentScanBytes
+        });
+    }
+    if (!hasQuery) {
+        setSessionListCache(cacheKey, result);
+    }
     return result;
 }
 

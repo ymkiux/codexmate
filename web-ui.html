@@ -965,6 +965,46 @@
             flex: 1;
         }
 
+        .session-item-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .session-item-copy {
+            border: 1px solid rgba(70, 86, 110, 0.35);
+            background: rgba(70, 86, 110, 0.08);
+            color: var(--color-text-secondary);
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: all var(--transition-fast) var(--ease-spring);
+        }
+
+        .session-item-copy:hover {
+            border-color: rgba(70, 86, 110, 0.7);
+            background: rgba(70, 86, 110, 0.16);
+            color: var(--color-text-primary);
+            transform: translateY(-1px);
+        }
+
+        .session-item-copy:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .session-item-copy svg {
+            width: 16px;
+            height: 16px;
+        }
+
         .session-item-delete {
             border: 1px solid rgba(210, 107, 90, 0.4);
             background: rgba(210, 107, 90, 0.08);
@@ -1959,16 +1999,31 @@
                                     </label>
                                     <div class="session-item-title">{{ session.title || session.sessionId }}</div>
                                 </div>
-                                <button
-                                    class="session-item-delete"
-                                    @click.stop="deleteSession(session)"
-                                    :disabled="batchDeleting || recordsBatchDeleting || sessionDeleting[getSessionExportKey(session)]"
-                                    title="删除会话">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M3 6h18"/>
-                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                                    </svg>
-                                </button>
+                                <div class="session-item-actions">
+                                    <button
+                                        v-if="isResumeCommandAvailable(session)"
+                                        class="session-item-copy"
+                                        @click.stop="copyResumeCommand(session)"
+                                        :disabled="batchDeleting || recordsBatchDeleting"
+                                        aria-label="复制恢复命令"
+                                        title="复制恢复命令">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+                                            <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path>
+                                        </svg>
+                                    </button>
+                                    <button
+                                        class="session-item-delete"
+                                        @click.stop="deleteSession(session)"
+                                        :disabled="batchDeleting || recordsBatchDeleting || sessionDeleting[getSessionExportKey(session)]"
+                                        aria-label="删除会话"
+                                        title="删除会话">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M3 6h18"/>
+                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
                             <div class="session-item-meta">
                                 <span class="session-source">{{ session.sourceLabel }}</span>
@@ -2474,6 +2529,72 @@
                     return `${session.source || 'unknown'}:${session.sessionId || ''}:${session.filePath || ''}`;
                 },
 
+                isResumeCommandAvailable(session) {
+                    if (!session) return false;
+                    const source = String(session.source || '').trim().toLowerCase();
+                    const sessionId = typeof session.sessionId === 'string' ? session.sessionId.trim() : '';
+                    return source === 'codex' && !!sessionId;
+                },
+
+                buildResumeCommand(session) {
+                    const sessionId = session && session.sessionId ? String(session.sessionId).trim() : '';
+                    return `codex resume ${this.quoteResumeArg(sessionId)}`;
+                },
+
+                quoteResumeArg(value) {
+                    const text = typeof value === 'string' ? value : String(value || '');
+                    if (!text) return "''";
+                    if (/^[a-zA-Z0-9._-]+$/.test(text)) return text;
+                    const escaped = text.replace(/'/g, "'\\''");
+                    return `'${escaped}'`;
+                },
+
+                fallbackCopyText(text) {
+                    let textarea = null;
+                    try {
+                        textarea = document.createElement('textarea');
+                        textarea.value = text;
+                        textarea.setAttribute('readonly', '');
+                        textarea.style.position = 'fixed';
+                        textarea.style.top = '-9999px';
+                        textarea.style.left = '-9999px';
+                        textarea.style.opacity = '0';
+                        document.body.appendChild(textarea);
+                        textarea.select();
+                        textarea.setSelectionRange(0, textarea.value.length);
+                        return document.execCommand('copy');
+                    } catch (e) {
+                        return false;
+                    } finally {
+                        if (textarea && textarea.parentNode) {
+                            textarea.parentNode.removeChild(textarea);
+                        }
+                    }
+                },
+
+                async copyResumeCommand(session) {
+                    if (!this.isResumeCommandAvailable(session)) {
+                        this.showMessage('当前会话不支持生成恢复命令', 'error');
+                        return;
+                    }
+                    const command = this.buildResumeCommand(session);
+                    const ok = this.fallbackCopyText(command);
+                    if (ok) {
+                        this.showMessage('已复制恢复命令', 'success');
+                        return;
+                    }
+                    try {
+                        if (navigator.clipboard && window.isSecureContext) {
+                            await navigator.clipboard.writeText(command);
+                            this.showMessage('已复制恢复命令', 'success');
+                            return;
+                        }
+                    } catch (e) {
+                        // keep fallback failure message
+                    }
+                    this.showMessage('复制失败，请手动复制命令', 'error');
+                },
+
                 normalizeSessionPathValue(value) {
                     if (typeof value !== 'string') return '';
                     return value.trim();
@@ -2811,7 +2932,8 @@
                             pathFilter: this.sessionPathFilter,
                             query,
                             queryMode: 'and',
-                            queryScope: 'summary',
+                            queryScope: 'content',
+                            contentScanLimit: 2,
                             roleFilter: this.sessionRoleFilter,
                             timeRangePreset: this.sessionTimePreset,
                             limit: 200,
