@@ -39,6 +39,8 @@ const DEFAULT_CONTENT_SCAN_LIMIT = 10;
 const SESSION_SCAN_FACTOR = 4;
 const SESSION_SCAN_MIN_FILES = 800;
 const MAX_SESSION_PATH_LIST_SIZE = 2000;
+const AGENTS_FILE_NAME = 'AGENTS.md';
+const UTF8_BOM = '\ufeff';
 const BOOTSTRAP_TEXT_MARKERS = [
     'agents.md instructions',
     '<instructions>',
@@ -151,6 +153,98 @@ function readJsonFile(filePath, fallback = null) {
 function ensureDir(dirPath) {
     if (!fs.existsSync(dirPath)) {
         fs.mkdirSync(dirPath, { recursive: true });
+    }
+}
+
+function hasUtf8Bom(text) {
+    return typeof text === 'string' && text.charCodeAt(0) === 0xfeff;
+}
+
+function stripUtf8Bom(text) {
+    if (!text) return '';
+    return hasUtf8Bom(text) ? text.slice(1) : text;
+}
+
+function ensureUtf8Bom(text) {
+    const content = typeof text === 'string' ? text : '';
+    return hasUtf8Bom(content) ? content : UTF8_BOM + content;
+}
+
+function detectLineEnding(text) {
+    return typeof text === 'string' && text.includes('\r\n') ? '\r\n' : '\n';
+}
+
+function normalizeLineEnding(text, lineEnding) {
+    const normalized = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    return lineEnding === '\r\n' ? normalized.replace(/\n/g, '\r\n') : normalized;
+}
+
+function resolveAgentsFilePath(params = {}) {
+    const baseDir = typeof params.baseDir === 'string' && params.baseDir.trim()
+        ? params.baseDir.trim()
+        : CONFIG_DIR;
+    return path.join(baseDir, AGENTS_FILE_NAME);
+}
+
+function validateAgentsBaseDir(filePath) {
+    const dirPath = path.dirname(filePath);
+    try {
+        const stat = fs.statSync(dirPath);
+        if (!stat.isDirectory()) {
+            return { error: `目标不是目录: ${dirPath}` };
+        }
+    } catch (e) {
+        return { error: `目标目录不存在: ${dirPath}` };
+    }
+    return { ok: true, dirPath };
+}
+
+function readAgentsFile(params = {}) {
+    const filePath = resolveAgentsFilePath(params);
+    const dirCheck = validateAgentsBaseDir(filePath);
+    if (dirCheck.error) {
+        return { error: dirCheck.error };
+    }
+
+    if (!fs.existsSync(filePath)) {
+        return {
+            exists: false,
+            path: filePath,
+            content: '',
+            lineEnding: os.EOL === '\r\n' ? '\r\n' : '\n'
+        };
+    }
+
+    try {
+        const raw = fs.readFileSync(filePath, 'utf-8');
+        return {
+            exists: true,
+            path: filePath,
+            content: stripUtf8Bom(raw),
+            lineEnding: detectLineEnding(raw)
+        };
+    } catch (e) {
+        return { error: `读取 AGENTS.md 失败: ${e.message}` };
+    }
+}
+
+function applyAgentsFile(params = {}) {
+    const filePath = resolveAgentsFilePath(params);
+    const dirCheck = validateAgentsBaseDir(filePath);
+    if (dirCheck.error) {
+        return { error: dirCheck.error };
+    }
+
+    const content = typeof params.content === 'string' ? params.content : '';
+    const lineEnding = params.lineEnding === '\r\n' ? '\r\n' : '\n';
+    const normalized = normalizeLineEnding(content, lineEnding);
+    const finalContent = ensureUtf8Bom(normalized);
+
+    try {
+        fs.writeFileSync(filePath, finalContent, 'utf-8');
+        return { success: true, path: filePath };
+    } catch (e) {
+        return { error: `写入 AGENTS.md 失败: ${e.message}` };
     }
 }
 
@@ -2758,6 +2852,12 @@ function cmdStart() {
                             break;
                         case 'apply-config-template':
                             result = applyConfigTemplate(params || {});
+                            break;
+                        case 'get-agents-file':
+                            result = readAgentsFile(params || {});
+                            break;
+                        case 'apply-agents-file':
+                            result = applyAgentsFile(params || {});
                             break;
                         case 'switch':
                         case 'use':

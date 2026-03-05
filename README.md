@@ -97,6 +97,7 @@ codexmate start
 - 查看当前提供商和模型状态
 - 快速切换提供商
 - 切换和管理可用模型
+- 编辑 `~/.codex/AGENTS.md` 指令文件（与 `config.toml` 同级）
 - 添加/删除自定义提供商
 - 支持 Linux / Windows 环境下的 Codex 配置管理
 
