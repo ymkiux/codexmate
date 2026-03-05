@@ -34,11 +34,11 @@ const SESSION_TITLE_READ_BYTES = 64 * 1024;
 const CODEXMATE_MANAGED_MARKER = '# codexmate-managed: true';
 const SESSION_LIST_CACHE_TTL_MS = 4000;
 const SESSION_SUMMARY_READ_BYTES = 256 * 1024;
+const SESSION_CONTENT_READ_BYTES = SESSION_SUMMARY_READ_BYTES;
+const DEFAULT_CONTENT_SCAN_LIMIT = 10;
 const SESSION_SCAN_FACTOR = 4;
 const SESSION_SCAN_MIN_FILES = 800;
 const MAX_SESSION_PATH_LIST_SIZE = 2000;
-const MAX_BATCH_DELETE_SESSIONS = 500;
-const MAX_BATCH_DELETE_RECORDS = 2000;
 const BOOTSTRAP_TEXT_MARKERS = [
     'agents.md instructions',
     '<instructions>',
@@ -789,6 +789,218 @@ function matchesSessionPathFilter(session, normalizedFilter) {
     return cwd.includes(normalizedFilter);
 }
 
+function normalizeQueryTokens(query) {
+    if (typeof query !== 'string') {
+        return [];
+    }
+    return query
+        .split(/\s+/)
+        .map(item => item.trim())
+        .map(item => item.toLowerCase())
+        .filter(Boolean);
+}
+
+function normalizeQueryMode(mode) {
+    return mode === 'or' ? 'or' : 'and';
+}
+
+function normalizeQueryScope(scope) {
+    if (scope === 'content' || scope === 'all' || scope === 'summary') {
+        return scope;
+    }
+    return 'summary';
+}
+
+function normalizeRoleFilter(roleFilter) {
+    if (roleFilter === 'all' || roleFilter === undefined || roleFilter === null) {
+        return 'all';
+    }
+    const normalized = normalizeRole(String(roleFilter));
+    return normalized || 'all';
+}
+
+function matchTokensInText(text, tokens, mode = 'and') {
+    if (!Array.isArray(tokens) || tokens.length === 0) {
+        return true;
+    }
+    const haystack = String(text || '').toLowerCase();
+    if (!haystack) {
+        return false;
+    }
+    if (mode === 'or') {
+        return tokens.some(token => haystack.includes(token));
+    }
+    return tokens.every(token => haystack.includes(token));
+}
+
+function buildSessionSummaryText(session) {
+    if (!session) {
+        return '';
+    }
+    return [
+        session.title,
+        session.sessionId,
+        session.cwd,
+        session.filePath,
+        session.sourceLabel
+    ].filter(Boolean).join(' ');
+}
+
+function extractMessageFromRecord(record, source) {
+    if (!record) {
+        return null;
+    }
+    if (source === 'codex') {
+        if (record.type === 'response_item' && record.payload && record.payload.type === 'message') {
+            const role = normalizeRole(record.payload.role);
+            const text = extractMessageText(record.payload.content);
+            if (!role || !text) {
+                return null;
+            }
+            return { role, text };
+        }
+        return null;
+    }
+
+    const role = normalizeRole(record.type);
+    if (!role) {
+        return null;
+    }
+    const content = record.message ? record.message.content : '';
+    const text = extractMessageText(content);
+    if (!text) {
+        return null;
+    }
+    return { role, text };
+}
+
+function scanSessionContentForQuery(session, tokens, options = {}) {
+    if (!session || !Array.isArray(tokens) || tokens.length === 0) {
+        return { hit: false, count: 0, snippets: [] };
+    }
+
+    const filePath = resolveSessionFilePath(session.source, session.filePath, session.sessionId);
+    if (!filePath) {
+        return { hit: false, count: 0, snippets: [] };
+    }
+
+    const maxBytes = Number.isFinite(Number(options.maxBytes))
+        ? Math.max(1024, Number(options.maxBytes))
+        : SESSION_CONTENT_READ_BYTES;
+    const headText = getFileHeadText(filePath, maxBytes);
+    if (!headText) {
+        return { hit: false, count: 0, snippets: [] };
+    }
+
+    const records = parseJsonlContent(headText);
+    const mode = normalizeQueryMode(options.mode);
+    const roleFilter = normalizeRoleFilter(options.roleFilter);
+    const maxMatches = Number.isFinite(Number(options.maxMatches))
+        ? Math.max(1, Number(options.maxMatches))
+        : 1;
+    const snippetLimit = Number.isFinite(Number(options.snippetLimit))
+        ? Math.max(0, Number(options.snippetLimit))
+        : 0;
+
+    const messages = [];
+    for (const record of records) {
+        const message = extractMessageFromRecord(record, session.source);
+        if (!message || !message.text) {
+            continue;
+        }
+        messages.push(message);
+    }
+
+    const filteredMessages = roleFilter === 'system'
+        ? messages
+        : removeLeadingSystemMessage(messages);
+
+    let count = 0;
+    const snippets = [];
+
+    for (const message of filteredMessages) {
+        if (roleFilter !== 'all' && message.role !== roleFilter) {
+            continue;
+        }
+        if (!matchTokensInText(message.text, tokens, mode)) {
+            continue;
+        }
+
+        count += 1;
+        if (snippetLimit > 0 && snippets.length < snippetLimit) {
+            snippets.push(truncateText(message.text));
+        }
+        if (count >= maxMatches) {
+            break;
+        }
+    }
+
+    return { hit: count > 0, count, snippets };
+}
+
+function applySessionQueryFilter(sessions, options = {}) {
+    const tokens = Array.isArray(options.tokens) ? options.tokens : [];
+    if (tokens.length === 0) {
+        return sessions;
+    }
+
+    const mode = normalizeQueryMode(options.queryMode);
+    const scope = normalizeQueryScope(options.queryScope);
+    const roleFilter = normalizeRoleFilter(options.roleFilter);
+    const contentScanLimit = Number.isFinite(Number(options.contentScanLimit))
+        ? Math.max(1, Number(options.contentScanLimit))
+        : DEFAULT_CONTENT_SCAN_LIMIT;
+    const contentScanBytes = Number.isFinite(Number(options.contentScanBytes))
+        ? Math.max(1024, Number(options.contentScanBytes))
+        : SESSION_CONTENT_READ_BYTES;
+
+    let scanned = 0;
+    const results = [];
+
+    for (const session of sessions) {
+        if (scope === 'content' && scanned >= contentScanLimit) {
+            break;
+        }
+
+        const summaryText = buildSessionSummaryText(session);
+        const summaryHit = scope !== 'content' && matchTokensInText(summaryText, tokens, mode);
+        let contentHit = false;
+        let contentInfo = null;
+
+        if (scope !== 'summary' && (!summaryHit || scope === 'content')) {
+            if (scanned < contentScanLimit) {
+                scanned += 1;
+                contentInfo = scanSessionContentForQuery(session, tokens, {
+                    mode,
+                    roleFilter,
+                    maxBytes: contentScanBytes,
+                    maxMatches: 1,
+                    snippetLimit: 2
+                });
+                contentHit = contentInfo.hit;
+            }
+        }
+
+        const hit = scope === 'summary'
+            ? summaryHit
+            : (scope === 'content' ? contentHit : (summaryHit || contentHit));
+        if (!hit) {
+            continue;
+        }
+
+        const matchInfo = contentInfo && contentInfo.hit
+            ? contentInfo
+            : { hit: true, count: 1, snippets: [] };
+        session.match = {
+            hit: true,
+            count: matchInfo.count || 1,
+            snippets: Array.isArray(matchInfo.snippets) ? matchInfo.snippets : []
+        };
+        results.push(session);
+    }
+
+    return results;
+}
 function collectRecentJsonlFiles(rootDir, options = {}) {
     if (!fs.existsSync(rootDir)) {
         return [];
@@ -1218,10 +1430,14 @@ function listAllSessions(params = {}) {
     const forceRefresh = !!params.forceRefresh;
     const normalizedPathFilter = normalizeSessionPathFilter(params.pathFilter);
     const hasPathFilter = !!normalizedPathFilter;
-    const cacheKey = `${source}:${limit}:${normalizedPathFilter}`;
-    const cached = getSessionListCache(cacheKey, forceRefresh);
-    if (cached) {
-        return cached;
+    const queryTokens = normalizeQueryTokens(params.query);
+    const hasQuery = queryTokens.length > 0;
+    const cacheKey = hasQuery ? '' : `${source}:${limit}:${normalizedPathFilter}`;
+    if (!hasQuery) {
+        const cached = getSessionListCache(cacheKey, forceRefresh);
+        if (cached) {
+            return cached;
+        }
     }
 
     const scanOptions = hasPathFilter
@@ -1243,8 +1459,21 @@ function listAllSessions(params = {}) {
         sessions = sessions.filter(item => matchesSessionPathFilter(item, normalizedPathFilter));
     }
 
-    const result = mergeAndLimitSessions(sessions, limit);
-    setSessionListCache(cacheKey, result);
+    let result = sessions;
+    if (hasQuery) {
+        result = applySessionQueryFilter(result, {
+            tokens: queryTokens,
+            queryMode: params.queryMode,
+            queryScope: params.queryScope,
+            roleFilter: params.roleFilter,
+            contentScanLimit: params.contentScanLimit,
+            contentScanBytes: params.contentScanBytes
+        });
+    }
+    result = mergeAndLimitSessions(result, limit);
+    if (!hasQuery) {
+        setSessionListCache(cacheKey, result);
+    }
     return result;
 }
 
@@ -1627,258 +1856,6 @@ async function exportSessionData(params = {}) {
         sessionId,
         fileName: `${source}-session-${safeSessionId}.md`,
         content: markdown
-    };
-}
-
-function deleteSessionFile(params = {}, options = {}) {
-    const source = params.source === 'claude' ? 'claude' : (params.source === 'codex' ? 'codex' : '');
-    if (!source) {
-        return { error: 'Invalid source' };
-    }
-
-    const filePath = resolveSessionFilePath(source, params.filePath, params.sessionId);
-    if (!filePath) {
-        return { error: 'Session file not found' };
-    }
-
-    if (!filePath.toLowerCase().endsWith('.jsonl')) {
-        return { error: 'Invalid session file' };
-    }
-
-    let stat;
-    try {
-        stat = fs.statSync(filePath);
-    } catch (e) {
-        return { error: 'Session file not found' };
-    }
-
-    if (!stat.isFile()) {
-        return { error: 'Session path is not a file' };
-    }
-
-    try {
-        fs.unlinkSync(filePath);
-    } catch (e) {
-        return { error: `Failed to delete session: ${e.message}` };
-    }
-
-    if (!options.skipCacheInvalidate) {
-        invalidateSessionListCache();
-    }
-
-    return {
-        success: true,
-        source,
-        sessionId: params.sessionId || path.basename(filePath, '.jsonl'),
-        filePath
-    };
-}
-
-function deleteSessionFilesBatch(params = {}) {
-    const items = Array.isArray(params.items) ? params.items : [];
-    if (items.length === 0) {
-        return { error: 'No sessions provided' };
-    }
-
-    if (items.length > MAX_BATCH_DELETE_SESSIONS) {
-        return { error: `Too many sessions, max ${MAX_BATCH_DELETE_SESSIONS}` };
-    }
-
-    const results = [];
-    let deleted = 0;
-
-    for (const item of items) {
-        const payload = (item && typeof item === 'object') ? item : {};
-        const source = typeof payload.source === 'string' ? payload.source : '';
-        const sessionId = typeof payload.sessionId === 'string' ? payload.sessionId : '';
-        const filePath = typeof payload.filePath === 'string' ? payload.filePath : '';
-
-        const single = deleteSessionFile(
-            { source, sessionId, filePath },
-            { skipCacheInvalidate: true }
-        );
-
-        if (single.error) {
-            results.push({
-                success: false,
-                source: source || 'unknown',
-                sessionId,
-                filePath,
-                error: single.error
-            });
-            continue;
-        }
-
-        deleted += 1;
-        results.push({
-            success: true,
-            source: single.source,
-            sessionId: single.sessionId,
-            filePath: single.filePath
-        });
-    }
-
-    if (deleted > 0) {
-        invalidateSessionListCache();
-    }
-
-    const failed = results.length - deleted;
-    return {
-        success: failed === 0,
-        total: results.length,
-        deleted,
-        failed,
-        results
-    };
-}
-
-async function deleteSessionRecords(params = {}) {
-    const source = params.source === 'claude' ? 'claude' : (params.source === 'codex' ? 'codex' : '');
-    if (!source) {
-        return { error: 'Invalid source' };
-    }
-
-    const filePath = resolveSessionFilePath(source, params.filePath, params.sessionId);
-    if (!filePath) {
-        return { error: 'Session file not found' };
-    }
-
-    if (!filePath.toLowerCase().endsWith('.jsonl')) {
-        return { error: 'Invalid session file' };
-    }
-
-    let stat;
-    try {
-        stat = fs.statSync(filePath);
-    } catch (e) {
-        return { error: 'Session file not found' };
-    }
-
-    if (!stat.isFile()) {
-        return { error: 'Session path is not a file' };
-    }
-
-    const rawIndices = Array.isArray(params.recordLineIndices) ? params.recordLineIndices : [];
-    if (rawIndices.length === 0) {
-        return { error: 'No records provided' };
-    }
-
-    if (rawIndices.length > MAX_BATCH_DELETE_RECORDS) {
-        return { error: `Too many records, max ${MAX_BATCH_DELETE_RECORDS}` };
-    }
-
-    const extracted = await extractMessagesFromFile(filePath, source, { maxMessages: Infinity });
-    const visibleMessages = removeLeadingSystemMessage(Array.isArray(extracted.messages) ? extracted.messages : []);
-    const visibleLineSet = new Set();
-    for (const message of visibleMessages) {
-        if (message && Number.isInteger(message.recordLineIndex) && message.recordLineIndex >= 0) {
-            visibleLineSet.add(message.recordLineIndex);
-        }
-    }
-
-    const normalizedIndices = [];
-    const seenIndices = new Set();
-    const results = [];
-
-    for (const raw of rawIndices) {
-        const parsed = Number(raw);
-        if (!Number.isInteger(parsed) || parsed < 0) {
-            results.push({
-                recordLineIndex: Number.isInteger(parsed) ? parsed : -1,
-                success: false,
-                error: 'Invalid record line index'
-            });
-            continue;
-        }
-
-        if (seenIndices.has(parsed)) {
-            continue;
-        }
-        seenIndices.add(parsed);
-        normalizedIndices.push(parsed);
-    }
-
-    const deleteSet = new Set();
-    for (const recordLineIndex of normalizedIndices) {
-        if (!visibleLineSet.has(recordLineIndex)) {
-            results.push({
-                recordLineIndex,
-                success: false,
-                error: 'Record not found'
-            });
-            continue;
-        }
-
-        deleteSet.add(recordLineIndex);
-        results.push({
-            recordLineIndex,
-            success: true
-        });
-    }
-
-    const requested = results.length;
-    const deleted = deleteSet.size;
-    const failed = requested - deleted;
-
-    if (deleteSet.size === 0) {
-        return {
-            success: failed === 0,
-            requested,
-            deleted,
-            failed,
-            remainingMessages: visibleMessages.length,
-            results
-        };
-    }
-
-    let rawContent = '';
-    try {
-        rawContent = fs.readFileSync(filePath, 'utf-8');
-    } catch (e) {
-        return { error: `Failed to read session file: ${e.message}` };
-    }
-
-    const newline = rawContent.includes('\r\n') ? '\r\n' : '\n';
-    const hasTrailingNewline = /\r?\n$/.test(rawContent);
-    let lines = rawContent === '' ? [] : rawContent.split(/\r?\n/);
-    if (hasTrailingNewline && lines.length > 0 && lines[lines.length - 1] === '') {
-        lines.pop();
-    }
-
-    const nextLines = [];
-    for (let i = 0; i < lines.length; i += 1) {
-        if (!deleteSet.has(i)) {
-            nextLines.push(lines[i]);
-        }
-    }
-
-    let nextContent = nextLines.join(newline);
-    if (hasTrailingNewline && nextLines.length > 0) {
-        nextContent += newline;
-    }
-
-    const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
-    try {
-        fs.writeFileSync(tmpPath, nextContent, 'utf-8');
-        fs.renameSync(tmpPath, filePath);
-    } catch (e) {
-        try {
-            if (fs.existsSync(tmpPath)) {
-                fs.unlinkSync(tmpPath);
-            }
-        } catch (_) {}
-        return { error: `Failed to rewrite session file: ${e.message}` };
-    }
-
-    invalidateSessionListCache();
-
-    return {
-        success: failed === 0,
-        requested,
-        deleted,
-        failed,
-        remainingMessages: Math.max(0, visibleMessages.length - deleted),
-        results
     };
 }
 
@@ -2835,15 +2812,6 @@ function cmdStart() {
                             break;
                         case 'session-detail':
                             result = await readSessionDetail(params);
-                            break;
-                        case 'delete-session':
-                            result = deleteSessionFile(params);
-                            break;
-                        case 'delete-sessions':
-                            result = deleteSessionFilesBatch(params);
-                            break;
-                        case 'delete-session-records':
-                            result = await deleteSessionRecords(params);
                             break;
                         default:
                             result = { error: '未知操作' };
