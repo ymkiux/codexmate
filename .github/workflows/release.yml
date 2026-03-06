@@ -6,9 +6,6 @@ on:
       tag:
         description: 'Tag to release (e.g., v0.0.1)'
         required: true
-      release_name:
-        description: 'Release name (optional)'
-        required: false
       prerelease:
         description: 'Mark as prerelease (true/false)'
         required: false
@@ -37,6 +34,9 @@ jobs:
       - name: Verify tag matches package.json version
         run: |
           node -e "const pkg=require('./package.json'); const tag='${{ inputs.tag }}'; const expected='v'+pkg.version; if(tag!==expected){ console.error('Tag '+tag+' does not match package.json version '+expected); process.exit(1);} console.log('Tag matches '+expected);"
+      - name: Compute release name
+        run: |
+          node -e "const p=require('./package.json'); const tag='${{ inputs.tag }}'; const name=p.name.includes('/')? p.name.split('/')[1]: p.name; const value=name+' '+tag; console.log('RELEASE_NAME='+value);" >> "$GITHUB_ENV"
       - name: Pack npm artifact
         run: |
           name=$(node -e "const p=require('./package.json'); const n=p.name.replace('@','').replace('/','-'); process.stdout.write(n+'-'+p.version+'.tgz');")
@@ -47,7 +47,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag }}
-          name: ${{ inputs.release_name || inputs.tag }}
+          name: ${{ env.RELEASE_NAME }}
           prerelease: ${{ inputs.prerelease }}
           draft: ${{ inputs.draft }}
           files: ${{ env.PACKAGE_TGZ }}
