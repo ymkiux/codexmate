@@ -1280,6 +1280,37 @@
             }
         }
 
+        @media (max-width: 520px) {
+            .session-item-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .session-item-actions {
+                justify-content: flex-end;
+            }
+
+            .session-actions {
+                width: 100%;
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .btn-session-refresh,
+            .btn-session-export {
+                width: 100%;
+            }
+
+            .session-toolbar-group.session-toolbar-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .session-toolbar-group.session-toolbar-actions .btn-tool {
+                width: 100%;
+            }
+        }
+
         .btn[disabled] {
             opacity: 0.5;
             cursor: not-allowed;
@@ -3537,7 +3568,6 @@
     </script>
 </body>
 </html>
-
 
 
 

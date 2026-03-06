@@ -160,6 +160,66 @@ function ensureDir(dirPath) {
     }
 }
 
+function expandHomePath(value) {
+    if (typeof value !== 'string') {
+        return '';
+    }
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return '';
+    }
+    if (trimmed === '~') {
+        return os.homedir();
+    }
+    if (trimmed.startsWith(`~${path.sep}`) || trimmed.startsWith('~/') || trimmed.startsWith('~\\')) {
+        return path.resolve(os.homedir(), trimmed.slice(2));
+    }
+    return trimmed;
+}
+
+function resolveExistingDir(candidates = [], fallback = '') {
+    for (const raw of candidates) {
+        const candidate = expandHomePath(raw);
+        if (!candidate) continue;
+        try {
+            if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
+                return candidate;
+            }
+        } catch (e) {}
+    }
+    return fallback;
+}
+
+function getCodexSessionsDir() {
+    const candidates = [];
+    const envCodexHome = process.env.CODEX_HOME;
+    if (envCodexHome) {
+        candidates.push(path.join(envCodexHome, 'sessions'));
+    }
+    const xdgConfig = process.env.XDG_CONFIG_HOME;
+    if (xdgConfig) {
+        candidates.push(path.join(xdgConfig, 'codex', 'sessions'));
+    }
+    candidates.push(path.join(os.homedir(), '.config', 'codex', 'sessions'));
+    candidates.push(CODEX_SESSIONS_DIR);
+    return resolveExistingDir(candidates, CODEX_SESSIONS_DIR);
+}
+
+function getClaudeProjectsDir() {
+    const candidates = [];
+    const envClaudeHome = process.env.CLAUDE_HOME || process.env.CLAUDE_CONFIG_DIR;
+    if (envClaudeHome) {
+        candidates.push(path.join(envClaudeHome, 'projects'));
+    }
+    const xdgConfig = process.env.XDG_CONFIG_HOME;
+    if (xdgConfig) {
+        candidates.push(path.join(xdgConfig, 'claude', 'projects'));
+    }
+    candidates.push(path.join(os.homedir(), '.config', 'claude', 'projects'));
+    candidates.push(CLAUDE_PROJECTS_DIR);
+    return resolveExistingDir(candidates, CLAUDE_PROJECTS_DIR);
+}
+
 function hasUtf8Bom(text) {
     return typeof text === 'string' && text.charCodeAt(0) === 0xfeff;
 }
@@ -810,9 +870,24 @@ function consumeInitNotice() {
     return notice;
 }
 
+function normalizePathForCompare(targetPath, options = {}) {
+    const ignoreCase = !!options.ignoreCase;
+    let resolved = '';
+    try {
+        resolved = fs.realpathSync.native ? fs.realpathSync.native(targetPath) : fs.realpathSync(targetPath);
+    } catch (e) {
+        resolved = path.resolve(targetPath);
+    }
+    return ignoreCase ? resolved.toLowerCase() : resolved;
+}
+
 function isPathInside(targetPath, rootPath) {
-    const resolvedTarget = path.resolve(targetPath).toLowerCase();
-    const resolvedRoot = path.resolve(rootPath).toLowerCase();
+    if (!targetPath || !rootPath) {
+        return false;
+    }
+    const ignoreCase = process.platform === 'win32';
+    const resolvedTarget = normalizePathForCompare(targetPath, { ignoreCase });
+    const resolvedRoot = normalizePathForCompare(rootPath, { ignoreCase });
     if (resolvedTarget === resolvedRoot) {
         return true;
     }
@@ -1516,6 +1591,7 @@ function parseClaudeSessionSummary(filePath) {
 }
 
 function listCodexSessions(limit, options = {}) {
+    const codexSessionsDir = getCodexSessionsDir();
     const scanFactor = Number.isFinite(Number(options.scanFactor))
         ? Math.max(1, Number(options.scanFactor))
         : SESSION_SCAN_FACTOR;
@@ -1531,7 +1607,7 @@ function listCodexSessions(limit, options = {}) {
     const maxFilesScanned = Number.isFinite(Number(options.maxFilesScanned))
         ? Math.max(scanCount, Math.floor(Number(options.maxFilesScanned)))
         : Math.max(scanCount * 2, minFiles);
-    const files = collectRecentJsonlFiles(CODEX_SESSIONS_DIR, {
+    const files = collectRecentJsonlFiles(codexSessionsDir, {
         returnCount: scanCount,
         maxFilesScanned
     });
@@ -1552,7 +1628,8 @@ function listCodexSessions(limit, options = {}) {
 }
 
 function listClaudeSessions(limit, options = {}) {
-    if (!fs.existsSync(CLAUDE_PROJECTS_DIR)) {
+    const claudeProjectsDir = getClaudeProjectsDir();
+    if (!fs.existsSync(claudeProjectsDir)) {
         return [];
     }
 
@@ -1575,9 +1652,9 @@ function listClaudeSessions(limit, options = {}) {
     const sessions = [];
     let projectDirs = [];
     try {
-        projectDirs = fs.readdirSync(CLAUDE_PROJECTS_DIR, { withFileTypes: true })
+        projectDirs = fs.readdirSync(claudeProjectsDir, { withFileTypes: true })
             .filter(entry => entry.isDirectory())
-            .map(entry => path.join(CLAUDE_PROJECTS_DIR, entry.name));
+            .map(entry => path.join(claudeProjectsDir, entry.name));
     } catch (e) {
         projectDirs = [];
     }
@@ -1597,6 +1674,11 @@ function listClaudeSessions(limit, options = {}) {
             let filePath = typeof entry.fullPath === 'string' && entry.fullPath
                 ? entry.fullPath
                 : path.join(projectDir, `${sessionId}.jsonl`);
+            filePath = expandHomePath(filePath);
+            if (filePath && !path.isAbsolute(filePath)) {
+                filePath = path.join(projectDir, filePath);
+            }
+            filePath = filePath ? path.resolve(filePath) : '';
 
             if (!fs.existsSync(filePath)) {
                 continue;
@@ -1652,7 +1734,7 @@ function listClaudeSessions(limit, options = {}) {
     }
 
     if (sessions.length === 0) {
-        const fallbackFiles = collectRecentJsonlFiles(CLAUDE_PROJECTS_DIR, {
+        const fallbackFiles = collectRecentJsonlFiles(claudeProjectsDir, {
             returnCount: scanCount,
             maxFilesScanned,
             ignoreSubPath: `${path.sep}subagents${path.sep}`
@@ -1784,14 +1866,15 @@ function listSessionPaths(params = {}) {
 }
 
 function resolveSessionFilePath(source, filePath, sessionId) {
-    const root = source === 'claude' ? CLAUDE_PROJECTS_DIR : CODEX_SESSIONS_DIR;
+    const root = source === 'claude' ? getClaudeProjectsDir() : getCodexSessionsDir();
     if (!root || !fs.existsSync(root)) {
         return '';
     }
 
     if (typeof filePath === 'string' && filePath.trim()) {
-        const targetPath = path.resolve(filePath.trim());
-        if (fs.existsSync(targetPath) && isPathInside(targetPath, root)) {
+        const expandedPath = expandHomePath(filePath.trim());
+        const targetPath = expandedPath ? path.resolve(expandedPath) : '';
+        if (targetPath && fs.existsSync(targetPath) && isPathInside(targetPath, root)) {
             return targetPath;
         }
     }
