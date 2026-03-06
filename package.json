@@ -1,6 +1,6 @@
-{
+﻿{
   "name": "codexmate",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Codex 提供商管理 CLI 工具",
   "bin": {
     "codexmate": "./cli.js"
