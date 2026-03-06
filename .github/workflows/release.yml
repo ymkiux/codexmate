@@ -39,7 +39,7 @@ jobs:
           node -e "const pkg=require('./package.json'); const tag='${{ inputs.tag }}'; const expected='v'+pkg.version; if(tag!==expected){ console.error('Tag '+tag+' does not match package.json version '+expected); process.exit(1);} console.log('Tag matches '+expected);"
       - name: Pack npm artifact
         run: |
-          name=$(node -e "const p=require('./package.json'); const n=p.name.replace('@','').replace('/','-'); process.stdout.write(`${n}-${p.version}.tgz`);")
+          name=$(node -e "const p=require('./package.json'); const n=p.name.replace('@','').replace('/','-'); process.stdout.write(n+'-'+p.version+'.tgz');")
           npm pack
           test -f "$name"
           echo "PACKAGE_TGZ=$name" >> "$GITHUB_ENV"
