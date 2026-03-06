@@ -89,10 +89,19 @@ npm install -g codexmate
 
 npm 包名：`codexmate`。
 
+若希望每次执行都能更新到最新特效功能，可使用 GitHub 源安装（重复执行即可更新）：
+
+```bash
+npm install -g ymkiux/codexmate
+```
+
 ### 使用 npx（免安装）
 
 ```bash
 npx codexmate@latest status
+```
+
+```bash
 npx codexmate@latest start
 ```
 
