@@ -93,10 +93,19 @@ npm install -g codexmate
 
 Package name on npm: `codexmate`.
 
+Want to update to the latest effects features each time? Install from GitHub (re-run to update):
+
+```bash
+npm install -g ymkiux/codexmate
+```
+
 ### Run with npx (No Install)
 
 ```bash
 npx codexmate@latest status
+```
+
+```bash
 npx codexmate@latest start
 ```
 
