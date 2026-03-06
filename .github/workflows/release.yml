@@ -1,20 +1,11 @@
 ﻿name: release
-
+run-name: "${{ github.event.repository.name }} ${{ inputs.tag }}"
 on:
   workflow_dispatch:
     inputs:
       tag:
         description: 'Tag to release (e.g., v0.0.1)'
         required: true
-      prerelease:
-        description: 'Mark as prerelease (true/false)'
-        required: false
-        default: 'false'
-      draft:
-        description: 'Create as draft (true/false)'
-        required: false
-        default: 'false'
-
 permissions:
   contents: write
 
@@ -48,7 +39,7 @@ jobs:
         with:
           tag_name: ${{ inputs.tag }}
           name: ${{ env.RELEASE_NAME }}
-          prerelease: ${{ inputs.prerelease }}
-          draft: ${{ inputs.draft }}
+          prerelease: false
+          draft: false
           files: ${{ env.PACKAGE_TGZ }}
           generate_release_notes: true
