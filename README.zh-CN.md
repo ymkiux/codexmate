@@ -2,8 +2,8 @@
 
 > 轻量级 AI 工具配置助手：CLI + Web，一站式管理 Codex 提供商与 Claude Code 配置
 
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/node-%3E%3D14.0.0-green.svg)](https://nodejs.org)
+[![Build](https://img.shields.io/github/actions/workflow/status/ymkiux/codexmate/release.yml?label=build)](https://github.com/ymkiux/codexmate/actions/workflows/release.yml) [![Version](https://img.shields.io/npm/v/codexmate?label=version&registry_uri=https%3A%2F%2Fregistry.npmjs.org)](https://www.npmjs.com/package/codexmate) [![Status](https://img.shields.io/badge/status-alpha-orange)](https://github.com/ymkiux/codexmate)
+[![Maintain](https://img.shields.io/github/commit-activity/m/ymkiux/codexmate?label=maintain%2Fmonth)](https://github.com/ymkiux/codexmate/commits) [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE) [![Node](https://img.shields.io/badge/node-%3E%3D14.0.0-green.svg)](https://nodejs.org)
 
 [English](README.md) | 中文
 
@@ -47,7 +47,12 @@
 
 1. 安装（全局）：
 ```bash
-npm install -g ymkiux/codexmate
+npm install -g codexmate
+```
+
+或免安装直接运行：
+```bash
+npx codexmate@latest status
 ```
 
 2. 查看当前状态：
@@ -71,7 +76,16 @@ codexmate start
 ### 全局安装（推荐）
 
 ```bash
-npm install -g ymkiux/codexmate
+npm install -g codexmate
+```
+
+npm 包名：`codexmate`。
+
+### 使用 npx（免安装）
+
+```bash
+npx codexmate@latest status
+npx codexmate@latest start
 ```
 
 ### 从源码安装
