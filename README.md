@@ -273,6 +273,10 @@ Note: Requires [7-Zip](https://www.7-zip.org/) installed.
 - **Vue.js 3** - Web UI framework
 - **Native HTTP** - Built-in Web server
 
+## Release (GitHub Actions)
+
+Create a tag that matches `package.json` (for example `v0.0.1`). Then run the `release` workflow in GitHub Actions and input that tag. It will create a GitHub Release and attach the `npm pack` `.tgz` artifact.
+
 ## License
 
 Apache-2.0 © [ymkiux](https://github.com/ymkiux)
