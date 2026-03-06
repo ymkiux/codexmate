@@ -48,6 +48,7 @@ codex-switcher.exe
 *.toml
 *.env
 .env.*
+.npmrc
 
 # Package manager lockfiles (keep package-lock.json)
 # pnpm-lock.yaml

@@ -2,8 +2,8 @@
 
 > A lightweight AI configuration assistant: CLI + Web to manage Codex providers/models and Claude Code configs
 
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/node-%3E%3D14.0.0-green.svg)](https://nodejs.org)
+[![Build](https://img.shields.io/github/actions/workflow/status/ymkiux/codexmate/release.yml?label=build)](https://github.com/ymkiux/codexmate/actions/workflows/release.yml) [![Version](https://img.shields.io/npm/v/codexmate?label=version&registry_uri=https%3A%2F%2Fregistry.npmjs.org)](https://www.npmjs.com/package/codexmate) [![Status](https://img.shields.io/badge/status-alpha-orange)](https://github.com/ymkiux/codexmate)
+[![Maintain](https://img.shields.io/github/commit-activity/m/ymkiux/codexmate?label=maintain%2Fmonth)](https://github.com/ymkiux/codexmate/commits) [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE) [![Node](https://img.shields.io/badge/node-%3E%3D14.0.0-green.svg)](https://nodejs.org)
 
 English | [Chinese](README.zh-CN.md)
 
@@ -51,7 +51,12 @@ If you frequently switch between models, providers, or configuration profiles, C
 
 1. Install (global):
 ```bash
-npm install -g ymkiux/codexmate
+npm install -g codexmate
+```
+
+Or run once without install:
+```bash
+npx codexmate@latest status
 ```
 
 2. Check status:
@@ -75,7 +80,16 @@ Then open `http://localhost:3737` in your browser.
 ### Global (Recommended)
 
 ```bash
-npm install -g ymkiux/codexmate
+npm install -g codexmate
+```
+
+Package name on npm: `codexmate`.
+
+### Run with npx (No Install)
+
+```bash
+npx codexmate@latest status
+npx codexmate@latest start
 ```
 
 ### From Source
