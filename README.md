@@ -1,37 +1,84 @@
 ﻿# Codex Mate
 
-> 轻量级 AI 工具配置助手，支持 Codex 提供商管理和 Claude Code 环境配置
+> A lightweight AI configuration assistant: CLI + Web to manage Codex providers/models and Claude Code configs
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D14.0.0-green.svg)](https://nodejs.org)
 
-Codex Mate 是一个简洁的命令行工具，提供两大核心功能：
+English | [Chinese](README.zh-CN.md)
 
-1. **Codex 提供商管理** - 快速切换 Codex 的 AI 模型提供商和模型
-2. **Claude Code 配置** - 一键写入 Claude Code 配置（默认 `~/.claude/settings.json`）
+## Overview
 
-其中 **Codex 配置功能支持 Linux 和 Windows**，Claude 配置应用支持 Windows / macOS / Linux，可通过 Web 统一管理。
+If you frequently switch between models, providers, or configuration profiles, Codex Mate turns that into a single command or a single click.
 
-支持通过 CLI 或 Web 界面进行可视化操作，让 AI 工具的配置管理变得简单高效。
+## What You Get
 
-## 功能特性
+- Faster provider/model switching
+- More controllable local configuration management
+- A visual Web UI to reduce CLI burden
+- Change tracking with backups
 
-- **快速切换** - 一键切换 AI 模型提供商
-- **模型管理** - 统一管理所有可用模型
-- **Web 界面** - 内置简洁的可视化界面
-- **安全可靠** - API key 本地存储，脱敏显示
-- **轻量高效** - 仅依赖 Node.js 和一个 TOML 解析库
-- **文件压缩** - 基于 7-Zip 的多线程压缩/解压
+## Feature Overview
 
-## 安装
+| Module | Problem | Key Capabilities |
+| --- | --- | --- |
+| Codex Config | Switching providers/models is painful | Provider/model switching, model management, CLI + Web entry points, template-confirmed writes |
+| Claude Code Config | Multiple profiles and inconsistent write paths | Profile management, default write to `~/.claude/settings.json`, compatibility mode env vars |
+| Session Browser | Local sessions are hard to track | List/filter sessions, export to Markdown, delete and batch cleanup |
+| Utilities | Compression/extraction requires extra tools | Multithreaded compress/unzip via 7-Zip |
 
-### 全局安装（推荐）
+## Why Codex Mate
+
+- Focused on two jobs: Codex provider/model switching + Claude Code config apply
+- Local-first: configs and API keys are written to local files, not the cloud
+- Lightweight: CLI + Web, no desktop app required
+- Reversible: auto-backup before first takeover
+
+## Use Cases
+
+- Frequent provider/model switching, want a one-command flow
+- Use both Codex and Claude Code, want a single entry point
+- Multi-project or multi-environment setups that need quick config changes
+- Want a visual UI without a heavy client
+
+## Scope and Boundaries
+
+- Only configuration management for Codex and Claude Code, not a full all-in-one tool suite
+- No built-in proxy/relay/billing dashboard/cloud sync (kept lightweight)
+- Web UI runs only when you start it (`codexmate start`)
+
+## Quick Start
+
+1. Install (global):
+```bash
+npm install -g ymkiux/codexmate
+```
+
+2. Check status:
+```bash
+codexmate status
+```
+
+3. Start the Web UI:
+```bash
+codexmate start
+```
+
+Then open `http://localhost:3737` in your browser.
+
+## UI Preview
+
+![Codex Mate Web UI](res/screenshot.png)
+
+## Install
+
+### Global (Recommended)
 
 ```bash
 npm install -g ymkiux/codexmate
 ```
 
-### 从源码安装
+### From Source
 
 ```bash
 git clone https://github.com/ymkiux/codexmate.git
@@ -40,238 +87,200 @@ npm install
 npm link
 ```
 
-### 环境要求
+### Requirements
 
 - Node.js >= 14
-- 支持 Windows / macOS / Linux
+- Windows / macOS / Linux
 
-## 使用方法
+## CLI Cheat Sheet
 
-### 命令行界面
+| Command | Description |
+| --- | --- |
+| `codexmate` | Show help and available commands |
+| `codexmate status` | Show current status |
+| `codexmate list` | List all providers |
+| `codexmate switch <provider>` | Switch provider |
+| `codexmate use <model>` | Switch model |
+| `codexmate add <name> <URL> [API key]` | Add a provider |
+| `codexmate delete <provider>` | Delete a provider |
+| `codexmate models` | List all models |
+| `codexmate add-model <model>` | Add a model |
+| `codexmate delete-model <model>` | Delete a model |
+| `codexmate start` | Start the Web UI |
 
-```bash
-# 查看帮助
-codexmate
+## Web UI
 
-# 查看当前状态
-codexmate status
-
-# 列出所有提供商
-codexmate list
-
-# 切换提供商
-codexmate switch <提供商名称>
-
-# 切换模型
-codexmate use <模型名称>
-
-# 添加新提供商
-codexmate add <名称> <URL> [API密钥]
-
-# 删除提供商
-codexmate delete <提供商名称>
-
-# 列出所有模型
-codexmate models
-
-# 添加模型
-codexmate add-model <模型名称>
-
-# 删除模型
-codexmate delete-model <模型名称>
-```
-
-### Web 界面
-
-启动 Web 界面（自动打开浏览器）：
+Start the Web UI (auto opens browser):
 
 ```bash
 codexmate start
 ```
 
-然后在浏览器中打开 `http://localhost:3737`
+### Codex Config Mode
 
-**Web 界面功能：**
+- View current provider and model status
+- Quickly switch provider and model
+- Manage available model list
+- Edit `~/.codex/AGENTS.md` instruction file (same level as `config.toml`)
+- Add/delete custom providers
+- Supports Codex config management on Linux/Windows
 
-#### Codex 配置模式
-- 查看当前提供商和模型状态
-- 快速切换提供商
-- 切换和管理可用模型
-- 编辑 `~/.codex/AGENTS.md` 指令文件（与 `config.toml` 同级）
-- 添加/删除自定义提供商
-- 支持 Linux / Windows 环境下的 Codex 配置管理
+### Claude Code Config Mode (Windows / macOS / Linux)
 
-#### Claude Code 配置模式（Windows / macOS / Linux）
-- 管理多个 Claude Code 配置方案
-- 配置 API Key、Base URL 和模型
-- 默认一键应用到 `~/.claude/settings.json` 的 `env` 字段：
-  - `env.ANTHROPIC_API_KEY`
-  - `env.ANTHROPIC_AUTH_TOKEN`
-  - `env.ANTHROPIC_BASE_URL`
-  - `env.ANTHROPIC_MODEL`
-  - `env.CLAUDE_CODE_USE_KEY`
-- 提供“兼容模式”可回退为系统环境变量写入（适合旧习惯或特定 Windows 场景）
+- Manage multiple Claude Code profiles
+- Configure API key, Base URL, and model
+- Default write to `env` in `~/.claude/settings.json`: `env.ANTHROPIC_API_KEY` / `env.ANTHROPIC_AUTH_TOKEN` / `env.ANTHROPIC_BASE_URL` / `env.ANTHROPIC_MODEL` / `env.CLAUDE_CODE_USE_KEY`
+- Compatibility mode: write to system environment variables (useful for legacy workflows or specific Windows cases)
 
-#### 会话浏览模式
-- 在同一 Web 页面查看 Codex 与 Claude Code 的本地会话列表
-- 支持按来源筛选（Codex / Claude / 全部）
-- 支持按已有会话路径（cwd）下拉筛选，选择后自动刷新
-- 支持一键导出指定会话为 Markdown，便于提供给其他 AI 继续分析
-- 支持直接删除指定会话（本地 jsonl 记录）
-- 支持勾选多条会话并批量删除，部分失败会汇总提示
-- 支持在会话详情内单条删除记录或多选批量删除记录（写回原始 jsonl）
+### Session Browser
 
-#### Codex 模板确认模式
-- Web 中的 Codex 配置改动默认进入 `config.toml` 模板编辑器
-- 仅在用户点击“确认应用模板”后才写入 `config.toml`
-- 不再通过前端一键操作直接改写 `config.toml`
+- View local Codex and Claude Code sessions in one page
+- Filter by source (Codex / Claude / All)
+- Filter by session path (cwd), auto refresh on selection
+- Export selected sessions to Markdown
+- Delete single sessions (local jsonl records)
+- Batch delete multiple sessions with partial failure summary
+- Delete individual records or multi-select within session details (writes back to original jsonl)
 
-## 配置文件
+### Codex Template Confirmation Mode
 
-配置文件位于 `~/.codex/` 目录：
+- Codex config changes in Web UI go to a `config.toml` template editor first
+- Only writes to `config.toml` after you click "Confirm Apply Template"
+- Prevents direct one-click overwrites from the UI
 
-- `config.toml` - Codex 主配置文件
-- `auth.json` - API 认证信息
-- `models.json` - 可用模型列表
-- `provider-current-models.json` - 提供商当前模型配置
-- `codexmate-init.json` - 首次初始化标记（用于避免重复重置）
-- `config.toml.codexmate-backup-*.bak` - 首次初始化时自动备份的旧配置（若存在）
+## Configuration Files
 
-Claude Code 配置应用涉及：
+Config directory: `~/.codex/`
 
-- `~/.claude/settings.json` - Claude Code 运行时配置（默认写入目标）
-- `~/.claude/settings.json.codexmate-backup-*.bak` - 首次改写前自动备份（若存在旧文件）
+- `config.toml` - Codex main config
+- `auth.json` - API auth info
+- `models.json` - Available model list
+- `provider-current-models.json` - Per-provider current model config
+- `codexmate-init.json` - First-run marker
+- `config.toml.codexmate-backup-*.bak` - Backup created on first takeover
 
-### 首次运行初始化说明
+Claude Code config files:
 
-- 首次运行 `codexmate` 时，如果检测到已有 `~/.codex/config.toml` 且不是 Codex Mate 管理的配置：
-  - 会先自动备份原文件为 `config.toml.codexmate-backup-时间戳.bak`
-  - 默认保留原 `config.toml` 不覆盖，并写入初始化标记
-- 仅在显式设置环境变量 `CODEXMATE_FORCE_RESET_EXISTING_CONFIG=1` 时，才会重建默认配置
-- 后续运行不会重复处理，避免影响已稳定使用的用户配置
+- `~/.claude/settings.json` - Runtime config (default write target)
+- `~/.claude/settings.json.codexmate-backup-*.bak` - Backup before first overwrite
 
-## 使用示例
+## First Run Initialization
 
-### 添加自定义 API 提供商
+When you run `codexmate` for the first time and an existing `~/.codex/config.toml` is detected that is not managed by Codex Mate:
+
+- The original file is backed up as `config.toml.codexmate-backup-<timestamp>.bak`
+- The original `config.toml` is preserved, and a first-run marker is written
+- Only when `CODEXMATE_FORCE_RESET_EXISTING_CONFIG=1` is set will the default config be rebuilt
+- Subsequent runs will not repeat this process
+
+## Examples
+
+### Add a Custom API Provider
 
 ```bash
 codexmate add myapi https://api.example.com/v1 sk-your-api-key
 codexmate switch myapi
 ```
 
-### 切换到不同的模型
+### Switch to a Different Model
 
 ```bash
 codexmate use gpt-4-turbo
 ```
 
-### 配置 Claude Code（跨平台）
+### Configure Claude Code (Cross-Platform)
 
-1. 启动 Web 界面：
-```bash
-codexmate start
-```
+1. Start the Web UI: `codexmate start`
+2. Switch to "Claude Code Config" mode in the browser
+3. Add a profile (example Zhipu GLM): Name=ZhipuGLM, API Key=your API key, Base URL=`https://open.bigmodel.cn/api/anthropic`, Model=`glm-4.7`
+4. Click the card to apply, or use "Save & Apply to Claude Config" in the editor
+5. Default write to `~/.claude/settings.json`; compatibility mode writes system env vars
+6. Restart Claude Code to apply
 
-2. 在浏览器中切换到 "Claude Code 配置" 模式
-
-3. 添加配置方案（例如智谱 GLM）：
-   - 配置名称：智谱GLM
-   - API Key：你的 API Key
-   - Base URL：`https://open.bigmodel.cn/api/anthropic`
-   - 模型：`glm-4.7`
-
-4. 点击配置卡片直接应用，或在编辑弹窗点击“保存并应用到 Claude 配置”
-   - 默认写入：`~/.claude/settings.json`
-   - 兼容模式：写入系统环境变量
-
-5. 重启 Claude Code，新的配置即生效
-
-### 启动 Web 界面
+### Start the Web UI
 
 ```bash
 codexmate start
 ```
 
-然后在浏览器中打开 `http://localhost:3737`
+Then open `http://localhost:3737`.
 
-## 常见问题
+## FAQ
 
-### Q: 支持哪些操作系统？
-A: Codex 功能支持 Windows 和 Linux（CLI 与 Web）。Claude Code 配置应用默认支持 Windows / macOS / Linux（写入 `~/.claude/settings.json`），兼容模式环境变量写入仅支持 Windows。
+### Q: Which operating systems are supported?
 
-### Q: API key 存储在哪里？
-A: API key 存储在本地配置文件 `~/.codex/config.toml` 中，不会上传到任何服务器。
+A: Codex features support Windows and Linux (CLI and Web). Claude Code config applies to Windows / macOS / Linux (writes to `~/.claude/settings.json`). Compatibility mode env vars are Windows-only.
 
-### Q: Web 界面安全吗？
-A: Web 界面运行在本地，所有操作都在本地完成。API key 在界面中仅显示脱敏版本。
+### Q: Where are API keys stored?
 
-### Q: Claude Code 配置后如何生效？
-A: 点击“应用到 Claude 配置”后会写入 `~/.claude/settings.json`，重启 Claude Code 即生效；如果使用兼容模式写系统环境变量，也建议重启 Claude Code。
+A: API keys are stored locally in `~/.codex/config.toml` and are not uploaded.
 
-### Q: 如何卸载？
-A: 运行 `npm uninstall -g codexmate`
+### Q: Is the Web UI safe?
 
-## 附属功能
+A: The Web UI runs locally; all operations happen on your machine. API keys are masked in the UI.
 
-### 多线程压缩/解压
+### Q: How do Claude Code configs take effect?
 
-基于 7-Zip 的多线程文件压缩和解压功能。
+A: After clicking "Apply to Claude Config", it writes to `~/.claude/settings.json`. Restart Claude Code to apply. If using compatibility mode env vars, a restart is also recommended.
+
+### Q: How to uninstall?
+
+A: Run `npm uninstall -g codexmate`.
+
+## Extras: Multithreaded Compression/Extraction
+
+Based on 7-Zip for multithreaded zip/unzip.
 
 ```bash
-# 压缩文件或文件夹（默认压缩级别 5）
-codexmate zip <文件或文件夹路径>
+# Compress file or folder (default compression level 5)
+codexmate zip <path>
 
-# 指定压缩级别（0-9，0=仅存储，9=极限压缩）
-codexmate zip <路径> --max:9
+# Set compression level (0-9, 0=store only, 9=max)
+codexmate zip <path> --max:9
 
-# 解压 zip 文件（默认解压到同级目录下同名文件夹）
-codexmate unzip <zip文件路径>
+# Unzip a zip file (default to same-level folder)
+codexmate unzip <zip path>
 
-# 解压到指定目录
-codexmate unzip <zip文件路径> <输出目录>
+# Unzip to a specific output directory
+codexmate unzip <zip path> <output dir>
 ```
 
-**使用示例：**
+Examples:
 
 ```bash
-# 压缩项目文件夹
+# Compress a project folder
 codexmate zip ./my-project
 
-# 极限压缩
+# Max compression
 codexmate zip ./my-project --max:9
 
-# 快速压缩（仅存储）
+# Store only (fast)
 codexmate zip ./large-folder --max:0
 
-# 解压文件
+# Unzip
 codexmate unzip ./my-project.zip
 
-# 解压到指定位置
+# Unzip to a target location
 codexmate unzip ./backup.zip D:/restored
 ```
 
-**注意：** 需要系统安装 [7-Zip](https://www.7-zip.org/)。
+Note: Requires [7-Zip](https://www.7-zip.org/) installed.
 
-## 技术栈
+## Tech Stack
 
-- **Node.js** - 运行环境
-- **@iarna/toml** - TOML 配置文件解析
-- **Vue.js 3** - Web 界面框架
-- **原生 HTTP** - 内建 Web 服务器
+- **Node.js** - Runtime
+- **@iarna/toml** - TOML parser
+- **Vue.js 3** - Web UI framework
+- **Native HTTP** - Built-in Web server
 
-## 许可证
+## License
 
 Apache-2.0 © [ymkiux](https://github.com/ymkiux)
 
-## 贡献
+## Contributing
 
-欢迎提交 Issue 和 Pull Request！
+Issues and pull requests are welcome.
 
 ---
 
 Made with [ymkiux](https://github.com/ymkiux)
-
-
-
-
-
