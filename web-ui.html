@@ -6,42 +6,47 @@
     <title>Codex Mate</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Source+Sans+3:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
         /* ============================================
            设计系统 - Design Tokens
            ============================================ */
         :root {
             /* 色彩系统 */
-            --color-brand: #D26B5A;
-            --color-brand-dark: #B85A4A;
-            --color-brand-light: rgba(210, 107, 90, 0.08);
-            --color-brand-subtle: rgba(210, 107, 90, 0.12);
+            --color-brand: #C95E4B;
+            --color-brand-dark: #A94637;
+            --color-brand-light: rgba(201, 94, 75, 0.14);
+            --color-brand-subtle: rgba(201, 94, 75, 0.2);
 
-            --color-bg: #F7F1E8;
-            --color-surface: #FFFFFF;
-            --color-surface-alt: #FAFAFA;
+            --color-bg: #F6EFE6;
+            --color-surface: #FFFDF9;
+            --color-surface-alt: #FFF7F0;
             --color-surface-elevated: #FFFFFF;
-            --color-surface-tint: rgba(255, 255, 255, 0.75);
-            --color-text-primary: #1F1A17;
-            --color-text-secondary: #5C5046;
-            --color-text-tertiary: #8B7668;
-            --color-text-muted: #766458;
-            --color-border: #D0C4B6;
-            --color-border-soft: rgba(208, 196, 182, 0.35);
-            --color-border-strong: rgba(208, 196, 182, 0.7);
+            --color-surface-tint: rgba(255, 255, 255, 0.78);
+            --color-text-primary: #1B1714;
+            --color-text-secondary: #4B4038;
+            --color-text-tertiary: #7A6A5D;
+            --color-text-muted: #6C5B50;
+            --color-border: #D8C9B8;
+            --color-border-soft: rgba(216, 201, 184, 0.45);
+            --color-border-strong: rgba(216, 201, 184, 0.8);
 
-            --color-success: #5A8B6A;
-            --color-error: #C84A3A;
+            --color-success: #4E8B66;
+            --color-error: #C1483B;
 
             --bg-warm-gradient:
-                radial-gradient(circle at 18% 12%, rgba(210, 107, 90, 0.12), transparent 45%),
-                radial-gradient(circle at 85% 0%, rgba(247, 241, 232, 0.9), transparent 40%),
-                linear-gradient(135deg, #F7F1E8 0%, #F2E6D7 45%, #F7F1E8 100%);
+                radial-gradient(circle at 16% 10%, rgba(201, 94, 75, 0.18), transparent 45%),
+                radial-gradient(circle at 90% 6%, rgba(255, 255, 255, 0.85), transparent 40%),
+                linear-gradient(135deg, #F6EFE6 0%, #EFE1D4 45%, #F6EFE6 100%);
 
             /* 字体系统 */
-            --font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+            --font-family-body: 'Source Sans 3', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            --font-family-display: 'Space Grotesk', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            --font-family-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+            --font-family: var(--font-family-body);
 
-            --font-size-display: 48px;
-            --font-size-title: 17px;
+            --font-size-display: 52px;
+            --font-size-title: 18px;
             --font-size-body: 15px;
             --font-size-secondary: 13px;
             --font-size-caption: 11px;
@@ -52,8 +57,8 @@
             --font-weight-secondary: 500;
             --font-weight-caption: 500;
 
-            --line-height-tight: 1.15;
-            --line-height-normal: 1.4;
+            --line-height-tight: 1.12;
+            --line-height-normal: 1.5;
 
             /* 间距系统 */
             --spacing-xs: 8px;
@@ -112,7 +117,7 @@
         }
 
         body {
-            font-family: var(--font-family);
+            font-family: var(--font-family-body);
             background-color: var(--color-bg);
             background: var(--bg-warm-gradient);
             color: var(--color-text-primary);
@@ -123,6 +128,21 @@
             padding: var(--spacing-lg) var(--spacing-md);
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background-image:
+                radial-gradient(circle at 12% 18%, rgba(201, 94, 75, 0.1), transparent 38%),
+                repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.4) 0 1px, transparent 1px 120px),
+                repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.35) 0 1px, transparent 1px 120px);
+            opacity: 0.45;
+            pointer-events: none;
+            z-index: 0;
         }
 
         /* ============================================
@@ -133,6 +153,8 @@
             max-width: 1160px;
             margin: 0 auto;
             padding-bottom: var(--spacing-lg);
+            position: relative;
+            z-index: 1;
         }
 
         /* ============================================
@@ -143,9 +165,10 @@
             font-weight: var(--font-weight-display);
             line-height: var(--line-height-tight);
             letter-spacing: -0.03em;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
             color: var(--color-text-primary);
-            background: linear-gradient(135deg, var(--color-text-primary) 0%, rgba(31, 26, 23, 0.85) 100%);
+            font-family: var(--font-family-display);
+            background: linear-gradient(135deg, var(--color-text-primary) 0%, rgba(27, 23, 20, 0.78) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -157,34 +180,44 @@
             position: relative;
         }
 
+        .subtitle {
+            font-size: var(--font-size-body);
+            color: var(--color-text-tertiary);
+            line-height: var(--line-height-normal);
+            margin-bottom: 20px;
+            max-width: 640px;
+            letter-spacing: 0.01em;
+        }
+
         /* ============================================
            模式切换器 - Segmented Control
            ============================================ */
         .segmented-control {
             display: flex;
-            background: linear-gradient(to bottom, var(--color-bg) 0%, rgba(247, 241, 232, 0.8) 100%);
-            border-radius: var(--radius-sm);
-            padding: 4px;
-            margin-bottom: 12px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.55) 100%);
+            border-radius: var(--radius-lg);
+            padding: 5px;
+            margin-bottom: 16px;
             position: relative;
-            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.04);
-            border: 1px solid var(--color-border-soft);
+            box-shadow: inset 0 1px 2px rgba(31, 26, 23, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
         }
 
         .segment {
             flex: 1;
-            padding: 10px 16px;
+            padding: 11px 16px;
             border: none;
             background: transparent;
             font-size: var(--font-size-body);
             font-weight: var(--font-weight-secondary);
             color: var(--color-text-secondary);
             cursor: pointer;
-            border-radius: 6px;
+            border-radius: 10px;
             transition: all var(--transition-normal) var(--ease-spring);
             position: relative;
             z-index: 2;
-            letter-spacing: -0.01em;
+            letter-spacing: 0.01em;
         }
 
         .segment:hover {
@@ -193,8 +226,8 @@
 
         .segment.active {
             color: var(--color-text-primary);
-            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.9) 100%);
-            box-shadow: var(--shadow-subtle), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.8) 100%);
+            box-shadow: var(--shadow-subtle), inset 0 1px 0 rgba(255, 255, 255, 0.85);
         }
 
         /* ============================================
@@ -226,11 +259,38 @@
             user-select: none;
             will-change: transform;
             border: 1px solid var(--color-border-soft);
+            position: relative;
+            overflow: hidden;
         }
 
         .card:hover {
             transform: translateY(-2px) scale(1.005);
             box-shadow: var(--shadow-float);
+        }
+
+        .card::before,
+        .card::after {
+            content: "";
+            position: absolute;
+            pointer-events: none;
+        }
+
+        .card::before {
+            left: 0;
+            top: 10px;
+            bottom: 10px;
+            width: 3px;
+            border-radius: 999px;
+            background: transparent;
+            transition: background var(--transition-fast) var(--ease-smooth);
+        }
+
+        .card::after {
+            inset: 0;
+            border-radius: inherit;
+            background: linear-gradient(120deg, rgba(255, 255, 255, 0.7) 0%, transparent 55%);
+            opacity: 0;
+            transition: opacity var(--transition-normal) var(--ease-smooth);
         }
 
         .card:active {
@@ -240,8 +300,16 @@
 
         .card.active {
             background: linear-gradient(to bottom, rgba(210, 107, 90, 0.12) 0%, rgba(255, 255, 255, 0.98) 100%);
-            border-color: rgba(210, 107, 90, 0.35);
+            border-color: rgba(201, 94, 75, 0.45);
             box-shadow: var(--shadow-float);
+        }
+
+        .card.active::before {
+            background: linear-gradient(180deg, rgba(201, 94, 75, 0.95) 0%, rgba(201, 94, 75, 0.35) 100%);
+        }
+
+        .card:hover::after {
+            opacity: 0.6;
         }
 
         .card.active .card-icon {
@@ -260,7 +328,7 @@
             width: 40px;
             height: 40px;
             border-radius: var(--radius-sm);
-            background: linear-gradient(135deg, var(--color-bg) 0%, rgba(247, 241, 232, 0.8) 100%);
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(247, 241, 232, 0.65) 100%);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -269,7 +337,7 @@
             color: var(--color-text-secondary);
             flex-shrink: 0;
             transition: all var(--transition-normal) var(--ease-spring-soft);
-            box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.5);
+            box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.7);
         }
 
         .card.active .card-icon {
@@ -362,7 +430,7 @@
             border-radius: var(--radius-full);
             font-size: var(--font-size-caption);
             font-weight: var(--font-weight-caption);
-            background-color: var(--color-bg);
+            background-color: rgba(255, 255, 255, 0.8);
             color: var(--color-text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.06em;
@@ -429,7 +497,7 @@
             background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.92) 100%);
             border-radius: var(--radius-lg);
             padding: calc(var(--spacing-sm) + 2px);
-            margin-bottom: 14px;
+            margin-bottom: 16px;
             box-shadow: var(--shadow-card);
             border: 1px solid var(--color-border-soft);
         }
@@ -447,7 +515,7 @@
             color: var(--color-text-muted);
             text-transform: none;
             letter-spacing: 0.04em;
-            opacity: 0.9;
+            opacity: 0.85;
         }
 
         .selector-actions {
@@ -533,7 +601,7 @@
             padding: 14px var(--spacing-sm);
             border: 1.5px dashed rgba(208, 196, 182, 0.6);
             border-radius: var(--radius-lg);
-            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.1) 100%);
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.15) 100%);
             font-size: var(--font-size-body);
             font-weight: var(--font-weight-secondary);
             color: var(--color-text-tertiary);
@@ -577,7 +645,7 @@
             padding: 12px var(--spacing-sm);
             border-radius: var(--radius-sm);
             border: 1px solid var(--color-border-soft);
-            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.95) 100%);
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%);
             font-size: var(--font-size-body);
             font-weight: var(--font-weight-secondary);
             color: var(--color-text-secondary);
@@ -616,22 +684,6 @@
 
         .session-toolbar-actions {
             justify-content: flex-end;
-        }
-
-        .session-batch-toolbar {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: var(--spacing-xs);
-            margin-bottom: var(--spacing-xs);
-        }
-
-        .session-batch-count {
-            font-size: var(--font-size-caption);
-            color: var(--color-text-tertiary);
-            line-height: 1.35;
-            white-space: nowrap;
-            padding: 0 2px;
         }
 
         .session-source-select,
@@ -787,33 +839,6 @@
             transform: none;
         }
 
-        .btn-session-delete {
-            border: 1px solid rgba(210, 107, 90, 0.5);
-            border-radius: var(--radius-sm);
-            background: linear-gradient(to bottom, rgba(210, 107, 90, 0.12) 0%, rgba(210, 107, 90, 0.04) 100%);
-            color: var(--color-brand);
-            padding: 8px 12px;
-            font-size: var(--font-size-secondary);
-            font-weight: var(--font-weight-secondary);
-            cursor: pointer;
-            transition: all var(--transition-fast) var(--ease-spring);
-            white-space: nowrap;
-            box-shadow: var(--shadow-subtle);
-            letter-spacing: -0.01em;
-        }
-
-        .btn-session-delete:hover {
-            border-color: var(--color-brand);
-            color: var(--color-brand);
-            transform: translateY(-1px);
-        }
-
-        .btn-session-delete:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-
         .session-empty {
             padding: 28px var(--spacing-sm);
             text-align: center;
@@ -912,25 +937,6 @@
             gap: 8px;
         }
 
-        .session-item-checkbox {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 20px;
-            height: 20px;
-            flex-shrink: 0;
-            cursor: pointer;
-            margin-top: 1px;
-        }
-
-        .session-item-checkbox input {
-            width: 16px;
-            height: 16px;
-            margin: 0;
-            cursor: pointer;
-            accent-color: var(--color-brand);
-        }
-
         .session-item:hover {
             border-color: var(--color-brand);
             background: linear-gradient(to bottom, rgba(210, 107, 90, 0.08) 0%, rgba(255, 255, 255, 0.98) 100%);
@@ -945,11 +951,6 @@
             border-color: var(--color-brand);
             background: linear-gradient(to bottom, rgba(210, 107, 90, 0.1) 0%, rgba(255, 255, 255, 0.98) 100%);
             box-shadow: 0 6px 16px rgba(210, 107, 90, 0.12);
-        }
-
-        .session-item.selected {
-            border-color: rgba(210, 107, 90, 0.6);
-            box-shadow: 0 4px 10px rgba(210, 107, 90, 0.08);
         }
 
         .session-item-title {
@@ -1001,38 +1002,6 @@
         }
 
         .session-item-copy svg {
-            width: 16px;
-            height: 16px;
-        }
-
-        .session-item-delete {
-            border: 1px solid rgba(210, 107, 90, 0.4);
-            background: rgba(210, 107, 90, 0.08);
-            color: var(--color-brand);
-            width: 28px;
-            height: 28px;
-            border-radius: 8px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            flex-shrink: 0;
-            transition: all var(--transition-fast) var(--ease-spring);
-        }
-
-        .session-item-delete:hover {
-            border-color: var(--color-brand);
-            background: rgba(210, 107, 90, 0.15);
-            transform: translateY(-1px);
-        }
-
-        .session-item-delete:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .session-item-delete svg {
             width: 16px;
             height: 16px;
         }
@@ -1181,22 +1150,6 @@
             gap: 10px;
         }
 
-        .session-record-toolbar {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: var(--spacing-xs);
-            margin-bottom: 4px;
-        }
-
-        .session-record-count {
-            font-size: var(--font-size-caption);
-            color: var(--color-text-tertiary);
-            line-height: 1.35;
-            white-space: nowrap;
-            padding: 0 2px;
-        }
-
         .session-msg {
             border-radius: 10px;
             padding: 10px 12px 10px 18px;
@@ -1230,11 +1183,6 @@
             background: rgba(90, 139, 106, 0.6);
         }
 
-        .session-msg.selected {
-            border-color: rgba(210, 107, 90, 0.62);
-            box-shadow: 0 4px 10px rgba(210, 107, 90, 0.12);
-        }
-
         .session-msg-header {
             display: flex;
             align-items: flex-start;
@@ -1253,24 +1201,6 @@
             gap: 8px;
         }
 
-        .session-msg-checkbox {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 20px;
-            height: 20px;
-            flex-shrink: 0;
-            cursor: pointer;
-        }
-
-        .session-msg-checkbox input {
-            width: 16px;
-            height: 16px;
-            margin: 0;
-            cursor: pointer;
-            accent-color: var(--color-brand);
-        }
-
         .session-msg-role {
             font-weight: var(--font-weight-secondary);
             color: var(--color-text-secondary);
@@ -1281,31 +1211,6 @@
             overflow: hidden;
             text-overflow: ellipsis;
             color: var(--color-text-tertiary);
-        }
-
-        .session-msg-delete {
-            border: 1px solid rgba(210, 107, 90, 0.4);
-            background: rgba(210, 107, 90, 0.08);
-            color: var(--color-brand);
-            border-radius: 8px;
-            padding: 4px 8px;
-            font-size: var(--font-size-caption);
-            line-height: 1.1;
-            cursor: pointer;
-            flex-shrink: 0;
-            transition: all var(--transition-fast) var(--ease-spring);
-        }
-
-        .session-msg-delete:hover {
-            border-color: var(--color-brand);
-            background: rgba(210, 107, 90, 0.15);
-            transform: translateY(-1px);
-        }
-
-        .session-msg-delete:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
         }
 
         .session-msg-content {
@@ -1357,14 +1262,6 @@
                 position: static;
                 max-height: 300px;
                 height: auto;
-            }
-
-            .session-batch-toolbar {
-                align-items: stretch;
-            }
-
-            .session-record-toolbar {
-                align-items: stretch;
             }
 
             .session-preview {
@@ -1455,7 +1352,7 @@
             color: var(--color-text-primary);
             outline: none;
             transition: all var(--transition-fast) var(--ease-spring);
-            font-family: var(--font-family);
+            font-family: var(--font-family-body);
             box-shadow: inset 0 1px 2px rgba(31, 26, 23, 0.04);
         }
 
@@ -1480,7 +1377,7 @@
             resize: vertical;
             overflow: auto;
             white-space: pre;
-            font-family: Consolas, 'SFMono-Regular', Menlo, Monaco, monospace;
+            font-family: var(--font-family-mono);
             font-size: 13px;
             line-height: 1.45;
         }
@@ -1736,6 +1633,30 @@
             min-height: 300px;
             position: relative;
         }
+
+        button:focus-visible,
+        select:focus-visible,
+        input:focus-visible,
+        textarea:focus-visible {
+            outline: 3px solid rgba(201, 94, 75, 0.25);
+            outline-offset: 2px;
+        }
+
+        @media (max-width: 720px) {
+            .main-title {
+                font-size: 40px;
+            }
+
+            .subtitle {
+                font-size: var(--font-size-secondary);
+                margin-bottom: 16px;
+            }
+
+            .segmented-control {
+                flex-direction: column;
+                gap: 6px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1745,6 +1666,7 @@
             Codex<br>
             <span class="accent">Mate.</span>
         </h1>
+        <p class="subtitle">本地配置中枢，统一管理 Codex / Claude Code / OpenClaw / 会话。</p>
 
         <!-- 模式切换器 -->
         <div class="segmented-control">
@@ -1753,6 +1675,9 @@
             </button>
             <button :class="['segment', { active: configMode === 'claude' }]" @click="switchConfigMode('claude')">
                 Claude Code 配置
+            </button>
+            <button :class="['segment', { active: configMode === 'openclaw' }]" @click="switchConfigMode('openclaw')">
+                OpenClaw 配置
             </button>
             <button :class="['segment', { active: configMode === 'sessions' }]" @click="switchConfigMode('sessions')">
                 会话浏览
@@ -1788,6 +1713,18 @@
                     </div>
                     <button class="btn-tool btn-template-editor" @click="openConfigTemplateEditor" :disabled="loading || !!initError">
                         打开 Config 模板编辑器
+                    </button>
+                </div>
+
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">AGENTS.md</span>
+                    </div>
+                    <div class="config-template-hint">
+                        管理 Codex 指令文件，默认读写 <code>~/.codex/AGENTS.md</code>（与 <code>config.toml</code> 同级）。
+                    </div>
+                    <button class="btn-tool" @click="openAgentsEditor" :disabled="loading || !!initError || agentsLoading">
+                        {{ agentsLoading ? '加载中...' : '打开 AGENTS.md 编辑器' }}
                     </button>
                 </div>
 
@@ -1880,6 +1817,64 @@
                 </div>
             </div>
 
+            <!-- OpenClaw 配置模式 -->
+            <div v-show="configMode === 'openclaw'" class="mode-content">
+                <button class="btn-add" @click="openOpenclawAddModal" v-if="!loading && !initError">
+                    <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10 4v12M4 10h12"/>
+                    </svg>
+                    添加 OpenClaw 配置
+                </button>
+                <div class="config-template-hint">
+                    默认应用到 <code>~/.openclaw/openclaw.json</code>；支持 JSON5（注释/尾逗号）。
+                </div>
+
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">AGENTS.md</span>
+                    </div>
+                    <div class="config-template-hint">
+                        管理 OpenClaw Workspace 指令文件，默认读写 <code>~/.openclaw/workspace/AGENTS.md</code>。
+                    </div>
+                    <button class="btn-tool" @click="openOpenclawAgentsEditor" :disabled="loading || !!initError || agentsLoading">
+                        {{ agentsLoading ? '加载中...' : '打开 AGENTS.md 编辑器' }}
+                    </button>
+                </div>
+
+                <div class="card-list">
+                    <div v-for="(config, name) in openclawConfigs" :key="name"
+                         :class="['card', { active: currentOpenclawConfig === name }]"
+                         @click="applyOpenclawConfig(name)">
+                        <div class="card-leading">
+                            <div class="card-icon">{{ name.charAt(0).toUpperCase() }}</div>
+                            <div class="card-content">
+                                <div class="card-title">{{ name }}</div>
+                                <div class="card-subtitle">{{ openclawSubtitle(config) }}</div>
+                            </div>
+                        </div>
+                        <div class="card-trailing">
+                            <span :class="['pill', openclawHasContent(config) ? 'configured' : 'empty']">
+                                {{ openclawHasContent(config) ? '已配置' : '未配置' }}
+                            </span>
+                            <div class="card-actions" @click.stop>
+                                <button class="card-action-btn" @click="openOpenclawEditModal(name)" title="编辑">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                    </svg>
+                                </button>
+                                <button class="card-action-btn delete" @click="deleteOpenclawConfig(name)" title="删除">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M3 6h18"/>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- 会话浏览模式 -->
             <div v-show="configMode === 'sessions'" class="mode-content">
                 <div class="selector-section">
@@ -1888,7 +1883,7 @@
                     </div>
                     <div class="session-toolbar">
                         <div class="session-toolbar-group">
-                            <select class="session-source-select" v-model="sessionFilterSource" @change="onSessionSourceChange" :disabled="sessionsLoading || batchDeleting || recordsBatchDeleting">
+                            <select class="session-source-select" v-model="sessionFilterSource" @change="onSessionSourceChange" :disabled="sessionsLoading">
                                 <option value="all">全部（Codex + Claude）</option>
                                 <option value="codex">仅 Codex</option>
                                 <option value="claude">仅 Claude Code</option>
@@ -1897,7 +1892,7 @@
                                 class="session-path-select"
                                 v-model="sessionPathFilter"
                                 @change="onSessionPathFilterChange"
-                                :disabled="sessionsLoading || batchDeleting || recordsBatchDeleting">
+                                :disabled="sessionsLoading">
                                 <option value="">全部路径</option>
                                 <option v-for="cwd in sessionPathOptions" :key="cwd" :value="cwd">{{ cwd }}</option>
                             </select>
@@ -1907,15 +1902,15 @@
                                 class="session-query-input"
                                 v-model="sessionQuery"
                                 @keyup.enter="loadSessions"
-                                :disabled="sessionsLoading || batchDeleting || recordsBatchDeleting"
-                                placeholder="关键词检索（空格=AND）">
+                                disabled
+                                placeholder="关键词检索（暂时停用）">
                         </div>
                         <div class="session-toolbar-group">
                             <select
                                 class="session-role-select"
                                 v-model="sessionRoleFilter"
                                 @change="onSessionFilterChange"
-                                :disabled="sessionsLoading || batchDeleting || recordsBatchDeleting">
+                                disabled>
                                 <option value="all">全部角色</option>
                                 <option value="user">仅 User</option>
                                 <option value="assistant">仅 Assistant</option>
@@ -1925,7 +1920,7 @@
                                 class="session-time-select"
                                 v-model="sessionTimePreset"
                                 @change="onSessionFilterChange"
-                                :disabled="sessionsLoading || batchDeleting || recordsBatchDeleting">
+                                disabled>
                                 <option value="all">全部时间</option>
                                 <option value="7d">近 7 天</option>
                                 <option value="30d">近 30 天</option>
@@ -1933,37 +1928,16 @@
                             </select>
                         </div>
                         <div class="session-toolbar-group session-toolbar-actions">
-                            <button class="btn-tool" @click="loadSessions" :disabled="sessionsLoading || batchDeleting || recordsBatchDeleting">
+                            <button class="btn-tool" @click="loadSessions" :disabled="sessionsLoading">
                                 {{ sessionsLoading ? '刷新中...' : '刷新会话' }}
                             </button>
-                            <button class="btn-tool" @click="clearSessionFilters" :disabled="sessionsLoading || batchDeleting || recordsBatchDeleting">
+                            <button class="btn-tool" @click="clearSessionFilters" :disabled="sessionsLoading">
                                 清空筛选
                             </button>
                         </div>
                     </div>
-                    <div v-if="sessionsList.length > 0" class="session-batch-toolbar">
-                        <button
-                            class="btn-tool"
-                            @click="toggleSelectAllSessions"
-                            :disabled="sessionsLoading || batchDeleting || recordsBatchDeleting || sessionsList.length === 0">
-                            {{ isAllSessionsSelected ? '取消全选' : '全选当前列表' }}
-                        </button>
-                        <button
-                            class="btn-tool"
-                            @click="clearSessionSelection"
-                            :disabled="batchDeleting || recordsBatchDeleting || selectedCount === 0">
-                            清空选择
-                        </button>
-                        <span class="session-batch-count">已选 {{ selectedCount }} 条</span>
-                        <button
-                            class="btn-session-delete"
-                            @click="deleteSelectedSessions"
-                            :disabled="batchDeleting || recordsBatchDeleting || selectedCount === 0">
-                            {{ batchDeleting ? '批量删除中...' : '批量删除' }}
-                        </button>
-                    </div>
                     <div class="session-hint">
-                        支持关键词、角色与时间预设筛选会话列表。左侧可勾选多条会话批量删除；右侧预览区支持导出或删除当前会话。
+                        关键词检索与角色/时间筛选暂时停用；当前仅支持来源与路径筛选会话列表。右侧预览区仅支持查看与导出。
                     </div>
                 </div>
 
@@ -1983,20 +1957,12 @@
                             :class="[
                                 'session-item',
                                 {
-                                    active: activeSession && getSessionExportKey(activeSession) === getSessionExportKey(session),
-                                    selected: isSessionSelected(session)
+                                    active: activeSession && getSessionExportKey(activeSession) === getSessionExportKey(session)
                                 }
                             ]"
                             @click="selectSession(session)">
                             <div class="session-item-header">
                                 <div class="session-item-main">
-                                    <label class="session-item-checkbox" @click.stop title="选择会话">
-                                        <input
-                                            type="checkbox"
-                                            :checked="isSessionSelected(session)"
-                                            :disabled="batchDeleting || recordsBatchDeleting || sessionDeleting[getSessionExportKey(session)]"
-                                            @change.stop="toggleSessionSelection(session, $event)">
-                                    </label>
                                     <div class="session-item-title">{{ session.title || session.sessionId }}</div>
                                 </div>
                                 <div class="session-item-actions">
@@ -2004,23 +1970,12 @@
                                         v-if="isResumeCommandAvailable(session)"
                                         class="session-item-copy"
                                         @click.stop="copyResumeCommand(session)"
-                                        :disabled="batchDeleting || recordsBatchDeleting"
+                                        :disabled="sessionsLoading"
                                         aria-label="复制恢复命令"
                                         title="复制恢复命令">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <rect x="8" y="8" width="12" height="12" rx="2"></rect>
                                             <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path>
-                                        </svg>
-                                    </button>
-                                    <button
-                                        class="session-item-delete"
-                                        @click.stop="deleteSession(session)"
-                                        :disabled="batchDeleting || recordsBatchDeleting || sessionDeleting[getSessionExportKey(session)]"
-                                        aria-label="删除会话"
-                                        title="删除会话">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M3 6h18"/>
-                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                                         </svg>
                                     </button>
                                 </div>
@@ -2052,20 +2007,14 @@
                                         </div>
                                     </div>
                                     <div class="session-actions">
-                                        <button class="btn-session-refresh" @click="loadActiveSessionDetail" :disabled="sessionDetailLoading || recordsBatchDeleting || !activeSession">
+                                        <button class="btn-session-refresh" @click="loadActiveSessionDetail" :disabled="sessionDetailLoading || !activeSession">
                                             {{ sessionDetailLoading ? '加载中...' : '刷新内容' }}
                                         </button>
                                         <button
                                             class="btn-session-export"
                                             @click="exportSession(activeSession)"
-                                            :disabled="!activeSession || batchDeleting || recordsBatchDeleting || sessionExporting[getSessionExportKey(activeSession)]">
+                                            :disabled="!activeSession || sessionExporting[getSessionExportKey(activeSession)]">
                                             {{ (activeSession && sessionExporting[getSessionExportKey(activeSession)]) ? '导出中...' : '导出记录' }}
-                                        </button>
-                                        <button
-                                            class="btn-session-delete"
-                                            @click="deleteSession(activeSession)"
-                                            :disabled="!activeSession || batchDeleting || recordsBatchDeleting || sessionDeleting[getSessionExportKey(activeSession)]">
-                                            {{ (activeSession && sessionDeleting[getSessionExportKey(activeSession)]) ? '删除中...' : '删除会话' }}
                                         </button>
                                     </div>
                                 </div>
@@ -2083,52 +2032,18 @@
                                 </div>
 
                                 <div v-else class="session-preview-body">
-                                    <div class="session-record-toolbar">
-                                        <button
-                                            class="btn-tool"
-                                            @click="toggleSelectAllRecords"
-                                            :disabled="recordsBatchDeleting || activeSessionMessages.length === 0">
-                                            {{ isAllRecordsSelected ? '取消全选记录' : '全选当前记录' }}
-                                        </button>
-                                        <button
-                                            class="btn-tool"
-                                            @click="clearRecordSelection"
-                                            :disabled="recordsBatchDeleting || selectedRecordCount === 0">
-                                            清空记录选择
-                                        </button>
-                                        <span class="session-record-count">已选 {{ selectedRecordCount }} 条记录</span>
-                                        <button
-                                            class="btn-session-delete"
-                                            @click="deleteSelectedRecords"
-                                            :disabled="recordsBatchDeleting || selectedRecordCount === 0">
-                                            {{ recordsBatchDeleting ? '删除记录中...' : '批量删除记录' }}
-                                        </button>
-                                    </div>
                                     <div v-if="activeSessionDetailClipped" class="session-item-sub session-item-wrap">
-                                        仅展示最近 {{ activeSessionMessages.length }} 条消息；记录批量删除仅作用于当前已加载内容。
+                                        仅展示最近 {{ activeSessionMessages.length }} 条消息。
                                     </div>
                                     <div
                                         v-for="(msg, idx) in activeSessionMessages"
                                         :key="getRecordRenderKey(msg, idx)"
-                                        :class="['session-msg', msg.role === 'user' ? 'user' : 'assistant', { selected: isRecordSelected(msg) }]">
+                                        :class="['session-msg', msg.role === 'user' ? 'user' : (msg.role === 'system' ? 'system' : 'assistant')]">
                                         <div class="session-msg-header">
                                             <div class="session-msg-meta">
-                                                <label class="session-msg-checkbox" @click.stop title="选择记录">
-                                                    <input
-                                                        type="checkbox"
-                                                        :checked="isRecordSelected(msg)"
-                                                        :disabled="recordsBatchDeleting || !isRecordSelectable(msg) || recordDeletingMap[getRecordKey(msg)]"
-                                                        @change.stop="toggleRecordSelection(msg, $event)">
-                                                </label>
-                                                <span class="session-msg-role">{{ msg.role === 'user' ? 'User' : 'Assistant' }}</span>
+                                                <span class="session-msg-role">{{ msg.role === 'user' ? 'User' : (msg.role === 'system' ? 'System' : 'Assistant') }}</span>
                                                 <span class="session-msg-time">{{ msg.timestamp || '' }}</span>
                                             </div>
-                                            <button
-                                                class="session-msg-delete"
-                                                @click.stop="deleteSingleRecord(msg)"
-                                                :disabled="recordsBatchDeleting || !isRecordSelectable(msg) || recordDeletingMap[getRecordKey(msg)]">
-                                                {{ recordDeletingMap[getRecordKey(msg)] ? '删除中...' : '删除记录' }}
-                                            </button>
                                         </div>
                                         <div class="session-msg-content">{{ msg.text || '' }}</div>
                                     </div>
@@ -2300,6 +2215,54 @@
             </div>
         </div>
 
+        <div v-if="showOpenclawConfigModal" class="modal-overlay" @click.self="closeOpenclawConfigModal">
+            <div class="modal modal-wide">
+                <div class="modal-title">{{ openclawEditorTitle }}</div>
+
+                <div class="form-group">
+                    <label class="form-label">配置名称</label>
+                    <input v-model="openclawEditing.name" class="form-input" :readonly="openclawEditing.lockName" placeholder="例如: 默认配置">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">目标文件</label>
+                    <div class="form-hint">
+                        {{ openclawConfigPath || '未加载' }}
+                        <span v-if="openclawConfigPath">
+                            （{{ openclawConfigExists ? '已存在' : '不存在，将在应用时创建' }}）
+                        </span>
+                    </div>
+                    <div class="btn-group" style="justify-content:flex-start;">
+                        <button class="btn btn-confirm secondary" @click="loadOpenclawConfigFromFile" :disabled="openclawFileLoading">
+                            {{ openclawFileLoading ? '加载中...' : '加载当前配置' }}
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">OpenClaw 配置（JSON5）</label>
+                    <textarea
+                        v-model="openclawEditing.content"
+                        class="form-input template-editor"
+                        spellcheck="false"
+                        placeholder="在这里编辑 OpenClaw 配置（JSON5）"></textarea>
+                    <div class="template-editor-warning">
+                        保存仅写入本地配置库；点击“保存并应用”后会写入 openclaw.json。
+                    </div>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-cancel" @click="closeOpenclawConfigModal">取消</button>
+                    <button class="btn btn-confirm" @click="saveOpenclawConfig" :disabled="openclawSaving">
+                        {{ openclawSaving ? '保存中...' : '保存' }}
+                    </button>
+                    <button class="btn btn-confirm secondary" @click="saveAndApplyOpenclawConfig" :disabled="openclawApplying">
+                        {{ openclawApplying ? '应用中...' : '保存并应用' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <div v-if="showConfigTemplateModal" class="modal-overlay" @click.self="closeConfigTemplateModal">
             <div class="modal modal-wide">
                 <div class="modal-title">Config 模板编辑器（手动确认应用）</div>
@@ -2325,6 +2288,42 @@
             </div>
         </div>
 
+        <div v-if="showAgentsModal" class="modal-overlay" @click.self="closeAgentsModal">
+            <div class="modal modal-wide">
+                <div class="modal-title">{{ agentsModalTitle }}</div>
+
+                <div class="form-group">
+                    <label class="form-label">目标文件</label>
+                    <div class="form-hint">
+                        {{ agentsPath || '未加载' }}
+                        <span v-if="agentsPath">
+                            （{{ agentsExists ? '已存在' : '不存在，将在保存时创建' }}）
+                        </span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">AGENTS.md 内容</label>
+                    <textarea
+                        v-model="agentsContent"
+                        class="form-input template-editor"
+                        spellcheck="false"
+                        :readonly="agentsLoading"
+                        placeholder="在这里编辑 AGENTS.md 内容"></textarea>
+                    <div class="template-editor-warning">
+                        {{ agentsModalHint }}
+                    </div>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-cancel" @click="closeAgentsModal">取消</button>
+                    <button class="btn btn-confirm" @click="applyAgentsContent" :disabled="agentsSaving || agentsLoading">
+                        {{ agentsSaving ? '保存中...' : '保存' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Toast通知 -->
         
         <!-- Toast -->
@@ -2334,6 +2333,17 @@
     <script>
         const { createApp } = Vue;
         const API_BASE = 'http://localhost:3737';
+        const DEFAULT_OPENCLAW_TEMPLATE = `{
+  // OpenClaw config (JSON5)
+  agent: {
+    model: "gpt-4.1"
+  },
+  agents: {
+    defaults: {
+      workspace: "~/.openclaw/workspace"
+    }
+  }
+}`;
 
         async function api(action, params = {}) {
             const res = await fetch(`${API_BASE}/api`, {
@@ -2362,9 +2372,20 @@
                     showModelListModal: false,
                     showClaudeConfigModal: false,
                     showEditConfigModal: false,
+                    showOpenclawConfigModal: false,
                     showConfigTemplateModal: false,
+                    showAgentsModal: false,
                     configTemplateContent: '',
                     configTemplateApplying: false,
+                    agentsContent: '',
+                    agentsPath: '',
+                    agentsExists: false,
+                    agentsLineEnding: '\n',
+                    agentsLoading: false,
+                    agentsSaving: false,
+                    agentsContext: 'codex',
+                    agentsModalTitle: 'AGENTS.md 编辑器',
+                    agentsModalHint: '保存后会写入目标 AGENTS.md（与 config.toml 同级）。',
                     sessionsList: [],
                     sessionsLoading: false,
                     sessionFilterSource: 'all',
@@ -2386,18 +2407,12 @@
                     },
                     sessionPathRequestSeq: 0,
                     sessionExporting: {},
-                    sessionDeleting: {},
                     activeSession: null,
                     activeSessionMessages: [],
                     activeSessionDetailError: '',
                     activeSessionDetailClipped: false,
                     sessionDetailLoading: false,
                     sessionDetailRequestSeq: 0,
-                    selectedSessionMap: {},
-                    batchDeleting: false,
-                    selectedRecordMap: {},
-                    recordDeletingMap: {},
-                    recordsBatchDeleting: false,
                     speedResults: {},
                     speedLoading: {},
                     newProvider: { name: '', url: '', key: '' },
@@ -2418,7 +2433,21 @@
                         apiKey: '',
                         baseUrl: 'https://open.bigmodel.cn/api/anthropic',
                         model: 'glm-4.7'
-                    }
+                    },
+                    currentOpenclawConfig: '',
+                    openclawConfigs: {
+                        '默认配置': {
+                            content: DEFAULT_OPENCLAW_TEMPLATE
+                        }
+                    },
+                    openclawEditing: { name: '', content: '', lockName: false },
+                    openclawEditorTitle: '添加 OpenClaw 配置',
+                    openclawConfigPath: '',
+                    openclawConfigExists: false,
+                    openclawLineEnding: '\n',
+                    openclawFileLoading: false,
+                    openclawSaving: false,
+                    openclawApplying: false
                 }
             },
             mounted() {
@@ -2442,49 +2471,24 @@
                         console.error('加载 Claude 配置失败:', e);
                     }
                 }
-                this.loadAll();
-            },
-            computed: {
-                selectedSessions() {
-                    if (!Array.isArray(this.sessionsList) || this.sessionsList.length === 0) {
-                        return [];
+                const savedOpenclawConfigs = localStorage.getItem('openclawConfigs');
+                if (savedOpenclawConfigs) {
+                    try {
+                        this.openclawConfigs = JSON.parse(savedOpenclawConfigs);
+                        const configNames = Object.keys(this.openclawConfigs);
+                        if (configNames.length > 0) {
+                            this.currentOpenclawConfig = configNames[0];
+                        }
+                    } catch (e) {
+                        console.error('加载 OpenClaw 配置失败:', e);
                     }
-                    return this.sessionsList.filter(session => this.isSessionSelected(session));
-                },
-
-                selectedCount() {
-                    return this.selectedSessions.length;
-                },
-
-                isAllSessionsSelected() {
-                    if (!Array.isArray(this.sessionsList) || this.sessionsList.length === 0) {
-                        return false;
+                } else {
+                    const configNames = Object.keys(this.openclawConfigs);
+                    if (configNames.length > 0) {
+                        this.currentOpenclawConfig = configNames[0];
                     }
-                    return this.sessionsList.every(session => this.isSessionSelected(session));
-                },
-
-                selectedRecords() {
-                    if (!Array.isArray(this.activeSessionMessages) || this.activeSessionMessages.length === 0) {
-                        return [];
-                    }
-                    return this.activeSessionMessages.filter(message => this.isRecordSelected(message));
-                },
-
-                selectedRecordCount() {
-                    return this.selectedRecords.length;
-                },
-
-                isAllRecordsSelected() {
-                    if (!Array.isArray(this.activeSessionMessages) || this.activeSessionMessages.length === 0) {
-                        return false;
-                    }
-                    const selectableMessages = this.activeSessionMessages
-                        .filter(message => this.isRecordSelectable(message));
-                    if (selectableMessages.length === 0) {
-                        return false;
-                    }
-                    return selectableMessages.every(message => this.isRecordSelected(message));
                 }
+                this.loadAll();
             },
             methods: {
                 async loadAll() {
@@ -2705,24 +2709,15 @@
                 },
 
                 async onSessionSourceChange() {
-                    this.clearSessionSelection();
-                    this.clearRecordSelection();
-                    this.recordDeletingMap = {};
                     this.refreshSessionPathOptions(this.sessionFilterSource);
                     await this.loadSessions();
                 },
 
                 async onSessionPathFilterChange() {
-                    this.clearSessionSelection();
-                    this.clearRecordSelection();
-                    this.recordDeletingMap = {};
                     await this.loadSessions();
                 },
 
                 async onSessionFilterChange() {
-                    this.clearSessionSelection();
-                    this.clearRecordSelection();
-                    this.recordDeletingMap = {};
                     await this.loadSessions();
                 },
 
@@ -2733,80 +2728,6 @@
                     this.sessionRoleFilter = 'all';
                     this.sessionTimePreset = 'all';
                     await this.onSessionSourceChange();
-                },
-
-                isSessionSelected(session) {
-                    if (!session) return false;
-                    return !!this.selectedSessionMap[this.getSessionExportKey(session)];
-                },
-
-                toggleSessionSelection(session, event) {
-                    if (!session) return;
-                    const key = this.getSessionExportKey(session);
-                    const checked = event && event.target ? !!event.target.checked : !this.isSessionSelected(session);
-                    const next = { ...this.selectedSessionMap };
-                    if (checked) {
-                        next[key] = true;
-                    } else {
-                        delete next[key];
-                    }
-                    this.selectedSessionMap = next;
-                },
-
-                toggleSelectAllSessions() {
-                    if (!Array.isArray(this.sessionsList) || this.sessionsList.length === 0) return;
-                    if (this.isAllSessionsSelected) {
-                        this.clearSessionSelection();
-                        return;
-                    }
-                    const next = {};
-                    for (const session of this.sessionsList) {
-                        next[this.getSessionExportKey(session)] = true;
-                    }
-                    this.selectedSessionMap = next;
-                },
-
-                clearSessionSelection() {
-                    this.selectedSessionMap = {};
-                },
-
-                removeSessionSelection(session) {
-                    if (!session) return;
-                    const key = this.getSessionExportKey(session);
-                    if (!this.selectedSessionMap[key]) return;
-                    const next = { ...this.selectedSessionMap };
-                    delete next[key];
-                    this.selectedSessionMap = next;
-                },
-
-                pruneSessionSelection() {
-                    if (!Array.isArray(this.sessionsList) || this.sessionsList.length === 0) {
-                        this.clearSessionSelection();
-                        return;
-                    }
-                    const next = {};
-                    for (const session of this.sessionsList) {
-                        const key = this.getSessionExportKey(session);
-                        if (this.selectedSessionMap[key]) {
-                            next[key] = true;
-                        }
-                    }
-                    this.selectedSessionMap = next;
-                },
-
-                formatBatchDeleteFailureSummary(results, limit = 3) {
-                    const failed = Array.isArray(results)
-                        ? results.filter(item => item && !item.success)
-                        : [];
-                    if (failed.length === 0) return '';
-                    const text = failed.slice(0, limit).map(item => {
-                        const label = item.sessionId || item.filePath || 'unknown';
-                        return `${label}: ${item.error || '未知错误'}`;
-                    }).join('；');
-                    if (failed.length > limit) {
-                        return `${text}；其余 ${failed.length - limit} 条请重试`;
-                    }
-                    return text;
                 },
 
                 getRecordKey(message) {
@@ -2822,88 +2743,6 @@
                         return `record-${recordKey}`;
                     }
                     return `record-fallback-${idx}-${message && message.timestamp ? message.timestamp : ''}`;
-                },
-
-                isRecordSelectable(message) {
-                    return !!this.getRecordKey(message);
-                },
-
-                isRecordSelected(message) {
-                    const key = this.getRecordKey(message);
-                    if (!key) return false;
-                    return !!this.selectedRecordMap[key];
-                },
-
-                toggleRecordSelection(message, event) {
-                    const key = this.getRecordKey(message);
-                    if (!key) return;
-
-                    const checked = event && event.target ? !!event.target.checked : !this.isRecordSelected(message);
-                    const next = { ...this.selectedRecordMap };
-                    if (checked) {
-                        next[key] = true;
-                    } else {
-                        delete next[key];
-                    }
-                    this.selectedRecordMap = next;
-                },
-
-                clearRecordSelection() {
-                    this.selectedRecordMap = {};
-                },
-
-                pruneRecordSelection() {
-                    if (!Array.isArray(this.activeSessionMessages) || this.activeSessionMessages.length === 0) {
-                        this.clearRecordSelection();
-                        return;
-                    }
-
-                    const next = {};
-                    for (const message of this.activeSessionMessages) {
-                        const key = this.getRecordKey(message);
-                        if (key && this.selectedRecordMap[key]) {
-                            next[key] = true;
-                        }
-                    }
-                    this.selectedRecordMap = next;
-                },
-
-                toggleSelectAllRecords() {
-                    const selectable = Array.isArray(this.activeSessionMessages)
-                        ? this.activeSessionMessages.filter(message => this.isRecordSelectable(message))
-                        : [];
-                    if (selectable.length === 0) return;
-
-                    if (this.isAllRecordsSelected) {
-                        this.clearRecordSelection();
-                        return;
-                    }
-
-                    const next = {};
-                    for (const message of selectable) {
-                        const key = this.getRecordKey(message);
-                        if (key) {
-                            next[key] = true;
-                        }
-                    }
-                    this.selectedRecordMap = next;
-                },
-
-                formatRecordDeleteFailureSummary(results, limit = 3) {
-                    const failed = Array.isArray(results)
-                        ? results.filter(item => item && !item.success)
-                        : [];
-                    if (failed.length === 0) return '';
-                    const text = failed.slice(0, limit).map(item => {
-                        const label = Number.isInteger(item.recordLineIndex) && item.recordLineIndex >= 0
-                            ? `行${item.recordLineIndex}`
-                            : '未知行';
-                        return `${label}: ${item.error || '未知错误'}`;
-                    }).join('；');
-                    if (failed.length > limit) {
-                        return `${text}；其余 ${failed.length - limit} 条请重试`;
-                    }
-                    return text;
                 },
 
                 syncActiveSessionMessageCount(messageCount) {
@@ -2923,9 +2762,7 @@
                     if (this.sessionsLoading) return;
                     this.sessionsLoading = true;
                     this.activeSessionDetailError = '';
-                    this.clearRecordSelection();
-                    this.recordDeletingMap = {};
-                    const query = this.sessionQuery ? this.sessionQuery.trim() : '';
+                    const query = this.sessionQuery;
                     try {
                         const res = await api('list-sessions', {
                             source: this.sessionFilterSource,
@@ -2942,7 +2779,6 @@
                         if (res.error) {
                             this.showMessage(res.error, 'error');
                             this.sessionsList = [];
-                            this.clearSessionSelection();
                             this.activeSession = null;
                             this.activeSessionMessages = [];
                             this.activeSessionDetailClipped = false;
@@ -2953,12 +2789,10 @@
                                 this.extractPathOptionsFromSessions(this.sessionsList),
                                 true
                             );
-                            this.pruneSessionSelection();
                             if (this.sessionsList.length === 0) {
                                 this.activeSession = null;
                                 this.activeSessionMessages = [];
                                 this.activeSessionDetailClipped = false;
-                                this.clearRecordSelection();
                             } else {
                                 const oldKey = this.activeSession ? this.getSessionExportKey(this.activeSession) : '';
                                 const matched = this.sessionsList.find(item => this.getSessionExportKey(item) === oldKey);
@@ -2969,11 +2803,9 @@
                         }
                     } catch (e) {
                         this.sessionsList = [];
-                        this.clearSessionSelection();
                         this.activeSession = null;
                         this.activeSessionMessages = [];
                         this.activeSessionDetailClipped = false;
-                        this.clearRecordSelection();
                         this.showMessage('加载会话失败: ' + e.message, 'error');
                     } finally {
                         this.sessionsLoading = false;
@@ -2987,8 +2819,6 @@
                     this.activeSessionMessages = [];
                     this.activeSessionDetailError = '';
                     this.activeSessionDetailClipped = false;
-                    this.clearRecordSelection();
-                    this.recordDeletingMap = {};
                     await this.loadActiveSessionDetail();
                 },
 
@@ -2997,15 +2827,12 @@
                         this.activeSessionMessages = [];
                         this.activeSessionDetailError = '';
                         this.activeSessionDetailClipped = false;
-                        this.clearRecordSelection();
-                        this.recordDeletingMap = {};
                         return;
                     }
 
                     const requestSeq = ++this.sessionDetailRequestSeq;
                     this.sessionDetailLoading = true;
                     this.activeSessionDetailError = '';
-                    this.recordDeletingMap = {};
                     try {
                         const res = await api('session-detail', {
                             source: this.activeSession.source,
@@ -3022,13 +2849,11 @@
                             this.activeSessionMessages = [];
                             this.activeSessionDetailClipped = false;
                             this.activeSessionDetailError = res.error;
-                            this.clearRecordSelection();
                             return;
                         }
 
                         this.activeSessionMessages = Array.isArray(res.messages) ? res.messages : [];
                         this.activeSessionDetailClipped = !!res.clipped;
-                        this.pruneRecordSelection();
                         if (res.updatedAt) {
                             this.activeSession.updatedAt = res.updatedAt;
                         }
@@ -3045,7 +2870,6 @@
                         this.activeSessionMessages = [];
                         this.activeSessionDetailClipped = false;
                         this.activeSessionDetailError = '加载会话内容失败: ' + e.message;
-                        this.clearRecordSelection();
                     } finally {
                         if (requestSeq === this.sessionDetailRequestSeq) {
                             this.sessionDetailLoading = false;
@@ -3086,220 +2910,6 @@
                         this.showMessage('导出失败: ' + e.message, 'error');
                     } finally {
                         this.sessionExporting[key] = false;
-                    }
-                },
-
-                async deleteSessionRecordsByLine(recordLineIndices, options = {}) {
-                    if (!this.activeSession) return;
-                    if (this.recordsBatchDeleting) return;
-
-                    const normalizedIndices = Array.from(new Set(
-                        (Array.isArray(recordLineIndices) ? recordLineIndices : [])
-                            .map(item => Number(item))
-                            .filter(item => Number.isInteger(item) && item >= 0)
-                    ));
-                    if (normalizedIndices.length === 0) return;
-
-                    this.recordsBatchDeleting = true;
-                    const pendingMap = { ...this.recordDeletingMap };
-                    for (const lineIndex of normalizedIndices) {
-                        pendingMap[String(lineIndex)] = true;
-                    }
-                    this.recordDeletingMap = pendingMap;
-
-                    try {
-                        const res = await api('delete-session-records', {
-                            source: this.activeSession.source,
-                            sessionId: this.activeSession.sessionId,
-                            filePath: this.activeSession.filePath,
-                            recordLineIndices: normalizedIndices
-                        });
-                        if (res.error) {
-                            this.showMessage('删除记录失败: ' + res.error, 'error');
-                            return;
-                        }
-
-                        const deleted = Number.isFinite(res.deleted) ? res.deleted : 0;
-                        const failed = Number.isFinite(res.failed)
-                            ? res.failed
-                            : Math.max(0, normalizedIndices.length - deleted);
-                        const results = Array.isArray(res.results) ? res.results : [];
-
-                        if (deleted > 0) {
-                            this.clearRecordSelection();
-                            await this.loadActiveSessionDetail();
-                            if (Number.isFinite(res.remainingMessages)) {
-                                this.syncActiveSessionMessageCount(res.remainingMessages);
-                            }
-                        } else {
-                            this.pruneRecordSelection();
-                        }
-
-                        if (failed > 0) {
-                            const detail = this.formatRecordDeleteFailureSummary(results);
-                            const summary = `记录删除完成：成功 ${deleted}，失败 ${failed}`;
-                            this.showMessage(detail ? `${summary}（${detail}）` : summary, 'error');
-                            return;
-                        }
-
-                        if (options && options.single === true) {
-                            this.showMessage('记录已删除', 'success');
-                        } else {
-                            this.showMessage(`已删除 ${deleted} 条记录`, 'success');
-                        }
-                    } catch (e) {
-                        this.showMessage('删除记录失败: ' + e.message, 'error');
-                    } finally {
-                        this.recordsBatchDeleting = false;
-                        this.recordDeletingMap = {};
-                    }
-                },
-
-                async deleteSingleRecord(message) {
-                    const key = this.getRecordKey(message);
-                    if (!key) {
-                        this.showMessage('当前记录暂不支持删除', 'error');
-                        return;
-                    }
-                    if (this.recordsBatchDeleting || this.recordDeletingMap[key]) return;
-                    if (!confirm('确定删除该条记录？\n删除后无法恢复。')) return;
-                    await this.deleteSessionRecordsByLine([Number(key)], { single: true });
-                },
-
-                async deleteSelectedRecords() {
-                    if (this.recordsBatchDeleting) return;
-                    const records = this.selectedRecords.slice();
-                    if (records.length === 0) return;
-
-                    const keys = records.map(message => this.getRecordKey(message)).filter(Boolean);
-                    const indices = Array.from(new Set(keys.map(key => Number(key)).filter(num => Number.isInteger(num) && num >= 0)));
-                    if (indices.length === 0) {
-                        this.showMessage('当前没有可删除的记录', 'error');
-                        return;
-                    }
-
-                    if (!confirm(`确定删除选中的 ${indices.length} 条记录？\n删除后无法恢复。`)) return;
-                    await this.deleteSessionRecordsByLine(indices, { single: false });
-                },
-
-                async deleteSelectedSessions() {
-                    if (this.batchDeleting || this.recordsBatchDeleting) return;
-                    const sessions = this.selectedSessions.slice();
-                    const total = sessions.length;
-                    if (total === 0) return;
-
-                    if (!confirm(`确定删除选中的 ${total} 个会话？\n删除后无法恢复。`)) return;
-
-                    this.batchDeleting = true;
-                    const pendingKeys = sessions.map(session => this.getSessionExportKey(session));
-                    for (const key of pendingKeys) {
-                        this.sessionDeleting[key] = true;
-                    }
-
-                    try {
-                        const items = sessions.map(session => ({
-                            source: session.source,
-                            sessionId: session.sessionId,
-                            filePath: session.filePath
-                        }));
-                        const res = await api('delete-sessions', { items });
-                        if (res.error) {
-                            this.showMessage('批量删除失败: ' + res.error, 'error');
-                            return;
-                        }
-
-                        const results = Array.isArray(res.results) ? res.results : [];
-                        const deletedSet = new Set(
-                            results
-                                .filter(item => item && item.success)
-                                .map(item => this.getSessionExportKey(item))
-                        );
-
-                        if (deletedSet.size > 0) {
-                            const activeKey = this.activeSession ? this.getSessionExportKey(this.activeSession) : '';
-                            this.sessionsList = this.sessionsList.filter(item => !deletedSet.has(this.getSessionExportKey(item)));
-                            this.pruneSessionSelection();
-
-                            if (activeKey && deletedSet.has(activeKey)) {
-                                this.activeSession = null;
-                                this.activeSessionMessages = [];
-                                this.activeSessionDetailError = '';
-                                this.activeSessionDetailClipped = false;
-                                this.clearRecordSelection();
-                                this.recordDeletingMap = {};
-                                this.sessionDetailRequestSeq += 1;
-                                this.sessionDetailLoading = false;
-
-                                if (this.sessionsList.length > 0) {
-                                    this.activeSession = this.sessionsList[0];
-                                    await this.loadActiveSessionDetail();
-                                }
-                            }
-                        } else {
-                            this.pruneSessionSelection();
-                        }
-
-                        const deleted = Number.isFinite(res.deleted) ? res.deleted : deletedSet.size;
-                        const failed = Number.isFinite(res.failed) ? res.failed : Math.max(0, total - deleted);
-                        if (failed > 0) {
-                            const detail = this.formatBatchDeleteFailureSummary(results);
-                            const summary = `批量删除完成：成功 ${deleted}，失败 ${failed}`;
-                            this.showMessage(detail ? `${summary}（${detail}）` : summary, 'error');
-                        } else {
-                            this.showMessage(`已删除 ${deleted} 个会话`, 'success');
-                        }
-                    } catch (e) {
-                        this.showMessage('批量删除失败: ' + e.message, 'error');
-                    } finally {
-                        this.batchDeleting = false;
-                        for (const key of pendingKeys) {
-                            this.sessionDeleting[key] = false;
-                        }
-                    }
-                },
-
-                async deleteSession(session) {
-                    if (!session) return;
-                    if (this.batchDeleting || this.recordsBatchDeleting) return;
-                    const title = session.title || session.sessionId || session.filePath || '当前会话';
-                    if (!confirm(`确定删除会话 "${title}"?\n删除后无法恢复。`)) return;
-                    const key = this.getSessionExportKey(session);
-                    if (this.sessionDeleting[key]) return;
-
-                    this.sessionDeleting[key] = true;
-                    try {
-                        const res = await api('delete-session', {
-                            source: session.source,
-                            sessionId: session.sessionId,
-                            filePath: session.filePath
-                        });
-                        if (res.error) {
-                            this.showMessage(res.error, 'error');
-                            return;
-                        }
-
-                        this.sessionsList = this.sessionsList.filter(item => this.getSessionExportKey(item) !== key);
-                        this.removeSessionSelection(session);
-                        if (this.activeSession && this.getSessionExportKey(this.activeSession) === key) {
-                            this.activeSession = null;
-                            this.activeSessionMessages = [];
-                            this.activeSessionDetailError = '';
-                            this.activeSessionDetailClipped = false;
-                            this.clearRecordSelection();
-                            this.recordDeletingMap = {};
-                            this.sessionDetailRequestSeq += 1;
-                            this.sessionDetailLoading = false;
-
-                            if (this.sessionsList.length > 0) {
-                                this.activeSession = this.sessionsList[0];
-                                await this.loadActiveSessionDetail();
-                            }
-                        }
-                        this.showMessage('会话已删除', 'success');
-                    } catch (e) {
-                        this.showMessage('删除失败: ' + e.message, 'error');
-                    } finally {
-                        this.sessionDeleting[key] = false;
                     }
                 },
 
@@ -3371,6 +2981,95 @@
                         this.showMessage('应用模板失败: ' + e.message, 'error');
                     } finally {
                         this.configTemplateApplying = false;
+                    }
+                },
+
+                async openAgentsEditor() {
+                    this.setAgentsModalContext('codex');
+                    this.agentsLoading = true;
+                    try {
+                        const res = await api('get-agents-file');
+                        if (res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        this.agentsContent = res.content || '';
+                        this.agentsPath = res.path || '';
+                        this.agentsExists = !!res.exists;
+                        this.agentsLineEnding = res.lineEnding === '\r\n' ? '\r\n' : '\n';
+                        this.showAgentsModal = true;
+                    } catch (e) {
+                        this.showMessage('加载 AGENTS.md 失败: ' + e.message, 'error');
+                    } finally {
+                        this.agentsLoading = false;
+                    }
+                },
+
+                async openOpenclawAgentsEditor() {
+                    this.setAgentsModalContext('openclaw');
+                    this.agentsLoading = true;
+                    try {
+                        const res = await api('get-openclaw-agents-file');
+                        if (res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        if (res.configError) {
+                            this.showMessage(`OpenClaw 配置解析失败，已使用默认 Workspace：${res.configError}`, 'error');
+                        }
+                        this.agentsContent = res.content || '';
+                        this.agentsPath = res.path || '';
+                        this.agentsExists = !!res.exists;
+                        this.agentsLineEnding = res.lineEnding === '\r\n' ? '\r\n' : '\n';
+                        this.showAgentsModal = true;
+                    } catch (e) {
+                        this.showMessage('加载 OpenClaw AGENTS.md 失败: ' + e.message, 'error');
+                    } finally {
+                        this.agentsLoading = false;
+                    }
+                },
+
+                setAgentsModalContext(context) {
+                    this.agentsContext = context === 'openclaw' ? 'openclaw' : 'codex';
+                    if (this.agentsContext === 'openclaw') {
+                        this.agentsModalTitle = 'OpenClaw AGENTS.md 编辑器';
+                        this.agentsModalHint = '保存后会写入 OpenClaw Workspace 下的 AGENTS.md。';
+                    } else {
+                        this.agentsModalTitle = 'AGENTS.md 编辑器';
+                        this.agentsModalHint = '保存后会写入目标 AGENTS.md（与 config.toml 同级）。';
+                    }
+                },
+
+                closeAgentsModal() {
+                    this.showAgentsModal = false;
+                    this.agentsContent = '';
+                    this.agentsPath = '';
+                    this.agentsExists = false;
+                    this.agentsLineEnding = '\n';
+                    this.agentsSaving = false;
+                    this.setAgentsModalContext('codex');
+                },
+
+                async applyAgentsContent() {
+                    this.agentsSaving = true;
+                    try {
+                        const action = this.agentsContext === 'openclaw'
+                            ? 'apply-openclaw-agents-file'
+                            : 'apply-agents-file';
+                        const res = await api(action, {
+                            content: this.agentsContent,
+                            lineEnding: this.agentsLineEnding
+                        });
+                        if (res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        this.showMessage('AGENTS.md 已保存', 'success');
+                        this.closeAgentsModal();
+                    } catch (e) {
+                        this.showMessage('保存 AGENTS.md 失败: ' + e.message, 'error');
+                    } finally {
+                        this.agentsSaving = false;
                     }
                 },
 
@@ -3633,6 +3332,173 @@
                         baseUrl: 'https://open.bigmodel.cn/api/anthropic',
                         model: 'glm-4.7'
                     };
+                },
+
+                openclawHasContent(config) {
+                    return !!(config && typeof config.content === 'string' && config.content.trim());
+                },
+
+                openclawSubtitle(config) {
+                    if (!this.openclawHasContent(config)) {
+                        return '未设置配置';
+                    }
+                    const length = config.content.trim().length;
+                    return `已保存 ${length} 字符`;
+                },
+
+                saveOpenclawConfigs() {
+                    localStorage.setItem('openclawConfigs', JSON.stringify(this.openclawConfigs));
+                },
+
+                openOpenclawAddModal() {
+                    this.openclawEditorTitle = '添加 OpenClaw 配置';
+                    this.openclawEditing = {
+                        name: '',
+                        content: DEFAULT_OPENCLAW_TEMPLATE,
+                        lockName: false
+                    };
+                    this.openclawConfigPath = '';
+                    this.openclawConfigExists = false;
+                    this.openclawLineEnding = '\n';
+                    this.showOpenclawConfigModal = true;
+                },
+
+                openOpenclawEditModal(name) {
+                    const config = this.openclawConfigs[name];
+                    this.openclawEditorTitle = `编辑 OpenClaw 配置: ${name}`;
+                    this.openclawEditing = {
+                        name,
+                        content: (config && config.content) ? config.content : '',
+                        lockName: true
+                    };
+                    this.showOpenclawConfigModal = true;
+                },
+
+                closeOpenclawConfigModal() {
+                    this.showOpenclawConfigModal = false;
+                    this.openclawEditing = { name: '', content: '', lockName: false };
+                    this.openclawSaving = false;
+                    this.openclawApplying = false;
+                },
+
+                async loadOpenclawConfigFromFile() {
+                    this.openclawFileLoading = true;
+                    try {
+                        const res = await api('get-openclaw-config');
+                        if (res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        this.openclawConfigPath = res.path || '';
+                        this.openclawConfigExists = !!res.exists;
+                        this.openclawLineEnding = res.lineEnding === '\r\n' ? '\r\n' : '\n';
+                        if (res.content && res.content.trim()) {
+                            this.openclawEditing.content = res.content;
+                        } else if (!this.openclawEditing.content) {
+                            this.openclawEditing.content = DEFAULT_OPENCLAW_TEMPLATE;
+                        }
+                        this.showMessage('已加载当前 OpenClaw 配置', 'success');
+                    } catch (e) {
+                        this.showMessage('加载 OpenClaw 配置失败: ' + e.message, 'error');
+                    } finally {
+                        this.openclawFileLoading = false;
+                    }
+                },
+
+                persistOpenclawConfig({ closeModal = true } = {}) {
+                    if (!this.openclawEditing.name || !this.openclawEditing.name.trim()) {
+                        this.showMessage('请输入配置名称', 'error');
+                        return '';
+                    }
+                    const name = this.openclawEditing.name.trim();
+                    if (!this.openclawEditing.lockName && this.openclawConfigs[name]) {
+                        this.showMessage('配置名称已存在', 'error');
+                        return '';
+                    }
+                    if (!this.openclawEditing.content || !this.openclawEditing.content.trim()) {
+                        this.showMessage('配置内容不能为空', 'error');
+                        return '';
+                    }
+
+                    this.openclawConfigs[name] = {
+                        content: this.openclawEditing.content
+                    };
+                    this.currentOpenclawConfig = name;
+                    this.saveOpenclawConfigs();
+                    if (closeModal) {
+                        this.closeOpenclawConfigModal();
+                    }
+                    return name;
+                },
+
+                async saveOpenclawConfig() {
+                    this.openclawSaving = true;
+                    try {
+                        const name = this.persistOpenclawConfig();
+                        if (!name) return;
+                        this.showMessage('OpenClaw 配置已保存', 'success');
+                    } finally {
+                        this.openclawSaving = false;
+                    }
+                },
+
+                async saveAndApplyOpenclawConfig() {
+                    this.openclawApplying = true;
+                    try {
+                        const name = this.persistOpenclawConfig({ closeModal: false });
+                        if (!name) return;
+                        const config = this.openclawConfigs[name];
+                        const res = await api('apply-openclaw-config', {
+                            content: config.content,
+                            lineEnding: this.openclawLineEnding
+                        });
+                        if (res.error || res.success === false) {
+                            this.showMessage(res.error || '应用 OpenClaw 配置失败', 'error');
+                            return;
+                        }
+                        this.openclawConfigPath = res.targetPath || this.openclawConfigPath;
+                        this.openclawConfigExists = true;
+                        const targetTip = res.targetPath ? `（${res.targetPath}）` : '';
+                        this.showMessage(`已保存并应用 OpenClaw 配置${targetTip}`, 'success');
+                        this.closeOpenclawConfigModal();
+                    } catch (e) {
+                        this.showMessage('应用 OpenClaw 配置失败: ' + e.message, 'error');
+                    } finally {
+                        this.openclawApplying = false;
+                    }
+                },
+
+                deleteOpenclawConfig(name) {
+                    if (Object.keys(this.openclawConfigs).length <= 1) {
+                        return this.showMessage('至少保留一个配置', 'error');
+                    }
+                    if (!confirm(`确定删除配置 "${name}"?`)) return;
+                    delete this.openclawConfigs[name];
+                    if (this.currentOpenclawConfig === name) {
+                        this.currentOpenclawConfig = Object.keys(this.openclawConfigs)[0];
+                    }
+                    this.saveOpenclawConfigs();
+                    this.showMessage('OpenClaw 配置已删除', 'success');
+                },
+
+                async applyOpenclawConfig(name) {
+                    this.currentOpenclawConfig = name;
+                    const config = this.openclawConfigs[name];
+                    if (!this.openclawHasContent(config)) {
+                        return this.showMessage('该配置为空，请先编辑', 'error');
+                    }
+                    const res = await api('apply-openclaw-config', {
+                        content: config.content,
+                        lineEnding: this.openclawLineEnding
+                    });
+                    if (res.error || res.success === false) {
+                        this.showMessage(res.error || '应用 OpenClaw 配置失败', 'error');
+                    } else {
+                        this.openclawConfigPath = res.targetPath || this.openclawConfigPath;
+                        this.openclawConfigExists = true;
+                        const targetTip = res.targetPath ? `（${res.targetPath}）` : '';
+                        this.showMessage(`已应用 OpenClaw 配置: ${name}${targetTip}`, 'success');
+                    }
                 },
 
                 formatLatency(result) {

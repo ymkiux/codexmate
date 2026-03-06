@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const toml = require('@iarna/toml');
+const JSON5 = require('json5');
 const { exec, execSync } = require('child_process');
 const http = require('http');
 const https = require('https');
@@ -20,6 +21,9 @@ const MODELS_FILE = path.join(CONFIG_DIR, 'models.json');
 const CURRENT_MODELS_FILE = path.join(CONFIG_DIR, 'provider-current-models.json');
 const INIT_MARK_FILE = path.join(CONFIG_DIR, 'codexmate-init.json');
 const CODEX_SESSIONS_DIR = path.join(CONFIG_DIR, 'sessions');
+const OPENCLAW_DIR = path.join(os.homedir(), '.openclaw');
+const OPENCLAW_CONFIG_FILE = path.join(OPENCLAW_DIR, 'openclaw.json');
+const OPENCLAW_WORKSPACE_DIR = path.join(OPENCLAW_DIR, 'workspace');
 const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 const CLAUDE_SETTINGS_FILE = path.join(CLAUDE_DIR, 'settings.json');
 const CLAUDE_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
@@ -34,12 +38,13 @@ const SESSION_TITLE_READ_BYTES = 64 * 1024;
 const CODEXMATE_MANAGED_MARKER = '# codexmate-managed: true';
 const SESSION_LIST_CACHE_TTL_MS = 4000;
 const SESSION_SUMMARY_READ_BYTES = 256 * 1024;
-const SESSION_CONTENT_READ_BYTES = 512 * 1024;
+const SESSION_CONTENT_READ_BYTES = SESSION_SUMMARY_READ_BYTES;
+const DEFAULT_CONTENT_SCAN_LIMIT = 10;
 const SESSION_SCAN_FACTOR = 4;
 const SESSION_SCAN_MIN_FILES = 800;
 const MAX_SESSION_PATH_LIST_SIZE = 2000;
-const MAX_BATCH_DELETE_SESSIONS = 500;
-const MAX_BATCH_DELETE_RECORDS = 2000;
+const AGENTS_FILE_NAME = 'AGENTS.md';
+const UTF8_BOM = '\ufeff';
 const BOOTSTRAP_TEXT_MARKERS = [
     'agents.md instructions',
     '<instructions>',
@@ -152,6 +157,253 @@ function readJsonFile(filePath, fallback = null) {
 function ensureDir(dirPath) {
     if (!fs.existsSync(dirPath)) {
         fs.mkdirSync(dirPath, { recursive: true });
+    }
+}
+
+function hasUtf8Bom(text) {
+    return typeof text === 'string' && text.charCodeAt(0) === 0xfeff;
+}
+
+function stripUtf8Bom(text) {
+    if (!text) return '';
+    return hasUtf8Bom(text) ? text.slice(1) : text;
+}
+
+function ensureUtf8Bom(text) {
+    const content = typeof text === 'string' ? text : '';
+    return hasUtf8Bom(content) ? content : UTF8_BOM + content;
+}
+
+function detectLineEnding(text) {
+    return typeof text === 'string' && text.includes('\r\n') ? '\r\n' : '\n';
+}
+
+function normalizeLineEnding(text, lineEnding) {
+    const normalized = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    return lineEnding === '\r\n' ? normalized.replace(/\n/g, '\r\n') : normalized;
+}
+
+function resolveAgentsFilePath(params = {}) {
+    const baseDir = typeof params.baseDir === 'string' && params.baseDir.trim()
+        ? params.baseDir.trim()
+        : CONFIG_DIR;
+    return path.join(baseDir, AGENTS_FILE_NAME);
+}
+
+function validateAgentsBaseDir(filePath) {
+    const dirPath = path.dirname(filePath);
+    try {
+        const stat = fs.statSync(dirPath);
+        if (!stat.isDirectory()) {
+            return { error: `目标不是目录: ${dirPath}` };
+        }
+    } catch (e) {
+        return { error: `目标目录不存在: ${dirPath}` };
+    }
+    return { ok: true, dirPath };
+}
+
+function readAgentsFile(params = {}) {
+    const filePath = resolveAgentsFilePath(params);
+    const dirCheck = validateAgentsBaseDir(filePath);
+    if (dirCheck.error) {
+        return { error: dirCheck.error };
+    }
+
+    if (!fs.existsSync(filePath)) {
+        return {
+            exists: false,
+            path: filePath,
+            content: '',
+            lineEnding: os.EOL === '\r\n' ? '\r\n' : '\n'
+        };
+    }
+
+    try {
+        const raw = fs.readFileSync(filePath, 'utf-8');
+        return {
+            exists: true,
+            path: filePath,
+            content: stripUtf8Bom(raw),
+            lineEnding: detectLineEnding(raw)
+        };
+    } catch (e) {
+        return { error: `读取 AGENTS.md 失败: ${e.message}` };
+    }
+}
+
+function applyAgentsFile(params = {}) {
+    const filePath = resolveAgentsFilePath(params);
+    const dirCheck = validateAgentsBaseDir(filePath);
+    if (dirCheck.error) {
+        return { error: dirCheck.error };
+    }
+
+    const content = typeof params.content === 'string' ? params.content : '';
+    const lineEnding = params.lineEnding === '\r\n' ? '\r\n' : '\n';
+    const normalized = normalizeLineEnding(content, lineEnding);
+    const finalContent = ensureUtf8Bom(normalized);
+
+    try {
+        fs.writeFileSync(filePath, finalContent, 'utf-8');
+        return { success: true, path: filePath };
+    } catch (e) {
+        return { error: `写入 AGENTS.md 失败: ${e.message}` };
+    }
+}
+
+function resolveHomePath(input) {
+    const raw = typeof input === 'string' ? input.trim() : '';
+    if (!raw) return '';
+    if (raw === '~') return os.homedir();
+    if (raw.startsWith('~/') || raw.startsWith('~\\')) {
+        return path.join(os.homedir(), raw.slice(2));
+    }
+    return raw;
+}
+
+function resolveOpenclawWorkspaceDir(config) {
+    const workspace = config
+        && config.agents
+        && config.agents.defaults
+        && typeof config.agents.defaults.workspace === 'string'
+        ? config.agents.defaults.workspace
+        : '';
+    const resolved = resolveHomePath(workspace);
+    if (!resolved) {
+        return OPENCLAW_WORKSPACE_DIR;
+    }
+    if (path.isAbsolute(resolved)) {
+        return resolved;
+    }
+    return path.join(OPENCLAW_DIR, resolved);
+}
+
+function readOpenclawConfigFile() {
+    const filePath = OPENCLAW_CONFIG_FILE;
+    if (!fs.existsSync(filePath)) {
+        return {
+            exists: false,
+            path: filePath,
+            content: '',
+            lineEnding: os.EOL === '\r\n' ? '\r\n' : '\n'
+        };
+    }
+
+    try {
+        const raw = fs.readFileSync(filePath, 'utf-8');
+        return {
+            exists: true,
+            path: filePath,
+            content: stripUtf8Bom(raw),
+            lineEnding: detectLineEnding(raw)
+        };
+    } catch (e) {
+        return { error: `读取 OpenClaw 配置失败: ${e.message}` };
+    }
+}
+
+function parseOpenclawConfigText(content) {
+    const raw = stripUtf8Bom(typeof content === 'string' ? content : '');
+    if (!raw.trim()) {
+        return { ok: false, error: 'OpenClaw 配置内容不能为空' };
+    }
+    try {
+        const parsed = JSON5.parse(raw);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            return { ok: false, error: '配置格式错误（根节点必须是对象）' };
+        }
+        return { ok: true, data: parsed };
+    } catch (e) {
+        return { ok: false, error: `配置解析失败: ${e.message}` };
+    }
+}
+
+function getOpenclawWorkspaceInfo() {
+    const readResult = readOpenclawConfigFile();
+    let workspaceDir = OPENCLAW_WORKSPACE_DIR;
+    let configError = readResult.error || '';
+    if (!configError && readResult.exists && readResult.content.trim()) {
+        const parsed = parseOpenclawConfigText(readResult.content);
+        if (parsed.ok) {
+            workspaceDir = resolveOpenclawWorkspaceDir(parsed.data);
+        } else {
+            configError = parsed.error || '';
+        }
+    }
+    return {
+        workspaceDir,
+        configError,
+        configPath: readResult.path || OPENCLAW_CONFIG_FILE
+    };
+}
+
+function readOpenclawAgentsFile() {
+    const workspaceInfo = getOpenclawWorkspaceInfo();
+    const baseDir = workspaceInfo.workspaceDir;
+    const filePath = path.join(baseDir, AGENTS_FILE_NAME);
+
+    if (!fs.existsSync(baseDir)) {
+        return {
+            exists: false,
+            path: filePath,
+            content: '',
+            lineEnding: os.EOL === '\r\n' ? '\r\n' : '\n',
+            workspaceDir: baseDir,
+            configError: workspaceInfo.configError,
+            baseDirMissing: true
+        };
+    }
+
+    const readResult = readAgentsFile({ baseDir });
+    return {
+        ...readResult,
+        workspaceDir: baseDir,
+        configError: workspaceInfo.configError
+    };
+}
+
+function applyOpenclawAgentsFile(params = {}) {
+    const workspaceInfo = getOpenclawWorkspaceInfo();
+    const baseDir = workspaceInfo.workspaceDir;
+    ensureDir(baseDir);
+    const result = applyAgentsFile({
+        ...params,
+        baseDir
+    });
+    return {
+        ...result,
+        workspaceDir: baseDir,
+        configError: workspaceInfo.configError
+    };
+}
+
+function applyOpenclawConfig(params = {}) {
+    const content = typeof params.content === 'string' ? params.content : '';
+    const lineEnding = params.lineEnding === '\r\n' ? '\r\n' : '\n';
+    const normalized = normalizeLineEnding(content, lineEnding);
+    const parsed = parseOpenclawConfigText(normalized);
+    if (!parsed.ok) {
+        return { success: false, error: parsed.error };
+    }
+
+    try {
+        ensureDir(OPENCLAW_DIR);
+        const backupPath = backupFileIfNeededOnce(OPENCLAW_CONFIG_FILE);
+        fs.writeFileSync(OPENCLAW_CONFIG_FILE, normalized, 'utf-8');
+        const result = {
+            success: true,
+            targetPath: OPENCLAW_CONFIG_FILE
+        };
+        if (backupPath) {
+            result.backupPath = backupPath;
+        }
+        return result;
+    } catch (e) {
+        return {
+            success: false,
+            error: e.message || '写入 OpenClaw 配置失败'
+        };
     }
 }
 
@@ -903,14 +1155,23 @@ function scanSessionContentForQuery(session, tokens, options = {}) {
         ? Math.max(0, Number(options.snippetLimit))
         : 0;
 
-    let count = 0;
-    const snippets = [];
-
+    const messages = [];
     for (const record of records) {
         const message = extractMessageFromRecord(record, session.source);
         if (!message || !message.text) {
             continue;
         }
+        messages.push(message);
+    }
+
+    const filteredMessages = roleFilter === 'system'
+        ? messages
+        : removeLeadingSystemMessage(messages);
+
+    let count = 0;
+    const snippets = [];
+
+    for (const message of filteredMessages) {
         if (roleFilter !== 'all' && message.role !== roleFilter) {
             continue;
         }
@@ -941,7 +1202,7 @@ function applySessionQueryFilter(sessions, options = {}) {
     const roleFilter = normalizeRoleFilter(options.roleFilter);
     const contentScanLimit = Number.isFinite(Number(options.contentScanLimit))
         ? Math.max(1, Number(options.contentScanLimit))
-        : 2;
+        : DEFAULT_CONTENT_SCAN_LIMIT;
     const contentScanBytes = Number.isFinite(Number(options.contentScanBytes))
         ? Math.max(1024, Number(options.contentScanBytes))
         : SESSION_CONTENT_READ_BYTES;
@@ -993,7 +1254,6 @@ function applySessionQueryFilter(sessions, options = {}) {
 
     return results;
 }
-
 function collectRecentJsonlFiles(rootDir, options = {}) {
     if (!fs.existsSync(rootDir)) {
         return [];
@@ -1452,7 +1712,7 @@ function listAllSessions(params = {}) {
         sessions = sessions.filter(item => matchesSessionPathFilter(item, normalizedPathFilter));
     }
 
-    let result = mergeAndLimitSessions(sessions, limit);
+    let result = sessions;
     if (hasQuery) {
         result = applySessionQueryFilter(result, {
             tokens: queryTokens,
@@ -1463,6 +1723,7 @@ function listAllSessions(params = {}) {
             contentScanBytes: params.contentScanBytes
         });
     }
+    result = mergeAndLimitSessions(result, limit);
     if (!hasQuery) {
         setSessionListCache(cacheKey, result);
     }
@@ -1848,258 +2109,6 @@ async function exportSessionData(params = {}) {
         sessionId,
         fileName: `${source}-session-${safeSessionId}.md`,
         content: markdown
-    };
-}
-
-function deleteSessionFile(params = {}, options = {}) {
-    const source = params.source === 'claude' ? 'claude' : (params.source === 'codex' ? 'codex' : '');
-    if (!source) {
-        return { error: 'Invalid source' };
-    }
-
-    const filePath = resolveSessionFilePath(source, params.filePath, params.sessionId);
-    if (!filePath) {
-        return { error: 'Session file not found' };
-    }
-
-    if (!filePath.toLowerCase().endsWith('.jsonl')) {
-        return { error: 'Invalid session file' };
-    }
-
-    let stat;
-    try {
-        stat = fs.statSync(filePath);
-    } catch (e) {
-        return { error: 'Session file not found' };
-    }
-
-    if (!stat.isFile()) {
-        return { error: 'Session path is not a file' };
-    }
-
-    try {
-        fs.unlinkSync(filePath);
-    } catch (e) {
-        return { error: `Failed to delete session: ${e.message}` };
-    }
-
-    if (!options.skipCacheInvalidate) {
-        invalidateSessionListCache();
-    }
-
-    return {
-        success: true,
-        source,
-        sessionId: params.sessionId || path.basename(filePath, '.jsonl'),
-        filePath
-    };
-}
-
-function deleteSessionFilesBatch(params = {}) {
-    const items = Array.isArray(params.items) ? params.items : [];
-    if (items.length === 0) {
-        return { error: 'No sessions provided' };
-    }
-
-    if (items.length > MAX_BATCH_DELETE_SESSIONS) {
-        return { error: `Too many sessions, max ${MAX_BATCH_DELETE_SESSIONS}` };
-    }
-
-    const results = [];
-    let deleted = 0;
-
-    for (const item of items) {
-        const payload = (item && typeof item === 'object') ? item : {};
-        const source = typeof payload.source === 'string' ? payload.source : '';
-        const sessionId = typeof payload.sessionId === 'string' ? payload.sessionId : '';
-        const filePath = typeof payload.filePath === 'string' ? payload.filePath : '';
-
-        const single = deleteSessionFile(
-            { source, sessionId, filePath },
-            { skipCacheInvalidate: true }
-        );
-
-        if (single.error) {
-            results.push({
-                success: false,
-                source: source || 'unknown',
-                sessionId,
-                filePath,
-                error: single.error
-            });
-            continue;
-        }
-
-        deleted += 1;
-        results.push({
-            success: true,
-            source: single.source,
-            sessionId: single.sessionId,
-            filePath: single.filePath
-        });
-    }
-
-    if (deleted > 0) {
-        invalidateSessionListCache();
-    }
-
-    const failed = results.length - deleted;
-    return {
-        success: failed === 0,
-        total: results.length,
-        deleted,
-        failed,
-        results
-    };
-}
-
-async function deleteSessionRecords(params = {}) {
-    const source = params.source === 'claude' ? 'claude' : (params.source === 'codex' ? 'codex' : '');
-    if (!source) {
-        return { error: 'Invalid source' };
-    }
-
-    const filePath = resolveSessionFilePath(source, params.filePath, params.sessionId);
-    if (!filePath) {
-        return { error: 'Session file not found' };
-    }
-
-    if (!filePath.toLowerCase().endsWith('.jsonl')) {
-        return { error: 'Invalid session file' };
-    }
-
-    let stat;
-    try {
-        stat = fs.statSync(filePath);
-    } catch (e) {
-        return { error: 'Session file not found' };
-    }
-
-    if (!stat.isFile()) {
-        return { error: 'Session path is not a file' };
-    }
-
-    const rawIndices = Array.isArray(params.recordLineIndices) ? params.recordLineIndices : [];
-    if (rawIndices.length === 0) {
-        return { error: 'No records provided' };
-    }
-
-    if (rawIndices.length > MAX_BATCH_DELETE_RECORDS) {
-        return { error: `Too many records, max ${MAX_BATCH_DELETE_RECORDS}` };
-    }
-
-    const extracted = await extractMessagesFromFile(filePath, source, { maxMessages: Infinity });
-    const visibleMessages = removeLeadingSystemMessage(Array.isArray(extracted.messages) ? extracted.messages : []);
-    const visibleLineSet = new Set();
-    for (const message of visibleMessages) {
-        if (message && Number.isInteger(message.recordLineIndex) && message.recordLineIndex >= 0) {
-            visibleLineSet.add(message.recordLineIndex);
-        }
-    }
-
-    const normalizedIndices = [];
-    const seenIndices = new Set();
-    const results = [];
-
-    for (const raw of rawIndices) {
-        const parsed = Number(raw);
-        if (!Number.isInteger(parsed) || parsed < 0) {
-            results.push({
-                recordLineIndex: Number.isInteger(parsed) ? parsed : -1,
-                success: false,
-                error: 'Invalid record line index'
-            });
-            continue;
-        }
-
-        if (seenIndices.has(parsed)) {
-            continue;
-        }
-        seenIndices.add(parsed);
-        normalizedIndices.push(parsed);
-    }
-
-    const deleteSet = new Set();
-    for (const recordLineIndex of normalizedIndices) {
-        if (!visibleLineSet.has(recordLineIndex)) {
-            results.push({
-                recordLineIndex,
-                success: false,
-                error: 'Record not found'
-            });
-            continue;
-        }
-
-        deleteSet.add(recordLineIndex);
-        results.push({
-            recordLineIndex,
-            success: true
-        });
-    }
-
-    const requested = results.length;
-    const deleted = deleteSet.size;
-    const failed = requested - deleted;
-
-    if (deleteSet.size === 0) {
-        return {
-            success: failed === 0,
-            requested,
-            deleted,
-            failed,
-            remainingMessages: visibleMessages.length,
-            results
-        };
-    }
-
-    let rawContent = '';
-    try {
-        rawContent = fs.readFileSync(filePath, 'utf-8');
-    } catch (e) {
-        return { error: `Failed to read session file: ${e.message}` };
-    }
-
-    const newline = rawContent.includes('\r\n') ? '\r\n' : '\n';
-    const hasTrailingNewline = /\r?\n$/.test(rawContent);
-    let lines = rawContent === '' ? [] : rawContent.split(/\r?\n/);
-    if (hasTrailingNewline && lines.length > 0 && lines[lines.length - 1] === '') {
-        lines.pop();
-    }
-
-    const nextLines = [];
-    for (let i = 0; i < lines.length; i += 1) {
-        if (!deleteSet.has(i)) {
-            nextLines.push(lines[i]);
-        }
-    }
-
-    let nextContent = nextLines.join(newline);
-    if (hasTrailingNewline && nextLines.length > 0) {
-        nextContent += newline;
-    }
-
-    const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
-    try {
-        fs.writeFileSync(tmpPath, nextContent, 'utf-8');
-        fs.renameSync(tmpPath, filePath);
-    } catch (e) {
-        try {
-            if (fs.existsSync(tmpPath)) {
-                fs.unlinkSync(tmpPath);
-            }
-        } catch (_) {}
-        return { error: `Failed to rewrite session file: ${e.message}` };
-    }
-
-    invalidateSessionListCache();
-
-    return {
-        success: failed === 0,
-        requested,
-        deleted,
-        failed,
-        remainingMessages: Math.max(0, visibleMessages.length - deleted),
-        results
     };
 }
 
@@ -3003,6 +3012,24 @@ function cmdStart() {
                         case 'apply-config-template':
                             result = applyConfigTemplate(params || {});
                             break;
+                        case 'get-agents-file':
+                            result = readAgentsFile(params || {});
+                            break;
+                        case 'apply-agents-file':
+                            result = applyAgentsFile(params || {});
+                            break;
+                        case 'get-openclaw-config':
+                            result = readOpenclawConfigFile();
+                            break;
+                        case 'apply-openclaw-config':
+                            result = applyOpenclawConfig(params || {});
+                            break;
+                        case 'get-openclaw-agents-file':
+                            result = readOpenclawAgentsFile();
+                            break;
+                        case 'apply-openclaw-agents-file':
+                            result = applyOpenclawAgentsFile(params || {});
+                            break;
                         case 'switch':
                         case 'use':
                         case 'add':
@@ -3056,15 +3083,6 @@ function cmdStart() {
                             break;
                         case 'session-detail':
                             result = await readSessionDetail(params);
-                            break;
-                        case 'delete-session':
-                            result = deleteSessionFile(params);
-                            break;
-                        case 'delete-sessions':
-                            result = deleteSessionFilesBatch(params);
-                            break;
-                        case 'delete-session-records':
-                            result = await deleteSessionRecords(params);
                             break;
                         default:
                             result = { error: '未知操作' };

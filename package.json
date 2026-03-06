@@ -1,6 +1,6 @@
-{
+﻿{
   "name": "codexmate",
-  "version": "0.0.1",
+  "version": "0.0.4",
   "description": "Codex 提供商管理 CLI 工具",
   "bin": {
     "codexmate": "./cli.js"
@@ -9,7 +9,8 @@
     "start": "node cli.js"
   },
   "dependencies": {
-    "@iarna/toml": "^2.2.5"
+    "@iarna/toml": "^2.2.5",
+    "json5": "^2.2.3"
   },
   "engines": {
     "node": ">=14"
@@ -23,3 +24,4 @@
   "author": "ymkiux",
   "license": "Apache-2.0"
 }
+

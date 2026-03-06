@@ -1,0 +1,45 @@
+﻿name: release
+run-name: "${{ github.event.repository.name }} ${{ inputs.tag }}"
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g., v0.0.1)'
+        required: true
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      - name: Verify tag matches package.json version
+        run: |
+          node -e "const pkg=require('./package.json'); const tag='${{ inputs.tag }}'; const expected='v'+pkg.version; if(tag!==expected){ console.error('Tag '+tag+' does not match package.json version '+expected); process.exit(1);} console.log('Tag matches '+expected);"
+      - name: Compute release name
+        run: |
+          node -e "const p=require('./package.json'); const tag='${{ inputs.tag }}'; const name=p.name.includes('/')? p.name.split('/')[1]: p.name; const value=name+' '+tag; console.log('RELEASE_NAME='+value);" >> "$GITHUB_ENV"
+      - name: Pack npm artifact
+        run: |
+          name=$(node -e "const p=require('./package.json'); const n=p.name.replace('@','').replace('/','-'); process.stdout.write(n+'-'+p.version+'.tgz');")
+          npm pack
+          test -f "$name"
+          echo "PACKAGE_TGZ=$name" >> "$GITHUB_ENV"
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          name: ${{ env.RELEASE_NAME }}
+          prerelease: false
+          draft: false
+          files: ${{ env.PACKAGE_TGZ }}
+          generate_release_notes: true
