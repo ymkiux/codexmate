@@ -1,7 +1,7 @@
 ﻿{
   "name": "codexmate",
   "version": "0.0.4",
-  "description": "Codex 提供商管理 CLI 工具",
+  "description": "Codex/Claude Code 配置与会话管理 CLI + Web 工具",
   "bin": {
     "codexmate": "./cli.js"
   },
@@ -17,6 +17,12 @@
   },
   "keywords": [
     "codex",
+    "claude",
+    "claude-code",
+    "config",
+    "session",
+    "web-ui",
+    "provider",
     "ai",
     "llm",
     "cli"
@@ -24,4 +30,3 @@
   "author": "ymkiux",
   "license": "Apache-2.0"
 }
-
