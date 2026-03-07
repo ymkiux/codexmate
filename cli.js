@@ -255,6 +255,97 @@ function isValidProviderName(name) {
     return typeof name === 'string' && /^[a-zA-Z0-9._-]+$/.test(name.trim());
 }
 
+function buildModelsUrl(baseUrl) {
+    const trimmed = typeof baseUrl === 'string' ? baseUrl.trim() : '';
+    if (!trimmed) return '';
+    if (/\/models\/?$/.test(trimmed)) return trimmed;
+    return trimmed.replace(/\/+$/, '') + '/models';
+}
+
+function extractModelNames(payload) {
+    if (!payload || typeof payload !== 'object') return [];
+    const data = Array.isArray(payload.data)
+        ? payload.data
+        : (Array.isArray(payload.models) ? payload.models : []);
+    const names = [];
+    for (const item of data) {
+        if (typeof item === 'string') {
+            if (item.trim()) names.push(item.trim());
+            continue;
+        }
+        if (!item || typeof item !== 'object') continue;
+        const name = item.id || item.name || item.model || '';
+        if (typeof name === 'string' && name.trim()) {
+            names.push(name.trim());
+        }
+    }
+    return Array.from(new Set(names));
+}
+
+function fetchModelsFromBaseUrl(baseUrl, apiKey) {
+    return new Promise((resolve) => {
+        const modelsUrl = buildModelsUrl(baseUrl);
+        if (!modelsUrl) return resolve({ error: 'Provider missing URL' });
+
+        let parsed;
+        try {
+            parsed = new URL(modelsUrl);
+        } catch (e) {
+            return resolve({ error: 'Invalid URL' });
+        }
+
+        const transport = parsed.protocol === 'https:' ? https : http;
+        const headers = {
+            'User-Agent': 'codexmate-models',
+            'Accept': 'application/json'
+        };
+        if (apiKey) {
+            headers['Authorization'] = `Bearer ${apiKey}`;
+        }
+
+        const req = transport.request(parsed, { method: 'GET', headers }, (res) => {
+            let body = '';
+            res.on('data', chunk => body += chunk);
+            res.on('end', () => {
+                if ((res.statusCode || 0) >= 400) {
+                    return resolve({ error: `Request failed: ${res.statusCode || 0}` });
+                }
+                try {
+                    const payload = JSON.parse(body || '{}');
+                    const models = extractModelNames(payload);
+                    return resolve({ models });
+                } catch (e) {
+                    return resolve({ error: 'Invalid JSON response' });
+                }
+            });
+        });
+
+        req.setTimeout(SPEED_TEST_TIMEOUT_MS, () => {
+            req.destroy(new Error('timeout'));
+        });
+        req.on('error', (err) => {
+            resolve({ error: err.message || 'Request failed' });
+        });
+        req.end();
+    });
+}
+
+async function fetchProviderModels(providerName, overrides = {}) {
+    const { config } = readConfigOrVirtualDefault();
+    const targetProvider = providerName || config.model_provider || '';
+    if (!targetProvider) return { error: '未设置当前提供商' };
+
+    const providers = config.model_providers || {};
+    const provider = providers[targetProvider];
+    if (!provider) return { error: `提供商不存在: ${targetProvider}` };
+
+    const baseUrl = overrides.baseUrl || provider.base_url || '';
+    const apiKey = overrides.apiKey ?? provider.preferred_auth_method ?? '';
+    const res = await fetchModelsFromBaseUrl(baseUrl, apiKey);
+    if (res.error) return { error: res.error };
+    return { models: res.models || [], provider: targetProvider };
+}
+
 function resolveAgentsFilePath(params = {}) {
     const baseDir = typeof params.baseDir === 'string' && params.baseDir.trim()
         ? params.baseDir.trim()
@@ -2421,6 +2512,7 @@ async function cmdSetup() {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     const lineQueue = [];
     let lineResolver = null;
+    let rlClosed = false;
     rl.on('line', (line) => {
         if (lineResolver) {
             const resolve = lineResolver;
@@ -2431,6 +2523,7 @@ async function cmdSetup() {
         }
     });
     rl.on('close', () => {
+        rlClosed = true;
         if (lineResolver) {
             const resolve = lineResolver;
             lineResolver = null;
@@ -2443,6 +2536,9 @@ async function cmdSetup() {
         }
         if (lineQueue.length > 0) {
             return lineQueue.shift();
+        }
+        if (rlClosed) {
+            return '';
         }
         return await new Promise(resolve => {
             lineResolver = resolve;
@@ -2460,8 +2556,8 @@ async function cmdSetup() {
         const providers = config.model_providers || {};
         const providerNames = Object.keys(providers);
         const defaultProvider = config.model_provider || providerNames[0] || '';
-        const models = readModels();
-        const defaultModel = config.model || models[0] || '';
+        let availableModels = [];
+        let defaultModel = config.model || '';
 
         while (true) {
             console.log('\n选择提供商:');
@@ -2546,10 +2642,37 @@ async function cmdSetup() {
             apiKey = (await ask('API Key (可空): ')).trim();
         }
 
+        let modelFetchError = '';
+        if (providerName) {
+            if (isCustomProvider) {
+                const res = await fetchModelsFromBaseUrl(baseUrl, apiKey);
+                if (res.error) {
+                    modelFetchError = res.error;
+                } else {
+                    availableModels = res.models || [];
+                }
+            } else {
+                const res = await fetchProviderModels(providerName);
+                if (res.error) {
+                    modelFetchError = res.error;
+                } else {
+                    availableModels = res.models || [];
+                }
+            }
+        }
+        if (modelFetchError) {
+            console.log(`提示: 获取模型列表失败: ${modelFetchError}，请手动输入。`);
+        }
+        if (availableModels.length > 0) {
+            if (!defaultModel || !availableModels.includes(defaultModel)) {
+                defaultModel = availableModels[0];
+            }
+        }
+
         while (true) {
             console.log('\n选择模型:');
-            if (models.length > 0) {
-                models.forEach((name, index) => {
+            if (availableModels.length > 0) {
+                availableModels.forEach((name, index) => {
                     console.log(`  ${index + 1}. ${name}`);
                 });
             } else {
@@ -2570,8 +2693,8 @@ async function cmdSetup() {
 
             if (/^\d+$/.test(input)) {
                 const index = parseInt(input, 10);
-                if (index >= 1 && index <= models.length) {
-                    modelName = models[index - 1];
+                if (index >= 1 && index <= availableModels.length) {
+                    modelName = availableModels[index - 1];
                     break;
                 }
                 console.log('提示: 序号无效，请重试。');
@@ -2674,21 +2797,23 @@ function cmdList() {
 }
 
 // 列出所有模型
-function cmdModels() {
-    const models = readModels();
-    const currentModels = readCurrentModels();
-
-    console.log('\n可用模型:');
-    models.forEach((m, i) => {
-        const users = Object.entries(currentModels)
-            .filter(([_, model]) => model === m)
-            .map(([name, _]) => name);
-        const usage = users.length > 0 ? users.join(', ') : '(未使用)';
-        console.log(`  ${i + 1}. ${m}`);
-        if (users.length > 0) {
-            console.log(`     → ${usage}`);
-        }
-    });
+async function cmdModels() {
+    const res = await fetchProviderModels('');
+    if (res.error) {
+        console.error('错误: 获取模型列表失败:', res.error);
+        process.exitCode = 1;
+        return;
+    }
+    const models = Array.isArray(res.models) ? res.models : [];
+    const label = res.provider ? ` (${res.provider})` : '';
+    console.log(`\n可用模型${label}:`);
+    if (models.length === 0) {
+        console.log('  (空)');
+    } else {
+        models.forEach((m, i) => {
+            console.log(`  ${i + 1}. ${m}`);
+        });
+    }
     console.log();
 }
 
@@ -2738,14 +2863,14 @@ function cmdSwitch(providerName, silent = false) {
 
 // 切换模型
 function cmdUseModel(modelName, silent = false) {
+    if (!modelName) {
+        if (!silent) console.error('错误: 模型名称必填');
+        throw new Error('模型名称必填');
+    }
     const models = readModels();
     if (!models.includes(modelName)) {
-        if (!silent) {
-            console.error('错误: 模型不存在:', modelName);
-            console.log('\n可用的模型:');
-            models.forEach(m => console.log('  -', m));
-        }
-        throw new Error('模型不存在');
+        models.push(modelName);
+        writeModels(models);
     }
 
     const config = readConfig();
@@ -3307,7 +3432,15 @@ function cmdStart() {
                             };
                             break;
                         case 'models':
-                            result = { models: readModels() };
+                            {
+                                const providerName = params && typeof params.provider === 'string' ? params.provider : '';
+                                const res = await fetchProviderModels(providerName);
+                                if (res.error) {
+                                    result = { error: res.error, models: [], source: 'remote' };
+                                } else {
+                                    result = { models: res.models || [], source: 'remote', provider: res.provider || '' };
+                                }
+                            }
                             break;
                         case 'get-config-template':
                             result = getConfigTemplate(params || {});
@@ -3432,7 +3565,7 @@ function cmdStart() {
 // ============================================================================
 // 主程序
 // ============================================================================
-function main() {
+async function main() {
     const bootstrap = ensureManagedConfigBootstrap();
     if (bootstrap && bootstrap.notice) {
         console.log(`\n[Init] ${bootstrap.notice}`);
@@ -3463,9 +3596,9 @@ function main() {
 
     switch (command) {
         case 'status': cmdStatus(); break;
-        case 'setup': cmdSetup(); break;
+        case 'setup': await cmdSetup(); break;
         case 'list': cmdList(); break;
-        case 'models': cmdModels(); break;
+        case 'models': await cmdModels(); break;
         case 'switch': cmdSwitch(args[1]); break;
         case 'use': cmdUseModel(args[1]); break;
         case 'add': cmdAdd(args[1], args[2], args[3]); break;
@@ -3496,4 +3629,7 @@ function main() {
     }
 }
 
-main();
+main().catch((err) => {
+    console.error('错误:', err && err.message ? err.message : err);
+    process.exit(1);
+});

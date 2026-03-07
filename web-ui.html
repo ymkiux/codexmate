@@ -1732,13 +1732,16 @@
                     <div class="selector-header">
                         <span class="selector-title">模型</span>
                         <div class="selector-actions">
-                            <button class="btn-icon" @click="showModelModal = true" title="添加模型">+</button>
-                            <button class="btn-icon" @click="showModelListModal = true" title="管理模型">≡</button>
+                            <button class="btn-icon" @click="showModelModal = true" title="添加模型" v-if="modelsSource !== 'remote'">+</button>
+                            <button class="btn-icon" @click="showModelListModal = true" title="管理模型" v-if="modelsSource !== 'remote'">≡</button>
                         </div>
                     </div>
                     <select class="model-select" v-model="currentModel" @change="onModelChange">
                         <option v-for="model in models" :key="model" :value="model">{{ model }}</option>
                     </select>
+                    <div class="config-template-hint" v-if="modelsSource === 'remote'">
+                        模型列表来自提供商接口，如需使用未显示模型，请在模板中手动填写。
+                    </div>
                     <div class="config-template-hint">
                         Codex 配置改动采用模板确认模式：请先编辑模板，再手动确认应用。
                     </div>
@@ -2393,6 +2396,7 @@
                     currentModel: '',
                     providersList: [],
                     models: [],
+                    modelsSource: 'remote',
                     loading: true,
                     initError: '',
                     message: '',
@@ -2526,11 +2530,8 @@
                     this.loading = true;
                     this.initError = '';
                     try {
-                        const [statusRes, listRes, modelsRes] = await Promise.all([
-                            api('status'),
-                            api('list'),
-                            api('models')
-                        ]);
+                        const statusRes = await api('status');
+                        const listRes = await api('list');
 
                         if (statusRes.error) {
                             this.initError = statusRes.error;
@@ -2538,7 +2539,7 @@
                             this.currentProvider = statusRes.provider;
                             this.currentModel = statusRes.model;
                             this.providersList = listRes.providers;
-                            this.models = modelsRes.models;
+                            await this.loadModelsForProvider(this.currentProvider);
                             if (statusRes.configReady === false) {
                                 this.showMessage(statusRes.configNotice || '未检测到 config.toml，已加载默认模板；请在模板编辑器确认后创建。', 'info');
                             }
@@ -2551,6 +2552,33 @@
                         this.initError = '连接失败: ' + e.message;
                     } finally {
                         this.loading = false;
+                    }
+                },
+
+                async loadModelsForProvider(providerName) {
+                    if (!providerName) {
+                        this.models = this.currentModel ? [this.currentModel] : [];
+                        this.modelsSource = 'remote';
+                        return;
+                    }
+                    try {
+                        const res = await api('models', { provider: providerName });
+                        if (res.error) {
+                            this.showMessage('模型列表获取失败: ' + res.error, 'error');
+                            this.models = this.currentModel ? [this.currentModel] : [];
+                            this.modelsSource = res.source || 'remote';
+                            return;
+                        }
+                        const list = Array.isArray(res.models) ? res.models : [];
+                        if (this.currentModel && !list.includes(this.currentModel)) {
+                            list.unshift(this.currentModel);
+                        }
+                        this.models = list;
+                        this.modelsSource = res.source || 'remote';
+                    } catch (e) {
+                        this.showMessage('模型列表获取失败: ' + e.message, 'error');
+                        this.models = this.currentModel ? [this.currentModel] : [];
+                        this.modelsSource = 'remote';
                     }
                 },
 
@@ -2956,6 +2984,7 @@
 
                 async switchProvider(name) {
                     this.currentProvider = name;
+                    await this.loadModelsForProvider(name);
                     await this.openConfigTemplateEditor();
                 },
 
@@ -3578,8 +3607,6 @@
     </script>
 </body>
 </html>
-
-
 
 
 
