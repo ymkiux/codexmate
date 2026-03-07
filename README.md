@@ -32,7 +32,7 @@ See [CHANGELOG.md](CHANGELOG.md) and [Releases](https://github.com/ymkiux/codexm
 | Module | Problem | Key Capabilities |
 | --- | --- | --- |
 | Codex Config | Switching providers/models is painful | Provider/model switching, model management, CLI + Web entry points, template-confirmed writes |
-| Claude Code Config | Multiple profiles and inconsistent write paths | Profile management, default write to `~/.claude/settings.json`, compatibility mode env vars |
+| Claude Code Config | Multiple profiles and inconsistent write paths | Profile management, default write to `~/.claude/settings.json` |
 | OpenClaw Config | OpenClaw configs are scattered | JSON5 profiles, apply to `~/.openclaw/openclaw.json`, AGENTS workspace management |
 | Session Browser | Local sessions are hard to track | List/filter sessions, export to Markdown, copy resume command (when available), delete and batch cleanup |
 | Utilities | Compression/extraction requires extra tools | Multithreaded compress/unzip via 7-Zip |
@@ -186,8 +186,7 @@ codexmate start
 
 - Manage multiple Claude Code profiles
 - Configure API key, Base URL, and model
-- Default write to `env` in `~/.claude/settings.json`: `env.ANTHROPIC_API_KEY` / `env.ANTHROPIC_AUTH_TOKEN` / `env.ANTHROPIC_BASE_URL` / `env.ANTHROPIC_MODEL` / `env.CLAUDE_CODE_USE_KEY`
-- Compatibility mode: write to system environment variables (useful for legacy workflows or specific Windows cases)
+- Default write to `env` in `~/.claude/settings.json`: `env.ANTHROPIC_API_KEY` / `env.ANTHROPIC_BASE_URL` / `env.ANTHROPIC_MODEL`
 
 ### OpenClaw Config Mode
 
@@ -263,7 +262,7 @@ codexmate use gpt-4-turbo
 2. Switch to "Claude Code Config" mode in the browser
 3. Add a profile (example Zhipu GLM): Name=ZhipuGLM, API Key=your API key, Base URL=`https://open.bigmodel.cn/api/anthropic`, Model=`glm-4.7`
 4. Click the card to apply, or use "Save & Apply to Claude Config" in the editor
-5. Default write to `~/.claude/settings.json`; compatibility mode writes system env vars
+5. Default write to `~/.claude/settings.json`
 6. Restart Claude Code to apply
 
 ### Start the Web UI
@@ -278,7 +277,7 @@ Then open `http://localhost:3737`.
 
 ### Q: Which operating systems are supported?
 
-A: Codex features support Windows and Linux (CLI and Web). Claude Code config applies to Windows / macOS / Linux (writes to `~/.claude/settings.json`). Compatibility mode env vars are Windows-only.
+A: Codex features support Windows and Linux (CLI and Web). Claude Code config applies to Windows / macOS / Linux (writes to `~/.claude/settings.json`).
 
 ### Q: Where are API keys stored?
 
@@ -290,7 +289,7 @@ A: The Web UI runs locally; all operations happen on your machine. API keys are 
 
 ### Q: How do Claude Code configs take effect?
 
-A: After clicking "Apply to Claude Config", it writes to `~/.claude/settings.json`. Restart Claude Code to apply. If using compatibility mode env vars, a restart is also recommended.
+A: After clicking "Apply to Claude Config", it writes to `~/.claude/settings.json`. Restart Claude Code to apply.
 
 ### Q: How to uninstall?
 

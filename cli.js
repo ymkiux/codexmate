@@ -3270,52 +3270,6 @@ function maskKey(key) {
     return key.substring(0, 4) + '...' + key.substring(key.length - 4);
 }
 
-// 应用到系统环境变量
-function applyToSystemEnv(config = {}) {
-    try {
-        const apiKey = config.apiKey || '';
-
-        // Windows 使用 setx 命令设置用户环境变量
-        if (process.platform === 'win32') {
-            const envVars = [
-                ['ANTHROPIC_API_KEY', apiKey],
-                ['ANTHROPIC_AUTH_TOKEN', apiKey],
-                ['ANTHROPIC_BASE_URL', config.baseUrl || 'https://open.bigmodel.cn/api/anthropic'],
-                ['CLAUDE_CODE_USE_KEY', '1'],
-                ['ANTHROPIC_MODEL', config.model || 'glm-4.7']
-            ];
-
-            const errors = [];
-            for (const [key, value] of envVars) {
-                try {
-                    // 转义值中的双引号，防止命令注入
-                    const safeValue = value.replace(/"/g, '""');
-                    execSync(`setx ${key} "${safeValue}"`, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
-                } catch (e) {
-                    errors.push(`${key}: ${e.message || '设置失败'}`);
-                }
-            }
-
-            if (errors.length > 0) {
-                return {
-                    success: false,
-                    mode: 'env-vars',
-                    error: `部分环境变量设置失败:\n${errors.join('\n')}`
-                };
-            }
-            return {
-                success: true,
-                mode: 'env-vars',
-                updatedKeys: envVars.map(([key]) => key)
-            };
-        } else {
-            return { success: false, mode: 'env-vars', error: '仅支持 Windows 系统' };
-        }
-    } catch (e) {
-        return { success: false, mode: 'env-vars', error: e.message };
-    }
-}
-
 // 应用到 Claude Code settings.json（跨平台）
 function applyToClaudeSettings(config = {}) {
     try {
@@ -3339,11 +3293,11 @@ function applyToClaudeSettings(config = {}) {
         const nextEnv = {
             ...currentEnv,
             ANTHROPIC_API_KEY: apiKey,
-            ANTHROPIC_AUTH_TOKEN: apiKey,
             ANTHROPIC_BASE_URL: baseUrl,
-            ANTHROPIC_MODEL: model,
-            CLAUDE_CODE_USE_KEY: '1'
+            ANTHROPIC_MODEL: model
         };
+        delete nextEnv.ANTHROPIC_AUTH_TOKEN;
+        delete nextEnv.CLAUDE_CODE_USE_KEY;
 
         const nextSettings = {
             ...currentSettings,
@@ -3360,10 +3314,8 @@ function applyToClaudeSettings(config = {}) {
             targetPath: CLAUDE_SETTINGS_FILE,
             updatedKeys: [
                 'env.ANTHROPIC_API_KEY',
-                'env.ANTHROPIC_AUTH_TOKEN',
                 'env.ANTHROPIC_BASE_URL',
-                'env.ANTHROPIC_MODEL',
-                'env.CLAUDE_CODE_USE_KEY'
+                'env.ANTHROPIC_MODEL'
             ]
         };
         if (backupPath) {
@@ -3659,9 +3611,6 @@ function cmdStart() {
                             break;
                         case 'apply-claude-config':
                             result = applyToClaudeSettings(params.config);
-                            break;
-                        case 'apply-env':
-                            result = applyToSystemEnv(params.config);
                             break;
                         case 'export-config':
                             result = {
