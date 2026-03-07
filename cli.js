@@ -2,6 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const crypto = require('crypto');
 const toml = require('@iarna/toml');
 const JSON5 = require('json5');
 const { exec, execSync } = require('child_process');
@@ -45,6 +46,10 @@ const SESSION_SCAN_MIN_FILES = 800;
 const MAX_SESSION_PATH_LIST_SIZE = 2000;
 const AGENTS_FILE_NAME = 'AGENTS.md';
 const UTF8_BOM = '\ufeff';
+const MODELS_CACHE_TTL_MS = 60 * 1000;
+const MODELS_NEGATIVE_CACHE_TTL_MS = 5 * 1000;
+const MODELS_CACHE_MAX_ENTRIES = 50;
+const MODELS_RESPONSE_MAX_BYTES = 1024 * 1024;
 const BOOTSTRAP_TEXT_MARKERS = [
     'agents.md instructions',
     '<instructions>',
@@ -52,6 +57,9 @@ const BOOTSTRAP_TEXT_MARKERS = [
     'you are a coding agent',
     'codex cli'
 ];
+
+const HTTP_KEEP_ALIVE_AGENT = new http.Agent({ keepAlive: true });
+const HTTPS_KEEP_ALIVE_AGENT = new https.Agent({ keepAlive: true });
 
 function resolveWebPort() {
     const raw = process.env.CODEXMATE_PORT;
@@ -83,6 +91,8 @@ stream_idle_timeout_ms = 300000
 
 let g_initNotice = '';
 let g_sessionListCache = new Map();
+let g_modelsCache = new Map();
+let g_modelsInFlight = new Map();
 
 // ============================================================================
 // 工具函数
@@ -305,7 +315,76 @@ function hasModelsListPayload(payload) {
     return Array.isArray(payload.data) || Array.isArray(payload.models);
 }
 
+function hashModelsCacheValue(value) {
+    if (!value) return '';
+    try {
+        return crypto.createHash('sha256').update(String(value)).digest('hex');
+    } catch (e) {
+        return '';
+    }
+}
+
+function buildModelsCacheKey(baseUrl, apiKey) {
+    const normalizedUrl = typeof baseUrl === 'string'
+        ? baseUrl.trim().replace(/\/+$/, '')
+        : '';
+    const apiKeyHash = hashModelsCacheValue(apiKey);
+    return `${normalizedUrl}|${apiKeyHash}`;
+}
+
+function readModelsCacheEntry(cacheKey) {
+    if (!cacheKey) return null;
+    const entry = g_modelsCache.get(cacheKey);
+    if (!entry) return null;
+    if (Date.now() >= entry.expiresAt) {
+        g_modelsCache.delete(cacheKey);
+        return null;
+    }
+    g_modelsCache.delete(cacheKey);
+    g_modelsCache.set(cacheKey, entry);
+    return entry.result || null;
+}
+
+function writeModelsCacheEntry(cacheKey, result) {
+    if (!cacheKey) return;
+    const isNegative = !!(result && (result.error || result.unlimited));
+    const ttl = isNegative ? MODELS_NEGATIVE_CACHE_TTL_MS : MODELS_CACHE_TTL_MS;
+    const entry = {
+        result,
+        expiresAt: Date.now() + ttl
+    };
+    if (g_modelsCache.has(cacheKey)) {
+        g_modelsCache.delete(cacheKey);
+    }
+    g_modelsCache.set(cacheKey, entry);
+    while (g_modelsCache.size > MODELS_CACHE_MAX_ENTRIES) {
+        const oldestKey = g_modelsCache.keys().next().value;
+        g_modelsCache.delete(oldestKey);
+    }
+}
+
 async function fetchModelsFromBaseUrl(baseUrl, apiKey) {
+    const cacheKey = buildModelsCacheKey(baseUrl, apiKey);
+    const cached = readModelsCacheEntry(cacheKey);
+    if (cached) return cached;
+
+    const inFlight = g_modelsInFlight.get(cacheKey);
+    if (inFlight) return inFlight;
+
+    const promise = (async () => {
+        const result = await fetchModelsFromBaseUrlCore(baseUrl, apiKey);
+        writeModelsCacheEntry(cacheKey, result);
+        return result;
+    })();
+
+    g_modelsInFlight.set(cacheKey, promise);
+    promise.finally(() => {
+        g_modelsInFlight.delete(cacheKey);
+    });
+    return promise;
+}
+
+async function fetchModelsFromBaseUrlCore(baseUrl, apiKey) {
     const candidates = buildModelsCandidates(baseUrl);
     if (candidates.length === 0) return { error: 'Provider missing URL' };
 
@@ -320,6 +399,7 @@ async function fetchModelsFromBaseUrl(baseUrl, apiKey) {
         }
 
         const transport = parsed.protocol === 'https:' ? https : http;
+        const agent = parsed.protocol === 'https:' ? HTTPS_KEEP_ALIVE_AGENT : HTTP_KEEP_ALIVE_AGENT;
         const headers = {
             'User-Agent': 'codexmate-models',
             'Accept': 'application/json'
@@ -329,31 +409,46 @@ async function fetchModelsFromBaseUrl(baseUrl, apiKey) {
         }
 
         const result = await new Promise((innerResolve) => {
-            const req = transport.request(parsed, { method: 'GET', headers }, (res) => {
+            let settled = false;
+            const finish = (payload) => {
+                if (settled) return;
+                settled = true;
+                innerResolve(payload);
+            };
+            const req = transport.request(parsed, { method: 'GET', headers, agent }, (res) => {
                 const status = res.statusCode || 0;
                 const contentType = String(res.headers['content-type'] || '').toLowerCase();
                 if (status === 404 || status === 405 || status === 501) {
                     res.resume();
-                    return innerResolve({ unavailable: true });
+                    return finish({ unavailable: true });
                 }
                 let body = '';
-                res.on('data', chunk => body += chunk);
+                let receivedBytes = 0;
+                res.on('data', chunk => {
+                    receivedBytes += chunk.length || 0;
+                    if (receivedBytes > MODELS_RESPONSE_MAX_BYTES) {
+                        res.destroy();
+                        return finish({ unavailable: true });
+                    }
+                    body += chunk;
+                });
                 res.on('end', () => {
+                    if (settled) return;
                     if (status >= 400) {
-                        return innerResolve({ error: `Request failed: ${status}` });
+                        return finish({ error: `Request failed: ${status}` });
                     }
                     if (contentType && !contentType.includes('application/json')) {
-                        return innerResolve({ unavailable: true });
+                        return finish({ unavailable: true });
                     }
                     try {
                         const payload = JSON.parse(body || '{}');
                         if (!hasModelsListPayload(payload)) {
-                            return innerResolve({ unavailable: true });
+                            return finish({ unavailable: true });
                         }
                         const models = extractModelNames(payload);
-                        return innerResolve({ models });
+                        return finish({ models });
                     } catch (e) {
-                        return innerResolve({ unavailable: true });
+                        return finish({ unavailable: true });
                     }
                 });
             });
@@ -362,7 +457,7 @@ async function fetchModelsFromBaseUrl(baseUrl, apiKey) {
                 req.destroy(new Error('timeout'));
             });
             req.on('error', (err) => {
-                innerResolve({ error: err.message || 'Request failed' });
+                finish({ error: err.message || 'Request failed' });
             });
             req.end();
         });
