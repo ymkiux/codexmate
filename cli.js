@@ -3509,6 +3509,20 @@ function cmdStart() {
                                 }
                             }
                             break;
+                        case 'models-by-url':
+                            {
+                                const baseUrl = params && typeof params.baseUrl === 'string' ? params.baseUrl : '';
+                                const apiKey = params && typeof params.apiKey === 'string' ? params.apiKey : '';
+                                const res = await fetchModelsFromBaseUrl(baseUrl, apiKey);
+                                if (res.error) {
+                                    result = { error: res.error, models: [], source: 'remote' };
+                                } else if (res.unlimited) {
+                                    result = { models: [], source: 'remote', unlimited: true };
+                                } else {
+                                    result = { models: res.models || [], source: 'remote' };
+                                }
+                            }
+                            break;
                         case 'get-config-template':
                             result = getConfigTemplate(params || {});
                             break;
