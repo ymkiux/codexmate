@@ -255,11 +255,17 @@ function isValidProviderName(name) {
     return typeof name === 'string' && /^[a-zA-Z0-9._-]+$/.test(name.trim());
 }
 
-function buildModelsUrl(baseUrl) {
+function buildModelsCandidates(baseUrl) {
     const trimmed = typeof baseUrl === 'string' ? baseUrl.trim() : '';
-    if (!trimmed) return '';
-    if (/\/models\/?$/.test(trimmed)) return trimmed;
-    return trimmed.replace(/\/+$/, '') + '/models';
+    if (!trimmed) return [];
+    if (/\/models\/?$/.test(trimmed)) {
+        return [trimmed];
+    }
+    const normalized = trimmed.replace(/\/+$/, '');
+    if (normalized !== trimmed) {
+        return [trimmed, normalized + '/models'];
+    }
+    return [trimmed, trimmed + '/models'];
 }
 
 function extractModelNames(payload) {
@@ -282,16 +288,23 @@ function extractModelNames(payload) {
     return Array.from(new Set(names));
 }
 
-function fetchModelsFromBaseUrl(baseUrl, apiKey) {
-    return new Promise((resolve) => {
-        const modelsUrl = buildModelsUrl(baseUrl);
-        if (!modelsUrl) return resolve({ error: 'Provider missing URL' });
+function hasModelsListPayload(payload) {
+    if (!payload || typeof payload !== 'object') return false;
+    return Array.isArray(payload.data) || Array.isArray(payload.models);
+}
 
+async function fetchModelsFromBaseUrl(baseUrl, apiKey) {
+    const candidates = buildModelsCandidates(baseUrl);
+    if (candidates.length === 0) return { error: 'Provider missing URL' };
+
+    let lastError = '';
+    for (const modelsUrl of candidates) {
         let parsed;
         try {
             parsed = new URL(modelsUrl);
         } catch (e) {
-            return resolve({ error: 'Invalid URL' });
+            lastError = 'Invalid URL';
+            continue;
         }
 
         const transport = parsed.protocol === 'https:' ? https : http;
@@ -303,40 +316,58 @@ function fetchModelsFromBaseUrl(baseUrl, apiKey) {
             headers['Authorization'] = `Bearer ${apiKey}`;
         }
 
-        const req = transport.request(parsed, { method: 'GET', headers }, (res) => {
-            const status = res.statusCode || 0;
-            const contentType = String(res.headers['content-type'] || '').toLowerCase();
-            if (status === 404 || status === 405 || status === 501) {
-                res.resume();
-                return resolve({ unlimited: true });
-            }
-            let body = '';
-            res.on('data', chunk => body += chunk);
-            res.on('end', () => {
-                if (status >= 400) {
-                    return resolve({ error: `Request failed: ${status}` });
+        const result = await new Promise((innerResolve) => {
+            const req = transport.request(parsed, { method: 'GET', headers }, (res) => {
+                const status = res.statusCode || 0;
+                const contentType = String(res.headers['content-type'] || '').toLowerCase();
+                if (status === 404 || status === 405 || status === 501) {
+                    res.resume();
+                    return innerResolve({ unavailable: true });
                 }
-                if (contentType && !contentType.includes('application/json')) {
-                    return resolve({ unlimited: true });
-                }
-                try {
-                    const payload = JSON.parse(body || '{}');
-                    const models = extractModelNames(payload);
-                    return resolve({ models });
-                } catch (e) {
-                    return resolve({ unlimited: true });
-                }
+                let body = '';
+                res.on('data', chunk => body += chunk);
+                res.on('end', () => {
+                    if (status >= 400) {
+                        return innerResolve({ error: `Request failed: ${status}` });
+                    }
+                    if (contentType && !contentType.includes('application/json')) {
+                        return innerResolve({ unavailable: true });
+                    }
+                    try {
+                        const payload = JSON.parse(body || '{}');
+                        if (!hasModelsListPayload(payload)) {
+                            return innerResolve({ unavailable: true });
+                        }
+                        const models = extractModelNames(payload);
+                        return innerResolve({ models });
+                    } catch (e) {
+                        return innerResolve({ unavailable: true });
+                    }
+                });
             });
+
+            req.setTimeout(SPEED_TEST_TIMEOUT_MS, () => {
+                req.destroy(new Error('timeout'));
+            });
+            req.on('error', (err) => {
+                innerResolve({ error: err.message || 'Request failed' });
+            });
+            req.end();
         });
 
-        req.setTimeout(SPEED_TEST_TIMEOUT_MS, () => {
-            req.destroy(new Error('timeout'));
-        });
-        req.on('error', (err) => {
-            resolve({ error: err.message || 'Request failed' });
-        });
-        req.end();
-    });
+        if (result && Array.isArray(result.models)) {
+            return { models: result.models };
+        }
+        if (result && result.error) {
+            lastError = result.error;
+            continue;
+        }
+    }
+
+    if (lastError) {
+        return { error: lastError };
+    }
+    return { unlimited: true };
 }
 
 async function fetchProviderModels(providerName, overrides = {}) {
