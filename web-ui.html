@@ -1839,7 +1839,7 @@
             <!-- Claude Code 配置模式 -->
             <div v-show="configMode === 'claude'" class="mode-content">
                 <!-- 添加提供商按钮 -->
-                <button class="btn-add" @click="showClaudeConfigModal = true" v-if="!loading && !initError">
+                <button class="btn-add" @click="openClaudeConfigModal" v-if="!loading && !initError">
                     <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M10 4v12M4 10h12"/>
                     </svg>
@@ -2240,7 +2240,23 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">模型</label>
-                    <input v-model="newClaudeConfig.model" class="form-input" placeholder="例如: claude-sonnet-4-20250514">
+                    <div class="form-hint" v-if="claudeModelsLoading">模型列表加载中...</div>
+                    <select v-if="claudeModelsSource === 'remote'" class="form-input" v-model="newClaudeConfig.model" @change="updateClaudeModelsCurrent('new')">
+                        <option v-for="model in claudeModels" :key="model" :value="model">{{ model }}</option>
+                    </select>
+                    <input v-if="claudeModelsSource !== 'remote' || !claudeModelsHasCurrent" v-model="newClaudeConfig.model" class="form-input" @blur="updateClaudeModelsCurrent('new')" placeholder="例如: claude-sonnet-4-20250514">
+                    <div class="config-template-hint" v-if="claudeModelsSource === 'unlimited'">
+                        接口未提供模型列表，视为不限；可手动输入。
+                    </div>
+                    <div class="config-template-hint" v-if="claudeModelsSource === 'error'">
+                        模型列表获取失败，可手动输入。
+                    </div>
+                    <div class="config-template-hint" v-if="claudeModelsSource === 'remote' && !claudeModelsHasCurrent">
+                        当前模型不在列表，可手动输入。
+                    </div>
+                    <button class="btn btn-confirm secondary" @click="loadClaudeModels('new')" :disabled="claudeModelsLoading">
+                        {{ claudeModelsLoading ? '获取中...' : '刷新模型列表' }}
+                    </button>
                 </div>
 
                 <div class="btn-group">
@@ -2269,7 +2285,23 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">模型</label>
-                    <input v-model="editingConfig.model" class="form-input" placeholder="例如: claude-sonnet-4-20250514">
+                    <div class="form-hint" v-if="claudeModelsLoading">模型列表加载中...</div>
+                    <select v-if="claudeModelsSource === 'remote'" class="form-input" v-model="editingConfig.model" @change="updateClaudeModelsCurrent('edit')">
+                        <option v-for="model in claudeModels" :key="model" :value="model">{{ model }}</option>
+                    </select>
+                    <input v-if="claudeModelsSource !== 'remote' || !claudeModelsHasCurrent" v-model="editingConfig.model" class="form-input" @blur="updateClaudeModelsCurrent('edit')" placeholder="例如: claude-sonnet-4-20250514">
+                    <div class="config-template-hint" v-if="claudeModelsSource === 'unlimited'">
+                        接口未提供模型列表，视为不限；可手动输入。
+                    </div>
+                    <div class="config-template-hint" v-if="claudeModelsSource === 'error'">
+                        模型列表获取失败，可手动输入。
+                    </div>
+                    <div class="config-template-hint" v-if="claudeModelsSource === 'remote' && !claudeModelsHasCurrent">
+                        当前模型不在列表，可手动输入。
+                    </div>
+                    <button class="btn btn-confirm secondary" @click="loadClaudeModels('edit')" :disabled="claudeModelsLoading">
+                        {{ claudeModelsLoading ? '获取中...' : '刷新模型列表' }}
+                    </button>
                 </div>
 
                 <div class="btn-group">
@@ -2430,6 +2462,10 @@
                     models: [],
                     modelsSource: 'remote',
                     modelsHasCurrent: true,
+                    claudeModels: [],
+                    claudeModelsSource: 'unlimited',
+                    claudeModelsHasCurrent: true,
+                    claudeModelsLoading: false,
                     loading: true,
                     initError: '',
                     message: '',
@@ -2620,6 +2656,63 @@
                         this.modelsSource = 'error';
                         this.modelsHasCurrent = true;
                     }
+                },
+
+                resetClaudeModelsState() {
+                    this.claudeModels = [];
+                    this.claudeModelsSource = 'unlimited';
+                    this.claudeModelsHasCurrent = true;
+                    this.claudeModelsLoading = false;
+                },
+
+                updateClaudeModelsCurrent(mode) {
+                    const currentModel = mode === 'edit' ? this.editingConfig.model : this.newClaudeConfig.model;
+                    this.claudeModelsHasCurrent = !!currentModel && this.claudeModels.includes(currentModel);
+                },
+
+                async loadClaudeModels(mode) {
+                    const config = mode === 'edit' ? this.editingConfig : this.newClaudeConfig;
+                    const baseUrl = (config.baseUrl || '').trim();
+                    const apiKey = (config.apiKey || '').trim();
+
+                    if (!baseUrl) {
+                        this.resetClaudeModelsState();
+                        return;
+                    }
+
+                    this.claudeModelsLoading = true;
+                    try {
+                        const res = await api('models-by-url', { baseUrl, apiKey });
+                        if (res.unlimited) {
+                            this.claudeModels = [];
+                            this.claudeModelsSource = 'unlimited';
+                            this.claudeModelsHasCurrent = true;
+                            return;
+                        }
+                        if (res.error) {
+                            this.showMessage('模型列表获取失败: ' + res.error, 'error');
+                            this.claudeModels = [];
+                            this.claudeModelsSource = 'error';
+                            this.claudeModelsHasCurrent = true;
+                            return;
+                        }
+                        const list = Array.isArray(res.models) ? res.models : [];
+                        this.claudeModels = list;
+                        this.claudeModelsSource = res.source || 'remote';
+                        this.updateClaudeModelsCurrent(mode);
+                    } catch (e) {
+                        this.showMessage('模型列表获取失败: ' + e.message, 'error');
+                        this.claudeModels = [];
+                        this.claudeModelsSource = 'error';
+                        this.claudeModelsHasCurrent = true;
+                    } finally {
+                        this.claudeModelsLoading = false;
+                    }
+                },
+
+                openClaudeConfigModal() {
+                    this.showClaudeConfigModal = true;
+                    this.loadClaudeModels('new');
                 },
 
                 maybeShowStarPrompt() {
@@ -3311,6 +3404,7 @@
                         model: config.model || ''
                     };
                     this.showEditConfigModal = true;
+                    this.loadClaudeModels('edit');
                 },
 
                 updateConfig() {
@@ -3329,6 +3423,7 @@
                 closeEditConfigModal() {
                     this.showEditConfigModal = false;
                     this.editingConfig = { name: '', apiKey: '', baseUrl: '', model: '' };
+                    this.resetClaudeModelsState();
                 },
 
                 async saveAndApplyConfig() {
@@ -3442,6 +3537,7 @@
                         baseUrl: 'https://open.bigmodel.cn/api/anthropic',
                         model: 'glm-4.7'
                     };
+                    this.resetClaudeModelsState();
                 },
 
                 openclawHasContent(config) {
