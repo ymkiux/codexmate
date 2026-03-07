@@ -304,11 +304,16 @@ function fetchModelsFromBaseUrl(baseUrl, apiKey) {
         }
 
         const req = transport.request(parsed, { method: 'GET', headers }, (res) => {
+            const status = res.statusCode || 0;
+            if (status === 404 || status === 405 || status === 501) {
+                res.resume();
+                return resolve({ unlimited: true });
+            }
             let body = '';
             res.on('data', chunk => body += chunk);
             res.on('end', () => {
-                if ((res.statusCode || 0) >= 400) {
-                    return resolve({ error: `Request failed: ${res.statusCode || 0}` });
+                if (status >= 400) {
+                    return resolve({ error: `Request failed: ${status}` });
                 }
                 try {
                     const payload = JSON.parse(body || '{}');
@@ -342,8 +347,9 @@ async function fetchProviderModels(providerName, overrides = {}) {
     const baseUrl = overrides.baseUrl || provider.base_url || '';
     const apiKey = overrides.apiKey ?? provider.preferred_auth_method ?? '';
     const res = await fetchModelsFromBaseUrl(baseUrl, apiKey);
+    if (res.unlimited) return { models: [], provider: targetProvider, unlimited: true };
     if (res.error) return { error: res.error };
-    return { models: res.models || [], provider: targetProvider };
+    return { models: res.models || [], provider: targetProvider, unlimited: false };
 }
 
 function resolveAgentsFilePath(params = {}) {
@@ -2558,6 +2564,7 @@ async function cmdSetup() {
         const defaultProvider = config.model_provider || providerNames[0] || '';
         let availableModels = [];
         let defaultModel = config.model || '';
+        let modelFetchUnlimited = false;
 
         while (true) {
             console.log('\n选择提供商:');
@@ -2646,21 +2653,27 @@ async function cmdSetup() {
         if (providerName) {
             if (isCustomProvider) {
                 const res = await fetchModelsFromBaseUrl(baseUrl, apiKey);
-                if (res.error) {
+                if (res.unlimited) {
+                    modelFetchUnlimited = true;
+                } else if (res.error) {
                     modelFetchError = res.error;
                 } else {
                     availableModels = res.models || [];
                 }
             } else {
                 const res = await fetchProviderModels(providerName);
-                if (res.error) {
+                if (res.unlimited) {
+                    modelFetchUnlimited = true;
+                } else if (res.error) {
                     modelFetchError = res.error;
                 } else {
                     availableModels = res.models || [];
                 }
             }
         }
-        if (modelFetchError) {
+        if (modelFetchUnlimited) {
+            console.log('提示: 提供商未提供模型列表，视为不限，请手动输入。');
+        } else if (modelFetchError) {
             console.log(`提示: 获取模型列表失败: ${modelFetchError}，请手动输入。`);
         }
         if (availableModels.length > 0) {
@@ -2751,13 +2764,11 @@ function cmdStatus() {
     const { config, isVirtual } = readConfigOrVirtualDefault();
     const current = config.model_provider || '未设置';
     const currentModel = config.model || '未设置';
-    const models = readModels();
-    const currentModels = readCurrentModels();
 
     console.log('\n当前状态:');
     console.log('  提供商:', current);
     console.log('  模型:', currentModel);
-    console.log('  模型列表:', models.length, '个');
+    console.log('  模型列表: 接口提供');
     if (isVirtual) {
         console.log('  说明: 当前为虚拟默认配置（config.toml 尚未创建）');
     }
@@ -2802,6 +2813,13 @@ async function cmdModels() {
     if (res.error) {
         console.error('错误: 获取模型列表失败:', res.error);
         process.exitCode = 1;
+        return;
+    }
+    if (res.unlimited) {
+        const label = res.provider ? ` (${res.provider})` : '';
+        console.log(`\n可用模型${label}:`);
+        console.log('  (接口未提供，视为不限)');
+        console.log();
         return;
     }
     const models = Array.isArray(res.models) ? res.models : [];
@@ -3437,6 +3455,8 @@ function cmdStart() {
                                 const res = await fetchProviderModels(providerName);
                                 if (res.error) {
                                     result = { error: res.error, models: [], source: 'remote' };
+                                } else if (res.unlimited) {
+                                    result = { models: [], source: 'remote', provider: res.provider || '', unlimited: true };
                                 } else {
                                     result = { models: res.models || [], source: 'remote', provider: res.provider || '' };
                                 }

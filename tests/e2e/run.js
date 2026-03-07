@@ -80,10 +80,16 @@ async function waitForServer(port, retries = 20, delayMs = 200) {
     throw lastError || new Error('Server not ready');
 }
 
-function startLocalServer() {
+function startLocalServer(options = {}) {
+    const mode = options.mode || 'list';
     return new Promise((resolve, reject) => {
         const server = http.createServer((req, res) => {
             if (req.url && req.url.startsWith('/models')) {
+                if (mode === 'none') {
+                    res.writeHead(404, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'not found' }));
+                    return;
+                }
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({
                     data: [
@@ -127,9 +133,12 @@ async function main() {
     const node = process.execPath;
 
     let mockProvider;
+    let noModelsProvider;
     try {
-        mockProvider = await startLocalServer();
+        mockProvider = await startLocalServer({ mode: 'list' });
+        noModelsProvider = await startLocalServer({ mode: 'none' });
         const mockProviderUrl = `http://127.0.0.1:${mockProvider.port}`;
+        const noModelsUrl = `http://127.0.0.1:${noModelsProvider.port}`;
 
         const setupInput = [
             '2',
@@ -194,7 +203,8 @@ async function main() {
             const importPayload = JSON.parse(JSON.stringify(exportResult.data));
             importPayload.providers = {
                 ...importPayload.providers,
-                e2e2: { baseUrl: mockProviderUrl, apiKey: 'sk-e2e2' }
+                e2e2: { baseUrl: mockProviderUrl, apiKey: 'sk-e2e2' },
+                e2e3: { baseUrl: noModelsUrl, apiKey: 'sk-e2e3' }
             };
             importPayload.models = Array.from(new Set([...(importPayload.models || []), 'e2e2-model']));
             importPayload.currentProvider = 'e2e2';
@@ -217,12 +227,18 @@ async function main() {
             const apiModels = await postJson(port, { action: 'models', params: { provider: 'e2e2' } });
             assert(Array.isArray(apiModels.models) && apiModels.models.includes('e2e2-model-2'), 'api models missing remote entry');
 
+            const apiModelsUnlimited = await postJson(port, { action: 'models', params: { provider: 'e2e3' } });
+            assert(apiModelsUnlimited.unlimited === true, 'api models unlimited missing');
+
             const speedResult = await postJson(port, { action: 'speed-test', params: { name: 'e2e2' } }, 4000);
             assert(speedResult.ok === true, 'speed-test failed');
 
+            const switchResult = runSync(node, [cliPath, 'switch', 'e2e3'], { env });
+            assert(switchResult.status === 0, 'cli switch failed');
+
             const cliModels = await runWithInput(node, [cliPath, 'models'], '', { env });
             assert(cliModels.status === 0, 'cli models failed');
-            assert(cliModels.stdout.includes('e2e2-model-2'), 'cli models missing remote entry');
+            assert(cliModels.stdout.includes('视为不限'), 'cli models missing unlimited hint');
         } finally {
             webServer.kill('SIGINT');
             await new Promise(resolve => webServer.on('exit', resolve));
@@ -230,6 +246,9 @@ async function main() {
     } finally {
         if (mockProvider) {
             await closeServer(mockProvider.server);
+        }
+        if (noModelsProvider) {
+            await closeServer(noModelsProvider.server);
         }
         try {
             if (fs.rmSync) {

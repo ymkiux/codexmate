@@ -580,6 +580,31 @@
             box-shadow: var(--shadow-input-focus);
         }
 
+        .model-input {
+            width: 100%;
+            padding: 12px var(--spacing-sm);
+            border: 1px solid var(--color-border-soft);
+            border-radius: var(--radius-sm);
+            font-size: var(--font-size-body);
+            font-weight: var(--font-weight-body);
+            background-color: var(--color-surface-alt);
+            color: var(--color-text-primary);
+            outline: none;
+            transition: all var(--transition-fast) var(--ease-smooth);
+            box-shadow: inset 0 1px 2px rgba(31, 26, 23, 0.04);
+        }
+
+        .model-input:hover {
+            border-color: var(--color-border-strong);
+            background-color: var(--color-surface);
+        }
+
+        .model-input:focus {
+            background-color: var(--color-surface);
+            border-color: var(--color-brand);
+            box-shadow: var(--shadow-input-focus);
+        }
+
         .config-template-hint {
             margin-top: 8px;
             margin-bottom: 10px;
@@ -1732,15 +1757,22 @@
                     <div class="selector-header">
                         <span class="selector-title">模型</span>
                         <div class="selector-actions">
-                            <button class="btn-icon" @click="showModelModal = true" title="添加模型" v-if="modelsSource !== 'remote'">+</button>
-                            <button class="btn-icon" @click="showModelListModal = true" title="管理模型" v-if="modelsSource !== 'remote'">≡</button>
+                            <button class="btn-icon" @click="showModelModal = true" title="添加模型" v-if="modelsSource === 'legacy'">+</button>
+                            <button class="btn-icon" @click="showModelListModal = true" title="管理模型" v-if="modelsSource === 'legacy'">≡</button>
                         </div>
                     </div>
-                    <select class="model-select" v-model="currentModel" @change="onModelChange">
+                    <select v-if="modelsSource === 'remote'" class="model-select" v-model="currentModel" @change="onModelChange">
                         <option v-for="model in models" :key="model" :value="model">{{ model }}</option>
                     </select>
-                    <div class="config-template-hint" v-if="modelsSource === 'remote'">
-                        模型列表来自提供商接口，如需使用未显示模型，请在模板中手动填写。
+                    <input v-if="modelsSource !== 'remote' || !modelsHasCurrent" class="model-input" v-model="currentModel" @blur="onModelChange" placeholder="例如: gpt-5.3-codex">
+                    <div class="config-template-hint" v-if="modelsSource === 'unlimited'">
+                        当前提供商未提供模型列表，视为不限；模型可手动输入。
+                    </div>
+                    <div class="config-template-hint" v-if="modelsSource === 'error'">
+                        模型列表获取失败，请检查接口或手动输入。
+                    </div>
+                    <div class="config-template-hint" v-if="modelsSource === 'remote' && !modelsHasCurrent">
+                        当前模型不在接口列表中，请手动输入或在模板中调整。
                     </div>
                     <div class="config-template-hint">
                         Codex 配置改动采用模板确认模式：请先编辑模板，再手动确认应用。
@@ -2397,6 +2429,7 @@
                     providersList: [],
                     models: [],
                     modelsSource: 'remote',
+                    modelsHasCurrent: true,
                     loading: true,
                     initError: '',
                     message: '',
@@ -2557,28 +2590,35 @@
 
                 async loadModelsForProvider(providerName) {
                     if (!providerName) {
-                        this.models = this.currentModel ? [this.currentModel] : [];
-                        this.modelsSource = 'remote';
+                        this.models = [];
+                        this.modelsSource = 'unlimited';
+                        this.modelsHasCurrent = true;
                         return;
                     }
                     try {
                         const res = await api('models', { provider: providerName });
+                        if (res.unlimited) {
+                            this.models = [];
+                            this.modelsSource = 'unlimited';
+                            this.modelsHasCurrent = true;
+                            return;
+                        }
                         if (res.error) {
                             this.showMessage('模型列表获取失败: ' + res.error, 'error');
-                            this.models = this.currentModel ? [this.currentModel] : [];
-                            this.modelsSource = res.source || 'remote';
+                            this.models = [];
+                            this.modelsSource = 'error';
+                            this.modelsHasCurrent = true;
                             return;
                         }
                         const list = Array.isArray(res.models) ? res.models : [];
-                        if (this.currentModel && !list.includes(this.currentModel)) {
-                            list.unshift(this.currentModel);
-                        }
                         this.models = list;
                         this.modelsSource = res.source || 'remote';
+                        this.modelsHasCurrent = !!this.currentModel && list.includes(this.currentModel);
                     } catch (e) {
                         this.showMessage('模型列表获取失败: ' + e.message, 'error');
-                        this.models = this.currentModel ? [this.currentModel] : [];
-                        this.modelsSource = 'remote';
+                        this.models = [];
+                        this.modelsSource = 'error';
+                        this.modelsHasCurrent = true;
                     }
                 },
 
@@ -3607,6 +3647,3 @@
     </script>
 </body>
 </html>
-
-
-
