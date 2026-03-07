@@ -262,10 +262,21 @@ function buildModelsCandidates(baseUrl) {
         return [trimmed];
     }
     const normalized = trimmed.replace(/\/+$/, '');
-    if (normalized !== trimmed) {
-        return [trimmed, normalized + '/models'];
+    const candidates = [];
+    const pushUnique = (url) => {
+        if (url && !candidates.includes(url)) {
+            candidates.push(url);
+        }
+    };
+
+    if (/\/v1$/i.test(normalized)) {
+        pushUnique(normalized + '/models');
+    } else {
+        pushUnique(normalized + '/v1/models');
+        pushUnique(normalized + '/models');
     }
-    return [trimmed, trimmed + '/models'];
+
+    return candidates;
 }
 
 function extractModelNames(payload) {

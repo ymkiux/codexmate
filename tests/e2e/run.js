@@ -82,9 +82,10 @@ async function waitForServer(port, retries = 20, delayMs = 200) {
 
 function startLocalServer(options = {}) {
     const mode = options.mode || 'list';
+    const modelsPath = options.modelsPath || '/models';
     return new Promise((resolve, reject) => {
         const server = http.createServer((req, res) => {
-            if (req.url && req.url.startsWith('/models')) {
+            if (req.url && req.url.startsWith(modelsPath)) {
                 if (mode === 'none') {
                     res.writeHead(404, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: 'not found' }));
@@ -141,9 +142,9 @@ async function main() {
     let noModelsProvider;
     let htmlModelsProvider;
     try {
-        mockProvider = await startLocalServer({ mode: 'list' });
-        noModelsProvider = await startLocalServer({ mode: 'none' });
-        htmlModelsProvider = await startLocalServer({ mode: 'html' });
+        mockProvider = await startLocalServer({ mode: 'list', modelsPath: '/v1/models' });
+        noModelsProvider = await startLocalServer({ mode: 'none', modelsPath: '/v1/models' });
+        htmlModelsProvider = await startLocalServer({ mode: 'html', modelsPath: '/v1/models' });
         const mockProviderUrl = `http://127.0.0.1:${mockProvider.port}`;
         const noModelsUrl = `http://127.0.0.1:${noModelsProvider.port}`;
         const htmlModelsUrl = `http://127.0.0.1:${htmlModelsProvider.port}`;
