@@ -243,6 +243,18 @@ async function main() {
             const apiModelsHtml = await postJson(port, { action: 'models', params: { provider: 'e2e4' } });
             assert(apiModelsHtml.unlimited === true, 'api models html unlimited missing');
 
+            const apiModelsByUrl = await postJson(port, {
+                action: 'models-by-url',
+                params: { baseUrl: mockProviderUrl, apiKey: 'sk-e2e2' }
+            });
+            assert(Array.isArray(apiModelsByUrl.models) && apiModelsByUrl.models.includes('e2e2-model'), 'api models-by-url missing remote entry');
+
+            const apiModelsByUrlUnlimited = await postJson(port, {
+                action: 'models-by-url',
+                params: { baseUrl: noModelsUrl }
+            });
+            assert(apiModelsByUrlUnlimited.unlimited === true, 'api models-by-url unlimited missing');
+
             const speedResult = await postJson(port, { action: 'speed-test', params: { name: 'e2e2' } }, 4000);
             assert(speedResult.ok === true, 'speed-test failed');
 
