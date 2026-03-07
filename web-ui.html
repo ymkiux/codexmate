@@ -1761,10 +1761,23 @@
                             <button class="btn-icon" @click="showModelListModal = true" title="管理模型" v-if="modelsSource === 'legacy'">≡</button>
                         </div>
                     </div>
-                    <select v-if="modelsSource === 'remote'" class="model-select" v-model="currentModel" @change="onModelChange">
-                        <option v-for="model in models" :key="model" :value="model">{{ model }}</option>
+                    <select
+                        v-if="codexModelsLoading || modelsSource === 'remote'"
+                        class="model-select"
+                        v-model="currentModel"
+                        @change="onModelChange"
+                        :disabled="codexModelsLoading"
+                    >
+                        <option v-if="codexModelsLoading" value="">加载中...</option>
+                        <option v-else v-for="model in models" :key="model" :value="model">{{ model }}</option>
                     </select>
-                    <input v-if="modelsSource !== 'remote' || !modelsHasCurrent" class="model-input" v-model="currentModel" @blur="onModelChange" placeholder="例如: gpt-5.3-codex">
+                    <input
+                        v-if="!codexModelsLoading && (modelsSource !== 'remote' || !modelsHasCurrent)"
+                        class="model-input"
+                        v-model="currentModel"
+                        @blur="onModelChange"
+                        placeholder="例如: gpt-5.3-codex"
+                    >
                     <div class="config-template-hint" v-if="modelsSource === 'unlimited'">
                         当前提供商未提供模型列表，视为不限；模型可手动输入。
                     </div>
@@ -2447,6 +2460,7 @@
                     currentModel: '',
                     providersList: [],
                     models: [],
+                    codexModelsLoading: false,
                     modelsSource: 'remote',
                     modelsHasCurrent: true,
                     claudeModels: [],
@@ -2613,10 +2627,12 @@
                 },
 
                 async loadModelsForProvider(providerName) {
+                    this.codexModelsLoading = true;
                     if (!providerName) {
                         this.models = [];
                         this.modelsSource = 'unlimited';
                         this.modelsHasCurrent = true;
+                        this.codexModelsLoading = false;
                         return;
                     }
                     try {
@@ -2643,6 +2659,8 @@
                         this.models = [];
                         this.modelsSource = 'error';
                         this.modelsHasCurrent = true;
+                    } finally {
+                        this.codexModelsLoading = false;
                     }
                 },
 
