@@ -1,11 +1,15 @@
 ﻿# Codex Mate
 
-> 轻量级 AI 工具配置助手：CLI + Web，一站式管理 Codex 提供商与 Claude Code 配置
+> 轻量级 AI 工具配置助手：快速切换 Codex 提供商/模型与 Claude Code 配置，并统一管理两者会话
 
 [![Build](https://img.shields.io/github/actions/workflow/status/ymkiux/codexmate/release.yml?label=build)](https://github.com/ymkiux/codexmate/actions/workflows/release.yml) [![Version](https://img.shields.io/npm/v/codexmate?label=version&registry_uri=https%3A%2F%2Fregistry.npmjs.org)](https://www.npmjs.com/package/codexmate) [![Status](https://img.shields.io/badge/status-alpha-orange)](https://github.com/ymkiux/codexmate)
 [![Maintain](https://img.shields.io/github/commit-activity/m/ymkiux/codexmate?label=maintain%2Fmonth)](https://github.com/ymkiux/codexmate/commits) [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE) [![Node](https://img.shields.io/badge/node-%3E%3D14.0.0-green.svg)](https://nodejs.org)
 
 [English](README.md) | 中文
+
+## 概览
+
+Codex Mate 让 Codex 与 Claude Code 的提供商/模型切换变成“一条命令或一次点击”，并在同一 Web 页面浏览、导出两者的本地会话记录。
 
 ## 你能获得什么
 
@@ -13,12 +17,15 @@
 - 更可控的本地配置管理
 - 可视化 Web 操作，降低命令行负担
 - 配置变更可回溯、有备份
+- Codex + Claude Code 统一会话浏览（查看/导出/可用时复制恢复命令）
 
 ## 更新说明（0.0.4）
 
 - 新增 OpenClaw 配置模式（JSON5 多配置管理 + 一键应用）
 - 新增 OpenClaw Workspace 的 AGENTS.md 管理
 - 增加 JSON5 解析依赖
+
+完整更新记录见 [CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md) 与 [Releases](https://github.com/ymkiux/codexmate/releases)。
 
 ## 功能总览
 
@@ -27,7 +34,7 @@
 | Codex 配置 | 多提供商/多模型切换麻烦 | 提供商/模型切换、模型管理、CLI + Web 双入口、模板确认写入 |
 | Claude Code 配置 | 多方案共存、写入路径不统一 | 多配置方案管理、默认写入 `~/.claude/settings.json`、兼容模式环境变量 |
 | OpenClaw 配置 | OpenClaw 配置分散 | JSON5 多配置管理、应用到 `~/.openclaw/openclaw.json`、Workspace 指令文件管理 |
-| 会话浏览 | 本地会话难以追踪 | 会话列表/筛选、Markdown 导出、删除与批量清理 |
+| 会话浏览 | 本地会话难以追踪 | 会话列表/筛选、Markdown 导出、可用时复制恢复命令、删除与批量清理 |
 | 附属工具 | 压缩/解压需额外工具 | 基于 7-Zip 的多线程压缩/解压 |
 
 ## 为什么选择 Codex Mate
@@ -41,6 +48,7 @@
 
 - 频繁切换提供商/模型，想要一条命令完成
 - 同时用 Codex 与 Claude Code，需要统一入口
+- 需要浏览/导出本地会话记录，并在可用时复制恢复命令
 - 使用 OpenClaw 多配置，希望快速切换
 - 多项目/多环境切换，希望快速改写配置
 - 想可视化改配置但又不想上大体量客户端
@@ -50,6 +58,18 @@
 - 只做 Codex、Claude Code 与 OpenClaw 的配置管理，不做全量多工具一体化
 - 不内置代理/转发/费用面板/云同步（保持轻量）
 - Web UI 仅在你启动时运行（`codexmate start`）
+
+## 30 秒上手（免安装）
+
+```bash
+npx codexmate@latest status
+```
+
+```bash
+npx codexmate@latest start
+```
+
+然后在浏览器中打开 `http://localhost:3737`。
 
 ## 快速开始
 
@@ -74,6 +94,10 @@ codexmate start
 ```
 
 然后在浏览器中打开 `http://localhost:3737`。
+
+## 竞品/替代
+
+- cc-switch: https://github.com/farion1231/cc-switch
 
 ## 界面预览
 
@@ -171,6 +195,7 @@ codexmate start
 - 支持按来源筛选（Codex / Claude / 全部）
 - 支持按已有会话路径（cwd）筛选，选择后自动刷新
 - 支持一键导出指定会话为 Markdown
+- 支持在可用时复制恢复命令
 - 支持删除指定会话（本地 jsonl 记录）
 - 支持勾选多条会话并批量删除，部分失败会汇总提示
 - 支持在会话详情内单条删除记录或多选批量删除记录（写回原始 jsonl）

@@ -2545,12 +2545,22 @@
                             if (statusRes.initNotice) {
                                 this.showMessage(statusRes.initNotice, 'info');
                             }
+                            this.maybeShowStarPrompt();
                         }
                     } catch (e) {
                         this.initError = '连接失败: ' + e.message;
                     } finally {
                         this.loading = false;
                     }
+                },
+
+                maybeShowStarPrompt() {
+                    const storageKey = 'codexmateStarPrompted';
+                    if (localStorage.getItem(storageKey)) {
+                        return;
+                    }
+                    this.showMessage('如果 Codex Mate 对你有帮助，欢迎到 GitHub 点个 Star。', 'info');
+                    localStorage.setItem(storageKey, '1');
                 },
 
                 switchConfigMode(mode) {
@@ -3568,7 +3578,6 @@
     </script>
 </body>
 </html>
-
 
 
 

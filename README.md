@@ -1,6 +1,6 @@
 ﻿# Codex Mate
 
-> A lightweight AI configuration assistant: CLI + Web to manage Codex providers/models and Claude Code configs
+> A lightweight AI configuration assistant: quickly switch Codex providers/models and Claude Code configs, with a unified session browser
 
 [![Build](https://img.shields.io/github/actions/workflow/status/ymkiux/codexmate/release.yml?label=build)](https://github.com/ymkiux/codexmate/actions/workflows/release.yml) [![Version](https://img.shields.io/npm/v/codexmate?label=version&registry_uri=https%3A%2F%2Fregistry.npmjs.org)](https://www.npmjs.com/package/codexmate) [![Status](https://img.shields.io/badge/status-alpha-orange)](https://github.com/ymkiux/codexmate)
 [![Maintain](https://img.shields.io/github/commit-activity/m/ymkiux/codexmate?label=maintain%2Fmonth)](https://github.com/ymkiux/codexmate/commits) [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE) [![Node](https://img.shields.io/badge/node-%3E%3D14.0.0-green.svg)](https://nodejs.org)
@@ -9,7 +9,7 @@ English | [Chinese](README.zh-CN.md)
 
 ## Overview
 
-If you frequently switch between models, providers, or configuration profiles, Codex Mate turns that into a single command or a single click.
+Codex Mate makes frequent provider/model switching for Codex and Claude Code a single command or click, and gives you a unified session browser to view/export local sessions from both.
 
 ## Release Notes (0.0.4)
 
@@ -17,12 +17,15 @@ If you frequently switch between models, providers, or configuration profiles, C
 - Added OpenClaw workspace AGENTS.md management
 - Added JSON5 parsing dependency
 
+See [CHANGELOG.md](CHANGELOG.md) and [Releases](https://github.com/ymkiux/codexmate/releases) for the full history.
+
 ## What You Get
 
 - Faster provider/model switching
 - More controllable local configuration management
 - A visual Web UI to reduce CLI burden
 - Change tracking with backups
+- A unified session browser for Codex + Claude Code (view/export/copy resume command when available)
 
 ## Feature Overview
 
@@ -31,7 +34,7 @@ If you frequently switch between models, providers, or configuration profiles, C
 | Codex Config | Switching providers/models is painful | Provider/model switching, model management, CLI + Web entry points, template-confirmed writes |
 | Claude Code Config | Multiple profiles and inconsistent write paths | Profile management, default write to `~/.claude/settings.json`, compatibility mode env vars |
 | OpenClaw Config | OpenClaw configs are scattered | JSON5 profiles, apply to `~/.openclaw/openclaw.json`, AGENTS workspace management |
-| Session Browser | Local sessions are hard to track | List/filter sessions, export to Markdown, delete and batch cleanup |
+| Session Browser | Local sessions are hard to track | List/filter sessions, export to Markdown, copy resume command (when available), delete and batch cleanup |
 | Utilities | Compression/extraction requires extra tools | Multithreaded compress/unzip via 7-Zip |
 
 ## Why Codex Mate
@@ -45,6 +48,7 @@ If you frequently switch between models, providers, or configuration profiles, C
 
 - Frequent provider/model switching, want a one-command flow
 - Use both Codex and Claude Code, want a single entry point
+- Need to browse/export local Codex + Claude Code sessions and copy resume commands when available
 - Use OpenClaw with multiple profiles, want quick switching
 - Multi-project or multi-environment setups that need quick config changes
 - Want a visual UI without a heavy client
@@ -54,6 +58,18 @@ If you frequently switch between models, providers, or configuration profiles, C
 - Only configuration management for Codex, Claude Code, and OpenClaw, not a full all-in-one tool suite
 - No built-in proxy/relay/billing dashboard/cloud sync (kept lightweight)
 - Web UI runs only when you start it (`codexmate start`)
+
+## 30-Second Start (No Install)
+
+```bash
+npx codexmate@latest status
+```
+
+```bash
+npx codexmate@latest start
+```
+
+Then open `http://localhost:3737` in your browser.
 
 ## Quick Start
 
@@ -78,6 +94,10 @@ codexmate start
 ```
 
 Then open `http://localhost:3737` in your browser.
+
+## Alternatives
+
+- cc-switch: https://github.com/farion1231/cc-switch
 
 ## UI Preview
 
@@ -175,6 +195,7 @@ codexmate start
 - Filter by source (Codex / Claude / All)
 - Filter by session path (cwd), auto refresh on selection
 - Export selected sessions to Markdown
+- Copy resume command when available
 - Delete single sessions (local jsonl records)
 - Batch delete multiple sessions with partial failure summary
 - Delete individual records or multi-select within session details (writes back to original jsonl)
