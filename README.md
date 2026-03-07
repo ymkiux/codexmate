@@ -83,12 +83,17 @@ Or run once without install:
 npx codexmate@latest status
 ```
 
-2. Check status:
+2. Run the interactive setup:
+```bash
+codexmate setup
+```
+
+3. Check status:
 ```bash
 codexmate status
 ```
 
-3. Start the Web UI:
+4. Start the Web UI:
 ```bash
 codexmate start
 ```
@@ -148,6 +153,7 @@ npm link
 | Command | Description |
 | --- | --- |
 | `codexmate` | Show help and available commands |
+| `codexmate setup` | Interactive configuration wizard |
 | `codexmate status` | Show current status |
 | `codexmate list` | List all providers |
 | `codexmate switch <provider>` | Switch provider |

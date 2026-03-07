@@ -83,12 +83,17 @@ npm install -g codexmate
 npx codexmate@latest status
 ```
 
-2. 查看当前状态：
+2. 运行交互式配置向导：
+```bash
+codexmate setup
+```
+
+3. 查看当前状态：
 ```bash
 codexmate status
 ```
 
-3. 启动 Web 界面：
+4. 启动 Web 界面：
 ```bash
 codexmate start
 ```
@@ -148,6 +153,7 @@ npm link
 | 命令 | 说明 |
 | --- | --- |
 | `codexmate` | 查看帮助与可用命令 |
+| `codexmate setup` | 交互式配置向导 |
 | `codexmate status` | 查看当前状态 |
 | `codexmate list` | 列出所有提供商 |
 | `codexmate switch <提供商名称>` | 切换提供商 |
