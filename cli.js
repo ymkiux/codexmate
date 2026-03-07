@@ -276,6 +276,7 @@ function buildModelsCandidates(baseUrl) {
         pushUnique(normalized + '/models');
     }
 
+    pushUnique(trimmed);
     return candidates;
 }
 
