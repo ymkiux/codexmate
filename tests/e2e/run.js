@@ -90,6 +90,11 @@ function startLocalServer(options = {}) {
                     res.end(JSON.stringify({ error: 'not found' }));
                     return;
                 }
+                if (mode === 'html') {
+                    res.writeHead(200, { 'Content-Type': 'text/html' });
+                    res.end('<!doctype html><html><body>ok</body></html>');
+                    return;
+                }
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({
                     data: [
@@ -134,11 +139,14 @@ async function main() {
 
     let mockProvider;
     let noModelsProvider;
+    let htmlModelsProvider;
     try {
         mockProvider = await startLocalServer({ mode: 'list' });
         noModelsProvider = await startLocalServer({ mode: 'none' });
+        htmlModelsProvider = await startLocalServer({ mode: 'html' });
         const mockProviderUrl = `http://127.0.0.1:${mockProvider.port}`;
         const noModelsUrl = `http://127.0.0.1:${noModelsProvider.port}`;
+        const htmlModelsUrl = `http://127.0.0.1:${htmlModelsProvider.port}`;
 
         const setupInput = [
             '2',
@@ -204,7 +212,8 @@ async function main() {
             importPayload.providers = {
                 ...importPayload.providers,
                 e2e2: { baseUrl: mockProviderUrl, apiKey: 'sk-e2e2' },
-                e2e3: { baseUrl: noModelsUrl, apiKey: 'sk-e2e3' }
+                e2e3: { baseUrl: noModelsUrl, apiKey: 'sk-e2e3' },
+                e2e4: { baseUrl: htmlModelsUrl, apiKey: 'sk-e2e4' }
             };
             importPayload.models = Array.from(new Set([...(importPayload.models || []), 'e2e2-model']));
             importPayload.currentProvider = 'e2e2';
@@ -230,10 +239,13 @@ async function main() {
             const apiModelsUnlimited = await postJson(port, { action: 'models', params: { provider: 'e2e3' } });
             assert(apiModelsUnlimited.unlimited === true, 'api models unlimited missing');
 
+            const apiModelsHtml = await postJson(port, { action: 'models', params: { provider: 'e2e4' } });
+            assert(apiModelsHtml.unlimited === true, 'api models html unlimited missing');
+
             const speedResult = await postJson(port, { action: 'speed-test', params: { name: 'e2e2' } }, 4000);
             assert(speedResult.ok === true, 'speed-test failed');
 
-            const switchResult = runSync(node, [cliPath, 'switch', 'e2e3'], { env });
+            const switchResult = runSync(node, [cliPath, 'switch', 'e2e4'], { env });
             assert(switchResult.status === 0, 'cli switch failed');
 
             const cliModels = await runWithInput(node, [cliPath, 'models'], '', { env });
@@ -249,6 +261,9 @@ async function main() {
         }
         if (noModelsProvider) {
             await closeServer(noModelsProvider.server);
+        }
+        if (htmlModelsProvider) {
+            await closeServer(htmlModelsProvider.server);
         }
         try {
             if (fs.rmSync) {
