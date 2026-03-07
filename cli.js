@@ -9,7 +9,7 @@ const http = require('http');
 const https = require('https');
 const readline = require('readline');
 
-const PORT = 3737;
+const DEFAULT_WEB_PORT = 3737;
 
 // ============================================================================
 // 配置
@@ -52,6 +52,14 @@ const BOOTSTRAP_TEXT_MARKERS = [
     'you are a coding agent',
     'codex cli'
 ];
+
+function resolveWebPort() {
+    const raw = process.env.CODEXMATE_PORT;
+    if (!raw) return DEFAULT_WEB_PORT;
+    const parsed = parseInt(raw, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_WEB_PORT;
+    return parsed;
+}
 
 const EMPTY_CONFIG_FALLBACK_TEMPLATE = `model = "gpt-5.3-codex"
 model_reasoning_effort = "high"
@@ -241,6 +249,10 @@ function detectLineEnding(text) {
 function normalizeLineEnding(text, lineEnding) {
     const normalized = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     return lineEnding === '\r\n' ? normalized.replace(/\n/g, '\r\n') : normalized;
+}
+
+function isValidProviderName(name) {
+    return typeof name === 'string' && /^[a-zA-Z0-9._-]+$/.test(name.trim());
 }
 
 function resolveAgentsFilePath(params = {}) {
@@ -2403,6 +2415,214 @@ function runSpeedTest(targetUrl, apiKey) {
 // 命令
 // ============================================================================
 
+// 交互式配置向导
+async function cmdSetup() {
+    console.log('\n交互式配置向导');
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const lineQueue = [];
+    let lineResolver = null;
+    rl.on('line', (line) => {
+        if (lineResolver) {
+            const resolve = lineResolver;
+            lineResolver = null;
+            resolve(line);
+        } else {
+            lineQueue.push(line);
+        }
+    });
+    rl.on('close', () => {
+        if (lineResolver) {
+            const resolve = lineResolver;
+            lineResolver = null;
+            resolve('');
+        }
+    });
+    const ask = async (question) => {
+        if (question) {
+            process.stdout.write(question);
+        }
+        if (lineQueue.length > 0) {
+            return lineQueue.shift();
+        }
+        return await new Promise(resolve => {
+            lineResolver = resolve;
+        });
+    };
+
+    let providerName = '';
+    let baseUrl = '';
+    let apiKey = '';
+    let modelName = '';
+    let isCustomProvider = false;
+
+    try {
+        const { config } = readConfigOrVirtualDefault();
+        const providers = config.model_providers || {};
+        const providerNames = Object.keys(providers);
+        const defaultProvider = config.model_provider || providerNames[0] || '';
+        const models = readModels();
+        const defaultModel = config.model || models[0] || '';
+
+        while (true) {
+            console.log('\n选择提供商:');
+            if (providerNames.length > 0) {
+                providerNames.forEach((name, index) => {
+                    console.log(`  ${index + 1}. ${name}`);
+                });
+                console.log(`  ${providerNames.length + 1}. 自定义`);
+            } else {
+                console.log('  (暂无提供商，需自定义)');
+            }
+
+            const suffix = defaultProvider ? ` (默认 ${defaultProvider})` : '';
+            const input = (await ask(`请输入序号或名称${suffix}: `)).trim();
+
+            if (!input) {
+                if (defaultProvider) {
+                    providerName = defaultProvider;
+                    isCustomProvider = false;
+                    break;
+                }
+                isCustomProvider = true;
+                break;
+            }
+
+            if (/^\d+$/.test(input)) {
+                const index = parseInt(input, 10);
+                if (index >= 1 && index <= providerNames.length) {
+                    providerName = providerNames[index - 1];
+                    isCustomProvider = false;
+                    break;
+                }
+                if (index === providerNames.length + 1) {
+                    isCustomProvider = true;
+                    break;
+                }
+                console.log('提示: 序号无效，请重试。');
+                continue;
+            }
+
+            if (providers[input]) {
+                providerName = input;
+                isCustomProvider = false;
+                break;
+            }
+
+            if (isValidProviderName(input)) {
+                providerName = input;
+                isCustomProvider = true;
+                break;
+            }
+
+            console.log('提示: 名称仅支持字母/数字/._-');
+        }
+
+        if (isCustomProvider && !providerName) {
+            while (true) {
+                const nameInput = (await ask('请输入自定义提供商名称(字母/数字/._-): ')).trim();
+                if (!nameInput) {
+                    console.log('提示: 名称不能为空。');
+                    continue;
+                }
+                if (!isValidProviderName(nameInput)) {
+                    console.log('提示: 名称仅支持字母/数字/._-');
+                    continue;
+                }
+                providerName = nameInput;
+                break;
+            }
+        }
+
+        if (isCustomProvider) {
+            while (true) {
+                const urlInput = (await ask('Base URL: ')).trim();
+                if (!urlInput) {
+                    console.log('提示: Base URL 不能为空。');
+                    continue;
+                }
+                baseUrl = urlInput;
+                break;
+            }
+            apiKey = (await ask('API Key (可空): ')).trim();
+        }
+
+        while (true) {
+            console.log('\n选择模型:');
+            if (models.length > 0) {
+                models.forEach((name, index) => {
+                    console.log(`  ${index + 1}. ${name}`);
+                });
+            } else {
+                console.log('  (暂无模型，将使用自定义输入)');
+            }
+
+            const suffix = defaultModel ? ` (默认 ${defaultModel})` : '';
+            const input = (await ask(`请输入序号或名称${suffix}: `)).trim();
+
+            if (!input) {
+                if (defaultModel) {
+                    modelName = defaultModel;
+                    break;
+                }
+                console.log('提示: 模型不能为空。');
+                continue;
+            }
+
+            if (/^\d+$/.test(input)) {
+                const index = parseInt(input, 10);
+                if (index >= 1 && index <= models.length) {
+                    modelName = models[index - 1];
+                    break;
+                }
+                console.log('提示: 序号无效，请重试。');
+                continue;
+            }
+
+            modelName = input;
+            break;
+        }
+
+        console.log('\n即将应用:');
+        console.log('  提供商:', providerName);
+        if (isCustomProvider) {
+            console.log('  Base URL:', baseUrl);
+        }
+        console.log('  模型:', modelName);
+
+        const confirm = (await ask('确认应用? (Y/n): ')).trim().toLowerCase();
+        if (confirm === 'n' || confirm === 'no') {
+            console.log('已取消');
+            return;
+        }
+
+        if (isCustomProvider) {
+            if (providers[providerName]) {
+                cmdUpdate(providerName, baseUrl, apiKey, true);
+            } else {
+                cmdAdd(providerName, baseUrl, apiKey, true);
+            }
+        }
+
+        const latestModels = readModels();
+        if (modelName && !latestModels.includes(modelName)) {
+            cmdAddModel(modelName, true);
+        }
+
+        cmdSwitch(providerName, true);
+        cmdUseModel(modelName, true);
+
+        console.log('✓ 已应用配置');
+        console.log('  提供商:', providerName);
+        console.log('  模型:', modelName);
+        console.log();
+    } catch (e) {
+        console.error('错误:', e.message || e);
+        process.exitCode = 1;
+    } finally {
+        rl.close();
+    }
+}
+
 // 显示当前状态
 function cmdStatus() {
     const { config, isVirtual } = readConfigOrVirtualDefault();
@@ -3185,14 +3405,15 @@ function cmdStart() {
         }
     });
 
-    server.listen(PORT, () => {
-        console.log('\n✓ Web UI 已启动: http://localhost:' + PORT);
+    const port = resolveWebPort();
+    server.listen(port, () => {
+        console.log('\n✓ Web UI 已启动: http://localhost:' + port);
         console.log('  按 Ctrl+C 退出\n');
 
         // 打开浏览器
         const platform = process.platform;
         let command;
-        const url = `http://localhost:${PORT}`;
+        const url = `http://localhost:${port}`;
 
         if (platform === 'win32') {
             command = `start "" "${url}"`;
@@ -3222,6 +3443,7 @@ function main() {
         console.log('\nCodex Mate - Codex 提供商管理工具');
         console.log('\n用法:');
         console.log('  codexmate status           显示当前状态');
+        console.log('  codexmate setup            交互式配置向导');
         console.log('  codexmate list             列出所有提供商');
         console.log('  codexmate models           列出所有模型');
         console.log('  codexmate switch <名称>    切换提供商');
@@ -3241,6 +3463,7 @@ function main() {
 
     switch (command) {
         case 'status': cmdStatus(); break;
+        case 'setup': cmdSetup(); break;
         case 'list': cmdList(); break;
         case 'models': cmdModels(); break;
         case 'switch': cmdSwitch(args[1]); break;
