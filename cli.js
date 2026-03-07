@@ -305,6 +305,7 @@ function fetchModelsFromBaseUrl(baseUrl, apiKey) {
 
         const req = transport.request(parsed, { method: 'GET', headers }, (res) => {
             const status = res.statusCode || 0;
+            const contentType = String(res.headers['content-type'] || '').toLowerCase();
             if (status === 404 || status === 405 || status === 501) {
                 res.resume();
                 return resolve({ unlimited: true });
@@ -315,12 +316,15 @@ function fetchModelsFromBaseUrl(baseUrl, apiKey) {
                 if (status >= 400) {
                     return resolve({ error: `Request failed: ${status}` });
                 }
+                if (contentType && !contentType.includes('application/json')) {
+                    return resolve({ unlimited: true });
+                }
                 try {
                     const payload = JSON.parse(body || '{}');
                     const models = extractModelNames(payload);
                     return resolve({ models });
                 } catch (e) {
-                    return resolve({ error: 'Invalid JSON response' });
+                    return resolve({ unlimited: true });
                 }
             });
         });
