@@ -2894,6 +2894,101 @@ function resolveSessionFilePath(source, filePath, sessionId) {
     return '';
 }
 
+function findClaudeSessionIndexPath(sessionFilePath) {
+    const root = getClaudeProjectsDir();
+    if (!root || !sessionFilePath) {
+        return '';
+    }
+    if (!isPathInside(sessionFilePath, root)) {
+        return '';
+    }
+    let current = path.dirname(sessionFilePath);
+    const resolvedRoot = path.resolve(root);
+    while (current && isPathInside(current, resolvedRoot)) {
+        const candidate = path.join(current, 'sessions-index.json');
+        if (fs.existsSync(candidate)) {
+            return candidate;
+        }
+        const parent = path.dirname(current);
+        if (parent === current) {
+            break;
+        }
+        current = parent;
+    }
+    return '';
+}
+
+function updateClaudeSessionIndex(indexPath, sessionFilePath, sessionId) {
+    if (!indexPath || !fs.existsSync(indexPath)) {
+        return;
+    }
+    const index = readJsonFile(indexPath, null);
+    if (!index || !Array.isArray(index.entries)) {
+        return;
+    }
+    const resolvedFile = sessionFilePath ? path.resolve(sessionFilePath) : '';
+    const resolvedLower = resolvedFile ? resolvedFile.toLowerCase() : '';
+    const filtered = index.entries.filter((entry) => {
+        if (!entry || typeof entry !== 'object') {
+            return false;
+        }
+        const entrySessionId = typeof entry.sessionId === 'string' ? entry.sessionId : '';
+        if (sessionId && entrySessionId === sessionId) {
+            return false;
+        }
+        if (entry.fullPath) {
+            const expanded = expandHomePath(entry.fullPath);
+            const entryPath = expanded ? path.resolve(expanded) : '';
+            if (entryPath && resolvedLower && entryPath.toLowerCase() === resolvedLower) {
+                return false;
+            }
+        }
+        return true;
+    });
+    if (filtered.length === index.entries.length) {
+        return;
+    }
+    index.entries = filtered;
+    try {
+        fs.writeFileSync(indexPath, JSON.stringify(index, null, 2), 'utf-8');
+    } catch (e) {}
+}
+
+async function deleteSessionData(params = {}) {
+    const source = params.source === 'claude' ? 'claude' : (params.source === 'codex' ? 'codex' : '');
+    if (!source) {
+        return { error: 'Invalid source' };
+    }
+
+    const filePath = resolveSessionFilePath(source, params.filePath, params.sessionId);
+    if (!filePath) {
+        return { error: 'Session file not found' };
+    }
+
+    const sessionId = params.sessionId || path.basename(filePath, '.jsonl');
+    try {
+        fs.unlinkSync(filePath);
+    } catch (e) {
+        return { error: `删除会话失败: ${e.message}` };
+    }
+
+    if (source === 'claude') {
+        const indexPath = findClaudeSessionIndexPath(filePath);
+        if (indexPath) {
+            updateClaudeSessionIndex(indexPath, filePath, sessionId);
+        }
+    }
+
+    invalidateSessionListCache();
+
+    return {
+        success: true,
+        source,
+        sessionId,
+        filePath
+    };
+}
+
 function generateCloneSessionId() {
     if (crypto.randomUUID) {
         return `clone-${crypto.randomUUID()}`;
@@ -4596,6 +4691,9 @@ function cmdStart() {
                             break;
                         case 'export-session':
                             result = await exportSessionData(params);
+                            break;
+                        case 'delete-session':
+                            result = await deleteSessionData(params || {});
                             break;
                         case 'clone-session':
                             result = await cloneCodexSession(params || {});

@@ -936,6 +936,21 @@
             letter-spacing: -0.01em;
         }
 
+        .btn-session-delete {
+            border: 1px solid rgba(189, 70, 68, 0.4);
+            border-radius: var(--radius-sm);
+            background: linear-gradient(to bottom, rgba(255, 245, 245, 0.95) 0%, rgba(255, 255, 255, 0.9) 100%);
+            color: #b74545;
+            padding: 8px 12px;
+            font-size: var(--font-size-secondary);
+            font-weight: var(--font-weight-secondary);
+            cursor: pointer;
+            transition: all var(--transition-fast) var(--ease-spring);
+            white-space: nowrap;
+            box-shadow: var(--shadow-subtle);
+            letter-spacing: -0.01em;
+        }
+
         .btn-session-refresh {
             border: 1px solid var(--color-border-soft);
             border-radius: var(--radius-sm);
@@ -982,6 +997,18 @@
         }
 
         .btn-session-clone:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-session-delete:hover {
+            border-color: rgba(189, 70, 68, 0.8);
+            color: #9f3b3b;
+            transform: translateY(-1px);
+        }
+
+        .btn-session-delete:disabled {
             opacity: 0.5;
             cursor: not-allowed;
             transform: none;
@@ -1136,10 +1163,32 @@
             transition: all var(--transition-fast) var(--ease-spring);
         }
 
+        .session-item-delete {
+            border: 1px solid rgba(189, 70, 68, 0.35);
+            background: rgba(189, 70, 68, 0.08);
+            color: #b74545;
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: all var(--transition-fast) var(--ease-spring);
+        }
+
         .session-item-copy:hover {
             border-color: rgba(70, 86, 110, 0.7);
             background: rgba(70, 86, 110, 0.16);
             color: var(--color-text-primary);
+            transform: translateY(-1px);
+        }
+
+        .session-item-delete:hover {
+            border-color: rgba(189, 70, 68, 0.7);
+            background: rgba(189, 70, 68, 0.18);
+            color: #9f3b3b;
             transform: translateY(-1px);
         }
 
@@ -1149,7 +1198,18 @@
             transform: none;
         }
 
+        .session-item-delete:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         .session-item-copy svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .session-item-delete svg {
             width: 16px;
             height: 16px;
         }
@@ -2524,6 +2584,21 @@
                                             <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path>
                                         </svg>
                                     </button>
+                                    <button
+                                        v-if="isDeleteAvailable(session)"
+                                        class="session-item-delete"
+                                        @click.stop="deleteSession(session)"
+                                        :disabled="sessionsLoading || sessionDeleting[getSessionExportKey(session)]"
+                                        aria-label="删除会话"
+                                        title="删除会话">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M3 6h18"></path>
+                                            <path d="M8 6V4h8v2"></path>
+                                            <path d="M19 6l-1 14H6L5 6"></path>
+                                            <path d="M10 11v6"></path>
+                                            <path d="M14 11v6"></path>
+                                        </svg>
+                                    </button>
                                 </div>
                             </div>
                             <div class="session-item-meta">
@@ -2562,6 +2637,13 @@
                                             @click="cloneSession(activeSession)"
                                             :disabled="!activeSession || sessionsLoading || sessionCloning[getSessionExportKey(activeSession)]">
                                             {{ (activeSession && sessionCloning[getSessionExportKey(activeSession)]) ? '克隆中...' : '克隆会话' }}
+                                        </button>
+                                        <button
+                                            v-if="isDeleteAvailable(activeSession)"
+                                            class="btn-session-delete"
+                                            @click="deleteSession(activeSession)"
+                                            :disabled="!activeSession || sessionsLoading || sessionDeleting[getSessionExportKey(activeSession)]">
+                                            {{ (activeSession && sessionDeleting[getSessionExportKey(activeSession)]) ? '删除中...' : '删除会话' }}
                                         </button>
                                         <button
                                             class="btn-session-export"
@@ -3185,6 +3267,7 @@
                     sessionPathRequestSeq: 0,
                     sessionExporting: {},
                     sessionCloning: {},
+                    sessionDeleting: {},
                     activeSession: null,
                     activeSessionMessages: [],
                     activeSessionDetailError: '',
@@ -3499,6 +3582,15 @@
                     return source === 'codex' && (!!sessionId || !!filePath);
                 },
 
+                isDeleteAvailable(session) {
+                    if (!session) return false;
+                    const source = String(session.source || '').trim().toLowerCase();
+                    if (source !== 'codex' && source !== 'claude') return false;
+                    const sessionId = typeof session.sessionId === 'string' ? session.sessionId.trim() : '';
+                    const filePath = typeof session.filePath === 'string' ? session.filePath.trim() : '';
+                    return !!sessionId || !!filePath;
+                },
+
                 buildResumeCommand(session) {
                     const sessionId = session && session.sessionId ? String(session.sessionId).trim() : '';
                     return `codex resume ${this.quoteResumeArg(sessionId)}`;
@@ -3591,6 +3683,35 @@
                         this.showMessage('克隆失败: ' + e.message, 'error');
                     } finally {
                         this.sessionCloning[key] = false;
+                    }
+                },
+
+                async deleteSession(session) {
+                    if (!this.isDeleteAvailable(session)) {
+                        this.showMessage('当前会话不支持删除', 'error');
+                        return;
+                    }
+                    const key = this.getSessionExportKey(session);
+                    if (this.sessionDeleting[key]) {
+                        return;
+                    }
+                    this.sessionDeleting[key] = true;
+                    try {
+                        const res = await api('delete-session', {
+                            source: session.source,
+                            sessionId: session.sessionId,
+                            filePath: session.filePath
+                        });
+                        if (res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        this.showMessage('会话已删除', 'success');
+                        await this.loadSessions();
+                    } catch (e) {
+                        this.showMessage('删除失败: ' + e.message, 'error');
+                    } finally {
+                        this.sessionDeleting[key] = false;
                     }
                 },
 
