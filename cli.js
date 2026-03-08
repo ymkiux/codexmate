@@ -609,6 +609,27 @@ function resolveOpenclawWorkspaceDir(config) {
     return path.join(OPENCLAW_DIR, resolved);
 }
 
+function normalizeOpenclawWorkspaceFileName(input) {
+    const raw = typeof input === 'string' ? input.trim() : '';
+    if (!raw) {
+        return { error: '文件名不能为空' };
+    }
+    if (raw.includes('\0')) {
+        return { error: '文件名非法' };
+    }
+    if (raw.includes('/') || raw.includes('\\') || raw.includes('..')) {
+        return { error: '文件名非法' };
+    }
+    const baseName = path.basename(raw);
+    if (baseName !== raw) {
+        return { error: '文件名非法' };
+    }
+    if (!raw.toLowerCase().endsWith('.md')) {
+        return { error: '仅支持 .md 文件' };
+    }
+    return { ok: true, name: raw };
+}
+
 function readOpenclawConfigFile() {
     const filePath = OPENCLAW_CONFIG_FILE;
     if (!fs.existsSync(filePath)) {
@@ -706,6 +727,81 @@ function applyOpenclawAgentsFile(params = {}) {
         workspaceDir: baseDir,
         configError: workspaceInfo.configError
     };
+}
+
+function readOpenclawWorkspaceFile(params = {}) {
+    const nameResult = normalizeOpenclawWorkspaceFileName(params.fileName);
+    if (nameResult.error) {
+        return { error: nameResult.error };
+    }
+    const workspaceInfo = getOpenclawWorkspaceInfo();
+    const baseDir = workspaceInfo.workspaceDir;
+    const filePath = path.join(baseDir, nameResult.name);
+
+    if (!fs.existsSync(baseDir)) {
+        return {
+            exists: false,
+            path: filePath,
+            content: '',
+            lineEnding: os.EOL === '\r\n' ? '\r\n' : '\n',
+            workspaceDir: baseDir,
+            configError: workspaceInfo.configError,
+            baseDirMissing: true
+        };
+    }
+
+    if (!fs.existsSync(filePath)) {
+        return {
+            exists: false,
+            path: filePath,
+            content: '',
+            lineEnding: os.EOL === '\r\n' ? '\r\n' : '\n',
+            workspaceDir: baseDir,
+            configError: workspaceInfo.configError
+        };
+    }
+
+    try {
+        const raw = fs.readFileSync(filePath, 'utf-8');
+        return {
+            exists: true,
+            path: filePath,
+            content: stripUtf8Bom(raw),
+            lineEnding: detectLineEnding(raw),
+            workspaceDir: baseDir,
+            configError: workspaceInfo.configError
+        };
+    } catch (e) {
+        return { error: `读取 OpenClaw 工作区文件失败: ${e.message}` };
+    }
+}
+
+function applyOpenclawWorkspaceFile(params = {}) {
+    const nameResult = normalizeOpenclawWorkspaceFileName(params.fileName);
+    if (nameResult.error) {
+        return { error: nameResult.error };
+    }
+    const workspaceInfo = getOpenclawWorkspaceInfo();
+    const baseDir = workspaceInfo.workspaceDir;
+    ensureDir(baseDir);
+
+    const content = typeof params.content === 'string' ? params.content : '';
+    const lineEnding = params.lineEnding === '\r\n' ? '\r\n' : '\n';
+    const normalized = normalizeLineEnding(content, lineEnding);
+    const finalContent = ensureUtf8Bom(normalized);
+    const filePath = path.join(baseDir, nameResult.name);
+
+    try {
+        fs.writeFileSync(filePath, finalContent, 'utf-8');
+        return {
+            success: true,
+            path: filePath,
+            workspaceDir: baseDir,
+            configError: workspaceInfo.configError
+        };
+    } catch (e) {
+        return { error: `写入 OpenClaw 工作区文件失败: ${e.message}` };
+    }
 }
 
 function applyOpenclawConfig(params = {}) {
@@ -4206,6 +4302,12 @@ function cmdStart() {
                             break;
                         case 'apply-openclaw-agents-file':
                             result = applyOpenclawAgentsFile(params || {});
+                            break;
+                        case 'get-openclaw-workspace-file':
+                            result = readOpenclawWorkspaceFile(params || {});
+                            break;
+                        case 'apply-openclaw-workspace-file':
+                            result = applyOpenclawWorkspaceFile(params || {});
                             break;
                         case 'switch':
                         case 'use':
