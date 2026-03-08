@@ -293,6 +293,17 @@ async function main() {
             assert(cloneResult.sessionId && cloneResult.sessionId !== sessionId, 'clone-session id invalid');
             assert(fs.existsSync(cloneResult.filePath), 'clone-session file missing');
 
+            const apiSessionsAfterClone = await postJson(port, {
+                action: 'list-sessions',
+                params: { source: 'codex', limit: 50, forceRefresh: true }
+            });
+            assert(Array.isArray(apiSessionsAfterClone.sessions), 'api sessions after clone missing');
+            assert(
+                apiSessionsAfterClone.sessions[0]
+                    && apiSessionsAfterClone.sessions[0].sessionId === cloneResult.sessionId,
+                'clone session not latest'
+            );
+
             const deleteResult = await postJson(port, {
                 action: 'delete-session',
                 params: { source: 'codex', sessionId }

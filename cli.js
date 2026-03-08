@@ -1571,6 +1571,16 @@ function toIsoTime(value, fallback = '') {
     return date.toISOString();
 }
 
+function updateLatestIso(currentIso, candidate) {
+    const currentTime = Date.parse(currentIso || '') || 0;
+    const candidateIso = toIsoTime(candidate, '');
+    const candidateTime = Date.parse(candidateIso || '') || 0;
+    if (!candidateTime) {
+        return currentIso;
+    }
+    return candidateTime > currentTime ? candidateIso : currentIso;
+}
+
 function truncateText(text, maxLength = 90) {
     if (!text) return '';
     const normalized = String(text).replace(/\s+/g, ' ').trim();
@@ -2444,7 +2454,7 @@ function parseCodexSessionSummary(filePath) {
 
     for (const record of records) {
         if (record.timestamp) {
-            updatedAt = toIsoTime(record.timestamp, updatedAt);
+            updatedAt = updateLatestIso(updatedAt, record.timestamp);
         }
 
         if (record.type === 'session_meta' && record.payload) {
@@ -2533,7 +2543,7 @@ function parseClaudeSessionSummary(filePath) {
             createdAt = toIsoTime(record.timestamp, createdAt);
         }
         if (record.timestamp) {
-            updatedAt = toIsoTime(record.timestamp, updatedAt);
+            updatedAt = updateLatestIso(updatedAt, record.timestamp);
         }
 
         if (!cwd && record.cwd) {
@@ -3093,6 +3103,8 @@ async function cloneCodexSession(params = {}) {
     const newSessionId = target.sessionId;
     const newFilePath = target.filePath;
     const offsetMs = maxTimestampMs ? (Date.now() - maxTimestampMs) : 0;
+    const cloneTime = new Date(Date.now() + 1);
+    const cloneIso = cloneTime.toISOString();
 
     const outputLines = [];
     for (const line of rawLines) {
@@ -3109,12 +3121,6 @@ async function cloneCodexSession(params = {}) {
             continue;
         }
 
-        if (record && record.type === 'session_meta' && record.payload && typeof record.payload === 'object') {
-            record.payload = {
-                ...record.payload,
-                id: newSessionId
-            };
-        }
         if (originalSessionId && typeof record.sessionId === 'string' && record.sessionId === originalSessionId) {
             record.sessionId = newSessionId;
         }
@@ -3127,6 +3133,14 @@ async function cloneCodexSession(params = {}) {
                 record.timestamp = new Date(ts + offsetMs).toISOString();
             }
         }
+        if (record && record.type === 'session_meta' && record.payload && typeof record.payload === 'object') {
+            record.payload = {
+                ...record.payload,
+                id: newSessionId,
+                timestamp: cloneIso
+            };
+            record.timestamp = cloneIso;
+        }
 
         outputLines.push(JSON.stringify(record));
     }
@@ -3137,6 +3151,9 @@ async function cloneCodexSession(params = {}) {
     } catch (e) {
         return { error: `写入克隆会话失败: ${e.message}` };
     }
+    try {
+        fs.utimesSync(newFilePath, cloneTime, cloneTime);
+    } catch (e) {}
 
     invalidateSessionListCache();
 
