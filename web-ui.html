@@ -523,6 +523,101 @@
             gap: var(--spacing-xs);
         }
 
+        .recent-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .recent-item {
+            border: 1px solid var(--color-border-soft);
+            background: var(--color-surface-elevated);
+            border-radius: var(--radius-md);
+            padding: 10px 12px;
+            min-width: 170px;
+            text-align: left;
+            cursor: pointer;
+            transition: all var(--transition-fast) var(--ease-spring);
+            box-shadow: 0 2px 6px rgba(27, 23, 20, 0.06);
+        }
+
+        .recent-item:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(27, 23, 20, 0.12);
+            border-color: var(--color-border);
+        }
+
+        .recent-item:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .recent-provider {
+            font-size: var(--font-size-body);
+            font-weight: var(--font-weight-secondary);
+            color: var(--color-text-primary);
+            margin-bottom: 4px;
+        }
+
+        .recent-model {
+            font-size: var(--font-size-caption);
+            color: var(--color-text-tertiary);
+            line-height: 1.4;
+        }
+
+        .recent-empty {
+            font-size: var(--font-size-caption);
+            color: var(--color-text-tertiary);
+        }
+
+        .health-report {
+            margin-top: 10px;
+            padding: 10px 12px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--color-border-soft);
+            background: var(--color-surface-alt);
+            display: grid;
+            gap: 8px;
+        }
+
+        .health-remote-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: var(--font-size-caption);
+            color: var(--color-text-secondary);
+        }
+
+        .health-remote-toggle input {
+            accent-color: var(--color-brand);
+        }
+
+        .health-ok {
+            color: var(--color-success);
+            font-weight: var(--font-weight-secondary);
+        }
+
+        .health-issue {
+            background: #fff6f5;
+            border-left: 3px solid var(--color-error);
+            padding: 8px 10px;
+            border-radius: 10px;
+        }
+
+        .health-issue-title {
+            font-size: var(--font-size-caption);
+            font-weight: var(--font-weight-secondary);
+            color: var(--color-text-primary);
+            margin-bottom: 4px;
+        }
+
+        .health-issue-suggestion {
+            font-size: var(--font-size-caption);
+            color: var(--color-text-secondary);
+            line-height: 1.4;
+        }
+
         .btn-icon {
             width: 28px;
             height: 28px;
@@ -1797,6 +1892,27 @@
 
                 <div class="selector-section">
                     <div class="selector-header">
+                        <span class="selector-title">最近使用</span>
+                        <span v-if="recentLoading" class="selector-title">加载中...</span>
+                    </div>
+                    <div v-if="recentConfigs.length === 0" class="recent-empty">
+                        暂无记录
+                    </div>
+                    <div v-else class="recent-list">
+                        <button
+                            v-for="item in recentConfigs"
+                            :key="item.provider + '::' + item.model + '::' + (item.usedAt || '')"
+                            class="recent-item"
+                            @click="applyRecentConfig(item)"
+                            :disabled="loading || !!initError">
+                            <div class="recent-provider">{{ item.provider }}</div>
+                            <div class="recent-model">{{ item.model }}</div>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="selector-section">
+                    <div class="selector-header">
                         <span class="selector-title">AGENTS.md</span>
                     </div>
                     <div class="config-template-hint">
@@ -1805,6 +1921,36 @@
                     <button class="btn-tool" @click="openAgentsEditor" :disabled="loading || !!initError || agentsLoading">
                         {{ agentsLoading ? '加载中...' : '打开 AGENTS.md 编辑器' }}
                     </button>
+                </div>
+
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">配置健康检查</span>
+                    </div>
+                    <div class="config-template-hint">
+                        检测 base_url、API Key 与模型可用性（可选远程探测会发起真实请求，可能产生费用）。
+                    </div>
+                    <div class="config-template-hint">
+                        <label class="health-remote-toggle">
+                            <input type="checkbox" v-model="healthCheckRemote">
+                            启用远程探测（请求 base_url 与 /v1/models）
+                        </label>
+                    </div>
+                    <button class="btn-tool" @click="runHealthCheck" :disabled="healthCheckLoading || loading || !!initError">
+                        {{ healthCheckLoading ? '检查中...' : '运行检查' }}
+                    </button>
+                    <div v-if="healthCheckResult" class="health-report">
+                        <div v-if="healthCheckResult.ok" class="health-ok">未发现问题</div>
+                        <div v-else>
+                            <div
+                                v-for="(issue, index) in healthCheckResult.issues"
+                                :key="(issue.code || 'issue') + index"
+                                class="health-issue">
+                                <div class="health-issue-title">{{ issue.message }}</div>
+                                <div v-if="issue.suggestion" class="health-issue-suggestion">{{ issue.suggestion }}</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div v-if="!loading && !initError" class="card-list">
@@ -2541,7 +2687,12 @@
                     openclawLineEnding: '\n',
                     openclawFileLoading: false,
                     openclawSaving: false,
-                    openclawApplying: false
+                    openclawApplying: false,
+                    recentConfigs: [],
+                    recentLoading: false,
+                    healthCheckLoading: false,
+                    healthCheckResult: null,
+                    healthCheckRemote: false
                 }
             },
             mounted() {
@@ -2614,6 +2765,7 @@
                             }
                             this.maybeShowStarPrompt();
                         }
+                        await this.loadRecentConfigs();
                     } catch (e) {
                         this.initError = '连接失败: ' + e.message;
                     } finally {
@@ -3141,6 +3293,60 @@
 
                 async onModelChange() {
                     await this.openConfigTemplateEditor();
+                },
+
+                async loadRecentConfigs() {
+                    this.recentLoading = true;
+                    try {
+                        const res = await api('get-recent-configs');
+                        if (res && Array.isArray(res.items)) {
+                            this.recentConfigs = res.items;
+                        } else {
+                            this.recentConfigs = [];
+                        }
+                    } catch (e) {
+                        this.recentConfigs = [];
+                    } finally {
+                        this.recentLoading = false;
+                    }
+                },
+
+                async applyRecentConfig(item) {
+                    if (!item || !item.provider || !item.model) {
+                        this.showMessage('最近配置无效，无法应用', 'error');
+                        return;
+                    }
+                    this.currentProvider = item.provider;
+                    this.currentModel = item.model;
+                    await this.openConfigTemplateEditor({
+                        appendHint: '最近使用配置，确认后将写入 config.toml'
+                    });
+                },
+
+                async runHealthCheck() {
+                    this.healthCheckLoading = true;
+                    this.healthCheckResult = null;
+                    try {
+                        const res = await api('config-health-check', {
+                            remote: this.healthCheckRemote
+                        });
+                        if (res && typeof res === 'object') {
+                            this.healthCheckResult = res;
+                            if (res.ok) {
+                                this.showMessage('健康检查通过', 'success');
+                            } else {
+                                this.showMessage('发现配置问题，请查看详情', 'error');
+                            }
+                        } else {
+                            this.healthCheckResult = null;
+                            this.showMessage('健康检查失败：返回数据异常', 'error');
+                        }
+                    } catch (e) {
+                        this.healthCheckResult = null;
+                        this.showMessage('健康检查失败: ' + e.message, 'error');
+                    } finally {
+                        this.healthCheckLoading = false;
+                    }
                 },
 
                 escapeTomlString(value) {
