@@ -5,6 +5,7 @@ const os = require('os');
 const crypto = require('crypto');
 const toml = require('@iarna/toml');
 const JSON5 = require('json5');
+const zipLib = require('zip-lib');
 const { exec, execSync } = require('child_process');
 const http = require('http');
 const https = require('https');
@@ -4088,8 +4089,67 @@ function applyToClaudeSettings(config = {}) {
     }
 }
 
-// 多线程压缩
-function cmdZip(targetPath, options = {}) {
+function commandExists(command, args = '') {
+    try {
+        execSync(`${command} ${args}`, { stdio: 'ignore' });
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+const SEVEN_ZIP_PATHS = [
+    'C:\\Program Files\\7-Zip\\7z.exe',
+    'C:\\Program Files (x86)\\7-Zip\\7z.exe',
+    '7z'
+];
+
+function findSevenZipExecutable() {
+    for (const candidate of SEVEN_ZIP_PATHS) {
+        try {
+            if (candidate === '7z') {
+                if (commandExists('7z', '--help')) {
+                    return '7z';
+                }
+            } else if (fs.existsSync(candidate)) {
+                return candidate;
+            }
+        } catch (e) {}
+    }
+    return null;
+}
+
+function resolveZipTool() {
+    const sevenZipExe = findSevenZipExecutable();
+    if (sevenZipExe) {
+        return { type: '7z', cmd: sevenZipExe };
+    }
+    return { type: 'lib', cmd: 'zip-lib' };
+}
+
+function resolveUnzipTool() {
+    const sevenZipExe = findSevenZipExecutable();
+    if (sevenZipExe) {
+        return { type: '7z', cmd: sevenZipExe };
+    }
+    return { type: 'lib', cmd: 'zip-lib' };
+}
+
+async function zipWithLibrary(absPath, outputPath) {
+    const stat = fs.lstatSync(absPath);
+    if (stat.isDirectory()) {
+        await zipLib.archiveFolder(absPath, outputPath);
+        return;
+    }
+    await zipLib.archiveFile(absPath, outputPath);
+}
+
+async function unzipWithLibrary(zipPath, outputDir) {
+    await zipLib.extract(zipPath, outputDir);
+}
+
+// 压缩（7-Zip 优先）
+async function cmdZip(targetPath, options = {}) {
     if (!targetPath) {
         console.error('用法: codexmate zip <文件或文件夹路径> [--max:压缩级别]');
         console.log('\n示例:');
@@ -4117,58 +4177,43 @@ function cmdZip(targetPath, options = {}) {
     const outputDir = path.dirname(absPath);
     const outputPath = path.join(outputDir, `${baseName}.zip`);
 
-    // 查找 7-Zip
-    const sevenZipPaths = [
-        'C:\\Program Files\\7-Zip\\7z.exe',
-        'C:\\Program Files (x86)\\7-Zip\\7z.exe',
-        '7z'
-    ];
-
-    let sevenZipExe = null;
-    for (const p of sevenZipPaths) {
-        try {
-            if (p === '7z') {
-                execSync('7z --help', { stdio: 'ignore' });
-                sevenZipExe = '7z';
-                break;
-            } else if (fs.existsSync(p)) {
-                sevenZipExe = p;
-                break;
-            }
-        } catch (e) {}
-    }
-
-    if (!sevenZipExe) {
-        console.error('错误: 未找到 7-Zip，请先安装 7-Zip');
-        console.log('下载地址: https://www.7-zip.org/');
-        process.exit(1);
-    }
+    const zipTool = resolveZipTool();
 
     console.log('\n压缩配置:');
     console.log('  源路径:', absPath);
     console.log('  输出文件:', outputPath);
     console.log('  压缩级别:', compressionLevel);
-    console.log('  多线程: 启用');
+    console.log('  压缩工具:', zipTool.type === '7z' ? '7-Zip' : 'zip-lib');
+    console.log('  多线程:', zipTool.type === '7z' ? '启用' : '未启用（JS 库）');
+    if (zipTool.type !== '7z') {
+        console.log('  提示: JS 库不支持压缩级别，已忽略 --max');
+    }
     console.log('\n开始压缩...\n');
 
     try {
-        const cmd = `"${sevenZipExe}" a -tzip -mmt=on -mx=${compressionLevel} "${outputPath}" "${absPath}"`;
-        const result = execSync(cmd, { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 });
+        if (zipTool.type === '7z') {
+            const cmd = `"${zipTool.cmd}" a -tzip -mmt=on -mx=${compressionLevel} "${outputPath}" "${absPath}"`;
+            const result = execSync(cmd, { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 });
+            const sizeMatch = result.match(/Archive size:\s*(\d+)\s*bytes/);
+            const filesMatch = result.match(/(\d+)\s*files/);
 
-        // 解析输出获取文件信息
-        const sizeMatch = result.match(/Archive size:\s*(\d+)\s*bytes/);
-        const filesMatch = result.match(/(\d+)\s*files/);
+            console.log('✓ 压缩完成!');
+            console.log('  输出文件:', outputPath);
+            if (sizeMatch) {
+                const sizeBytes = parseInt(sizeMatch[1]);
+                const sizeMB = (sizeBytes / 1024 / 1024).toFixed(2);
+                console.log('  压缩大小:', sizeMB, 'MB');
+            }
+            if (filesMatch) {
+                console.log('  文件数量:', filesMatch[1]);
+            }
+            console.log();
+            return;
+        }
 
+        await zipWithLibrary(absPath, outputPath);
         console.log('✓ 压缩完成!');
         console.log('  输出文件:', outputPath);
-        if (sizeMatch) {
-            const sizeBytes = parseInt(sizeMatch[1]);
-            const sizeMB = (sizeBytes / 1024 / 1024).toFixed(2);
-            console.log('  压缩大小:', sizeMB, 'MB');
-        }
-        if (filesMatch) {
-            console.log('  文件数量:', filesMatch[1]);
-        }
         console.log();
     } catch (e) {
         console.error('压缩失败:', e.message);
@@ -4176,8 +4221,8 @@ function cmdZip(targetPath, options = {}) {
     }
 }
 
-// 多线程解压
-function cmdUnzip(zipPath, outputDir) {
+// 解压（7-Zip 优先）
+async function cmdUnzip(zipPath, outputDir) {
     if (!zipPath) {
         console.error('用法: codexmate unzip <zip文件路径> [输出目录]');
         console.log('\n示例:');
@@ -4203,51 +4248,32 @@ function cmdUnzip(zipPath, outputDir) {
     const defaultOutputDir = path.join(path.dirname(absZipPath), baseName);
     const absOutputDir = outputDir ? path.resolve(outputDir) : defaultOutputDir;
 
-    // 查找 7-Zip
-    const sevenZipPaths = [
-        'C:\\Program Files\\7-Zip\\7z.exe',
-        'C:\\Program Files (x86)\\7-Zip\\7z.exe',
-        '7z'
-    ];
-
-    let sevenZipExe = null;
-    for (const p of sevenZipPaths) {
-        try {
-            if (p === '7z') {
-                execSync('7z --help', { stdio: 'ignore' });
-                sevenZipExe = '7z';
-                break;
-            } else if (fs.existsSync(p)) {
-                sevenZipExe = p;
-                break;
-            }
-        } catch (e) {}
-    }
-
-    if (!sevenZipExe) {
-        console.error('错误: 未找到 7-Zip，请先安装 7-Zip');
-        console.log('下载地址: https://www.7-zip.org/');
-        process.exit(1);
-    }
+    const unzipTool = resolveUnzipTool();
 
     console.log('\n解压配置:');
     console.log('  源文件:', absZipPath);
     console.log('  输出目录:', absOutputDir);
-    console.log('  多线程: 启用');
+    console.log('  解压工具:', unzipTool.type === '7z' ? '7-Zip' : 'zip-lib');
+    console.log('  多线程:', unzipTool.type === '7z' ? '启用' : '未启用（JS 库）');
     console.log('\n开始解压...\n');
 
     try {
-        const cmd = `"${sevenZipExe}" x -mmt=on -o"${absOutputDir}" "${absZipPath}" -y`;
-        const result = execSync(cmd, { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 });
+        if (unzipTool.type === '7z') {
+            const cmd = `"${unzipTool.cmd}" x -mmt=on -o"${absOutputDir}" "${absZipPath}" -y`;
+            const result = execSync(cmd, { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 });
+            const filesMatch = result.match(/(\d+)\s*files/);
+            console.log('✓ 解压完成!');
+            console.log('  输出目录:', absOutputDir);
+            if (filesMatch) {
+                console.log('  文件数量:', filesMatch[1]);
+            }
+            console.log();
+            return;
+        }
 
-        // 解析输出获取文件信息
-        const filesMatch = result.match(/(\d+)\s*files/);
-
+        await unzipWithLibrary(absZipPath, absOutputDir);
         console.log('✓ 解压完成!');
         console.log('  输出目录:', absOutputDir);
-        if (filesMatch) {
-            console.log('  文件数量:', filesMatch[1]);
-        }
         console.log();
     } catch (e) {
         console.error('解压失败:', e.message);
@@ -4483,8 +4509,8 @@ async function main() {
         console.log('  codexmate add-model <模型> 添加模型');
         console.log('  codexmate delete-model <模型> 删除模型');
         console.log('  codexmate start            启动 Web 界面');
-        console.log('  codexmate zip <路径> [--max:级别]  多线程压缩');
-        console.log('  codexmate unzip <zip文件> [输出目录]  多线程解压');
+        console.log('  codexmate zip <路径> [--max:级别]  压缩（7-Zip 优先）');
+        console.log('  codexmate unzip <zip文件> [输出目录]  解压（7-Zip 优先）');
         console.log('');
         process.exit(0);
     }
@@ -4515,10 +4541,10 @@ async function main() {
                     targetPath = arg;
                 }
             }
-            cmdZip(targetPath, zipOptions);
+            await cmdZip(targetPath, zipOptions);
             break;
         }
-        case 'unzip': cmdUnzip(args[1], args[2]); break;
+        case 'unzip': await cmdUnzip(args[1], args[2]); break;
         default:
             console.error('错误: 未知命令:', command);
             console.log('运行 "codexmate" 查看帮助');

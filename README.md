@@ -27,7 +27,7 @@ Codex Mate makes frequent provider/model switching for Codex and Claude Code a s
 | Claude Code Config | Multiple profiles and inconsistent write paths | Profile management, default write to `~/.claude/settings.json` |
 | OpenClaw Config | OpenClaw configs are scattered | JSON5 profiles, apply to `~/.openclaw/openclaw.json`, AGENTS workspace management |
 | Session Browser | Local sessions are hard to track | List/filter sessions, export to Markdown, copy resume command (when available), delete and batch cleanup |
-| Utilities | Compression/extraction requires extra tools | Multithreaded compress/unzip via 7-Zip |
+| Utilities | Compression/extraction requires extra tools | 7-Zip preferred, JS fallback |
 
 ## Why Codex Mate
 
@@ -287,9 +287,9 @@ A: After clicking "Apply to Claude Config", it writes to `~/.claude/settings.jso
 
 A: Run `npm uninstall -g codexmate`.
 
-## Extras: Multithreaded Compression/Extraction
+## Extras: Compression/Extraction
 
-Based on 7-Zip for multithreaded zip/unzip.
+Prefer 7-Zip for multithreaded zip/unzip. Fallback to the built-in JS library when unavailable.
 
 ```bash
 # Compress file or folder (default compression level 5)
@@ -324,7 +324,7 @@ codexmate unzip ./my-project.zip
 codexmate unzip ./backup.zip D:/restored
 ```
 
-Note: Requires [7-Zip](https://www.7-zip.org/) installed.
+Note: 7-Zip is optional. If missing, the built-in JS library is used. `--max` only applies to 7-Zip.
 
 ## Tech Stack
 
