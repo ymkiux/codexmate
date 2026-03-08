@@ -921,6 +921,21 @@
             letter-spacing: -0.01em;
         }
 
+        .btn-session-clone {
+            border: 1px solid var(--color-border-soft);
+            border-radius: var(--radius-sm);
+            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.9) 100%);
+            color: var(--color-text-secondary);
+            padding: 8px 12px;
+            font-size: var(--font-size-secondary);
+            font-weight: var(--font-weight-secondary);
+            cursor: pointer;
+            transition: all var(--transition-fast) var(--ease-spring);
+            white-space: nowrap;
+            box-shadow: var(--shadow-subtle);
+            letter-spacing: -0.01em;
+        }
+
         .btn-session-refresh {
             border: 1px solid var(--color-border-soft);
             border-radius: var(--radius-sm);
@@ -955,6 +970,18 @@
         }
 
         .btn-session-export:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-session-clone:hover {
+            border-color: var(--color-brand);
+            color: var(--color-brand);
+            transform: translateY(-1px);
+        }
+
+        .btn-session-clone:disabled {
             opacity: 0.5;
             cursor: not-allowed;
             transform: none;
@@ -2530,6 +2557,13 @@
                                             {{ sessionDetailLoading ? '加载中...' : '刷新内容' }}
                                         </button>
                                         <button
+                                            v-if="isCloneAvailable(activeSession)"
+                                            class="btn-session-clone"
+                                            @click="cloneSession(activeSession)"
+                                            :disabled="!activeSession || sessionsLoading || sessionCloning[getSessionExportKey(activeSession)]">
+                                            {{ (activeSession && sessionCloning[getSessionExportKey(activeSession)]) ? '克隆中...' : '克隆会话' }}
+                                        </button>
+                                        <button
                                             class="btn-session-export"
                                             @click="exportSession(activeSession)"
                                             :disabled="!activeSession || sessionExporting[getSessionExportKey(activeSession)]">
@@ -3150,6 +3184,7 @@
                     },
                     sessionPathRequestSeq: 0,
                     sessionExporting: {},
+                    sessionCloning: {},
                     activeSession: null,
                     activeSessionMessages: [],
                     activeSessionDetailError: '',
@@ -3456,6 +3491,14 @@
                     return source === 'codex' && !!sessionId;
                 },
 
+                isCloneAvailable(session) {
+                    if (!session) return false;
+                    const source = String(session.source || '').trim().toLowerCase();
+                    const sessionId = typeof session.sessionId === 'string' ? session.sessionId.trim() : '';
+                    const filePath = typeof session.filePath === 'string' ? session.filePath.trim() : '';
+                    return source === 'codex' && (!!sessionId || !!filePath);
+                },
+
                 buildResumeCommand(session) {
                     const sessionId = session && session.sessionId ? String(session.sessionId).trim() : '';
                     return `codex resume ${this.quoteResumeArg(sessionId)}`;
@@ -3513,6 +3556,42 @@
                         // keep fallback failure message
                     }
                     this.showMessage('复制失败，请手动复制命令', 'error');
+                },
+
+                async cloneSession(session) {
+                    if (!this.isCloneAvailable(session)) {
+                        this.showMessage('当前会话不支持克隆', 'error');
+                        return;
+                    }
+                    const key = this.getSessionExportKey(session);
+                    if (this.sessionCloning[key]) {
+                        return;
+                    }
+                    this.sessionCloning[key] = true;
+                    try {
+                        const res = await api('clone-session', {
+                            source: session.source,
+                            sessionId: session.sessionId,
+                            filePath: session.filePath
+                        });
+                        if (res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+
+                        this.showMessage('会话已克隆', 'success');
+                        await this.loadSessions();
+                        if (res.sessionId) {
+                            const matched = this.sessionsList.find(item => item.source === 'codex' && item.sessionId === res.sessionId);
+                            if (matched) {
+                                await this.selectSession(matched);
+                            }
+                        }
+                    } catch (e) {
+                        this.showMessage('克隆失败: ' + e.message, 'error');
+                    } finally {
+                        this.sessionCloning[key] = false;
+                    }
                 },
 
                 normalizeSessionPathValue(value) {

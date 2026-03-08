@@ -2894,6 +2894,166 @@ function resolveSessionFilePath(source, filePath, sessionId) {
     return '';
 }
 
+function generateCloneSessionId() {
+    if (crypto.randomUUID) {
+        return `clone-${crypto.randomUUID()}`;
+    }
+    const timePart = Date.now().toString(36);
+    const randomPart = crypto.randomBytes(8).toString('hex');
+    return `clone-${timePart}-${randomPart}`;
+}
+
+function allocateCloneSessionTarget(dirPath) {
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+        const sessionId = generateCloneSessionId();
+        const filePath = path.join(dirPath, `${sessionId}.jsonl`);
+        if (!fs.existsSync(filePath)) {
+            return { sessionId, filePath };
+        }
+    }
+    const fallbackId = `clone-${Date.now().toString(36)}-${crypto.randomBytes(8).toString('hex')}`;
+    return { sessionId: fallbackId, filePath: path.join(dirPath, `${fallbackId}.jsonl`) };
+}
+
+function parseTimestampMs(value) {
+    if (value === undefined || value === null || value === '') {
+        return null;
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        if (value > 1e12) return value;
+        if (value > 1e9) return value * 1000;
+        return value;
+    }
+    if (typeof value === 'string') {
+        const parsed = Date.parse(value);
+        if (Number.isFinite(parsed)) {
+            return parsed;
+        }
+        const numeric = Number(value);
+        if (Number.isFinite(numeric)) {
+            if (numeric > 1e12) return numeric;
+            if (numeric > 1e9) return numeric * 1000;
+            return numeric;
+        }
+    }
+    return null;
+}
+
+async function cloneCodexSession(params = {}) {
+    const source = params.source === 'codex' ? 'codex' : '';
+    if (!source) {
+        return { error: '仅支持 Codex 会话克隆' };
+    }
+
+    const filePath = resolveSessionFilePath(source, params.filePath, params.sessionId);
+    if (!filePath) {
+        return { error: 'Session file not found' };
+    }
+
+    let content = '';
+    try {
+        content = fs.readFileSync(filePath, 'utf-8');
+    } catch (e) {
+        return { error: `读取会话失败: ${e.message}` };
+    }
+
+    if (!content.trim()) {
+        return { error: 'Session file is empty' };
+    }
+
+    const lineEnding = detectLineEnding(content);
+    const rawLines = content.split(/\r?\n/);
+    if (rawLines.length > 0 && rawLines[rawLines.length - 1] === '') {
+        rawLines.pop();
+    }
+
+    let originalSessionId = typeof params.sessionId === 'string' ? params.sessionId.trim() : '';
+    if (!originalSessionId) {
+        originalSessionId = path.basename(filePath, '.jsonl');
+    }
+    let maxTimestampMs = 0;
+
+    for (const line of rawLines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+            const record = JSON.parse(trimmed);
+            if (record && record.type === 'session_meta' && record.payload) {
+                if (record.payload.id) {
+                    originalSessionId = record.payload.id;
+                }
+            }
+            if (record && record.timestamp !== undefined) {
+                const ts = parseTimestampMs(record.timestamp);
+                if (Number.isFinite(ts) && ts > maxTimestampMs) {
+                    maxTimestampMs = ts;
+                }
+            }
+        } catch (e) {}
+    }
+
+    const sessionsDir = getCodexSessionsDir();
+    ensureDir(sessionsDir);
+    const target = allocateCloneSessionTarget(sessionsDir);
+    const newSessionId = target.sessionId;
+    const newFilePath = target.filePath;
+    const offsetMs = maxTimestampMs ? (Date.now() - maxTimestampMs) : 0;
+
+    const outputLines = [];
+    for (const line of rawLines) {
+        const trimmed = line.trim();
+        if (!trimmed) {
+            outputLines.push(line);
+            continue;
+        }
+        let record;
+        try {
+            record = JSON.parse(trimmed);
+        } catch (e) {
+            outputLines.push(line);
+            continue;
+        }
+
+        if (record && record.type === 'session_meta' && record.payload && typeof record.payload === 'object') {
+            record.payload = {
+                ...record.payload,
+                id: newSessionId
+            };
+        }
+        if (originalSessionId && typeof record.sessionId === 'string' && record.sessionId === originalSessionId) {
+            record.sessionId = newSessionId;
+        }
+        if (originalSessionId && typeof record.session_id === 'string' && record.session_id === originalSessionId) {
+            record.session_id = newSessionId;
+        }
+        if (offsetMs && record.timestamp !== undefined) {
+            const ts = parseTimestampMs(record.timestamp);
+            if (Number.isFinite(ts)) {
+                record.timestamp = new Date(ts + offsetMs).toISOString();
+            }
+        }
+
+        outputLines.push(JSON.stringify(record));
+    }
+
+    const output = outputLines.join(lineEnding) + lineEnding;
+    try {
+        fs.writeFileSync(newFilePath, output, 'utf-8');
+    } catch (e) {
+        return { error: `写入克隆会话失败: ${e.message}` };
+    }
+
+    invalidateSessionListCache();
+
+    return {
+        success: true,
+        source,
+        sourceLabel: 'Codex',
+        sessionId: newSessionId,
+        filePath: newFilePath
+    };
+}
+
 function buildSessionMarkdown(payload) {
     const lines = [
         '# AI Session Export',
@@ -4436,6 +4596,9 @@ function cmdStart() {
                             break;
                         case 'export-session':
                             result = await exportSessionData(params);
+                            break;
+                        case 'clone-session':
+                            result = await cloneCodexSession(params || {});
                             break;
                         case 'session-detail':
                             result = await readSessionDetail(params);
