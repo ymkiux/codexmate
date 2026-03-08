@@ -1475,10 +1475,60 @@ async function buildConfigHealthReport(params = {}) {
         } else {
             const timeoutMs = Number.isFinite(params.timeoutMs)
                 ? Math.max(1000, Number(params.timeoutMs))
-                : HEALTH_CHECK_TIMEOUT_MS;
-            remote = await runRemoteHealthCheck(provider, modelName, { timeoutMs });
-            if (remote && Array.isArray(remote.issues)) {
-                issues.push(...remote.issues);
+                : undefined;
+            const apiKey = typeof provider.preferred_auth_method === 'string'
+                ? provider.preferred_auth_method.trim()
+                : '';
+            const speedResult = await runSpeedTest(baseUrl, apiKey, { timeoutMs });
+            const status = speedResult && typeof speedResult.status === 'number'
+                ? speedResult.status
+                : 0;
+            const durationMs = speedResult && typeof speedResult.durationMs === 'number'
+                ? speedResult.durationMs
+                : 0;
+            const error = speedResult && speedResult.error ? String(speedResult.error) : '';
+            remote = {
+                type: 'speed-test',
+                url: baseUrl,
+                ok: !!speedResult.ok,
+                status,
+                durationMs,
+                error
+            };
+
+            if (!speedResult.ok) {
+                const errorLower = error.toLowerCase();
+                if (errorLower.includes('timeout')) {
+                    issues.push({
+                        code: 'remote-speedtest-timeout',
+                        message: '远程测速超时',
+                        suggestion: '检查网络或 base_url 是否可达'
+                    });
+                } else if (errorLower.includes('invalid url')) {
+                    issues.push({
+                        code: 'remote-speedtest-invalid-url',
+                        message: '远程测速失败：base_url 无效',
+                        suggestion: '请设置为 http/https 的完整 URL'
+                    });
+                } else {
+                    issues.push({
+                        code: 'remote-speedtest-unreachable',
+                        message: `远程测速失败：${error || '无法连接'}`,
+                        suggestion: '检查网络或 base_url 是否可用'
+                    });
+                }
+            } else if (status === 401 || status === 403) {
+                issues.push({
+                    code: 'remote-speedtest-auth-failed',
+                    message: '远程测速鉴权失败（401/403）',
+                    suggestion: '检查 API Key 或认证方式'
+                });
+            } else if (status >= 400) {
+                issues.push({
+                    code: 'remote-speedtest-http-error',
+                    message: `远程测速返回异常状态: ${status}`,
+                    suggestion: '检查 base_url 或服务状态'
+                });
             }
         }
     }
@@ -3309,7 +3359,7 @@ function resolveSpeedTestTarget(params) {
     return { error: 'Missing name or url' };
 }
 
-function runSpeedTest(targetUrl, apiKey) {
+function runSpeedTest(targetUrl, apiKey, options = {}) {
     return new Promise((resolve) => {
         let parsed;
         try {
@@ -3317,6 +3367,10 @@ function runSpeedTest(targetUrl, apiKey) {
         } catch (e) {
             return resolve({ ok: false, error: 'Invalid URL' });
         }
+
+        const timeoutMs = Number.isFinite(options.timeoutMs)
+            ? Math.max(1000, Number(options.timeoutMs))
+            : SPEED_TEST_TIMEOUT_MS;
 
         const transport = parsed.protocol === 'https:' ? https : http;
         const headers = {
@@ -3339,7 +3393,7 @@ function runSpeedTest(targetUrl, apiKey) {
             });
         });
 
-        req.setTimeout(SPEED_TEST_TIMEOUT_MS, () => {
+        req.setTimeout(timeoutMs, () => {
             req.destroy(new Error('timeout'));
         });
 

@@ -1462,6 +1462,9 @@
             background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.98) 100%);
             width: 90%;
             max-width: 400px;
+            max-height: 90vh;
+            overflow-y: auto;
+            overscroll-behavior: contain;
             border-radius: var(--radius-lg);
             padding: var(--spacing-md);
             box-shadow: var(--shadow-modal);
@@ -1556,6 +1559,94 @@
             opacity: 0.8;
         }
 
+        .quick-section {
+            margin-top: var(--spacing-md);
+            padding: var(--spacing-sm);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--color-border-soft);
+            background: linear-gradient(140deg, rgba(255, 252, 247, 0.95), rgba(255, 255, 255, 0.6));
+        }
+
+        .quick-header {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--spacing-xs);
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .quick-title {
+            font-size: var(--font-size-secondary);
+            font-weight: var(--font-weight-secondary);
+            color: var(--color-text-secondary);
+        }
+
+        .quick-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--spacing-xs);
+        }
+
+        .quick-steps {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--spacing-xs);
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .quick-step {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1px dashed var(--color-border-soft);
+            background: var(--color-surface);
+            font-size: var(--font-size-caption);
+            color: var(--color-text-secondary);
+        }
+
+        .step-badge {
+            width: 20px;
+            height: 20px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--color-brand);
+            color: #fff;
+            font-size: 12px;
+            font-weight: var(--font-weight-secondary);
+        }
+
+        .quick-grid {
+            display: grid;
+            gap: var(--spacing-sm);
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        }
+
+        .quick-card {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border-soft);
+            border-radius: var(--radius-sm);
+            padding: var(--spacing-sm);
+            box-shadow: var(--shadow-subtle);
+        }
+
+        .quick-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: var(--font-size-caption);
+            color: var(--color-text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .quick-option input {
+            accent-color: var(--color-brand);
+        }
+
         .structured-section {
             margin-top: var(--spacing-md);
             padding: var(--spacing-sm);
@@ -1598,6 +1689,102 @@
             font-weight: var(--font-weight-secondary);
             color: var(--color-text-secondary);
             margin-bottom: 8px;
+        }
+
+        .provider-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-xs);
+        }
+
+        .provider-item {
+            border: 1px dashed var(--color-border-soft);
+            border-radius: var(--radius-sm);
+            padding: var(--spacing-xs);
+            background: var(--color-surface-alt);
+        }
+
+        .provider-header {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--spacing-xs);
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .provider-name {
+            font-weight: var(--font-weight-secondary);
+            color: var(--color-text-secondary);
+        }
+
+        .provider-source {
+            font-size: var(--font-size-caption);
+            color: var(--color-text-tertiary);
+        }
+
+        .provider-fields {
+            display: grid;
+            gap: 6px;
+        }
+
+        .provider-field {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: baseline;
+        }
+
+        .provider-field-key {
+            font-family: var(--font-family-mono);
+            font-size: var(--font-size-caption);
+            color: var(--color-text-muted);
+            min-width: 110px;
+        }
+
+        .provider-field-value {
+            font-family: var(--font-family-mono);
+            font-size: var(--font-size-caption);
+            color: var(--color-text-secondary);
+            word-break: break-all;
+        }
+
+        .agent-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-xs);
+        }
+
+        .agent-item {
+            border: 1px dashed var(--color-border-soft);
+            border-radius: var(--radius-sm);
+            padding: var(--spacing-xs);
+            background: var(--color-surface-alt);
+        }
+
+        .agent-header {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--spacing-xs);
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .agent-name {
+            font-weight: var(--font-weight-secondary);
+            color: var(--color-text-secondary);
+        }
+
+        .agent-id {
+            font-size: var(--font-size-caption);
+            color: var(--color-text-tertiary);
+        }
+
+        .agent-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            font-size: var(--font-size-caption);
+            color: var(--color-text-secondary);
         }
 
         .list-row {
@@ -1965,7 +2152,7 @@
                         placeholder="例如: gpt-5.3-codex"
                     >
                     <div class="config-template-hint" v-if="modelsSource === 'unlimited'">
-                        当前提供商未提供模型列表，视为不限；模型可手动输入。
+                        当前提供商未提供模型列表，视为不限。模型可手动输入。
                     </div>
                     <div class="config-template-hint" v-if="modelsSource === 'error'">
                         模型列表获取失败，请检查接口或手动输入。
@@ -2019,29 +2206,11 @@
                         <span class="selector-title">配置健康检查</span>
                     </div>
                     <div class="config-template-hint">
-                        检测 base_url、API Key 与模型可用性（可选远程探测会发起真实请求，可能产生费用）。
-                    </div>
-                    <div class="config-template-hint">
-                        <label class="health-remote-toggle">
-                            <input type="checkbox" v-model="healthCheckRemote">
-                            启用远程探测（请求 base_url 与 /v1/models）
-                        </label>
+                        检测 base_url、API Key 与模型配置。可选远程探测会发起真实测速请求，可能产生费用。
                     </div>
                     <button class="btn-tool" @click="runHealthCheck" :disabled="healthCheckLoading || loading || !!initError">
                         {{ healthCheckLoading ? '检查中...' : '运行检查' }}
                     </button>
-                    <div v-if="healthCheckResult" class="health-report">
-                        <div v-if="healthCheckResult.ok" class="health-ok">未发现问题</div>
-                        <div v-else>
-                            <div
-                                v-for="(issue, index) in healthCheckResult.issues"
-                                :key="(issue.code || 'issue') + index"
-                                class="health-issue">
-                                <div class="health-issue-title">{{ issue.message }}</div>
-                                <div v-if="issue.suggestion" class="health-issue-suggestion">{{ issue.suggestion }}</div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 <div v-if="!loading && !initError" class="card-list">
@@ -2158,7 +2327,7 @@
                     添加 OpenClaw 配置
                 </button>
                 <div class="config-template-hint">
-                    默认应用到 <code>~/.openclaw/openclaw.json</code>；支持 JSON5（注释/尾逗号）。
+                    默认应用到 <code>~/.openclaw/openclaw.json</code>。支持 JSON5（注释/尾逗号）。
                 </div>
 
                 <div class="selector-section">
@@ -2285,7 +2454,7 @@
                         </div>
                     </div>
                     <div class="session-hint">
-                        关键词/角色/时间筛选暂不可用；<br>
+                        关键词/角色/时间筛选暂不可用。<br>
                         仅支持来源与路径筛选，右侧仅查看/导出。
                     </div>
                 </div>
@@ -2578,9 +2747,101 @@
                     </div>
                 </div>
 
+                <div class="quick-section">
+                    <div class="quick-header">
+                        <div>
+                            <div class="quick-title">新手快速配置</div>
+                            <div class="form-hint">按 3 步完成：填 Provider 和模型，写入编辑器，保存并应用。</div>
+                        </div>
+                        <div class="quick-actions">
+                            <button class="btn-mini" @click="syncOpenclawQuickFromText">从编辑器读取</button>
+                            <button class="btn-mini" @click="resetOpenclawQuick">清空</button>
+                        </div>
+                    </div>
+                    <div class="quick-steps">
+                        <div class="quick-step"><span class="step-badge">1</span><span>填写 Provider 与模型</span></div>
+                        <div class="quick-step"><span class="step-badge">2</span><span>点击写入编辑器</span></div>
+                        <div class="quick-step"><span class="step-badge">3</span><span>保存并应用</span></div>
+                    </div>
+                    <div class="quick-grid">
+                        <div class="quick-card">
+                            <div class="structured-card-title">Provider</div>
+                            <div class="form-group">
+                                <label class="form-label">Provider 名称</label>
+                                <input v-model="openclawQuick.providerName" class="form-input" placeholder="例如: custom-myapi">
+                                <div class="form-hint">会拼成 provider/model 作为主模型标识。</div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Base URL</label>
+                                <input v-model="openclawQuick.baseUrl" class="form-input" placeholder="https://api.example.com/v1">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">API Key</label>
+                                <div class="list-row">
+                                    <input v-model="openclawQuick.apiKey" class="form-input" :type="openclawQuick.showKey ? 'text' : 'password'" placeholder="sk-...">
+                                    <button class="btn-mini" @click="toggleOpenclawQuickKey">
+                                        {{ openclawQuick.showKey ? '隐藏' : '显示' }}
+                                    </button>
+                                </div>
+                                <div class="form-hint">留空表示不覆盖现有 key。</div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">API 类型</label>
+                                <input v-model="openclawQuick.apiType" class="form-input" list="openclawApiTypeList" placeholder="例如: openai-responses">
+                                <datalist id="openclawApiTypeList">
+                                    <option value="openai-responses"></option>
+                                    <option value="openai-chat"></option>
+                                    <option value="anthropic"></option>
+                                    <option value="custom"></option>
+                                </datalist>
+                            </div>
+                        </div>
+
+                        <div class="quick-card">
+                            <div class="structured-card-title">模型</div>
+                            <div class="form-group">
+                                <label class="form-label">模型 ID</label>
+                                <input v-model="openclawQuick.modelId" class="form-input" placeholder="例如: gpt-4.1">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">展示名称</label>
+                                <input v-model="openclawQuick.modelName" class="form-input" placeholder="留空则使用模型 ID">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">上下文与最大输出</label>
+                                <div class="list-row">
+                                    <input v-model="openclawQuick.contextWindow" class="form-input" placeholder="上下文长度">
+                                    <input v-model="openclawQuick.maxTokens" class="form-input" placeholder="最大输出">
+                                </div>
+                                <div class="form-hint">留空表示不改动已有配置。</div>
+                            </div>
+                        </div>
+
+                        <div class="quick-card">
+                            <div class="structured-card-title">选项</div>
+                            <label class="quick-option">
+                                <input type="checkbox" v-model="openclawQuick.setPrimary">
+                                设为主模型
+                            </label>
+                            <label class="quick-option">
+                                <input type="checkbox" v-model="openclawQuick.overrideProvider">
+                                覆盖同名 Provider 基础信息
+                            </label>
+                            <label class="quick-option">
+                                <input type="checkbox" v-model="openclawQuick.overrideModels">
+                                覆盖同名模型列表
+                            </label>
+                            <div class="form-hint">关闭覆盖会只补空缺字段。</div>
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-confirm" @click="applyOpenclawQuickToText">写入编辑器</button>
+                    </div>
+                </div>
+
                 <div class="structured-section">
                     <div class="structured-header">
-                        <span class="structured-title">结构化配置（可选）</span>
+                        <span class="structured-title">结构化配置（高级）</span>
                         <span class="form-hint">写入编辑器会重排 JSON，注释可能丢失。</span>
                     </div>
                     <div class="structured-grid">
@@ -2660,6 +2921,52 @@
                                 <button class="btn-mini" @click="addOpenclawToolsDeny">添加 deny</button>
                             </div>
                         </div>
+
+                        <div class="structured-card">
+                            <div class="structured-card-title">Providers（只读）</div>
+                            <div v-if="openclawProviders.length === 0" class="form-hint">
+                                未发现 providers 配置（可能使用内置 provider 或 auth profiles）。
+                            </div>
+                            <div v-else class="provider-list">
+                                <div class="provider-item" v-for="(provider, index) in openclawProviders" :key="provider.key + '-' + provider.source + '-' + index">
+                                    <div class="provider-header">
+                                        <span class="provider-name">{{ provider.key }}</span>
+                                        <span class="provider-source">来源: {{ provider.source }}</span>
+                                        <span v-if="provider.isActive" class="pill configured">使用中</span>
+                                    </div>
+                                    <div v-if="provider.fields.length === 0" class="form-hint">未配置字段</div>
+                                    <div v-else class="provider-fields">
+                                        <div class="provider-field" v-for="field in provider.fields" :key="provider.key + '-' + field.key">
+                                            <span class="provider-field-key">{{ field.key }}</span>
+                                            <span class="provider-field-value">{{ field.value }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div v-if="openclawMissingProviders.length" class="form-hint">
+                                使用中的 provider 未在配置中显示：{{ openclawMissingProviders.join(', ') }}。
+                            </div>
+                        </div>
+
+                        <div class="structured-card">
+                            <div class="structured-card-title">Agents（只读）</div>
+                            <div v-if="openclawAgentsList.length === 0" class="form-hint">
+                                未发现 agents.list 配置。
+                            </div>
+                            <div v-else class="agent-list">
+                                <div class="agent-item" v-for="(agent, index) in openclawAgentsList" :key="agent.key + '-' + index">
+                                    <div class="agent-header">
+                                        <span class="agent-name">{{ agent.name }}</span>
+                                        <span class="agent-id">ID: {{ agent.id }}</span>
+                                    </div>
+                                    <div class="agent-meta" v-if="agent.theme || agent.emoji || agent.avatar">
+                                        <span v-if="agent.theme">主题: {{ agent.theme }}</span>
+                                        <span v-if="agent.emoji">表情: {{ agent.emoji }}</span>
+                                        <span v-if="agent.avatar">头像: {{ agent.avatar }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="btn-group">
                         <button class="btn btn-confirm secondary" @click="syncOpenclawStructuredFromText">从文本刷新</button>
@@ -2675,7 +2982,7 @@
                         spellcheck="false"
                         placeholder="在这里编辑 OpenClaw 配置（JSON5）"></textarea>
                     <div class="template-editor-warning">
-                        保存仅写入本地配置库；点击“保存并应用”后会写入 openclaw.json。
+                        保存仅写入本地配置库。点击“保存并应用”后会写入 openclaw.json。
                     </div>
                 </div>
 
@@ -2703,7 +3010,7 @@
                         spellcheck="false"
                         placeholder="在这里编辑 config.toml 模板内容"></textarea>
                     <div class="template-editor-warning">
-                        工具不会自动改动 `config.toml`；只有点击“确认应用模板”后才写入。
+                        工具不会自动改动 `config.toml`。只有点击“确认应用模板”后才写入。
                     </div>
                 </div>
 
@@ -2898,6 +3205,23 @@
                         toolsAllow: [],
                         toolsDeny: []
                     },
+                    openclawQuick: {
+                        providerName: '',
+                        baseUrl: '',
+                        apiKey: '',
+                        apiType: 'openai-responses',
+                        modelId: '',
+                        modelName: '',
+                        contextWindow: '',
+                        maxTokens: '',
+                        setPrimary: true,
+                        overrideProvider: true,
+                        overrideModels: true,
+                        showKey: false
+                    },
+                    openclawAgentsList: [],
+                    openclawProviders: [],
+                    openclawMissingProviders: [],
                     recentConfigs: [],
                     recentLoading: false,
                     healthCheckLoading: false,
@@ -2968,7 +3292,7 @@
                             this.providersList = listRes.providers;
                             await this.loadModelsForProvider(this.currentProvider);
                             if (statusRes.configReady === false) {
-                                this.showMessage(statusRes.configNotice || '未检测到 config.toml，已加载默认模板；请在模板编辑器确认后创建。', 'info');
+                                this.showMessage(statusRes.configNotice || '未检测到 config.toml，已加载默认模板。请在模板编辑器确认后创建。', 'info');
                             }
                             if (statusRes.initNotice) {
                                 this.showMessage(statusRes.initNotice, 'info');
@@ -3538,14 +3862,44 @@
                     this.healthCheckResult = null;
                     try {
                         const res = await api('config-health-check', {
-                            remote: this.healthCheckRemote
+                            remote: false
                         });
                         if (res && typeof res === 'object') {
-                            this.healthCheckResult = res;
-                            if (res.ok) {
+                            const issues = Array.isArray(res.issues) ? [...res.issues] : [];
+                            let remote = res.remote || null;
+                            {
+                                const providers = (this.providersList || [])
+                                    .filter(provider => provider && provider.name);
+                                const tasks = providers.map(provider =>
+                                    this.runSpeedTest(provider.name, { silent: true })
+                                        .then(result => ({ name: provider.name, result }))
+                                        .catch(err => ({
+                                            name: provider.name,
+                                            result: { ok: false, error: err && err.message ? err.message : 'Speed test failed' }
+                                        }))
+                                );
+                                const pairs = await Promise.all(tasks);
+                                const results = {};
+                                for (const pair of pairs) {
+                                    results[pair.name] = pair.result || null;
+                                    const issue = this.buildSpeedTestIssue(pair.name, pair.result);
+                                    if (issue) issues.push(issue);
+                                }
+                                remote = {
+                                    type: 'speed-test',
+                                    results
+                                };
+                            }
+
+                            const ok = issues.length === 0;
+                            this.healthCheckResult = {
+                                ...res,
+                                ok,
+                                issues,
+                                remote
+                            };
+                            if (ok) {
                                 this.showMessage('健康检查通过', 'success');
-                            } else {
-                                this.showMessage('发现配置问题，请查看详情', 'error');
                             }
                         } else {
                             this.healthCheckResult = null;
@@ -4093,6 +4447,160 @@
                         toolsAllow: [''],
                         toolsDeny: ['']
                     };
+                    this.openclawAgentsList = [];
+                    this.openclawProviders = [];
+                    this.openclawMissingProviders = [];
+                },
+
+                getOpenclawQuickDefaults() {
+                    return {
+                        providerName: '',
+                        baseUrl: '',
+                        apiKey: '',
+                        apiType: 'openai-responses',
+                        modelId: '',
+                        modelName: '',
+                        contextWindow: '',
+                        maxTokens: '',
+                        setPrimary: true,
+                        overrideProvider: true,
+                        overrideModels: true,
+                        showKey: false
+                    };
+                },
+
+                resetOpenclawQuick() {
+                    this.openclawQuick = this.getOpenclawQuickDefaults();
+                },
+
+                toggleOpenclawQuickKey() {
+                    this.openclawQuick.showKey = !this.openclawQuick.showKey;
+                },
+
+                fillOpenclawQuickFromConfig(config) {
+                    const defaults = this.getOpenclawQuickDefaults();
+                    if (!config || typeof config !== 'object' || Array.isArray(config)) {
+                        this.openclawQuick = defaults;
+                        return;
+                    }
+
+                    const agentDefaults = config.agents && typeof config.agents === 'object' && !Array.isArray(config.agents)
+                        && config.agents.defaults && typeof config.agents.defaults === 'object' && !Array.isArray(config.agents.defaults)
+                        ? config.agents.defaults
+                        : {};
+                    const modelConfig = agentDefaults.model;
+                    const legacyAgent = config.agent && typeof config.agent === 'object' && !Array.isArray(config.agent)
+                        ? config.agent
+                        : {};
+
+                    let primaryRef = '';
+                    if (modelConfig && typeof modelConfig === 'object' && !Array.isArray(modelConfig) && typeof modelConfig.primary === 'string') {
+                        primaryRef = modelConfig.primary;
+                    } else if (typeof modelConfig === 'string') {
+                        primaryRef = modelConfig;
+                    }
+                    if (!primaryRef) {
+                        if (typeof legacyAgent.model === 'string') {
+                            primaryRef = legacyAgent.model;
+                        } else if (legacyAgent.model && typeof legacyAgent.model === 'object' && typeof legacyAgent.model.primary === 'string') {
+                            primaryRef = legacyAgent.model.primary;
+                        }
+                    }
+
+                    let providerName = '';
+                    let modelId = '';
+                    if (primaryRef) {
+                        const parts = primaryRef.split('/');
+                        if (parts.length >= 2) {
+                            providerName = parts.shift().trim();
+                            modelId = parts.join('/').trim();
+                        }
+                    }
+
+                    const providers = config.models && typeof config.models === 'object' && !Array.isArray(config.models)
+                        && config.models.providers && typeof config.models.providers === 'object' && !Array.isArray(config.models.providers)
+                        ? config.models.providers
+                        : null;
+                    let providerConfig = providerName && providers ? providers[providerName] : null;
+                    if (!providerName && providers) {
+                        const providerKeys = Object.keys(providers);
+                        if (providerKeys.length === 1) {
+                            providerName = providerKeys[0];
+                            providerConfig = providers[providerName];
+                        }
+                    }
+
+                    let modelEntry = null;
+                    if (providerConfig && typeof providerConfig === 'object' && Array.isArray(providerConfig.models)) {
+                        if (modelId) {
+                            modelEntry = providerConfig.models.find(item => item && item.id === modelId);
+                        }
+                        if (!modelEntry && providerConfig.models.length === 1) {
+                            modelEntry = providerConfig.models[0];
+                            if (!modelId && modelEntry && typeof modelEntry.id === 'string') {
+                                modelId = modelEntry.id;
+                            }
+                        }
+                    }
+
+                    const baseUrl = providerConfig && typeof providerConfig === 'object' && typeof providerConfig.baseUrl === 'string'
+                        ? providerConfig.baseUrl
+                        : '';
+                    const apiKey = providerConfig && typeof providerConfig === 'object' && typeof providerConfig.apiKey === 'string'
+                        ? providerConfig.apiKey
+                        : '';
+                    const apiType = providerConfig && typeof providerConfig === 'object' && typeof providerConfig.api === 'string'
+                        ? providerConfig.api
+                        : defaults.apiType;
+
+                    this.openclawQuick = {
+                        ...defaults,
+                        providerName,
+                        baseUrl,
+                        apiKey,
+                        apiType,
+                        modelId: modelId || '',
+                        modelName: modelEntry && typeof modelEntry.name === 'string' ? modelEntry.name : '',
+                        contextWindow: modelEntry && typeof modelEntry.contextWindow === 'number'
+                            ? String(modelEntry.contextWindow)
+                            : '',
+                        maxTokens: modelEntry && typeof modelEntry.maxTokens === 'number'
+                            ? String(modelEntry.maxTokens)
+                            : ''
+                    };
+                },
+
+                syncOpenclawQuickFromText(options = {}) {
+                    const silent = !!options.silent;
+                    const parsed = this.parseOpenclawContent(this.openclawEditing.content, { allowEmpty: true });
+                    if (!parsed.ok) {
+                        this.resetOpenclawQuick();
+                        if (!silent) {
+                            this.showMessage('解析 OpenClaw 配置失败: ' + parsed.error, 'error');
+                        }
+                        return false;
+                    }
+                    this.fillOpenclawQuickFromConfig(parsed.data);
+                    if (!silent) {
+                        this.showMessage('已从编辑器读取快速配置', 'success');
+                    }
+                    return true;
+                },
+
+                mergeOpenclawModelEntry(existing, incoming, overwrite = false) {
+                    if (!existing || typeof existing !== 'object' || Array.isArray(existing)) {
+                        return { ...incoming };
+                    }
+                    if (overwrite) {
+                        return { ...incoming };
+                    }
+                    const merged = { ...existing };
+                    for (const [key, value] of Object.entries(incoming || {})) {
+                        if (merged[key] === undefined || merged[key] === null || merged[key] === '') {
+                            merged[key] = value;
+                        }
+                    }
+                    return merged;
                 },
 
                 fillOpenclawStructured(config) {
@@ -4159,16 +4667,168 @@
                     const parsed = this.parseOpenclawContent(this.openclawEditing.content, { allowEmpty: true });
                     if (!parsed.ok) {
                         this.resetOpenclawStructured();
+                        this.resetOpenclawQuick();
                         if (!silent) {
                             this.showMessage('解析 OpenClaw 配置失败: ' + parsed.error, 'error');
                         }
                         return false;
                     }
                     this.fillOpenclawStructured(parsed.data);
+                    this.fillOpenclawQuickFromConfig(parsed.data);
+                    this.refreshOpenclawProviders(parsed.data);
+                    this.refreshOpenclawAgentsList(parsed.data);
                     if (!silent) {
                         this.showMessage('已从文本刷新结构化配置', 'success');
                     }
                     return true;
+                },
+
+                getOpenclawActiveProviders(config) {
+                    const active = new Set();
+                    const addProvider = (ref) => {
+                        if (typeof ref !== 'string') return;
+                        const text = ref.trim();
+                        if (!text) return;
+                        const parts = text.split('/');
+                        if (parts.length < 2) return;
+                        const provider = parts[0].trim();
+                        if (provider) active.add(provider);
+                    };
+                    const defaults = config && config.agents && config.agents.defaults
+                        ? config.agents.defaults
+                        : {};
+                    const model = defaults && defaults.model;
+                    if (model && typeof model === 'object' && !Array.isArray(model)) {
+                        addProvider(model.primary);
+                        if (Array.isArray(model.fallbacks)) {
+                            for (const item of model.fallbacks) {
+                                addProvider(item);
+                            }
+                        }
+                    } else if (typeof model === 'string') {
+                        addProvider(model);
+                    }
+                    const modelsDefaults = config && config.models && config.models.defaults
+                        ? config.models.defaults
+                        : {};
+                    if (modelsDefaults && typeof modelsDefaults.provider === 'string' && modelsDefaults.provider.trim()) {
+                        active.add(modelsDefaults.provider.trim());
+                    }
+                    if (modelsDefaults && typeof modelsDefaults.model === 'string') {
+                        addProvider(modelsDefaults.model);
+                    }
+                    return active;
+                },
+
+                maskProviderValue(value) {
+                    const text = value == null ? '' : String(value);
+                    if (!text) return '****';
+                    if (text.length <= 6) return '****';
+                    return `${text.slice(0, 3)}****${text.slice(-3)}`;
+                },
+
+                formatProviderValue(key, value) {
+                    if (typeof value === 'undefined' || value === null) {
+                        return '';
+                    }
+                    let text = '';
+                    if (typeof value === 'string') {
+                        text = value;
+                    } else if (typeof value === 'number' || typeof value === 'boolean') {
+                        text = String(value);
+                    } else {
+                        try {
+                            text = JSON.stringify(value);
+                        } catch (_) {
+                            text = String(value);
+                        }
+                    }
+                    if (!text) return '';
+                    if (/key|token|secret|password/i.test(key)) {
+                        return this.maskProviderValue(text);
+                    }
+                    if (text.length > 160) {
+                        return `${text.slice(0, 157)}...`;
+                    }
+                    return text;
+                },
+
+                collectOpenclawProviders(source, providerMap, activeProviders, entries) {
+                    if (!providerMap || typeof providerMap !== 'object' || Array.isArray(providerMap)) {
+                        return;
+                    }
+                    const keys = Object.keys(providerMap).sort();
+                    for (const key of keys) {
+                        const value = providerMap[key];
+                        const fields = [];
+                        if (value && typeof value === 'object' && !Array.isArray(value)) {
+                            const fieldKeys = Object.keys(value).sort();
+                            for (const fieldKey of fieldKeys) {
+                                const fieldValue = this.formatProviderValue(fieldKey, value[fieldKey]);
+                                if (fieldValue === '') continue;
+                                fields.push({ key: fieldKey, value: fieldValue });
+                            }
+                        } else {
+                            const fieldValue = this.formatProviderValue('value', value);
+                            if (fieldValue !== '') {
+                                fields.push({ key: 'value', value: fieldValue });
+                            }
+                        }
+                        entries.push({
+                            key,
+                            source,
+                            fields,
+                            isActive: activeProviders.has(key)
+                        });
+                    }
+                },
+
+                refreshOpenclawProviders(config) {
+                    const activeProviders = this.getOpenclawActiveProviders(config || {});
+                    const entries = [];
+                    const modelsProviders = config && config.models ? config.models.providers : null;
+                    const rootProviders = config && config.providers ? config.providers : null;
+                    this.collectOpenclawProviders('models.providers', modelsProviders, activeProviders, entries);
+                    this.collectOpenclawProviders('providers', rootProviders, activeProviders, entries);
+                    const existing = new Set(entries.map(item => item.key));
+                    const missing = [];
+                    for (const provider of activeProviders) {
+                        if (!existing.has(provider)) {
+                            missing.push(provider);
+                        }
+                    }
+                    this.openclawProviders = entries;
+                    this.openclawMissingProviders = missing;
+                },
+
+                refreshOpenclawAgentsList(config) {
+                    const list = config && config.agents && typeof config.agents === 'object' && !Array.isArray(config.agents)
+                        ? config.agents.list
+                        : null;
+                    if (!Array.isArray(list)) {
+                        this.openclawAgentsList = [];
+                        return;
+                    }
+                    const entries = [];
+                    list.forEach((item, index) => {
+                        if (!item || typeof item !== 'object') return;
+                        const id = typeof item.id === 'string' && item.id.trim() ? item.id.trim() : `agent-${index + 1}`;
+                        const identity = item.identity && typeof item.identity === 'object' && !Array.isArray(item.identity)
+                            ? item.identity
+                            : {};
+                        const name = typeof identity.name === 'string' && identity.name.trim()
+                            ? identity.name.trim()
+                            : id;
+                        entries.push({
+                            key: `${id}-${index}`,
+                            id,
+                            name,
+                            theme: typeof identity.theme === 'string' ? identity.theme : '',
+                            emoji: typeof identity.emoji === 'string' ? identity.emoji : '',
+                            avatar: typeof identity.avatar === 'string' ? identity.avatar : ''
+                        });
+                    });
+                    this.openclawAgentsList = entries;
                 },
 
                 normalizeStringList(list) {
@@ -4313,7 +4973,128 @@
                     }
 
                     this.openclawEditing.content = this.stringifyOpenclawConfig(config);
+                    this.refreshOpenclawProviders(config);
+                    this.refreshOpenclawAgentsList(config);
+                    this.fillOpenclawQuickFromConfig(config);
                     this.showMessage('已写入编辑器', 'success');
+                },
+
+                applyOpenclawQuickToText() {
+                    const parsed = this.parseOpenclawContent(this.openclawEditing.content, { allowEmpty: true });
+                    if (!parsed.ok) {
+                        this.showMessage('解析 OpenClaw 配置失败: ' + parsed.error, 'error');
+                        return;
+                    }
+
+                    const providerName = (this.openclawQuick.providerName || '').trim();
+                    const modelId = (this.openclawQuick.modelId || '').trim();
+                    if (!providerName) {
+                        this.showMessage('请填写 Provider 名称', 'error');
+                        return;
+                    }
+                    if (providerName.includes('/')) {
+                        this.showMessage('Provider 名称不能包含 "/"', 'error');
+                        return;
+                    }
+                    if (!modelId) {
+                        this.showMessage('请填写模型 ID', 'error');
+                        return;
+                    }
+
+                    const config = parsed.data;
+                    const ensureObject = (value) => (value && typeof value === 'object' && !Array.isArray(value)) ? value : {};
+                    const models = ensureObject(config.models);
+                    const providers = ensureObject(models.providers);
+                    const provider = ensureObject(providers[providerName]);
+                    const baseUrl = (this.openclawQuick.baseUrl || '').trim();
+                    if (!baseUrl && !provider.baseUrl) {
+                        this.showMessage('请填写 Base URL', 'error');
+                        return;
+                    }
+
+                    const contextWindow = this.parseOptionalNumber(this.openclawQuick.contextWindow, '上下文长度');
+                    if (!contextWindow.ok) {
+                        this.showMessage(contextWindow.error, 'error');
+                        return;
+                    }
+                    const maxTokens = this.parseOptionalNumber(this.openclawQuick.maxTokens, '最大输出');
+                    if (!maxTokens.ok) {
+                        this.showMessage(maxTokens.error, 'error');
+                        return;
+                    }
+
+                    const shouldOverrideProvider = !!this.openclawQuick.overrideProvider;
+                    const apiKey = (this.openclawQuick.apiKey || '').trim();
+                    const apiType = (this.openclawQuick.apiType || '').trim();
+                    const setProviderField = (key, value) => {
+                        if (!value) return;
+                        if (shouldOverrideProvider || provider[key] === undefined || provider[key] === null || provider[key] === '') {
+                            provider[key] = value;
+                        }
+                    };
+                    setProviderField('baseUrl', baseUrl);
+                    setProviderField('api', apiType);
+                    if (apiKey) {
+                        setProviderField('apiKey', apiKey);
+                    }
+
+                    const modelName = (this.openclawQuick.modelName || '').trim() || modelId;
+                    const modelEntry = {
+                        id: modelId,
+                        name: modelName,
+                        reasoning: false,
+                        input: ['text'],
+                        cost: {
+                            input: 0,
+                            output: 0,
+                            cacheRead: 0,
+                            cacheWrite: 0
+                        }
+                    };
+                    if (contextWindow.value !== null) {
+                        modelEntry.contextWindow = contextWindow.value;
+                    }
+                    if (maxTokens.value !== null) {
+                        modelEntry.maxTokens = maxTokens.value;
+                    }
+
+                    const existingModels = Array.isArray(provider.models) ? [...provider.models] : [];
+                    if (this.openclawQuick.overrideModels || existingModels.length === 0) {
+                        provider.models = [modelEntry];
+                    } else {
+                        const idx = existingModels.findIndex(item => item && item.id === modelId);
+                        if (idx >= 0) {
+                            existingModels[idx] = this.mergeOpenclawModelEntry(existingModels[idx], modelEntry, false);
+                        } else {
+                            existingModels.push(modelEntry);
+                        }
+                        provider.models = existingModels;
+                    }
+
+                    providers[providerName] = provider;
+                    models.providers = providers;
+                    config.models = models;
+
+                    if (this.openclawQuick.setPrimary) {
+                        const agents = ensureObject(config.agents);
+                        const defaults = ensureObject(agents.defaults);
+                        const modelConfig = defaults.model && typeof defaults.model === 'object' && !Array.isArray(defaults.model)
+                            ? defaults.model
+                            : {};
+                        modelConfig.primary = `${providerName}/${modelId}`;
+                        defaults.model = modelConfig;
+                        agents.defaults = defaults;
+                        config.agents = agents;
+                        if (config.agent && typeof config.agent === 'object' && !Array.isArray(config.agent)) {
+                            config.agent.model = modelConfig.primary;
+                        }
+                    }
+
+                    this.openclawEditing.content = this.stringifyOpenclawConfig(config);
+                    this.fillOpenclawStructured(config);
+                    this.refreshOpenclawProviders(config);
+                    this.refreshOpenclawAgentsList(config);
+                    this.showMessage('快速配置已写入编辑器', 'success');
                 },
 
                 addOpenclawFallback() {
@@ -4387,25 +5168,24 @@
                     this.openclawEditorTitle = '添加 OpenClaw 配置';
                     this.openclawEditing = {
                         name: '',
-                        content: DEFAULT_OPENCLAW_TEMPLATE,
+                        content: '',
                         lockName: false
                     };
                     this.openclawConfigPath = '';
                     this.openclawConfigExists = false;
                     this.openclawLineEnding = '\n';
-                    this.syncOpenclawStructuredFromText({ silent: true });
+                    void this.loadOpenclawConfigFromFile({ silent: true, force: true, fallbackToTemplate: true });
                     this.showOpenclawConfigModal = true;
                 },
 
                 openOpenclawEditModal(name) {
-                    const config = this.openclawConfigs[name];
                     this.openclawEditorTitle = `编辑 OpenClaw 配置: ${name}`;
                     this.openclawEditing = {
                         name,
-                        content: (config && config.content) ? config.content : '',
+                        content: '',
                         lockName: true
                     };
-                    this.syncOpenclawStructuredFromText({ silent: true });
+                    void this.loadOpenclawConfigFromFile({ silent: true, force: true, fallbackToTemplate: true });
                     this.showOpenclawConfigModal = true;
                 },
 
@@ -4415,28 +5195,40 @@
                     this.openclawSaving = false;
                     this.openclawApplying = false;
                     this.resetOpenclawStructured();
+                    this.resetOpenclawQuick();
                 },
 
-                async loadOpenclawConfigFromFile() {
+                async loadOpenclawConfigFromFile(options = {}) {
+                    const silent = !!options.silent;
+                    const force = !!options.force;
+                    const fallbackToTemplate = options.fallbackToTemplate !== false;
                     this.openclawFileLoading = true;
                     try {
                         const res = await api('get-openclaw-config');
                         if (res.error) {
-                            this.showMessage(res.error, 'error');
+                            if (!silent) {
+                                this.showMessage(res.error, 'error');
+                            }
                             return;
                         }
                         this.openclawConfigPath = res.path || '';
                         this.openclawConfigExists = !!res.exists;
                         this.openclawLineEnding = res.lineEnding === '\r\n' ? '\r\n' : '\n';
-                        if (res.content && res.content.trim()) {
+                        const hasContent = !!(res.content && res.content.trim());
+                        const shouldOverride = force || !this.openclawEditing.content || !this.openclawEditing.content.trim();
+                        if (hasContent && shouldOverride) {
                             this.openclawEditing.content = res.content;
-                        } else if (!this.openclawEditing.content) {
+                        } else if (!hasContent && shouldOverride && fallbackToTemplate) {
                             this.openclawEditing.content = DEFAULT_OPENCLAW_TEMPLATE;
                         }
                         this.syncOpenclawStructuredFromText({ silent: true });
-                        this.showMessage('已加载当前 OpenClaw 配置', 'success');
+                        if (!silent) {
+                            this.showMessage('已加载当前 OpenClaw 配置', 'success');
+                        }
                     } catch (e) {
-                        this.showMessage('加载 OpenClaw 配置失败: ' + e.message, 'error');
+                        if (!silent) {
+                            this.showMessage('加载 OpenClaw 配置失败: ' + e.message, 'error');
+                        }
                     } finally {
                         this.openclawFileLoading = false;
                     }
@@ -4545,19 +5337,93 @@
                     return `${ms}ms`;
                 },
 
-                async runSpeedTest(name) {
-                    if (!name || this.speedLoading[name]) return;
-                    this.speedLoading[name] = true;
-                    const res = await api('speed-test', { name });
-                    if (res.error) {
-                        this.speedResults[name] = { ok: false, error: res.error };
-                        this.showMessage(res.error, 'error');
-                    } else {
-                        this.speedResults[name] = res;
-                        const status = res.status ? ` (${res.status})` : '';
-                        this.showMessage(`Speed ${name}: ${this.formatLatency(res)}${status}`, 'success');
+                buildSpeedTestIssue(name, result) {
+                    if (!name || !result) return null;
+                    if (result.error) {
+                        const error = String(result.error || '');
+                        const errorLower = error.toLowerCase();
+                        if (error === 'Provider not found') {
+                            return {
+                                code: 'remote-speedtest-provider-missing',
+                                message: `提供商 ${name} 未找到，无法测速`,
+                                suggestion: '检查配置是否存在该 provider'
+                            };
+                        }
+                        if (error === 'Provider missing URL' || error === 'Missing name or url') {
+                            return {
+                                code: 'remote-speedtest-baseurl-missing',
+                                message: `提供商 ${name} 缺少 base_url`,
+                                suggestion: '补全 base_url 后重试'
+                            };
+                        }
+                        if (errorLower.includes('invalid url')) {
+                            return {
+                                code: 'remote-speedtest-invalid-url',
+                                message: `提供商 ${name} 的 base_url 无效`,
+                                suggestion: '请设置为 http/https 的完整 URL'
+                            };
+                        }
+                        if (errorLower.includes('timeout')) {
+                            return {
+                                code: 'remote-speedtest-timeout',
+                                message: `提供商 ${name} 远程测速超时`,
+                                suggestion: '检查网络或 base_url 是否可达'
+                            };
+                        }
+                        return {
+                            code: 'remote-speedtest-unreachable',
+                            message: `提供商 ${name} 远程测速失败：${error || '无法连接'}`,
+                            suggestion: '检查网络或 base_url 是否可用'
+                        };
                     }
-                    this.speedLoading[name] = false;
+
+                    const status = typeof result.status === 'number' ? result.status : 0;
+                    if (status === 401 || status === 403) {
+                        return {
+                            code: 'remote-speedtest-auth-failed',
+                            message: `提供商 ${name} 远程测速鉴权失败（401/403）`,
+                            suggestion: '检查 API Key 或认证方式'
+                        };
+                    }
+                    if (status >= 400) {
+                        return {
+                            code: 'remote-speedtest-http-error',
+                            message: `提供商 ${name} 远程测速返回异常状态: ${status}`,
+                            suggestion: '检查 base_url 或服务状态'
+                        };
+                    }
+                    return null;
+                },
+
+                async runSpeedTest(name, options = {}) {
+                    if (!name || this.speedLoading[name]) return null;
+                    const silent = !!options.silent;
+                    this.speedLoading[name] = true;
+                    try {
+                        const res = await api('speed-test', { name });
+                        if (res.error) {
+                            this.speedResults[name] = { ok: false, error: res.error };
+                            if (!silent) {
+                                this.showMessage(res.error, 'error');
+                            }
+                            return { ok: false, error: res.error };
+                        }
+                        this.speedResults[name] = res;
+                        if (!silent) {
+                            const status = res.status ? ` (${res.status})` : '';
+                            this.showMessage(`Speed ${name}: ${this.formatLatency(res)}${status}`, 'success');
+                        }
+                        return res;
+                    } catch (e) {
+                        const message = e && e.message ? e.message : 'Speed test failed';
+                        this.speedResults[name] = { ok: false, error: message };
+                        if (!silent) {
+                            this.showMessage(message, 'error');
+                        }
+                        return { ok: false, error: message };
+                    } finally {
+                        this.speedLoading[name] = false;
+                    }
                 },
 
                 showMessage(text, type) {

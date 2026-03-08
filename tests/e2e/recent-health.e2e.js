@@ -118,8 +118,9 @@ async function run() {
         });
         const remoteHealth = await request('config-health-check', { remote: true, timeoutMs: 2000 });
         assert(remoteHealth && Array.isArray(remoteHealth.issues), 'remote health issues should be array');
-        const remoteCodes = new Set(remoteHealth.issues.map(item => item.code));
-        assert(remoteCodes.has('remote-models-parse'), 'remote health should flag models parse error');
+        assert(remoteHealth.ok === true, 'remote health should pass');
+        assert(remoteHealth.remote && remoteHealth.remote.type === 'speed-test', 'remote health should include speed-test info');
+        assert(typeof remoteHealth.remote.durationMs === 'number', 'remote health should include duration');
     } finally {
         if (child && !child.killed) {
             child.kill('SIGINT');
