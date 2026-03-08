@@ -2419,8 +2419,8 @@
                                 class="session-query-input"
                                 v-model="sessionQuery"
                                 @keyup.enter="loadSessions"
-                                disabled
-                                placeholder="关键词检索（暂时停用）">
+                                :disabled="sessionsLoading || !isSessionQueryEnabled"
+                                :placeholder="sessionQueryPlaceholder">
                         </div>
                         <div class="session-toolbar-group">
                             <select
@@ -2454,7 +2454,8 @@
                         </div>
                     </div>
                     <div class="session-hint">
-                        关键词/角色/时间筛选暂不可用。<br>
+                        关键词检索仅 Codex 可用；<br>
+                        角色/时间筛选暂不可用；<br>
                         仅支持来源与路径筛选，右侧仅查看/导出。
                     </div>
                 </div>
@@ -3276,6 +3277,15 @@
                 }
                 this.loadAll();
             },
+
+            computed: {
+                isSessionQueryEnabled() {
+                    return this.sessionFilterSource === 'codex';
+                },
+                sessionQueryPlaceholder() {
+                    return this.isSessionQueryEnabled ? '关键词检索' : '仅 Codex 支持关键词检索';
+                }
+            },
             methods: {
                 async loadAll() {
                     this.loading = true;
@@ -3668,7 +3678,7 @@
                     if (this.sessionsLoading) return;
                     this.sessionsLoading = true;
                     this.activeSessionDetailError = '';
-                    const query = this.sessionQuery;
+                    const query = this.isSessionQueryEnabled ? this.sessionQuery : '';
                     try {
                         const res = await api('list-sessions', {
                             source: this.sessionFilterSource,
@@ -3676,7 +3686,7 @@
                             query,
                             queryMode: 'and',
                             queryScope: 'content',
-                            contentScanLimit: 2,
+                            contentScanLimit: 50,
                             roleFilter: this.sessionRoleFilter,
                             timeRangePreset: this.sessionTimePreset,
                             limit: 200,
