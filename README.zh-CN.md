@@ -19,14 +19,6 @@ Codex Mate 让 Codex 与 Claude Code 的提供商/模型切换变成“一条命
 - 配置变更可回溯、有备份
 - Codex + Claude Code 统一会话浏览（查看/导出/可用时复制恢复命令）
 
-## 更新说明（0.0.4）
-
-- 新增 OpenClaw 配置模式（JSON5 多配置管理 + 一键应用）
-- 新增 OpenClaw Workspace 的 AGENTS.md 管理
-- 增加 JSON5 解析依赖
-
-完整更新记录见 [CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md) 与 [Releases](https://github.com/ymkiux/codexmate/releases)。
-
 ## 功能总览
 
 | 模块 | 解决的问题 | 关键能力 |

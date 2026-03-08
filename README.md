@@ -11,14 +11,6 @@ English | [Chinese](README.zh-CN.md)
 
 Codex Mate makes frequent provider/model switching for Codex and Claude Code a single command or click, and gives you a unified session browser to view/export local sessions from both.
 
-## Release Notes (0.0.4)
-
-- Added OpenClaw config mode with JSON5 profiles and one-click apply
-- Added OpenClaw workspace AGENTS.md management
-- Added JSON5 parsing dependency
-
-See [CHANGELOG.md](CHANGELOG.md) and [Releases](https://github.com/ymkiux/codexmate/releases) for the full history.
-
 ## What You Get
 
 - Faster provider/model switching
