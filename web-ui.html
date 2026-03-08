@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Codex Mate</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/json5@2/dist/index.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Source+Sans+3:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
@@ -1555,6 +1556,96 @@
             opacity: 0.8;
         }
 
+        .structured-section {
+            margin-top: var(--spacing-md);
+            padding: var(--spacing-sm);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--color-border-soft);
+            background: rgba(255, 255, 255, 0.6);
+        }
+
+        .structured-header {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--spacing-xs);
+            align-items: baseline;
+            justify-content: space-between;
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .structured-title {
+            font-size: var(--font-size-secondary);
+            font-weight: var(--font-weight-secondary);
+            color: var(--color-text-secondary);
+        }
+
+        .structured-grid {
+            display: grid;
+            gap: var(--spacing-sm);
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        }
+
+        .structured-card {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border-soft);
+            border-radius: var(--radius-sm);
+            padding: var(--spacing-sm);
+            box-shadow: var(--shadow-subtle);
+        }
+
+        .structured-card-title {
+            font-size: var(--font-size-body);
+            font-weight: var(--font-weight-secondary);
+            color: var(--color-text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .list-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--spacing-xs);
+            align-items: center;
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .list-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .list-row .form-input {
+            flex: 1;
+            min-width: 140px;
+        }
+
+        .btn-mini {
+            padding: 6px 10px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--color-border-soft);
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%);
+            font-size: var(--font-size-caption);
+            font-weight: var(--font-weight-secondary);
+            color: var(--color-text-secondary);
+            cursor: pointer;
+            transition: all var(--transition-fast) var(--ease-spring);
+            box-shadow: var(--shadow-subtle);
+        }
+
+        .btn-mini:hover {
+            border-color: var(--color-brand);
+            color: var(--color-brand);
+            transform: translateY(-1px);
+        }
+
+        .btn-mini.delete {
+            color: var(--color-error);
+            border-color: rgba(193, 72, 59, 0.35);
+        }
+
+        .btn-mini.delete:hover {
+            border-color: rgba(193, 72, 59, 0.7);
+            color: var(--color-error);
+        }
+
         .btn-group {
             display: flex;
             gap: var(--spacing-sm);
@@ -2082,6 +2173,22 @@
                     </button>
                 </div>
 
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">工作区文件</span>
+                    </div>
+                    <input
+                        class="form-input"
+                        v-model="openclawWorkspaceFileName"
+                        placeholder="例如: SOUL.md">
+                    <div class="config-template-hint">
+                        仅支持 OpenClaw Workspace 内的 <code>.md</code> 文件。
+                    </div>
+                    <button class="btn-tool" @click="openOpenclawWorkspaceEditor" :disabled="loading || !!initError || agentsLoading">
+                        {{ agentsLoading ? '加载中...' : '打开工作区文件' }}
+                    </button>
+                </div>
+
                 <div class="card-list">
                     <div v-for="(config, name) in openclawConfigs" :key="name"
                          :class="['card', { active: currentOpenclawConfig === name }]"
@@ -2471,6 +2578,95 @@
                     </div>
                 </div>
 
+                <div class="structured-section">
+                    <div class="structured-header">
+                        <span class="structured-title">结构化配置（可选）</span>
+                        <span class="form-hint">写入编辑器会重排 JSON，注释可能丢失。</span>
+                    </div>
+                    <div class="structured-grid">
+                        <div class="structured-card">
+                            <div class="structured-card-title">Agents Defaults</div>
+                            <div class="form-group">
+                                <label class="form-label">主模型</label>
+                                <input v-model="openclawStructured.agentPrimary" class="form-input" placeholder="例如: provider/model">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">备选模型</label>
+                                <div class="list-row" v-for="(item, index) in openclawStructured.agentFallbacks" :key="'fallback-' + index">
+                                    <input v-model="openclawStructured.agentFallbacks[index]" class="form-input" placeholder="例如: provider/model">
+                                    <button class="btn-mini delete" @click="removeOpenclawFallback(index)">删除</button>
+                                </div>
+                                <button class="btn-mini" @click="addOpenclawFallback">添加备选</button>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Workspace</label>
+                                <input v-model="openclawStructured.workspace" class="form-input" placeholder="例如: ~/.openclaw/workspace">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Timeout(s)</label>
+                                <input v-model="openclawStructured.timeout" class="form-input" placeholder="例如: 600">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Context Tokens</label>
+                                <input v-model="openclawStructured.contextTokens" class="form-input" placeholder="例如: 4096">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Max Concurrent</label>
+                                <input v-model="openclawStructured.maxConcurrent" class="form-input" placeholder="例如: 2">
+                            </div>
+                        </div>
+
+                        <div class="structured-card">
+                            <div class="structured-card-title">Env</div>
+                            <div class="form-group">
+                                <label class="form-label">环境变量</label>
+                                <div class="list-row" v-for="(item, index) in openclawStructured.envItems" :key="'env-' + index">
+                                    <input v-model="item.key" class="form-input" placeholder="KEY">
+                                    <input v-model="item.value" class="form-input" :type="item.show ? 'text' : 'password'" placeholder="VALUE">
+                                    <button class="btn-mini" @click="toggleOpenclawEnvItem(index)">
+                                        {{ item.show ? '隐藏' : '显示' }}
+                                    </button>
+                                    <button class="btn-mini delete" @click="removeOpenclawEnvItem(index)">删除</button>
+                                </div>
+                                <button class="btn-mini" @click="addOpenclawEnvItem">添加变量</button>
+                            </div>
+                        </div>
+
+                        <div class="structured-card">
+                            <div class="structured-card-title">Tools</div>
+                            <div class="form-group">
+                                <label class="form-label">Profile</label>
+                                <select v-model="openclawStructured.toolsProfile" class="form-input">
+                                    <option value="default">default</option>
+                                    <option value="strict">strict</option>
+                                    <option value="permissive">permissive</option>
+                                    <option value="custom">custom</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Allow</label>
+                                <div class="list-row" v-for="(item, index) in openclawStructured.toolsAllow" :key="'allow-' + index">
+                                    <input v-model="openclawStructured.toolsAllow[index]" class="form-input" placeholder="例如: fs.read*">
+                                    <button class="btn-mini delete" @click="removeOpenclawToolsAllow(index)">删除</button>
+                                </div>
+                                <button class="btn-mini" @click="addOpenclawToolsAllow">添加 allow</button>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Deny</label>
+                                <div class="list-row" v-for="(item, index) in openclawStructured.toolsDeny" :key="'deny-' + index">
+                                    <input v-model="openclawStructured.toolsDeny[index]" class="form-input" placeholder="例如: net.*">
+                                    <button class="btn-mini delete" @click="removeOpenclawToolsDeny(index)">删除</button>
+                                </div>
+                                <button class="btn-mini" @click="addOpenclawToolsDeny">添加 deny</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-confirm secondary" @click="syncOpenclawStructuredFromText">从文本刷新</button>
+                        <button class="btn btn-confirm" @click="applyOpenclawStructuredToText">写入编辑器</button>
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label class="form-label">OpenClaw 配置（JSON5）</label>
                     <textarea
@@ -2688,6 +2884,20 @@
                     openclawFileLoading: false,
                     openclawSaving: false,
                     openclawApplying: false,
+                    openclawWorkspaceFileName: 'SOUL.md',
+                    agentsWorkspaceFileName: '',
+                    openclawStructured: {
+                        agentPrimary: '',
+                        agentFallbacks: [],
+                        workspace: '',
+                        timeout: '',
+                        contextTokens: '',
+                        maxConcurrent: '',
+                        envItems: [],
+                        toolsProfile: 'default',
+                        toolsAllow: [],
+                        toolsDeny: []
+                    },
                     recentConfigs: [],
                     recentLoading: false,
                     healthCheckLoading: false,
@@ -3456,7 +3666,44 @@
                     }
                 },
 
-                setAgentsModalContext(context) {
+                async openOpenclawWorkspaceEditor() {
+                    const fileName = (this.openclawWorkspaceFileName || '').trim();
+                    if (!fileName) {
+                        this.showMessage('请输入工作区文件名', 'error');
+                        return;
+                    }
+                    this.setAgentsModalContext('openclaw-workspace', { fileName });
+                    this.agentsLoading = true;
+                    try {
+                        const res = await api('get-openclaw-workspace-file', { fileName });
+                        if (res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        if (res.configError) {
+                            this.showMessage(`OpenClaw 配置解析失败，已使用默认 Workspace：${res.configError}`, 'error');
+                        }
+                        this.agentsContent = res.content || '';
+                        this.agentsPath = res.path || '';
+                        this.agentsExists = !!res.exists;
+                        this.agentsLineEnding = res.lineEnding === '\r\n' ? '\r\n' : '\n';
+                        this.showAgentsModal = true;
+                    } catch (e) {
+                        this.showMessage('加载 OpenClaw 工作区文件失败: ' + e.message, 'error');
+                    } finally {
+                        this.agentsLoading = false;
+                    }
+                },
+
+                setAgentsModalContext(context, options = {}) {
+                    if (context === 'openclaw-workspace') {
+                        const fileName = (options.fileName || this.openclawWorkspaceFileName || 'AGENTS.md').trim();
+                        this.agentsContext = 'openclaw-workspace';
+                        this.agentsWorkspaceFileName = fileName;
+                        this.agentsModalTitle = `OpenClaw 工作区文件: ${fileName}`;
+                        this.agentsModalHint = `保存后会写入 OpenClaw Workspace 下的 ${fileName}。`;
+                        return;
+                    }
                     this.agentsContext = context === 'openclaw' ? 'openclaw' : 'codex';
                     if (this.agentsContext === 'openclaw') {
                         this.agentsModalTitle = 'OpenClaw AGENTS.md 编辑器';
@@ -3465,6 +3712,7 @@
                         this.agentsModalTitle = 'AGENTS.md 编辑器';
                         this.agentsModalHint = '保存后会写入目标 AGENTS.md（与 config.toml 同级）。';
                     }
+                    this.agentsWorkspaceFileName = '';
                 },
 
                 closeAgentsModal() {
@@ -3474,27 +3722,36 @@
                     this.agentsExists = false;
                     this.agentsLineEnding = '\n';
                     this.agentsSaving = false;
+                    this.agentsWorkspaceFileName = '';
                     this.setAgentsModalContext('codex');
                 },
 
                 async applyAgentsContent() {
                     this.agentsSaving = true;
                     try {
-                        const action = this.agentsContext === 'openclaw'
-                            ? 'apply-openclaw-agents-file'
-                            : 'apply-agents-file';
-                        const res = await api(action, {
+                        let action = 'apply-agents-file';
+                        const params = {
                             content: this.agentsContent,
                             lineEnding: this.agentsLineEnding
-                        });
+                        };
+                        if (this.agentsContext === 'openclaw') {
+                            action = 'apply-openclaw-agents-file';
+                        } else if (this.agentsContext === 'openclaw-workspace') {
+                            action = 'apply-openclaw-workspace-file';
+                            params.fileName = this.agentsWorkspaceFileName;
+                        }
+                        const res = await api(action, params);
                         if (res.error) {
                             this.showMessage(res.error, 'error');
                             return;
                         }
-                        this.showMessage('AGENTS.md 已保存', 'success');
+                        const successLabel = this.agentsContext === 'openclaw-workspace'
+                            ? `工作区文件已保存${this.agentsWorkspaceFileName ? `: ${this.agentsWorkspaceFileName}` : ''}`
+                            : (this.agentsContext === 'openclaw' ? 'OpenClaw AGENTS.md 已保存' : 'AGENTS.md 已保存');
+                        this.showMessage(successLabel, 'success');
                         this.closeAgentsModal();
                     } catch (e) {
-                        this.showMessage('保存 AGENTS.md 失败: ' + e.message, 'error');
+                        this.showMessage('保存文件失败: ' + e.message, 'error');
                     } finally {
                         this.agentsSaving = false;
                     }
@@ -3780,6 +4037,336 @@
                     };
                 },
 
+                getOpenclawParser() {
+                    if (window.JSON5 && typeof window.JSON5.parse === 'function' && typeof window.JSON5.stringify === 'function') {
+                        return {
+                            parse: window.JSON5.parse,
+                            stringify: window.JSON5.stringify
+                        };
+                    }
+                    return {
+                        parse: JSON.parse,
+                        stringify: JSON.stringify
+                    };
+                },
+
+                parseOpenclawContent(content, options = {}) {
+                    const allowEmpty = !!options.allowEmpty;
+                    const raw = typeof content === 'string' ? content.trim() : '';
+                    if (!raw) {
+                        if (allowEmpty) {
+                            return { ok: true, data: {} };
+                        }
+                        return { ok: false, error: '配置内容为空' };
+                    }
+                    try {
+                        const parser = this.getOpenclawParser();
+                        const data = parser.parse(raw);
+                        if (!data || typeof data !== 'object' || Array.isArray(data)) {
+                            return { ok: false, error: '配置格式错误（根节点必须是对象）' };
+                        }
+                        return { ok: true, data };
+                    } catch (e) {
+                        return { ok: false, error: e.message || '解析失败' };
+                    }
+                },
+
+                stringifyOpenclawConfig(data) {
+                    const parser = this.getOpenclawParser();
+                    try {
+                        return parser.stringify(data, null, 2);
+                    } catch (e) {
+                        return JSON.stringify(data, null, 2);
+                    }
+                },
+
+                resetOpenclawStructured() {
+                    this.openclawStructured = {
+                        agentPrimary: '',
+                        agentFallbacks: [''],
+                        workspace: '',
+                        timeout: '',
+                        contextTokens: '',
+                        maxConcurrent: '',
+                        envItems: [{ key: '', value: '', show: false }],
+                        toolsProfile: 'default',
+                        toolsAllow: [''],
+                        toolsDeny: ['']
+                    };
+                },
+
+                fillOpenclawStructured(config) {
+                    const defaults = config && config.agents && typeof config.agents === 'object' && !Array.isArray(config.agents)
+                        && config.agents.defaults && typeof config.agents.defaults === 'object' && !Array.isArray(config.agents.defaults)
+                        ? config.agents.defaults
+                        : {};
+                    const model = defaults.model && typeof defaults.model === 'object' && !Array.isArray(defaults.model)
+                        ? defaults.model
+                        : {};
+                    const legacyAgent = config && config.agent && typeof config.agent === 'object' && !Array.isArray(config.agent)
+                        ? config.agent
+                        : {};
+                    const fallbackList = Array.isArray(model.fallbacks)
+                        ? model.fallbacks.filter(item => typeof item === 'string' && item.trim()).map(item => item.trim())
+                        : [];
+                    const env = config && config.env && typeof config.env === 'object' && !Array.isArray(config.env)
+                        ? config.env
+                        : {};
+                    const envItems = Object.entries(env).map(([key, value]) => ({
+                        key,
+                        value: value == null ? '' : String(value),
+                        show: false
+                    }));
+                    const tools = config && config.tools && typeof config.tools === 'object' && !Array.isArray(config.tools)
+                        ? config.tools
+                        : {};
+
+                    let primary = typeof model.primary === 'string' ? model.primary : '';
+                    if (!primary) {
+                        if (typeof legacyAgent.model === 'string') {
+                            primary = legacyAgent.model;
+                        } else if (legacyAgent.model && typeof legacyAgent.model === 'object' && typeof legacyAgent.model.primary === 'string') {
+                            primary = legacyAgent.model.primary;
+                        }
+                    }
+
+                    this.openclawStructured = {
+                        agentPrimary: primary,
+                        agentFallbacks: fallbackList.length ? fallbackList : [''],
+                        workspace: typeof defaults.workspace === 'string' ? defaults.workspace : '',
+                        timeout: typeof defaults.timeout === 'number' && Number.isFinite(defaults.timeout)
+                            ? String(defaults.timeout)
+                            : '',
+                        contextTokens: typeof defaults.contextTokens === 'number' && Number.isFinite(defaults.contextTokens)
+                            ? String(defaults.contextTokens)
+                            : '',
+                        maxConcurrent: typeof defaults.maxConcurrent === 'number' && Number.isFinite(defaults.maxConcurrent)
+                            ? String(defaults.maxConcurrent)
+                            : '',
+                        envItems: envItems.length ? envItems : [{ key: '', value: '', show: false }],
+                        toolsProfile: typeof tools.profile === 'string' && tools.profile.trim() ? tools.profile : 'default',
+                        toolsAllow: Array.isArray(tools.allow) && tools.allow.length
+                            ? tools.allow.filter(item => typeof item === 'string' && item.trim()).map(item => item.trim())
+                            : [''],
+                        toolsDeny: Array.isArray(tools.deny) && tools.deny.length
+                            ? tools.deny.filter(item => typeof item === 'string' && item.trim()).map(item => item.trim())
+                            : ['']
+                    };
+                },
+
+                syncOpenclawStructuredFromText(options = {}) {
+                    const silent = !!options.silent;
+                    const parsed = this.parseOpenclawContent(this.openclawEditing.content, { allowEmpty: true });
+                    if (!parsed.ok) {
+                        this.resetOpenclawStructured();
+                        if (!silent) {
+                            this.showMessage('解析 OpenClaw 配置失败: ' + parsed.error, 'error');
+                        }
+                        return false;
+                    }
+                    this.fillOpenclawStructured(parsed.data);
+                    if (!silent) {
+                        this.showMessage('已从文本刷新结构化配置', 'success');
+                    }
+                    return true;
+                },
+
+                normalizeStringList(list) {
+                    if (!Array.isArray(list)) return [];
+                    const result = [];
+                    const seen = new Set();
+                    for (const item of list) {
+                        const value = typeof item === 'string' ? item.trim() : String(item || '').trim();
+                        if (!value) continue;
+                        const key = value;
+                        if (seen.has(key)) continue;
+                        seen.add(key);
+                        result.push(value);
+                    }
+                    return result;
+                },
+
+                normalizeEnvItems(items) {
+                    if (!Array.isArray(items)) {
+                        return { ok: true, items: {} };
+                    }
+                    const output = {};
+                    const seen = new Set();
+                    for (const item of items) {
+                        const key = item && typeof item.key === 'string' ? item.key.trim() : '';
+                        if (!key) continue;
+                        if (seen.has(key)) {
+                            return { ok: false, error: `环境变量重复: ${key}` };
+                        }
+                        seen.add(key);
+                        const value = item && typeof item.value !== 'undefined' ? String(item.value) : '';
+                        output[key] = value;
+                    }
+                    return { ok: true, items: output };
+                },
+
+                parseOptionalNumber(value, label) {
+                    const text = typeof value === 'string' ? value.trim() : String(value || '').trim();
+                    if (!text) {
+                        return { ok: true, value: null };
+                    }
+                    const num = Number(text);
+                    if (!Number.isFinite(num) || num < 0) {
+                        return { ok: false, error: `${label} 请输入有效数字` };
+                    }
+                    return { ok: true, value: num };
+                },
+
+                applyOpenclawStructuredToText() {
+                    const parsed = this.parseOpenclawContent(this.openclawEditing.content, { allowEmpty: true });
+                    if (!parsed.ok) {
+                        this.showMessage('解析 OpenClaw 配置失败: ' + parsed.error, 'error');
+                        return;
+                    }
+
+                    const config = parsed.data;
+                    const agents = config.agents && typeof config.agents === 'object' && !Array.isArray(config.agents)
+                        ? config.agents
+                        : {};
+                    const defaults = agents.defaults && typeof agents.defaults === 'object' && !Array.isArray(agents.defaults)
+                        ? agents.defaults
+                        : {};
+                    const model = defaults.model && typeof defaults.model === 'object' && !Array.isArray(defaults.model)
+                        ? defaults.model
+                        : {};
+
+                    const primary = (this.openclawStructured.agentPrimary || '').trim();
+                    const fallbacks = this.normalizeStringList(this.openclawStructured.agentFallbacks);
+                    if (primary) {
+                        model.primary = primary;
+                    }
+                    if (fallbacks.length) {
+                        model.fallbacks = fallbacks;
+                    }
+                    if (primary || fallbacks.length) {
+                        defaults.model = model;
+                    }
+                    if (primary && config.agent && typeof config.agent === 'object' && !Array.isArray(config.agent)) {
+                        config.agent.model = primary;
+                    }
+
+                    const workspace = (this.openclawStructured.workspace || '').trim();
+                    if (workspace) {
+                        defaults.workspace = workspace;
+                    }
+
+                    const timeout = this.parseOptionalNumber(this.openclawStructured.timeout, 'Timeout');
+                    if (!timeout.ok) {
+                        this.showMessage(timeout.error, 'error');
+                        return;
+                    }
+                    if (timeout.value !== null) {
+                        defaults.timeout = timeout.value;
+                    }
+
+                    const contextTokens = this.parseOptionalNumber(this.openclawStructured.contextTokens, 'Context Tokens');
+                    if (!contextTokens.ok) {
+                        this.showMessage(contextTokens.error, 'error');
+                        return;
+                    }
+                    if (contextTokens.value !== null) {
+                        defaults.contextTokens = contextTokens.value;
+                    }
+
+                    const maxConcurrent = this.parseOptionalNumber(this.openclawStructured.maxConcurrent, 'Max Concurrent');
+                    if (!maxConcurrent.ok) {
+                        this.showMessage(maxConcurrent.error, 'error');
+                        return;
+                    }
+                    if (maxConcurrent.value !== null) {
+                        defaults.maxConcurrent = maxConcurrent.value;
+                    }
+
+                    if (Object.keys(defaults).length > 0) {
+                        config.agents = agents;
+                        config.agents.defaults = defaults;
+                    }
+
+                    const envResult = this.normalizeEnvItems(this.openclawStructured.envItems);
+                    if (!envResult.ok) {
+                        this.showMessage(envResult.error, 'error');
+                        return;
+                    }
+                    if (Object.keys(envResult.items).length > 0) {
+                        config.env = envResult.items;
+                    } else if (config.env) {
+                        delete config.env;
+                    }
+
+                    const profile = (this.openclawStructured.toolsProfile || '').trim();
+                    const allowList = this.normalizeStringList(this.openclawStructured.toolsAllow);
+                    const denyList = this.normalizeStringList(this.openclawStructured.toolsDeny);
+                    const hasTools = profile || allowList.length || denyList.length || (config.tools && typeof config.tools === 'object');
+                    if (hasTools) {
+                        const tools = config.tools && typeof config.tools === 'object' && !Array.isArray(config.tools)
+                            ? config.tools
+                            : {};
+                        tools.profile = profile || tools.profile || 'default';
+                        tools.allow = allowList;
+                        tools.deny = denyList;
+                        config.tools = tools;
+                    }
+
+                    this.openclawEditing.content = this.stringifyOpenclawConfig(config);
+                    this.showMessage('已写入编辑器', 'success');
+                },
+
+                addOpenclawFallback() {
+                    this.openclawStructured.agentFallbacks.push('');
+                },
+
+                removeOpenclawFallback(index) {
+                    this.openclawStructured.agentFallbacks.splice(index, 1);
+                    if (this.openclawStructured.agentFallbacks.length === 0) {
+                        this.openclawStructured.agentFallbacks.push('');
+                    }
+                },
+
+                addOpenclawEnvItem() {
+                    this.openclawStructured.envItems.push({ key: '', value: '', show: false });
+                },
+
+                removeOpenclawEnvItem(index) {
+                    this.openclawStructured.envItems.splice(index, 1);
+                    if (this.openclawStructured.envItems.length === 0) {
+                        this.openclawStructured.envItems.push({ key: '', value: '', show: false });
+                    }
+                },
+
+                toggleOpenclawEnvItem(index) {
+                    const item = this.openclawStructured.envItems[index];
+                    if (item) {
+                        item.show = !item.show;
+                    }
+                },
+
+                addOpenclawToolsAllow() {
+                    this.openclawStructured.toolsAllow.push('');
+                },
+
+                removeOpenclawToolsAllow(index) {
+                    this.openclawStructured.toolsAllow.splice(index, 1);
+                    if (this.openclawStructured.toolsAllow.length === 0) {
+                        this.openclawStructured.toolsAllow.push('');
+                    }
+                },
+
+                addOpenclawToolsDeny() {
+                    this.openclawStructured.toolsDeny.push('');
+                },
+
+                removeOpenclawToolsDeny(index) {
+                    this.openclawStructured.toolsDeny.splice(index, 1);
+                    if (this.openclawStructured.toolsDeny.length === 0) {
+                        this.openclawStructured.toolsDeny.push('');
+                    }
+                },
+
                 openclawHasContent(config) {
                     return !!(config && typeof config.content === 'string' && config.content.trim());
                 },
@@ -3806,6 +4393,7 @@
                     this.openclawConfigPath = '';
                     this.openclawConfigExists = false;
                     this.openclawLineEnding = '\n';
+                    this.syncOpenclawStructuredFromText({ silent: true });
                     this.showOpenclawConfigModal = true;
                 },
 
@@ -3817,6 +4405,7 @@
                         content: (config && config.content) ? config.content : '',
                         lockName: true
                     };
+                    this.syncOpenclawStructuredFromText({ silent: true });
                     this.showOpenclawConfigModal = true;
                 },
 
@@ -3825,6 +4414,7 @@
                     this.openclawEditing = { name: '', content: '', lockName: false };
                     this.openclawSaving = false;
                     this.openclawApplying = false;
+                    this.resetOpenclawStructured();
                 },
 
                 async loadOpenclawConfigFromFile() {
@@ -3843,6 +4433,7 @@
                         } else if (!this.openclawEditing.content) {
                             this.openclawEditing.content = DEFAULT_OPENCLAW_TEMPLATE;
                         }
+                        this.syncOpenclawStructuredFromText({ silent: true });
                         this.showMessage('已加载当前 OpenClaw 配置', 'success');
                     } catch (e) {
                         this.showMessage('加载 OpenClaw 配置失败: ' + e.message, 'error');
