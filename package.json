@@ -1,6 +1,6 @@
-﻿{
+{
   "name": "codexmate",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Codex/Claude Code 配置与会话管理 CLI + Web 工具",
   "bin": {
     "codexmate": "./cli.js"
