@@ -2206,7 +2206,7 @@
                         <span class="selector-title">配置健康检查</span>
                     </div>
                     <div class="config-template-hint">
-                        检测 base_url、API Key 与模型配置。可选远程探测会发起真实测速请求，可能产生费用。
+                        检测 base_url/Key/模型；远程探测=真实请求/可能费用。
                     </div>
                     <button class="btn-tool" @click="runHealthCheck" :disabled="healthCheckLoading || loading || !!initError">
                         {{ healthCheckLoading ? '检查中...' : '运行检查' }}
