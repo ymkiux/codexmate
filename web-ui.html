@@ -1788,7 +1788,7 @@
                         当前模型不在接口列表中，请手动输入或在模板中调整。
                     </div>
                     <div class="config-template-hint">
-                        Codex 配置改动采用模板确认模式：请先编辑模板，再手动确认应用。
+                        Codex 配置需先改模板，再手动应用。
                     </div>
                     <button class="btn-tool btn-template-editor" @click="openConfigTemplateEditor" :disabled="loading || !!initError">
                         打开 Config 模板编辑器
@@ -1800,7 +1800,7 @@
                         <span class="selector-title">AGENTS.md</span>
                     </div>
                     <div class="config-template-hint">
-                        管理 Codex 指令文件，默认读写 <code>~/.codex/AGENTS.md</code>（与 <code>config.toml</code> 同级）。
+                        Codex 指令：<code>~/.codex/AGENTS.md</code>（同级 <code>config.toml</code>）。
                     </div>
                     <button class="btn-tool" @click="openAgentsEditor" :disabled="loading || !!initError || agentsLoading">
                         {{ agentsLoading ? '加载中...' : '打开 AGENTS.md 编辑器' }}
@@ -1860,6 +1860,22 @@
                 </button>
                 <div class="config-template-hint">
                     默认应用到 <code>~/.claude/settings.json</code>。
+                </div>
+
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">模型</span>
+                    </div>
+                    <input
+                        class="model-input"
+                        v-model="currentClaudeModel"
+                        @blur="onClaudeModelChange"
+                        @keyup.enter="onClaudeModelChange"
+                        placeholder="例如: claude-3-7-sonnet"
+                    >
+                    <div class="config-template-hint">
+                        模型修改后会自动保存并应用到当前配置。
+                    </div>
                 </div>
 
                 <div class="card-list">
@@ -2016,7 +2032,8 @@
                         </div>
                     </div>
                     <div class="session-hint">
-                        关键词检索与角色/时间筛选暂时停用；当前仅支持来源与路径筛选会话列表。右侧预览区仅支持查看与导出。
+                        关键词/角色/时间筛选暂不可用；<br>
+                        仅支持来源与路径筛选，右侧仅查看/导出。
                     </div>
                 </div>
 
@@ -2245,25 +2262,11 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">API Key</label>
-                    <input v-model="newClaudeConfig.apiKey" class="form-input" placeholder="sk-ant-..." @input="scheduleClaudeModelsReload('new')">
+                    <input v-model="newClaudeConfig.apiKey" class="form-input" placeholder="sk-ant-...">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Base URL</label>
-                    <input v-model="newClaudeConfig.baseUrl" class="form-input" placeholder="https://open.bigmodel.cn/api/anthropic" @input="scheduleClaudeModelsReload('new')">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">模型</label>
-                    <div class="form-hint" v-if="claudeModelsLoading">模型列表加载中...</div>
-                    <select v-if="claudeModelsSource === 'remote'" class="form-input" v-model="newClaudeConfig.model" @change="updateClaudeModelsCurrent('new')">
-                        <option v-for="model in claudeModels" :key="model" :value="model">{{ model }}</option>
-                    </select>
-                    <input v-if="claudeModelsSource !== 'remote' || !claudeModelsHasCurrent" v-model="newClaudeConfig.model" class="form-input" @blur="updateClaudeModelsCurrent('new')" placeholder="例如: claude-sonnet-4-20250514">
-                    <div class="config-template-hint" v-if="claudeModelsSource === 'error'">
-                        模型列表获取失败，可手动输入。
-                    </div>
-                    <div class="config-template-hint" v-if="claudeModelsSource === 'remote' && !claudeModelsHasCurrent">
-                        当前模型不在列表，可手动输入。
-                    </div>
+                    <input v-model="newClaudeConfig.baseUrl" class="form-input" placeholder="https://open.bigmodel.cn/api/anthropic">
                 </div>
 
                 <div class="btn-group">
@@ -2284,31 +2287,16 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">API Key</label>
-                    <input v-model="editingConfig.apiKey" class="form-input" placeholder="sk-ant-..." @input="scheduleClaudeModelsReload('edit')">
+                    <input v-model="editingConfig.apiKey" class="form-input" placeholder="sk-ant-...">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Base URL</label>
-                    <input v-model="editingConfig.baseUrl" class="form-input" placeholder="https://open.bigmodel.cn/api/anthropic" @input="scheduleClaudeModelsReload('edit')">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">模型</label>
-                    <div class="form-hint" v-if="claudeModelsLoading">模型列表加载中...</div>
-                    <select v-if="claudeModelsSource === 'remote'" class="form-input" v-model="editingConfig.model" @change="updateClaudeModelsCurrent('edit')">
-                        <option v-for="model in claudeModels" :key="model" :value="model">{{ model }}</option>
-                    </select>
-                    <input v-if="claudeModelsSource !== 'remote' || !claudeModelsHasCurrent" v-model="editingConfig.model" class="form-input" @blur="updateClaudeModelsCurrent('edit')" placeholder="例如: claude-sonnet-4-20250514">
-                    <div class="config-template-hint" v-if="claudeModelsSource === 'error'">
-                        模型列表获取失败，可手动输入。
-                    </div>
-                    <div class="config-template-hint" v-if="claudeModelsSource === 'remote' && !claudeModelsHasCurrent">
-                        当前模型不在列表，可手动输入。
-                    </div>
+                    <input v-model="editingConfig.baseUrl" class="form-input" placeholder="https://open.bigmodel.cn/api/anthropic">
                 </div>
 
                 <div class="btn-group">
                     <button class="btn btn-cancel" @click="closeEditConfigModal">取消</button>
-                    <button class="btn btn-confirm" @click="updateConfig">保存</button>
-                    <button class="btn btn-confirm secondary" @click="saveAndApplyConfig">保存并应用到 Claude 配置</button>
+                    <button class="btn btn-confirm" @click="saveAndApplyConfig">保存并应用</button>
                 </div>
             </div>
         </div>
@@ -2467,7 +2455,6 @@
                     claudeModelsSource: 'idle',
                     claudeModelsHasCurrent: true,
                     claudeModelsLoading: false,
-                    claudeModelsReloadTimer: null,
                     loading: true,
                     initError: '',
                     message: '',
@@ -2525,6 +2512,7 @@
                     editingProvider: { name: '', url: '', key: '' },
                     newModelName: '',
                     currentClaudeConfig: '',
+                    currentClaudeModel: '',
                     editingConfig: { name: '', apiKey: '', baseUrl: '', model: '' },
                     claudeConfigs: {
                         '智谱GLM': {
@@ -2577,6 +2565,13 @@
                         console.error('加载 Claude 配置失败:', e);
                     }
                 }
+                if (!this.currentClaudeConfig) {
+                    const configNames = Object.keys(this.claudeConfigs);
+                    if (configNames.length > 0) {
+                        this.currentClaudeConfig = configNames[0];
+                    }
+                }
+                this.syncClaudeModelFromConfig();
                 const savedOpenclawConfigs = localStorage.getItem('openclawConfigs');
                 if (savedOpenclawConfigs) {
                     try {
@@ -2664,33 +2659,35 @@
                     }
                 },
 
+                getCurrentClaudeConfig() {
+                    if (!this.currentClaudeConfig) return null;
+                    return this.claudeConfigs[this.currentClaudeConfig] || null;
+                },
+
+                syncClaudeModelFromConfig() {
+                    const config = this.getCurrentClaudeConfig();
+                    this.currentClaudeModel = config && config.model ? config.model : '';
+                },
+
+                refreshClaudeModelContext() {
+                    this.syncClaudeModelFromConfig();
+                    this.loadClaudeModels();
+                },
+
                 resetClaudeModelsState() {
-                    if (this.claudeModelsReloadTimer) {
-                        clearTimeout(this.claudeModelsReloadTimer);
-                        this.claudeModelsReloadTimer = null;
-                    }
                     this.claudeModels = [];
                     this.claudeModelsSource = 'idle';
                     this.claudeModelsHasCurrent = true;
                     this.claudeModelsLoading = false;
                 },
 
-                updateClaudeModelsCurrent(mode) {
-                    const currentModel = mode === 'edit' ? this.editingConfig.model : this.newClaudeConfig.model;
+                updateClaudeModelsCurrent() {
+                    const currentModel = (this.currentClaudeModel || '').trim();
                     this.claudeModelsHasCurrent = !!currentModel && this.claudeModels.includes(currentModel);
                 },
 
-                scheduleClaudeModelsReload(mode) {
-                    if (this.claudeModelsReloadTimer) {
-                        clearTimeout(this.claudeModelsReloadTimer);
-                    }
-                    this.claudeModelsReloadTimer = setTimeout(() => {
-                        this.loadClaudeModels(mode);
-                    }, 400);
-                },
-
-                async loadClaudeModels(mode) {
-                    const config = mode === 'edit' ? this.editingConfig : this.newClaudeConfig;
+                async loadClaudeModels() {
+                    const config = this.getCurrentClaudeConfig();
                     const baseUrl = (config.baseUrl || '').trim();
                     const apiKey = (config.apiKey || '').trim();
 
@@ -2718,7 +2715,7 @@
                         const list = Array.isArray(res.models) ? res.models : [];
                         this.claudeModels = list;
                         this.claudeModelsSource = res.source || 'remote';
-                        this.updateClaudeModelsCurrent(mode);
+                        this.updateClaudeModelsCurrent();
                     } catch (e) {
                         this.showMessage('模型列表获取失败: ' + e.message, 'error');
                         this.claudeModels = [];
@@ -2731,7 +2728,6 @@
 
                 openClaudeConfigModal() {
                     this.showClaudeConfigModal = true;
-                    this.loadClaudeModels('new');
                 },
 
                 maybeShowStarPrompt() {
@@ -2745,6 +2741,9 @@
 
                 switchConfigMode(mode) {
                     this.configMode = mode;
+                    if (mode === 'claude') {
+                        this.refreshClaudeModelContext();
+                    }
                     if (mode === 'sessions' && this.sessionsList.length === 0) {
                         this.loadSessions();
                     }
@@ -3408,6 +3407,35 @@
 
                 switchClaudeConfig(name) {
                     this.currentClaudeConfig = name;
+                    this.refreshClaudeModelContext();
+                },
+
+                onClaudeModelChange() {
+                    const name = this.currentClaudeConfig;
+                    if (!name) {
+                        this.showMessage('请先选择配置', 'error');
+                        return;
+                    }
+                    const model = (this.currentClaudeModel || '').trim();
+                    if (!model) {
+                        this.showMessage('请输入模型', 'error');
+                        return;
+                    }
+                    const existing = this.claudeConfigs[name] || {};
+                    this.currentClaudeModel = model;
+                    this.claudeConfigs[name] = {
+                        apiKey: existing.apiKey || '',
+                        baseUrl: existing.baseUrl || '',
+                        model: model,
+                        hasKey: !!existing.apiKey
+                    };
+                    this.saveClaudeConfigs();
+                    this.updateClaudeModelsCurrent();
+                    if (!this.claudeConfigs[name].apiKey) {
+                        this.showMessage('该配置未设置 API Key，请先编辑', 'error');
+                        return;
+                    }
+                    this.applyClaudeConfig(name);
                 },
 
                 saveClaudeConfigs() {
@@ -3423,7 +3451,6 @@
                         model: config.model || ''
                     };
                     this.showEditConfigModal = true;
-                    this.loadClaudeModels('edit');
                 },
 
                 updateConfig() {
@@ -3437,12 +3464,14 @@
                     this.saveClaudeConfigs();
                     this.showMessage('配置已更新', 'success');
                     this.closeEditConfigModal();
+                    if (name === this.currentClaudeConfig) {
+                        this.refreshClaudeModelContext();
+                    }
                 },
 
                 closeEditConfigModal() {
                     this.showEditConfigModal = false;
                     this.editingConfig = { name: '', apiKey: '', baseUrl: '', model: '' };
-                    this.resetClaudeModelsState();
                 },
 
                 async saveAndApplyConfig() {
@@ -3457,7 +3486,12 @@
 
                     const config = this.claudeConfigs[name];
                     if (!config.apiKey) {
-                        return this.showMessage('请先输入 API Key', 'error');
+                        this.showMessage('已保存，未应用：请先输入 API Key', 'info');
+                        this.closeEditConfigModal();
+                        if (name === this.currentClaudeConfig) {
+                            this.refreshClaudeModelContext();
+                        }
+                        return;
                     }
 
                     const res = await api('apply-claude-config', { config });
@@ -3467,6 +3501,9 @@
                         const targetTip = res.targetPath ? `（${res.targetPath}）` : '';
                         this.showMessage(`已保存并应用到 Claude 配置${targetTip}`, 'success');
                         this.closeEditConfigModal();
+                        if (name === this.currentClaudeConfig) {
+                            this.refreshClaudeModelContext();
+                        }
                     }
                 },
 
@@ -3490,6 +3527,7 @@
                     this.saveClaudeConfigs();
                     this.showMessage('配置已添加', 'success');
                     this.closeClaudeConfigModal();
+                    this.refreshClaudeModelContext();
                 },
 
                 deleteClaudeConfig(name) {
@@ -3505,10 +3543,12 @@
                     }
                     this.saveClaudeConfigs();
                     this.showMessage('配置已删除', 'success');
+                    this.refreshClaudeModelContext();
                 },
 
                 async applyClaudeConfig(name) {
                     this.currentClaudeConfig = name;
+                    this.refreshClaudeModelContext();
                     const config = this.claudeConfigs[name];
 
                     if (!config.apiKey) {
@@ -3532,7 +3572,6 @@
                         baseUrl: 'https://open.bigmodel.cn/api/anthropic',
                         model: 'glm-4.7'
                     };
-                    this.resetClaudeModelsState();
                 },
 
                 openclawHasContent(config) {
