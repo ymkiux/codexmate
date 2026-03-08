@@ -178,6 +178,29 @@ async function main() {
         const models = JSON.parse(fs.readFileSync(modelsPath, 'utf-8'));
         assert(models.includes('e2e-model'), 'custom model not added');
 
+        const sessionsDir = path.join(tmpHome, '.codex', 'sessions');
+        fs.mkdirSync(sessionsDir, { recursive: true });
+        const sessionId = 'e2e-session';
+        const sessionPath = path.join(sessionsDir, `${sessionId}.jsonl`);
+        const sessionRecords = [
+            {
+                type: 'session_meta',
+                payload: { id: sessionId, cwd: '/tmp/e2e' },
+                timestamp: '2025-01-01T00:00:00.000Z'
+            },
+            {
+                type: 'response_item',
+                payload: { type: 'message', role: 'user', content: 'hello' },
+                timestamp: '2025-01-01T00:00:01.000Z'
+            },
+            {
+                type: 'response_item',
+                payload: { type: 'message', role: 'assistant', content: 'world' },
+                timestamp: '2025-01-01T00:00:02.000Z'
+            }
+        ];
+        fs.writeFileSync(sessionPath, sessionRecords.map(record => JSON.stringify(record)).join('\n') + '\n', 'utf-8');
+
         const statusResult = runSync(node, [cliPath, 'status'], { env });
         assert(statusResult.status === 0, 'status failed');
         assert(statusResult.stdout.includes('提供商: e2e'), 'status provider not shown');
@@ -254,6 +277,35 @@ async function main() {
                 params: { baseUrl: noModelsUrl }
             });
             assert(apiModelsByUrlUnlimited.unlimited === true, 'api models-by-url unlimited missing');
+
+            const apiSessions = await postJson(port, {
+                action: 'list-sessions',
+                params: { source: 'codex', limit: 50, forceRefresh: true }
+            });
+            assert(Array.isArray(apiSessions.sessions), 'api sessions missing');
+            assert(apiSessions.sessions.some(item => item.sessionId === sessionId), 'api sessions missing codex entry');
+
+            const cloneResult = await postJson(port, {
+                action: 'clone-session',
+                params: { source: 'codex', sessionId }
+            });
+            assert(cloneResult.success === true, 'clone-session failed');
+            assert(cloneResult.sessionId && cloneResult.sessionId !== sessionId, 'clone-session id invalid');
+            assert(fs.existsSync(cloneResult.filePath), 'clone-session file missing');
+
+            const deleteResult = await postJson(port, {
+                action: 'delete-session',
+                params: { source: 'codex', sessionId }
+            });
+            assert(deleteResult.success === true, 'delete-session failed');
+            assert(!fs.existsSync(sessionPath), 'delete-session file still exists');
+
+            const apiSessionsAfterDelete = await postJson(port, {
+                action: 'list-sessions',
+                params: { source: 'codex', limit: 50, forceRefresh: true }
+            });
+            assert(!apiSessionsAfterDelete.sessions.some(item => item.sessionId === sessionId), 'deleted session still listed');
+            assert(apiSessionsAfterDelete.sessions.some(item => item.sessionId === cloneResult.sessionId), 'clone session missing after delete');
 
             const speedResult = await postJson(port, { action: 'speed-test', params: { name: 'e2e2' } }, 4000);
             assert(speedResult.ok === true, 'speed-test failed');
