@@ -28,9 +28,11 @@ const OPENCLAW_WORKSPACE_DIR = path.join(OPENCLAW_DIR, 'workspace');
 const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 const CLAUDE_SETTINGS_FILE = path.join(CLAUDE_DIR, 'settings.json');
 const CLAUDE_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
+const RECENT_CONFIGS_FILE = path.join(CONFIG_DIR, 'recent-configs.json');
 
 const DEFAULT_MODELS = ['gpt-5.3-codex', 'gpt-5.1-codex-max', 'gpt-4-turbo', 'gpt-4'];
 const SPEED_TEST_TIMEOUT_MS = 8000;
+const HEALTH_CHECK_TIMEOUT_MS = 6000;
 const MAX_SESSION_LIST_SIZE = 300;
 const MAX_EXPORT_MESSAGES = 1000;
 const DEFAULT_SESSION_DETAIL_MESSAGES = 300;
@@ -50,6 +52,7 @@ const MODELS_CACHE_TTL_MS = 60 * 1000;
 const MODELS_NEGATIVE_CACHE_TTL_MS = 5 * 1000;
 const MODELS_CACHE_MAX_ENTRIES = 50;
 const MODELS_RESPONSE_MAX_BYTES = 1024 * 1024;
+const MAX_RECENT_CONFIGS = 3;
 const BOOTSTRAP_TEXT_MARKERS = [
     'agents.md instructions',
     '<instructions>',
@@ -169,6 +172,22 @@ function readJsonFile(filePath, fallback = null) {
         return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
     } catch (e) {
         return fallback;
+    }
+}
+
+function readJsonArrayFile(filePath, fallback = []) {
+    if (!fs.existsSync(filePath)) {
+        return Array.isArray(fallback) ? [...fallback] : [];
+    }
+    try {
+        const content = fs.readFileSync(filePath, 'utf-8');
+        if (!content.trim()) {
+            return Array.isArray(fallback) ? [...fallback] : [];
+        }
+        const parsed = JSON.parse(content);
+        return Array.isArray(parsed) ? parsed : (Array.isArray(fallback) ? [...fallback] : []);
+    } catch (e) {
+        return Array.isArray(fallback) ? [...fallback] : [];
     }
 }
 
@@ -795,6 +814,590 @@ function writeJsonAtomic(filePath, data) {
     }
 }
 
+function normalizeRecentConfigs(items) {
+    if (!Array.isArray(items)) return [];
+    const output = [];
+    const seen = new Set();
+    for (const item of items) {
+        if (!item || typeof item !== 'object') continue;
+        const provider = typeof item.provider === 'string' ? item.provider.trim() : '';
+        const model = typeof item.model === 'string' ? item.model.trim() : '';
+        if (!provider || !model) continue;
+        const key = `${provider}::${model}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        output.push({
+            provider,
+            model,
+            usedAt: typeof item.usedAt === 'string' ? item.usedAt : ''
+        });
+    }
+    return output;
+}
+
+function readRecentConfigs() {
+    return normalizeRecentConfigs(readJsonArrayFile(RECENT_CONFIGS_FILE, []));
+}
+
+function writeRecentConfigs(items) {
+    writeJsonAtomic(RECENT_CONFIGS_FILE, items);
+}
+
+function recordRecentConfig(provider, model) {
+    const providerName = typeof provider === 'string' ? provider.trim() : '';
+    const modelName = typeof model === 'string' ? model.trim() : '';
+    if (!providerName || !modelName) return;
+
+    const now = new Date().toISOString();
+    const current = readRecentConfigs();
+    const next = [{
+        provider: providerName,
+        model: modelName,
+        usedAt: now
+    }];
+
+    for (const item of current) {
+        if (item.provider === providerName && item.model === modelName) continue;
+        next.push(item);
+    }
+
+    const trimmed = next.slice(0, MAX_RECENT_CONFIGS);
+    writeRecentConfigs(trimmed);
+}
+
+function isValidHttpUrl(value) {
+    if (typeof value !== 'string' || !value.trim()) return false;
+    try {
+        const parsed = new URL(value);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch (e) {
+        return false;
+    }
+}
+
+function normalizeBaseUrl(value) {
+    if (typeof value !== 'string') return '';
+    return value.trim().replace(/\/+$/g, '');
+}
+
+function joinApiUrl(baseUrl, pathSuffix) {
+    const trimmed = normalizeBaseUrl(baseUrl);
+    if (!trimmed) return '';
+    const safeSuffix = String(pathSuffix || '').replace(/^\/+/g, '');
+    if (!safeSuffix) return trimmed;
+    if (/\/v1$/i.test(trimmed)) {
+        return `${trimmed}/${safeSuffix}`;
+    }
+    return `${trimmed}/v1/${safeSuffix}`;
+}
+
+function buildModelsProbeUrl(baseUrl) {
+    return joinApiUrl(baseUrl, 'models');
+}
+
+function normalizeWireApi(value) {
+    const raw = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (!raw) return 'responses';
+    return raw.replace(/[\s-]/g, '_');
+}
+
+function buildModelProbeSpec(provider, modelName, baseUrl) {
+    const model = typeof modelName === 'string' ? modelName.trim() : '';
+    if (!model) return null;
+
+    const wireApi = normalizeWireApi(provider && provider.wire_api);
+    if (wireApi === 'chat_completions' || wireApi === 'chat') {
+        return {
+            url: joinApiUrl(baseUrl, 'chat/completions'),
+            body: {
+                model,
+                messages: [{ role: 'user', content: 'ping' }],
+                max_tokens: 1,
+                temperature: 0
+            }
+        };
+    }
+
+    if (wireApi === 'completions') {
+        return {
+            url: joinApiUrl(baseUrl, 'completions'),
+            body: {
+                model,
+                prompt: 'ping',
+                max_tokens: 1,
+                temperature: 0
+            }
+        };
+    }
+
+    return {
+        url: joinApiUrl(baseUrl, 'responses'),
+        body: {
+            model,
+            input: 'ping',
+            max_output_tokens: 1
+        }
+    };
+}
+
+function probeUrl(targetUrl, options = {}) {
+    return new Promise((resolve) => {
+        let parsed;
+        try {
+            parsed = new URL(targetUrl);
+        } catch (e) {
+            return resolve({ ok: false, error: 'Invalid URL' });
+        }
+
+        const transport = parsed.protocol === 'https:' ? https : http;
+        const headers = {
+            'User-Agent': 'codexmate-health-check',
+            'Accept': 'application/json'
+        };
+        if (options.apiKey) {
+            headers['Authorization'] = `Bearer ${options.apiKey}`;
+        }
+
+        const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : HEALTH_CHECK_TIMEOUT_MS;
+        const maxBytes = Number.isFinite(options.maxBytes) ? options.maxBytes : 256 * 1024;
+        const start = Date.now();
+        const req = transport.request(parsed, { method: 'GET', headers }, (res) => {
+            const chunks = [];
+            let size = 0;
+            res.on('data', (chunk) => {
+                if (!chunk) return;
+                size += chunk.length;
+                if (size <= maxBytes) {
+                    chunks.push(chunk);
+                }
+            });
+            res.on('end', () => {
+                const body = chunks.length > 0 ? Buffer.concat(chunks).toString('utf-8') : '';
+                resolve({
+                    ok: true,
+                    status: res.statusCode || 0,
+                    durationMs: Date.now() - start,
+                    body
+                });
+            });
+        });
+
+        req.setTimeout(timeoutMs, () => {
+            req.destroy(new Error('timeout'));
+        });
+
+        req.on('error', (err) => {
+            resolve({
+                ok: false,
+                error: err.message || 'request failed',
+                durationMs: Date.now() - start
+            });
+        });
+
+        req.end();
+    });
+}
+
+function probeJsonPost(targetUrl, body, options = {}) {
+    return new Promise((resolve) => {
+        let parsed;
+        try {
+            parsed = new URL(targetUrl);
+        } catch (e) {
+            return resolve({ ok: false, error: 'Invalid URL' });
+        }
+
+        const transport = parsed.protocol === 'https:' ? https : http;
+        const headers = {
+            'User-Agent': 'codexmate-health-check',
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        };
+        if (options.apiKey) {
+            headers['Authorization'] = `Bearer ${options.apiKey}`;
+        }
+
+        const payload = JSON.stringify(body || {});
+        headers['Content-Length'] = Buffer.byteLength(payload);
+
+        const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : HEALTH_CHECK_TIMEOUT_MS;
+        const maxBytes = Number.isFinite(options.maxBytes) ? options.maxBytes : 256 * 1024;
+        const start = Date.now();
+        const req = transport.request(parsed, { method: 'POST', headers }, (res) => {
+            const chunks = [];
+            let size = 0;
+            res.on('data', (chunk) => {
+                if (!chunk) return;
+                size += chunk.length;
+                if (size <= maxBytes) {
+                    chunks.push(chunk);
+                }
+            });
+            res.on('end', () => {
+                const bodyText = chunks.length > 0 ? Buffer.concat(chunks).toString('utf-8') : '';
+                resolve({
+                    ok: true,
+                    status: res.statusCode || 0,
+                    durationMs: Date.now() - start,
+                    body: bodyText
+                });
+            });
+        });
+
+        req.setTimeout(timeoutMs, () => {
+            req.destroy(new Error('timeout'));
+        });
+
+        req.on('error', (err) => {
+            resolve({
+                ok: false,
+                error: err.message || 'request failed',
+                durationMs: Date.now() - start
+            });
+        });
+
+        req.write(payload);
+        req.end();
+    });
+}
+
+function extractModelIds(payload) {
+    const ids = [];
+    const pushValue = (value) => {
+        if (typeof value === 'string' && value.trim()) {
+            ids.push(value.trim());
+        }
+    };
+
+    if (!payload) return ids;
+
+    if (Array.isArray(payload)) {
+        for (const item of payload) {
+            if (item && typeof item === 'object') {
+                pushValue(item.id);
+                pushValue(item.model);
+                pushValue(item.name);
+            } else {
+                pushValue(item);
+            }
+        }
+        return ids;
+    }
+
+    if (Array.isArray(payload.data)) {
+        for (const item of payload.data) {
+            if (item && typeof item === 'object') {
+                pushValue(item.id);
+                pushValue(item.model);
+                pushValue(item.name);
+            } else {
+                pushValue(item);
+            }
+        }
+    }
+
+    if (Array.isArray(payload.models)) {
+        for (const item of payload.models) {
+            if (item && typeof item === 'object') {
+                pushValue(item.id);
+                pushValue(item.model);
+                pushValue(item.name);
+            } else {
+                pushValue(item);
+            }
+        }
+    }
+
+    return ids;
+}
+
+async function runRemoteHealthCheck(provider, modelName, options = {}) {
+    const issues = [];
+    const results = {};
+    const baseUrl = normalizeBaseUrl(provider && provider.base_url ? provider.base_url : '');
+    if (!baseUrl) {
+        issues.push({
+            code: 'remote-skip-base-url',
+            message: '无法进行远程探测：base_url 为空',
+            suggestion: '补全 base_url 或关闭远程探测'
+        });
+        return { issues, results };
+    }
+
+    const requiresAuth = provider && provider.requires_openai_auth !== false;
+    const apiKey = typeof provider.preferred_auth_method === 'string'
+        ? provider.preferred_auth_method.trim()
+        : '';
+    const authValue = requiresAuth ? apiKey : (apiKey || '');
+    const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : HEALTH_CHECK_TIMEOUT_MS;
+
+    const baseProbe = await probeUrl(baseUrl, { apiKey: authValue, timeoutMs });
+    results.base = {
+        url: baseUrl,
+        status: baseProbe.status || 0,
+        ok: baseProbe.ok,
+        durationMs: baseProbe.durationMs || 0
+    };
+
+    if (!baseProbe.ok) {
+        issues.push({
+            code: 'remote-unreachable',
+            message: `远程探测失败：${baseProbe.error || '无法连接'}`,
+            suggestion: '检查网络与 base_url 可达性'
+        });
+        return { issues, results };
+    }
+
+    if (baseProbe.status === 401 || baseProbe.status === 403) {
+        issues.push({
+            code: 'remote-auth-failed',
+            message: '远程探测鉴权失败（401/403）',
+            suggestion: '检查 API Key 或认证方式'
+        });
+    } else if (baseProbe.status >= 400) {
+        issues.push({
+            code: 'remote-http-error',
+            message: `远程探测返回异常状态: ${baseProbe.status}`,
+            suggestion: '检查 base_url 是否正确'
+        });
+    }
+
+    const modelsUrl = buildModelsProbeUrl(baseUrl);
+    if (modelsUrl) {
+        const modelsProbe = await probeUrl(modelsUrl, { apiKey: authValue, timeoutMs, maxBytes: 256 * 1024 });
+        results.models = {
+            url: modelsUrl,
+            status: modelsProbe.status || 0,
+            ok: modelsProbe.ok,
+            durationMs: modelsProbe.durationMs || 0
+        };
+
+        if (!modelsProbe.ok) {
+            issues.push({
+                code: 'remote-models-unreachable',
+                message: `模型列表探测失败：${modelsProbe.error || '无法连接'}`,
+                suggestion: '检查 base_url 是否包含 /v1 或关闭远程探测'
+            });
+        } else if (modelsProbe.status === 401 || modelsProbe.status === 403) {
+            issues.push({
+                code: 'remote-models-auth-failed',
+                message: '模型列表鉴权失败（401/403）',
+                suggestion: '检查 API Key 或认证方式'
+            });
+        } else if (modelsProbe.status >= 400) {
+            issues.push({
+                code: 'remote-models-http-error',
+                message: `模型列表返回异常状态: ${modelsProbe.status}`,
+                suggestion: '确认 /v1/models 可用'
+            });
+        } else {
+            let payload = null;
+            try {
+                payload = modelsProbe.body ? JSON.parse(modelsProbe.body) : null;
+            } catch (e) {
+                issues.push({
+                    code: 'remote-models-parse',
+                    message: '模型列表解析失败（非 JSON）',
+                    suggestion: '确认 /v1/models 返回 JSON'
+                });
+            }
+
+            if (payload) {
+                const ids = extractModelIds(payload);
+                if (ids.length === 0) {
+                    issues.push({
+                        code: 'remote-models-empty',
+                        message: '模型列表为空或结构无法识别',
+                        suggestion: '确认 provider 是否兼容 /v1/models'
+                    });
+                } else if (modelName && !ids.includes(modelName)) {
+                    issues.push({
+                        code: 'remote-model-unavailable',
+                        message: `远程模型列表中未找到: ${modelName}`,
+                        suggestion: '切换模型或确认模型名称'
+                    });
+                }
+            }
+        }
+    }
+
+    const modelProbeSpec = buildModelProbeSpec(provider, modelName, baseUrl);
+    if (modelProbeSpec && modelProbeSpec.url) {
+        const modelProbe = await probeJsonPost(modelProbeSpec.url, modelProbeSpec.body, {
+            apiKey: authValue,
+            timeoutMs,
+            maxBytes: 256 * 1024
+        });
+
+        results.modelProbe = {
+            url: modelProbeSpec.url,
+            status: modelProbe.status || 0,
+            ok: modelProbe.ok,
+            durationMs: modelProbe.durationMs || 0
+        };
+
+        if (!modelProbe.ok) {
+            issues.push({
+                code: 'remote-model-probe-unreachable',
+                message: `模型可用性探测失败：${modelProbe.error || '无法连接'}`,
+                suggestion: '检查网络或模型接口是否可用'
+            });
+        } else if (modelProbe.status === 401 || modelProbe.status === 403) {
+            issues.push({
+                code: 'remote-model-probe-auth-failed',
+                message: '模型可用性探测鉴权失败（401/403）',
+                suggestion: '检查 API Key 或认证方式'
+            });
+        } else if (modelProbe.status >= 400) {
+            issues.push({
+                code: 'remote-model-probe-http-error',
+                message: `模型可用性探测返回异常状态: ${modelProbe.status}`,
+                suggestion: '检查模型或接口路径'
+            });
+        } else {
+            let payload = null;
+            try {
+                payload = modelProbe.body ? JSON.parse(modelProbe.body) : null;
+            } catch (e) {
+                issues.push({
+                    code: 'remote-model-probe-parse',
+                    message: '模型可用性探测解析失败（非 JSON）',
+                    suggestion: '确认模型接口返回 JSON'
+                });
+            }
+            if (payload && payload.error) {
+                const message = typeof payload.error.message === 'string'
+                    ? payload.error.message
+                    : '模型接口返回错误';
+                issues.push({
+                    code: 'remote-model-probe-error',
+                    message: `模型可用性探测失败：${message}`,
+                    suggestion: '检查模型名与权限'
+                });
+            }
+        }
+    }
+
+    return { issues, results };
+}
+
+async function buildConfigHealthReport(params = {}) {
+    const issues = [];
+    const status = readConfigOrVirtualDefault();
+    const config = status.config || {};
+
+    if (status.isVirtual) {
+        issues.push({
+            code: 'config-missing',
+            message: status.reason || '未检测到 config.toml',
+            suggestion: '在模板编辑器中确认应用配置，生成可用的 config.toml'
+        });
+    }
+
+    const providerName = typeof config.model_provider === 'string' ? config.model_provider.trim() : '';
+    const modelName = typeof config.model === 'string' ? config.model.trim() : '';
+    if (!providerName) {
+        issues.push({
+            code: 'provider-missing',
+            message: '当前 provider 未设置',
+            suggestion: '在模板中设置 model_provider'
+        });
+    }
+
+    if (!modelName) {
+        issues.push({
+            code: 'model-missing',
+            message: '当前模型未设置',
+            suggestion: '在模板中设置 model'
+        });
+    }
+
+    const providers = config.model_providers && typeof config.model_providers === 'object'
+        ? config.model_providers
+        : {};
+    const provider = providerName ? providers[providerName] : null;
+    if (providerName && !provider) {
+        issues.push({
+            code: 'provider-not-found',
+            message: `当前 provider 未在配置中找到: ${providerName}`,
+            suggestion: '检查 model_providers 是否包含该 provider 配置块'
+        });
+    }
+
+    if (provider && typeof provider === 'object') {
+        const baseUrl = typeof provider.base_url === 'string' ? provider.base_url.trim() : '';
+        if (!isValidHttpUrl(baseUrl)) {
+            issues.push({
+                code: 'base-url-invalid',
+                message: '当前 provider 的 base_url 无效',
+                suggestion: '请设置为 http/https 的完整 URL'
+            });
+        }
+
+        const requiresAuth = provider.requires_openai_auth;
+        if (requiresAuth !== false) {
+            const apiKey = typeof provider.preferred_auth_method === 'string'
+                ? provider.preferred_auth_method.trim()
+                : '';
+            if (!apiKey) {
+                issues.push({
+                    code: 'api-key-missing',
+                    message: '当前 provider 未配置 API Key',
+                    suggestion: '在模板中设置 preferred_auth_method'
+                });
+            }
+        }
+    }
+
+    if (modelName) {
+        const models = readModels();
+        if (!models.includes(modelName)) {
+            issues.push({
+                code: 'model-unavailable',
+                message: `模型未在可用列表中找到: ${modelName}`,
+                suggestion: '在模型列表中添加该模型或切换到已有模型'
+            });
+        }
+    }
+
+    const remoteEnabled = !!params.remote;
+    let remote = null;
+    if (remoteEnabled) {
+        const baseUrl = provider && typeof provider.base_url === 'string' ? provider.base_url.trim() : '';
+        if (!provider) {
+            issues.push({
+                code: 'remote-skip-provider',
+                message: '无法进行远程探测：provider 未找到',
+                suggestion: '检查 model_provider 配置或关闭远程探测'
+            });
+        } else if (!isValidHttpUrl(baseUrl)) {
+            issues.push({
+                code: 'remote-skip-base-url',
+                message: '无法进行远程探测：base_url 无效',
+                suggestion: '补全 base_url 或关闭远程探测'
+            });
+        } else {
+            const timeoutMs = Number.isFinite(params.timeoutMs)
+                ? Math.max(1000, Number(params.timeoutMs))
+                : HEALTH_CHECK_TIMEOUT_MS;
+            remote = await runRemoteHealthCheck(provider, modelName, { timeoutMs });
+            if (remote && Array.isArray(remote.issues)) {
+                issues.push(...remote.issues);
+            }
+        }
+    }
+
+    return {
+        ok: issues.length === 0,
+        issues,
+        summary: {
+            currentProvider: providerName,
+            currentModel: modelName
+        },
+        remote
+    };
+}
+
 function formatTimestampForFileName(value) {
     const date = value ? new Date(value) : new Date();
     const normalized = Number.isNaN(date.getTime()) ? new Date() : date;
@@ -999,6 +1602,8 @@ function applyConfigTemplate(params = {}) {
     const currentModels = readCurrentModels();
     currentModels[activeProvider] = parsed.model;
     writeCurrentModels(currentModels);
+
+    recordRecentConfig(activeProvider, parsed.model);
 
     return { success: true };
 }
@@ -3018,6 +3623,7 @@ function cmdSwitch(providerName, silent = false) {
         console.log('✓ 当前模型:', targetModel);
         console.log();
     }
+    recordRecentConfig(providerName, targetModel);
     return targetModel;
 }
 
@@ -3057,6 +3663,7 @@ function cmdUseModel(modelName, silent = false) {
         console.log('✓ 已切换模型:', modelName);
         console.log();
     }
+    recordRecentConfig(currentProvider, modelName);
 }
 
 // 添加提供商
@@ -3576,6 +4183,12 @@ function cmdStart() {
                         case 'apply-config-template':
                             result = applyConfigTemplate(params || {});
                             break;
+                        case 'get-recent-configs':
+                            result = { items: readRecentConfigs() };
+                            break;
+                        case 'config-health-check':
+                            result = await buildConfigHealthReport(params || {});
+                            break;
                         case 'get-agents-file':
                             result = readAgentsFile(params || {});
                             break;
@@ -3681,9 +4294,12 @@ function cmdStart() {
             command = `xdg-open "${url}"`;
         }
 
-        exec(command, (error) => {
-            if (error) console.warn('无法自动打开浏览器，请手动访问:', url);
-        });
+        const disableBrowser = process.env.CODEXMATE_NO_BROWSER === '1';
+        if (!disableBrowser) {
+            exec(command, (error) => {
+                if (error) console.warn('无法自动打开浏览器，请手动访问:', url);
+            });
+        }
     });
 }
 
