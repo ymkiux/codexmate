@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const toml = require('@iarna/toml');
 const JSON5 = require('json5');
 const zipLib = require('zip-lib');
-const { exec, execSync } = require('child_process');
+const { exec, execSync, spawn } = require('child_process');
 const http = require('http');
 const https = require('https');
 const readline = require('readline');
@@ -5139,6 +5139,39 @@ function cmdStart(options = {}) {
     });
 }
 
+async function cmdCodex(args = []) {
+    const extraArgs = Array.isArray(args) ? args.filter(arg => arg !== undefined) : [];
+    const hasYolo = extraArgs.includes('--yolo');
+    const finalArgs = hasYolo ? extraArgs : ['--yolo', ...extraArgs];
+
+    return new Promise((resolve, reject) => {
+        const child = spawn('codex', finalArgs, {
+            stdio: 'inherit',
+            shell: process.platform === 'win32'
+        });
+
+        child.on('error', (err) => {
+            reject(new Error(`无法启动 codex，请确认已安装并在 PATH 中: ${err.message}`));
+        });
+
+        child.on('exit', (code, signal) => {
+            if (typeof code === 'number') {
+                resolve(code);
+                return;
+            }
+            if (signal === 'SIGINT') {
+                resolve(130);
+                return;
+            }
+            if (signal === 'SIGTERM') {
+                resolve(143);
+                return;
+            }
+            resolve(1);
+        });
+    });
+}
+
 // ============================================================================
 // 主程序
 // ============================================================================
@@ -5163,6 +5196,7 @@ async function main() {
         console.log('  codexmate add-model <模型> 添加模型');
         console.log('  codexmate delete-model <模型> 删除模型');
         console.log('  codexmate start [--host <HOST>]  启动 Web 界面');
+        console.log('  codexmate codex [参数...]  等同于 codex --yolo');
         console.log('  codexmate export-session --source <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]');
         console.log('  codexmate zip <路径> [--max:级别]  压缩（7-Zip 优先）');
         console.log('  codexmate unzip <zip文件> [输出目录]  解压（7-Zip 优先）');
@@ -5184,6 +5218,11 @@ async function main() {
         case 'add-model': cmdAddModel(args[1]); break;
         case 'delete-model': cmdDeleteModel(args[1]); break;
         case 'start': cmdStart(parseStartOptions(args.slice(1))); break;
+        case 'codex': {
+            const exitCode = await cmdCodex(args.slice(1));
+            process.exit(exitCode);
+            break;
+        }
         case 'export-session': await cmdExportSession(args.slice(1)); break;
         case 'zip': {
             // 解析 --max:N 参数

@@ -3278,7 +3278,9 @@
 
     <script>
         const { createApp } = Vue;
-        const API_BASE = 'http://localhost:3737';
+        const API_BASE = (location && location.origin && location.origin !== 'null')
+            ? location.origin
+            : 'http://localhost:3737';
         const DEFAULT_OPENCLAW_TEMPLATE = `{
   // OpenClaw config (JSON5)
   agent: {
