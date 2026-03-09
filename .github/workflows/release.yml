@@ -1,10 +1,10 @@
-﻿﻿name: release
+﻿name: release
 run-name: "${{ github.event.repository.name }} ${{ inputs.tag || 'auto' }}"
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag (e.g., v0.0.1). Empty = auto patch+1.'
+        description: 'Tag (e.g., v0.0.1). Empty = latest tag.'
         required: false
         default: ''
 permissions:
@@ -42,16 +42,6 @@ jobs:
             const [major, minor, patch] = version.split('.').map(n => Number(n));
             return { major, minor, patch };
           };
-          const compareSemver = (a, b) => {
-            if (a.major !== b.major) return Math.sign(a.major - b.major);
-            if (a.minor !== b.minor) return Math.sign(a.minor - b.minor);
-            return Math.sign(a.patch - b.patch);
-          };
-          const bumpPatch = (version) => {
-            const parts = version.split('.').map(n => Number(n));
-            parts[2] += 1;
-            return parts.join('.');
-          };
 
           let latestTag = '';
           try {
@@ -66,7 +56,7 @@ jobs:
             console.error(`package.json version ${pkgVersion} is not a valid semver.`);
             process.exit(1);
           }
-          const pkgSemver = parseSemver(pkgVersion);
+
           const latestVersion = latestTag ? normalizeTag(latestTag) : '';
           const latestSemver = latestVersion ? parseSemver(latestVersion) : null;
 
@@ -75,7 +65,6 @@ jobs:
           let mode = '';
           let baseVersion = '';
           let baseSource = '';
-          let needBump = '0';
 
           if (inputTagRaw) {
             if (!/^v?\d+\.\d+\.\d+$/.test(inputTagRaw)) {
@@ -95,24 +84,10 @@ jobs:
               console.error(`Latest tag ${latestTag} is not a valid semver.`);
               process.exit(1);
             }
-            const nextFromLatest = bumpPatch(latestVersion);
-            if (pkgVersion === nextFromLatest) {
-              expectedVersion = pkgVersion;
-              baseVersion = latestVersion;
-              baseSource = 'latest_tag';
-            } else {
-              const cmpPkgLatest = compareSemver(pkgSemver, latestSemver);
-              if (cmpPkgLatest <= 0 || pkgVersion === latestVersion) {
-                expectedVersion = nextFromLatest;
-                baseVersion = latestVersion;
-                baseSource = 'latest_tag';
-                needBump = '1';
-              } else {
-                console.error(`package.json version ${pkgVersion} is ahead of latest tag ${latestTag}. Please run manual tag or align versions.`);
-                process.exit(1);
-              }
-            }
-            resolvedTag = `v${expectedVersion}`;
+            resolvedTag = latestTag;
+            expectedVersion = latestVersion;
+            baseVersion = latestVersion;
+            baseSource = 'latest_tag';
           }
 
           const envLines = [
@@ -122,8 +97,7 @@ jobs:
             `LATEST_TAG=${latestTag}`,
             `PACKAGE_VERSION=${pkgVersion}`,
             `BASE_VERSION=${baseVersion}`,
-            `BASE_SOURCE=${baseSource}`,
-            `RELEASE_NEED_BUMP=${needBump}`
+            `BASE_SOURCE=${baseSource}`
           ].join('\n') + '\n';
           fs.appendFileSync(process.env.GITHUB_ENV, envLines);
 
@@ -134,8 +108,7 @@ jobs:
             `latest_tag=${latestTag}`,
             `package_version=${pkgVersion}`,
             `base_version=${baseVersion}`,
-            `base_source=${baseSource}`,
-            `release_need_bump=${needBump}`
+            `base_source=${baseSource}`
           ].join('\n') + '\n';
           fs.appendFileSync(process.env.GITHUB_OUTPUT, outputLines);
 
@@ -148,20 +121,12 @@ jobs:
             `- base_version: ${baseVersion || '(none)'}`,
             `- base_source: ${baseSource || '(none)'}`,
             `- resolved_tag: ${resolvedTag}`,
-            `- expected_version: ${expectedVersion}`,
-            `- need_bump: ${needBump}`
+            `- expected_version: ${expectedVersion}`
           ].join('\n');
           fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summaryLines + '\n');
           console.log(`::notice title=Resolved Tag::${resolvedTag}`);
           NODE
-      - name: Auto bump package.json (auto)
-        if: steps.resolve.outputs.release_mode == 'auto' && steps.resolve.outputs.release_need_bump == '1'
-        env:
-          RELEASE_VERSION: ${{ steps.resolve.outputs.release_version }}
-        run: |
-          npm version --no-git-tag-version "${RELEASE_VERSION}"
-      - name: Checkout target tag (manual)
-        if: steps.resolve.outputs.release_mode == 'manual'
+      - name: Checkout target tag
         env:
           RELEASE_TAG: ${{ steps.resolve.outputs.release_tag }}
         run: |
@@ -172,17 +137,6 @@ jobs:
           RELEASE_TAG: ${{ steps.resolve.outputs.release_tag }}
         run: |
           node -e "const pkg=require('./package.json'); const tag=process.env.RELEASE_TAG; const expected='v'+pkg.version; if(tag!==expected){ console.error('Tag '+tag+' does not match package.json version '+expected); process.exit(1);} console.log('Tag matches '+expected);"
-      - name: Create tag (auto)
-        if: steps.resolve.outputs.release_mode == 'auto'
-        env:
-          RELEASE_TAG: ${{ steps.resolve.outputs.release_tag }}
-        run: |
-          if git rev-parse "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
-            echo "Tag ${RELEASE_TAG} already exists."
-            exit 1
-          fi
-          git tag "${RELEASE_TAG}"
-          git push origin "${RELEASE_TAG}"
       - name: Compute release name
         env:
           RELEASE_TAG: ${{ steps.resolve.outputs.release_tag }}
