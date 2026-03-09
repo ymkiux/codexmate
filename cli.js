@@ -12,6 +12,7 @@ const https = require('https');
 const readline = require('readline');
 
 const DEFAULT_WEB_PORT = 3737;
+const DEFAULT_WEB_HOST = '127.0.0.1';
 
 // ============================================================================
 // 配置
@@ -71,6 +72,18 @@ function resolveWebPort() {
     const parsed = parseInt(raw, 10);
     if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_WEB_PORT;
     return parsed;
+}
+
+function resolveWebHost(options = {}) {
+    const optionHost = typeof options.host === 'string' ? options.host.trim() : '';
+    if (optionHost) {
+        return optionHost;
+    }
+    const envHost = typeof process.env.CODEXMATE_HOST === 'string' ? process.env.CODEXMATE_HOST.trim() : '';
+    if (envHost) {
+        return envHost;
+    }
+    return DEFAULT_WEB_HOST;
 }
 
 const EMPTY_CONFIG_FALLBACK_TEMPLATE = `model = "gpt-5.3-codex"
@@ -4865,8 +4878,46 @@ async function cmdExportSession(args = []) {
     console.log();
 }
 
+function parseStartOptions(args = []) {
+    const options = { host: '' };
+    if (!Array.isArray(args)) {
+        return options;
+    }
+
+    for (let i = 0; i < args.length; i++) {
+        const arg = args[i];
+        if (!arg) continue;
+        if (arg.startsWith('--host=')) {
+            options.host = arg.slice('--host='.length);
+            continue;
+        }
+        if (arg === '--host') {
+            options.host = args[i + 1] || '';
+            i += 1;
+        }
+    }
+
+    return options;
+}
+
+function isAnyAddressHost(host) {
+    return host === '0.0.0.0' || host === '::';
+}
+
+function formatHostForUrl(host) {
+    const value = typeof host === 'string' ? host.trim() : '';
+    if (!value) return '';
+    if (value.startsWith('[') && value.endsWith(']')) {
+        return value;
+    }
+    if (value.includes(':')) {
+        return `[${value}]`;
+    }
+    return value;
+}
+
 // 打开 Web UI
-function cmdStart() {
+function cmdStart(options = {}) {
     const htmlPath = path.join(__dirname, 'web-ui.html');
     if (!fs.existsSync(htmlPath)) {
         console.error('错误: web-ui.html 不存在');
@@ -5052,14 +5103,24 @@ function cmdStart() {
     });
 
     const port = resolveWebPort();
-    server.listen(port, () => {
-        console.log('\n✓ Web UI 已启动: http://localhost:' + port);
+    const host = resolveWebHost(options);
+    const openHost = isAnyAddressHost(host) ? DEFAULT_WEB_HOST : host;
+    const openUrl = `http://${formatHostForUrl(openHost)}:${port}`;
+    server.listen(port, host, () => {
+        console.log('\n✓ Web UI 已启动:', openUrl);
+        if (host && host !== openHost) {
+            console.log('  监听地址:', host);
+        }
         console.log('  按 Ctrl+C 退出\n');
+        if (isAnyAddressHost(host)) {
+            console.warn('! 安全提示: 当前监听所有网卡（无鉴权）。');
+            console.warn('  建议仅在可信网络使用，或改用 --host 127.0.0.1。');
+        }
 
         // 打开浏览器
         const platform = process.platform;
         let command;
-        const url = `http://localhost:${port}`;
+        const url = openUrl;
 
         if (platform === 'win32') {
             command = `start "" "${url}"`;
@@ -5101,7 +5162,7 @@ async function main() {
         console.log('  codexmate delete <名称>    删除提供商');
         console.log('  codexmate add-model <模型> 添加模型');
         console.log('  codexmate delete-model <模型> 删除模型');
-        console.log('  codexmate start            启动 Web 界面');
+        console.log('  codexmate start [--host <HOST>]  启动 Web 界面');
         console.log('  codexmate export-session --source <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]');
         console.log('  codexmate zip <路径> [--max:级别]  压缩（7-Zip 优先）');
         console.log('  codexmate unzip <zip文件> [输出目录]  解压（7-Zip 优先）');
@@ -5122,7 +5183,7 @@ async function main() {
         case 'delete': cmdDelete(args[1]); break;
         case 'add-model': cmdAddModel(args[1]); break;
         case 'delete-model': cmdDeleteModel(args[1]); break;
-        case 'start': cmdStart(); break;
+        case 'start': cmdStart(parseStartOptions(args.slice(1))); break;
         case 'export-session': await cmdExportSession(args.slice(1)); break;
         case 'zip': {
             // 解析 --max:N 参数

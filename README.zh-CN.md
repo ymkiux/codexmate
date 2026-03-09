@@ -273,7 +273,13 @@ codexmate export-session --source claude --file "~/.claude/projects/demo/session
 codexmate start
 ```
 
-然后在浏览器中打开 `http://localhost:3737`。
+默认仅监听 `127.0.0.1`。如需局域网访问，可用 `--host` 或 `CODEXMATE_HOST`：
+
+```bash
+codexmate start --host 0.0.0.0
+```
+
+然后在浏览器中打开 `http://localhost:3737`（或你指定的地址）。注意：监听 `0.0.0.0` 在不可信网络下不安全。
 
 ## 常见问题
 
