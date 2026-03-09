@@ -921,6 +921,21 @@
             letter-spacing: -0.01em;
         }
 
+        .btn-session-open {
+            border: 1px solid var(--color-border-soft);
+            border-radius: var(--radius-sm);
+            background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.9) 100%);
+            color: var(--color-text-secondary);
+            padding: 8px 12px;
+            font-size: var(--font-size-secondary);
+            font-weight: var(--font-weight-secondary);
+            cursor: pointer;
+            transition: all var(--transition-fast) var(--ease-spring);
+            white-space: nowrap;
+            box-shadow: var(--shadow-subtle);
+            letter-spacing: -0.01em;
+        }
+
         .btn-session-clone {
             border: 1px solid var(--color-border-soft);
             border-radius: var(--radius-sm);
@@ -978,13 +993,15 @@
             transform: none;
         }
 
-        .btn-session-export:hover {
+        .btn-session-export:hover,
+        .btn-session-open:hover {
             border-color: var(--color-brand);
             color: var(--color-brand);
             transform: translateY(-1px);
         }
 
-        .btn-session-export:disabled {
+        .btn-session-export:disabled,
+        .btn-session-open:disabled {
             opacity: 0.5;
             cursor: not-allowed;
             transform: none;
@@ -1043,6 +1060,10 @@
             align-items: start;
             height: min(72vh, 760px);
             min-height: 520px;
+        }
+
+        .session-layout.session-standalone {
+            grid-template-columns: minmax(0, 1fr);
         }
 
         .session-list {
@@ -1569,6 +1590,25 @@
             margin-bottom: var(--spacing-md);
             color: var(--color-text-primary);
             letter-spacing: -0.01em;
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-md);
+            flex-wrap: wrap;
+        }
+
+        .modal-header .modal-title {
+            margin-bottom: 0;
+        }
+
+        .btn-modal-copy {
+            padding: 6px 12px;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .form-group {
@@ -2178,14 +2218,14 @@
 <body>
     <div id="app" class="container" v-cloak>
         <!-- 主标题 -->
-        <h1 class="main-title">
+        <h1 v-if="!sessionStandalone" class="main-title">
             Codex<br>
             <span class="accent">Mate.</span>
         </h1>
-        <p class="subtitle">本地配置中枢，统一管理 Codex / Claude Code / OpenClaw / 会话。</p>
+        <p v-if="!sessionStandalone" class="subtitle">本地配置中枢，统一管理 Codex / Claude Code / OpenClaw / 会话。</p>
 
         <!-- 模式切换器 -->
-        <div class="segmented-control">
+        <div v-if="!sessionStandalone" class="segmented-control">
             <button :class="['segment', { active: configMode === 'codex' }]" @click="switchConfigMode('codex')">
                 Codex 配置
             </button>
@@ -2291,9 +2331,6 @@
                 <div class="selector-section">
                     <div class="selector-header">
                         <span class="selector-title">配置健康检查</span>
-                    </div>
-                    <div class="config-template-hint">
-                        检测 base_url/Key/模型；远程探测=真实请求/可能费用。
                     </div>
                     <button class="btn-tool" @click="runHealthCheck" :disabled="healthCheckLoading || loading || !!initError">
                         {{ healthCheckLoading ? '检查中...' : '运行检查' }}
@@ -2481,7 +2518,7 @@
 
             <!-- 会话浏览模式 -->
             <div v-show="configMode === 'sessions'" class="mode-content">
-                <div class="selector-section">
+                <div v-if="!sessionStandalone" class="selector-section">
                     <div class="selector-header">
                         <span class="selector-title">会话来源</span>
                     </div>
@@ -2547,16 +2584,16 @@
                     </div>
                 </div>
 
-                <div v-if="sessionsLoading" class="state-message">
+                <div v-if="!sessionStandalone && sessionsLoading" class="state-message">
                     会话加载中...
                 </div>
 
-                <div v-else-if="sessionsList.length === 0" class="session-empty">
+                <div v-else-if="!sessionStandalone && sessionsList.length === 0" class="session-empty">
                     暂无可用会话记录
                 </div>
 
-                <div v-else class="session-layout">
-                    <div class="session-list">
+                <div v-else :class="['session-layout', { 'session-standalone': sessionStandalone }]">
+                    <div v-if="!sessionStandalone" class="session-list">
                         <div
                             v-for="session in sessionsList"
                             :key="session.source + '-' + session.sessionId + '-' + session.filePath"
@@ -2651,6 +2688,13 @@
                                             :disabled="!activeSession || sessionExporting[getSessionExportKey(activeSession)]">
                                             {{ (activeSession && sessionExporting[getSessionExportKey(activeSession)]) ? '导出中...' : '导出记录' }}
                                         </button>
+                                        <button
+                                            v-if="!sessionStandalone"
+                                            class="btn-session-open"
+                                            @click="openSessionStandalone(activeSession)"
+                                            :disabled="!activeSession">
+                                            新页查看
+                                        </button>
                                     </div>
                                 </div>
 
@@ -2686,10 +2730,11 @@
                             </div>
                         </template>
 
-                        <div v-else class="session-preview-empty">
-                            请先在左侧选择一个会话
-                        </div>
+                    <div v-else class="session-preview-empty">
+                        <span v-if="sessionStandaloneError">{{ sessionStandaloneError }}</span>
+                        <span v-else>请先在左侧选择一个会话</span>
                     </div>
+                </div>
                 </div>
             </div>
 
@@ -3142,7 +3187,15 @@
 
         <div v-if="showAgentsModal" class="modal-overlay" @click.self="closeAgentsModal">
             <div class="modal modal-wide">
-                <div class="modal-title">{{ agentsModalTitle }}</div>
+                <div class="modal-header">
+                    <div class="modal-title">{{ agentsModalTitle }}</div>
+                    <button
+                        class="btn-mini btn-modal-copy"
+                        @click="copyAgentsContent"
+                        :disabled="agentsLoading">
+                        复制
+                    </button>
+                </div>
 
                 <div class="form-group">
                     <label class="form-label">目标文件</label>
@@ -3274,6 +3327,8 @@
                     activeSessionDetailClipped: false,
                     sessionDetailLoading: false,
                     sessionDetailRequestSeq: 0,
+                    sessionStandalone: false,
+                    sessionStandaloneError: '',
                     speedResults: {},
                     speedLoading: {},
                     newProvider: { name: '', url: '', key: '' },
@@ -3349,6 +3404,7 @@
                 }
             },
             mounted() {
+                this.initSessionStandalone();
                 const savedConfigs = localStorage.getItem('claudeConfigs');
                 if (savedConfigs) {
                     try {
@@ -3563,6 +3619,97 @@
                     }
                 },
 
+                getSessionStandaloneContext() {
+                    try {
+                        const url = new URL(window.location.href);
+                        if (url.pathname !== '/session') {
+                            return { requested: false, params: null, error: '' };
+                        }
+
+                        const source = (url.searchParams.get('source') || '').trim().toLowerCase();
+                        const sessionId = (url.searchParams.get('sessionId') || url.searchParams.get('id') || '').trim();
+                        const filePath = (url.searchParams.get('filePath') || url.searchParams.get('path') || '').trim();
+                        let error = '';
+                        if (!source) {
+                            error = '缺少 source 参数';
+                        } else if (source !== 'codex' && source !== 'claude') {
+                            error = 'source 仅支持 codex 或 claude';
+                        }
+                        if (!sessionId && !filePath) {
+                            error = error ? `${error}，还缺少 sessionId 或 filePath` : '缺少 sessionId 或 filePath 参数';
+                        }
+
+                        if (error) {
+                            return { requested: true, params: null, error };
+                        }
+
+                        return {
+                            requested: true,
+                            params: {
+                                source,
+                                sessionId,
+                                filePath
+                            },
+                            error: ''
+                        };
+                    } catch (_) {
+                        return { requested: false, params: null, error: '' };
+                    }
+                },
+
+                initSessionStandalone() {
+                    const context = this.getSessionStandaloneContext();
+                    if (!context.requested) return;
+
+                    this.sessionStandalone = true;
+                    this.configMode = 'sessions';
+
+                    if (context.error || !context.params) {
+                        this.sessionStandaloneError = `会话链接参数不完整：${context.error || '参数解析失败'}`;
+                        return;
+                    }
+
+                    const sourceLabel = context.params.source === 'codex' ? 'Codex' : 'Claude Code';
+                    this.activeSession = {
+                        source: context.params.source,
+                        sourceLabel,
+                        sessionId: context.params.sessionId,
+                        filePath: context.params.filePath,
+                        title: context.params.sessionId || context.params.filePath || '会话'
+                    };
+                    this.activeSessionMessages = [];
+                    this.activeSessionDetailError = '';
+                    this.activeSessionDetailClipped = false;
+                    this.sessionStandaloneError = '';
+                    this.loadActiveSessionDetail();
+                },
+
+                buildSessionStandaloneUrl(session) {
+                    if (!session) return '';
+                    const source = typeof session.source === 'string' ? session.source.trim().toLowerCase() : '';
+                    if (!source || (source !== 'codex' && source !== 'claude')) return '';
+                    const sessionId = typeof session.sessionId === 'string' ? session.sessionId.trim() : '';
+                    const filePath = typeof session.filePath === 'string' ? session.filePath.trim() : '';
+                    if (!sessionId && !filePath) return '';
+                    const origin = window.location.origin && window.location.origin !== 'null'
+                        ? window.location.origin
+                        : API_BASE;
+                    const params = new URLSearchParams();
+                    params.set('source', source);
+                    if (sessionId) params.set('sessionId', sessionId);
+                    if (filePath) params.set('filePath', filePath);
+                    return `${origin}/session?${params.toString()}`;
+                },
+
+                openSessionStandalone(session) {
+                    const url = this.buildSessionStandaloneUrl(session);
+                    if (!url) {
+                        this.showMessage('当前会话无法生成新页链接', 'error');
+                        return;
+                    }
+                    window.open(url, '_blank', 'noopener');
+                },
+
                 getSessionExportKey(session) {
                     return `${session.source || 'unknown'}:${session.sessionId || ''}:${session.filePath || ''}`;
                 },
@@ -3625,6 +3772,20 @@
                             textarea.parentNode.removeChild(textarea);
                         }
                     }
+                },
+
+                copyAgentsContent() {
+                    const text = typeof this.agentsContent === 'string' ? this.agentsContent : '';
+                    if (!text) {
+                        this.showMessage('没有可复制的内容', 'info');
+                        return;
+                    }
+                    const ok = this.fallbackCopyText(text);
+                    if (ok) {
+                        this.showMessage('已复制 AGENTS.md 内容', 'success');
+                        return;
+                    }
+                    this.showMessage('复制失败，请手动复制内容', 'error');
                 },
 
                 async copyResumeCommand(session) {
@@ -3970,6 +4131,20 @@
 
                         this.activeSessionMessages = Array.isArray(res.messages) ? res.messages : [];
                         this.activeSessionDetailClipped = !!res.clipped;
+                        if (this.activeSession) {
+                            if (res.sourceLabel) {
+                                this.activeSession.sourceLabel = res.sourceLabel;
+                            }
+                            if (res.sessionId) {
+                                this.activeSession.sessionId = res.sessionId;
+                                if (!this.activeSession.title) {
+                                    this.activeSession.title = res.sessionId;
+                                }
+                            }
+                            if (res.filePath) {
+                                this.activeSession.filePath = res.filePath;
+                            }
+                        }
                         if (res.updatedAt) {
                             this.activeSession.updatedAt = res.updatedAt;
                         }
