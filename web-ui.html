@@ -4290,7 +4290,12 @@
 
                         const fileName = res.fileName || `${session.source || 'session'}-${session.sessionId || Date.now()}.md`;
                         this.downloadTextFile(fileName, res.content || '');
-                        this.showMessage('会话导出完成', 'success');
+                        if (res.truncated) {
+                            const maxLabel = res.maxMessages === 'all' ? 'all' : res.maxMessages;
+                            this.showMessage(`会话导出完成（已截断：最多 ${maxLabel} 条消息）`, 'info');
+                        } else {
+                            this.showMessage('会话导出完成', 'success');
+                        }
                     } catch (e) {
                         this.showMessage('导出失败: ' + e.message, 'error');
                     } finally {

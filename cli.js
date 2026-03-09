@@ -3219,20 +3219,50 @@ function buildSessionPlainText(messages) {
     return lines.join('\n');
 }
 
+function parseMaxMessagesValue(value) {
+    if (value === Infinity) {
+        return Infinity;
+    }
+
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) {
+            return null;
+        }
+        const lower = trimmed.toLowerCase();
+        if (lower === 'all' || lower === 'infinity' || lower === 'inf') {
+            return Infinity;
+        }
+        const parsed = Number(trimmed);
+        if (Number.isFinite(parsed)) {
+            return parsed;
+        }
+        return null;
+    }
+
+    if (Number.isFinite(value)) {
+        return value;
+    }
+    return null;
+}
+
+function resolveMaxMessagesValue(value, fallback) {
+    const parsed = parseMaxMessagesValue(value);
+    if (parsed === null) {
+        return fallback;
+    }
+    if (parsed === Infinity) {
+        return Infinity;
+    }
+    return Math.max(1, Math.floor(parsed));
+}
+
 function resolveStateMaxMessages(state) {
     if (!state || typeof state !== 'object') {
         return MAX_EXPORT_MESSAGES;
     }
 
-    if (state.maxMessages === Infinity) {
-        return Infinity;
-    }
-
-    const rawMax = Number(state.maxMessages);
-    if (Number.isFinite(rawMax) && rawMax > 0) {
-        return Math.floor(rawMax);
-    }
-    return MAX_EXPORT_MESSAGES;
+    return resolveMaxMessagesValue(state.maxMessages, MAX_EXPORT_MESSAGES);
 }
 
 function canAppendMessage(state) {
@@ -3298,29 +3328,66 @@ function extractClaudeMessageFromRecord(record, state, lineIndex = -1) {
     }
 }
 
+function recordHasCodexMessage(record) {
+    if (!record || record.type !== 'response_item' || !record.payload) {
+        return false;
+    }
+    if (record.payload.type !== 'message') {
+        return false;
+    }
+    const role = normalizeRole(record.payload.role);
+    if (role !== 'user' && role !== 'assistant' && role !== 'system') {
+        return false;
+    }
+    const text = extractMessageText(record.payload.content);
+    return !!text;
+}
+
+function recordHasClaudeMessage(record) {
+    if (!record) {
+        return false;
+    }
+    const role = normalizeRole(record.type);
+    if (role !== 'user' && role !== 'assistant' && role !== 'system') {
+        return false;
+    }
+    const content = record.message ? record.message.content : '';
+    const text = extractMessageText(content);
+    return !!text;
+}
+
+function recordHasMessage(record, source) {
+    return source === 'codex'
+        ? recordHasCodexMessage(record)
+        : recordHasClaudeMessage(record);
+}
+
 function extractMessagesFromRecords(records, source, options = {}) {
-    const maxMessages = options.maxMessages === Infinity
-        ? Infinity
-        : (Number.isFinite(Number(options.maxMessages)) ? Math.max(1, Number(options.maxMessages)) : MAX_EXPORT_MESSAGES);
+    const maxMessages = resolveMaxMessagesValue(options.maxMessages, MAX_EXPORT_MESSAGES);
     const state = {
         sessionId: '',
         cwd: '',
         updatedAt: '',
         messages: [],
-        maxMessages
+        maxMessages,
+        truncated: false
     };
 
-    let lineIndex = 0;
-    for (const record of records) {
+    for (let lineIndex = 0; lineIndex < records.length; lineIndex++) {
+        const record = records[lineIndex];
         if (source === 'codex') {
             extractCodexMessageFromRecord(record, state, lineIndex);
         } else {
             extractClaudeMessageFromRecord(record, state, lineIndex);
         }
 
-        lineIndex += 1;
-
         if (state.maxMessages !== Infinity && state.messages.length >= state.maxMessages) {
+            for (let i = lineIndex + 1; i < records.length; i++) {
+                if (recordHasMessage(records[i], source)) {
+                    state.truncated = true;
+                    break;
+                }
+            }
             break;
         }
     }
@@ -3329,15 +3396,14 @@ function extractMessagesFromRecords(records, source, options = {}) {
 }
 
 async function extractMessagesFromFile(filePath, source, options = {}) {
-    const maxMessages = options.maxMessages === Infinity
-        ? Infinity
-        : (Number.isFinite(Number(options.maxMessages)) ? Math.max(1, Number(options.maxMessages)) : MAX_EXPORT_MESSAGES);
+    const maxMessages = resolveMaxMessagesValue(options.maxMessages, MAX_EXPORT_MESSAGES);
     const state = {
         sessionId: '',
         cwd: '',
         updatedAt: '',
         messages: [],
-        maxMessages
+        maxMessages,
+        truncated: false
     };
 
     let stream;
@@ -3347,6 +3413,7 @@ async function extractMessagesFromFile(filePath, source, options = {}) {
         rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
 
         let lineIndex = 0;
+        let limitReached = false;
         for await (const line of rl) {
             const currentLineIndex = lineIndex;
             lineIndex += 1;
@@ -3361,6 +3428,14 @@ async function extractMessagesFromFile(filePath, source, options = {}) {
                 continue;
             }
 
+            if (limitReached) {
+                if (recordHasMessage(record, source)) {
+                    state.truncated = true;
+                    break;
+                }
+                continue;
+            }
+
             if (source === 'codex') {
                 extractCodexMessageFromRecord(record, state, currentLineIndex);
             } else {
@@ -3368,11 +3443,7 @@ async function extractMessagesFromFile(filePath, source, options = {}) {
             }
 
             if (state.maxMessages !== Infinity && state.messages.length >= state.maxMessages) {
-                rl.close();
-                if (stream.destroy) {
-                    stream.destroy();
-                }
-                break;
+                limitReached = true;
             }
         }
     } catch (e) {
@@ -3482,6 +3553,7 @@ async function exportSessionData(params = {}) {
         return { error: 'Invalid source' };
     }
 
+    const maxMessages = resolveMaxMessagesValue(params.maxMessages, MAX_EXPORT_MESSAGES);
     const filePath = resolveSessionFilePath(source, params.filePath, params.sessionId);
     if (!filePath) {
         return { error: 'Session file not found' };
@@ -3489,7 +3561,7 @@ async function exportSessionData(params = {}) {
 
     let extracted;
     try {
-        extracted = await extractMessagesFromFile(filePath, source);
+        extracted = await extractMessagesFromFile(filePath, source, { maxMessages });
     } catch (e) {
         extracted = null;
     }
@@ -3503,7 +3575,7 @@ async function exportSessionData(params = {}) {
         if (fallbackRecords.length === 0) {
             return { error: 'Session file is empty' };
         }
-        extracted = extractMessagesFromRecords(fallbackRecords, source);
+        extracted = extractMessagesFromRecords(fallbackRecords, source, { maxMessages });
     }
 
     extracted.messages = removeLeadingSystemMessage(Array.isArray(extracted.messages) ? extracted.messages : []);
@@ -3518,6 +3590,8 @@ async function exportSessionData(params = {}) {
     const sessionId = extracted.sessionId || params.sessionId || path.basename(filePath, '.jsonl');
     const safeSessionId = String(sessionId).replace(/[^a-zA-Z0-9_-]/g, '_');
     const sourceLabel = source === 'codex' ? 'Codex' : 'Claude Code';
+    const truncated = !!extracted.truncated;
+    const maxMessagesLabel = maxMessages === Infinity ? 'all' : maxMessages;
     const markdown = buildSessionMarkdown({
         sourceLabel,
         sessionId,
@@ -3532,7 +3606,9 @@ async function exportSessionData(params = {}) {
         sourceLabel,
         sessionId,
         fileName: `${source}-session-${safeSessionId}.md`,
-        content: markdown
+        content: markdown,
+        truncated,
+        maxMessages: maxMessagesLabel
     };
 }
 
@@ -4619,6 +4695,176 @@ async function cmdUnzip(zipPath, outputDir) {
     }
 }
 
+function resolveExportOutputPath(outputPath, defaultFileName) {
+    const fallback = path.resolve(process.cwd(), defaultFileName);
+    if (typeof outputPath !== 'string' || !outputPath.trim()) {
+        return fallback;
+    }
+
+    const trimmed = outputPath.trim();
+    const resolved = path.resolve(trimmed);
+    const hasTrailingSep = /[\\\/]$/.test(trimmed);
+    if (hasTrailingSep) {
+        ensureDir(resolved);
+        return path.join(resolved, defaultFileName);
+    }
+
+    if (fs.existsSync(resolved)) {
+        try {
+            const stat = fs.statSync(resolved);
+            if (stat.isDirectory()) {
+                return path.join(resolved, defaultFileName);
+            }
+        } catch (e) {}
+    }
+
+    return resolved;
+}
+
+function printExportSessionUsage() {
+    console.log('\n用法: codexmate export-session --source <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]');
+    console.log('\n示例:');
+    console.log('  codexmate export-session --source codex --session-id 123456');
+    console.log('  codexmate export-session --source claude --file "~/.claude/projects/demo/session.jsonl"');
+    console.log('  codexmate export-session --source codex --session-id 123456 --max-messages=all');
+}
+
+function parseExportSessionArgs(args = []) {
+    const options = {
+        source: '',
+        sessionId: '',
+        filePath: '',
+        output: '',
+        maxMessages: undefined
+    };
+    const errors = [];
+
+    for (let i = 0; i < args.length; i++) {
+        const arg = args[i];
+        if (!arg) continue;
+
+        if (arg.startsWith('--source=')) {
+            options.source = arg.slice('--source='.length);
+            continue;
+        }
+        if (arg === '--source') {
+            options.source = args[i + 1] || '';
+            i += 1;
+            continue;
+        }
+        if (arg.startsWith('--session-id=')) {
+            options.sessionId = arg.slice('--session-id='.length);
+            continue;
+        }
+        if (arg === '--session-id') {
+            options.sessionId = args[i + 1] || '';
+            i += 1;
+            continue;
+        }
+        if (arg.startsWith('--file=')) {
+            options.filePath = arg.slice('--file='.length);
+            continue;
+        }
+        if (arg === '--file') {
+            options.filePath = args[i + 1] || '';
+            i += 1;
+            continue;
+        }
+        if (arg.startsWith('--output=')) {
+            options.output = arg.slice('--output='.length);
+            continue;
+        }
+        if (arg === '--output') {
+            options.output = args[i + 1] || '';
+            i += 1;
+            continue;
+        }
+        if (arg.startsWith('--max-messages=')) {
+            options.maxMessages = arg.slice('--max-messages='.length);
+            continue;
+        }
+        if (arg === '--max-messages') {
+            options.maxMessages = args[i + 1] || '';
+            i += 1;
+            continue;
+        }
+
+        errors.push(`未知参数: ${arg}`);
+    }
+
+    const normalizedSource = options.source.trim().toLowerCase();
+    if (normalizedSource && normalizedSource !== 'codex' && normalizedSource !== 'claude') {
+        errors.push('参数 --source 仅支持 codex 或 claude');
+    }
+    options.source = normalizedSource;
+
+    if (!options.source) {
+        errors.push('缺少 --source');
+    }
+
+    if (!options.sessionId && !options.filePath) {
+        errors.push('必须指定 --session-id 或 --file');
+    }
+
+    if (options.maxMessages !== undefined) {
+        const parsed = parseMaxMessagesValue(options.maxMessages);
+        if (parsed === null) {
+            errors.push('参数 --max-messages 无效');
+        } else {
+            options.maxMessages = parsed === Infinity ? Infinity : Math.max(1, Math.floor(parsed));
+        }
+    }
+
+    return {
+        options,
+        error: errors.length > 0 ? errors.join('；') : ''
+    };
+}
+
+async function cmdExportSession(args = []) {
+    const parsed = parseExportSessionArgs(args);
+    if (parsed.error) {
+        console.error('错误:', parsed.error);
+        printExportSessionUsage();
+        process.exit(1);
+    }
+
+    const options = parsed.options;
+    const maxMessages = resolveMaxMessagesValue(options.maxMessages, MAX_EXPORT_MESSAGES);
+    let result;
+    try {
+        result = await exportSessionData({
+            source: options.source,
+            sessionId: options.sessionId,
+            filePath: options.filePath,
+            maxMessages
+        });
+    } catch (e) {
+        console.error('导出失败:', e.message || e);
+        process.exit(1);
+    }
+
+    if (result && result.error) {
+        console.error('导出失败:', result.error);
+        process.exit(1);
+    }
+
+    const defaultFileName = (result && result.fileName)
+        ? result.fileName
+        : `${options.source}-session-${options.sessionId || Date.now()}.md`;
+    const outputPath = resolveExportOutputPath(options.output, defaultFileName);
+    ensureDir(path.dirname(outputPath));
+    fs.writeFileSync(outputPath, (result && result.content) ? result.content : '', 'utf-8');
+
+    console.log('\n✓ 会话已导出:', outputPath);
+    if (result && result.truncated) {
+        const label = maxMessages === Infinity ? 'all' : maxMessages;
+        console.log(`! 已截断: 仅导出前 ${label} 条消息`);
+        console.log('  可使用 --max-messages=all 导出完整内容');
+    }
+    console.log();
+}
+
 // 打开 Web UI
 function cmdStart() {
     const htmlPath = path.join(__dirname, 'web-ui.html');
@@ -4856,6 +5102,7 @@ async function main() {
         console.log('  codexmate add-model <模型> 添加模型');
         console.log('  codexmate delete-model <模型> 删除模型');
         console.log('  codexmate start            启动 Web 界面');
+        console.log('  codexmate export-session --source <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]');
         console.log('  codexmate zip <路径> [--max:级别]  压缩（7-Zip 优先）');
         console.log('  codexmate unzip <zip文件> [输出目录]  解压（7-Zip 优先）');
         console.log('');
@@ -4876,6 +5123,7 @@ async function main() {
         case 'add-model': cmdAddModel(args[1]); break;
         case 'delete-model': cmdDeleteModel(args[1]); break;
         case 'start': cmdStart(); break;
+        case 'export-session': await cmdExportSession(args.slice(1)); break;
         case 'zip': {
             // 解析 --max:N 参数
             const zipOptions = {};
