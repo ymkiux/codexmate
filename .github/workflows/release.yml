@@ -18,6 +18,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          fetch-tags: true
       - uses: actions/setup-node@v4
         with:
           node-version: '18'
@@ -33,6 +34,21 @@ jobs:
           const inputTagRaw = (process.env.INPUT_TAG || '').trim();
           const normalizeTag = (tag) => tag.startsWith('v') ? tag.slice(1) : tag;
           const isSemver = (version) => /^\d+\.\d+\.\d+$/.test(version);
+          const parseSemver = (version) => {
+            if (!isSemver(version)) return null;
+            const [major, minor, patch] = version.split('.').map(n => Number(n));
+            return { major, minor, patch };
+          };
+          const compareSemver = (a, b) => {
+            if (a.major !== b.major) return Math.sign(a.major - b.major);
+            if (a.minor !== b.minor) return Math.sign(a.minor - b.minor);
+            return Math.sign(a.patch - b.patch);
+          };
+          const bumpPatch = (version) => {
+            const parts = version.split('.').map(n => Number(n));
+            parts[2] += 1;
+            return parts.join('.');
+          };
 
           let latestTag = '';
           try {
@@ -41,9 +57,22 @@ jobs:
             latestTag = '';
           }
 
+          const pkg = require('./package.json');
+          const pkgVersion = pkg.version;
+          if (!isSemver(pkgVersion)) {
+            console.error(`package.json version ${pkgVersion} is not a valid semver.`);
+            process.exit(1);
+          }
+          const pkgSemver = parseSemver(pkgVersion);
+          const latestVersion = latestTag ? normalizeTag(latestTag) : '';
+          const latestSemver = latestVersion ? parseSemver(latestVersion) : null;
+
           let resolvedTag = '';
           let expectedVersion = '';
           let mode = '';
+          let baseVersion = '';
+          let baseSource = '';
+          let needBump = '0';
 
           if (inputTagRaw) {
             if (!/^v?\d+\.\d+\.\d+$/.test(inputTagRaw)) {
@@ -56,27 +85,44 @@ jobs:
           } else {
             mode = 'auto';
             if (latestTag) {
-              const base = normalizeTag(latestTag);
-              if (!isSemver(base)) {
+              if (!latestSemver) {
                 console.error(`Latest tag ${latestTag} is not a valid semver.`);
                 process.exit(1);
               }
-              const parts = base.split('.').map(n => Number(n));
-              parts[2] += 1;
-              expectedVersion = parts.join('.');
-              resolvedTag = `v${expectedVersion}`;
+              const nextFromLatest = bumpPatch(latestVersion);
+              if (pkgVersion === nextFromLatest) {
+                expectedVersion = pkgVersion;
+                baseVersion = latestVersion;
+                baseSource = 'latest_tag';
+              } else {
+                const cmpPkgLatest = compareSemver(pkgSemver, latestSemver);
+                if (cmpPkgLatest <= 0 || pkgVersion === latestVersion) {
+                  expectedVersion = nextFromLatest;
+                  baseVersion = latestVersion;
+                  baseSource = 'latest_tag';
+                  needBump = '1';
+                } else {
+                  console.error(`package.json version ${pkgVersion} is ahead of latest tag ${latestTag}. Please run manual tag or align versions.`);
+                  process.exit(1);
+                }
+              }
             } else {
-              const pkg = require('./package.json');
-              expectedVersion = pkg.version;
-              resolvedTag = `v${expectedVersion}`;
+              expectedVersion = pkgVersion;
+              baseVersion = pkgVersion;
+              baseSource = 'package.json';
             }
+            resolvedTag = `v${expectedVersion}`;
           }
 
           const envLines = [
             `RELEASE_TAG=${resolvedTag}`,
             `RELEASE_VERSION=${expectedVersion}`,
             `RELEASE_MODE=${mode}`,
-            `LATEST_TAG=${latestTag}`
+            `LATEST_TAG=${latestTag}`,
+            `PACKAGE_VERSION=${pkgVersion}`,
+            `BASE_VERSION=${baseVersion}`,
+            `BASE_SOURCE=${baseSource}`,
+            `RELEASE_NEED_BUMP=${needBump}`
           ].join('\n') + '\n';
           fs.appendFileSync(process.env.GITHUB_ENV, envLines);
 
@@ -85,11 +131,19 @@ jobs:
             `- mode: ${mode}`,
             `- input_tag: ${inputTagRaw || '(empty)'}`,
             `- latest_tag: ${latestTag || '(none)'}`,
+            `- package_version: ${pkgVersion}`,
+            `- base_version: ${baseVersion || '(none)'}`,
+            `- base_source: ${baseSource || '(none)'}`,
             `- resolved_tag: ${resolvedTag}`,
-            `- expected_version: ${expectedVersion}`
+            `- expected_version: ${expectedVersion}`,
+            `- need_bump: ${needBump}`
           ].join('\n');
           fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summaryLines + '\n');
           NODE
+      - name: Auto bump package.json (auto)
+        if: env.RELEASE_MODE == 'auto' && env.RELEASE_NEED_BUMP == '1'
+        run: |
+          npm version --no-git-tag-version "${RELEASE_VERSION}"
       - name: Checkout target tag (manual)
         if: env.RELEASE_MODE == 'manual'
         run: |
