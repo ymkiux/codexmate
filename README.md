@@ -273,7 +273,13 @@ By default, exports are capped at 1000 messages. Use `--max-messages=all` (or `I
 codexmate start
 ```
 
-Then open `http://localhost:3737`.
+By default it binds to `127.0.0.1`. To expose on LAN, use `--host` or `CODEXMATE_HOST`:
+
+```bash
+codexmate start --host 0.0.0.0
+```
+
+Then open `http://localhost:3737` (or your chosen host). Note: binding to `0.0.0.0` is unsafe on untrusted networks.
 
 ## FAQ
 
