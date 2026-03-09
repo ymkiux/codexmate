@@ -156,6 +156,7 @@ npm link
 | `codexmate add-model <model>` | Add a model |
 | `codexmate delete-model <model>` | Delete a model |
 | `codexmate start` | Start the Web UI |
+| `codexmate export-session --source <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]` | Export a session to Markdown |
 
 ## Web UI
 
@@ -247,6 +248,15 @@ codexmate switch myapi
 ```bash
 codexmate use gpt-4-turbo
 ```
+
+### Export a Session (CLI)
+
+```bash
+codexmate export-session --source codex --session-id 123456
+codexmate export-session --source claude --file "~/.claude/projects/demo/session.jsonl" --max-messages=all
+```
+
+By default, exports are capped at 1000 messages. Use `--max-messages=all` (or `Infinity`) to export everything.
 
 ### Configure Claude Code (Cross-Platform)
 

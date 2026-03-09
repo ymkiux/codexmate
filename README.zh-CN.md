@@ -156,6 +156,7 @@ npm link
 | `codexmate add-model <模型名称>` | 添加模型 |
 | `codexmate delete-model <模型名称>` | 删除模型 |
 | `codexmate start` | 启动 Web 界面 |
+| `codexmate export-session --source <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]` | 导出指定会话为 Markdown |
 
 ## Web 界面
 
@@ -247,6 +248,15 @@ codexmate switch myapi
 ```bash
 codexmate use gpt-4-turbo
 ```
+
+### 导出会话（CLI）
+
+```bash
+codexmate export-session --source codex --session-id 123456
+codexmate export-session --source claude --file "~/.claude/projects/demo/session.jsonl" --max-messages=all
+```
+
+默认最多导出 1000 条消息；如需完整导出可用 `--max-messages=all`（或 `Infinity`）。
 
 ### 配置 Claude Code（跨平台）
 
