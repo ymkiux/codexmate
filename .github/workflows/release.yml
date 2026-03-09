@@ -1,5 +1,5 @@
 ﻿name: release
-run-name: "${{ github.event.repository.name }} ${{ inputs.tag }}"
+run-name: "${{ github.event.repository.name }} ${{ inputs.tag || 'auto' }}"
 on:
   workflow_dispatch:
     inputs:
@@ -19,11 +19,14 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
+      - name: Fetch tags
+        run: git fetch --tags --force
       - uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
       - name: Resolve release tag
+        id: resolve
         env:
           INPUT_TAG: ${{ inputs.tag }}
         run: |
@@ -126,6 +129,18 @@ jobs:
           ].join('\n') + '\n';
           fs.appendFileSync(process.env.GITHUB_ENV, envLines);
 
+          const outputLines = [
+            `release_tag=${resolvedTag}`,
+            `release_version=${expectedVersion}`,
+            `release_mode=${mode}`,
+            `latest_tag=${latestTag}`,
+            `package_version=${pkgVersion}`,
+            `base_version=${baseVersion}`,
+            `base_source=${baseSource}`,
+            `release_need_bump=${needBump}`
+          ].join('\n') + '\n';
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, outputLines);
+
           const summaryLines = [
             '### Release Preview',
             `- mode: ${mode}`,
@@ -139,21 +154,30 @@ jobs:
             `- need_bump: ${needBump}`
           ].join('\n');
           fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summaryLines + '\n');
+          console.log(`::notice title=Resolved Tag::${resolvedTag}`);
           NODE
       - name: Auto bump package.json (auto)
-        if: env.RELEASE_MODE == 'auto' && env.RELEASE_NEED_BUMP == '1'
+        if: steps.resolve.outputs.release_mode == 'auto' && steps.resolve.outputs.release_need_bump == '1'
+        env:
+          RELEASE_VERSION: ${{ steps.resolve.outputs.release_version }}
         run: |
           npm version --no-git-tag-version "${RELEASE_VERSION}"
       - name: Checkout target tag (manual)
-        if: env.RELEASE_MODE == 'manual'
+        if: steps.resolve.outputs.release_mode == 'manual'
+        env:
+          RELEASE_TAG: ${{ steps.resolve.outputs.release_tag }}
         run: |
           git rev-parse "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1
           git checkout "${RELEASE_TAG}"
       - name: Verify tag matches package.json version
+        env:
+          RELEASE_TAG: ${{ steps.resolve.outputs.release_tag }}
         run: |
           node -e "const pkg=require('./package.json'); const tag=process.env.RELEASE_TAG; const expected='v'+pkg.version; if(tag!==expected){ console.error('Tag '+tag+' does not match package.json version '+expected); process.exit(1);} console.log('Tag matches '+expected);"
       - name: Create tag (auto)
-        if: env.RELEASE_MODE == 'auto'
+        if: steps.resolve.outputs.release_mode == 'auto'
+        env:
+          RELEASE_TAG: ${{ steps.resolve.outputs.release_tag }}
         run: |
           if git rev-parse "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
             echo "Tag ${RELEASE_TAG} already exists."
@@ -162,6 +186,8 @@ jobs:
           git tag "${RELEASE_TAG}"
           git push origin "${RELEASE_TAG}"
       - name: Compute release name
+        env:
+          RELEASE_TAG: ${{ steps.resolve.outputs.release_tag }}
         run: |
           node -e "const p=require('./package.json'); const tag=process.env.RELEASE_TAG; const name=p.name.includes('/')? p.name.split('/')[1]: p.name; const value=name+' '+tag; console.log('RELEASE_NAME='+value);" >> "$GITHUB_ENV"
       - name: Pack npm artifact
@@ -173,7 +199,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.RELEASE_TAG }}
+          tag_name: ${{ steps.resolve.outputs.release_tag }}
           name: ${{ env.RELEASE_NAME }}
           prerelease: false
           draft: false
