@@ -87,32 +87,30 @@ jobs:
             mode = 'manual';
           } else {
             mode = 'auto';
-            if (latestTag) {
-              if (!latestSemver) {
-                console.error(`Latest tag ${latestTag} is not a valid semver.`);
-                process.exit(1);
-              }
-              const nextFromLatest = bumpPatch(latestVersion);
-              if (pkgVersion === nextFromLatest) {
-                expectedVersion = pkgVersion;
+            if (!latestTag) {
+              console.error('No git tag found. Please create an initial tag or use manual tag input.');
+              process.exit(1);
+            }
+            if (!latestSemver) {
+              console.error(`Latest tag ${latestTag} is not a valid semver.`);
+              process.exit(1);
+            }
+            const nextFromLatest = bumpPatch(latestVersion);
+            if (pkgVersion === nextFromLatest) {
+              expectedVersion = pkgVersion;
+              baseVersion = latestVersion;
+              baseSource = 'latest_tag';
+            } else {
+              const cmpPkgLatest = compareSemver(pkgSemver, latestSemver);
+              if (cmpPkgLatest <= 0 || pkgVersion === latestVersion) {
+                expectedVersion = nextFromLatest;
                 baseVersion = latestVersion;
                 baseSource = 'latest_tag';
+                needBump = '1';
               } else {
-                const cmpPkgLatest = compareSemver(pkgSemver, latestSemver);
-                if (cmpPkgLatest <= 0 || pkgVersion === latestVersion) {
-                  expectedVersion = nextFromLatest;
-                  baseVersion = latestVersion;
-                  baseSource = 'latest_tag';
-                  needBump = '1';
-                } else {
-                  console.error(`package.json version ${pkgVersion} is ahead of latest tag ${latestTag}. Please run manual tag or align versions.`);
-                  process.exit(1);
-                }
+                console.error(`package.json version ${pkgVersion} is ahead of latest tag ${latestTag}. Please run manual tag or align versions.`);
+                process.exit(1);
               }
-            } else {
-              expectedVersion = pkgVersion;
-              baseVersion = pkgVersion;
-              baseSource = 'package.json';
             }
             resolvedTag = `v${expectedVersion}`;
           }
