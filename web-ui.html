@@ -1066,6 +1066,29 @@
             grid-template-columns: minmax(0, 1fr);
         }
 
+        .session-standalone-page {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: var(--spacing-sm) 0;
+        }
+
+        .session-standalone-title {
+            font-size: var(--font-size-title);
+            font-weight: var(--font-weight-title);
+            color: var(--color-text-primary);
+            margin-bottom: var(--spacing-sm);
+            letter-spacing: -0.01em;
+        }
+
+        .session-standalone-text {
+            white-space: pre-wrap;
+            font-family: var(--font-family-body);
+            font-size: var(--font-size-body);
+            line-height: 1.7;
+            color: var(--color-text-primary);
+            word-break: break-word;
+        }
+
         .session-list {
             display: flex;
             flex-direction: column;
@@ -2518,6 +2541,23 @@
 
             <!-- 会话浏览模式 -->
             <div v-show="configMode === 'sessions'" class="mode-content">
+                <div v-if="sessionStandalone" class="session-standalone-page">
+                    <div v-if="sessionStandaloneLoading" class="state-message">
+                        加载中...
+                    </div>
+                    <div v-else-if="sessionStandaloneError" class="state-message error">
+                        {{ sessionStandaloneError }}
+                    </div>
+                    <div v-else>
+                        <div class="session-standalone-title">
+                            {{ sessionStandaloneTitle }}
+                            <span v-if="sessionStandaloneSourceLabel"> · {{ sessionStandaloneSourceLabel }}</span>
+                        </div>
+                        <pre class="session-standalone-text">{{ sessionStandaloneText }}</pre>
+                    </div>
+                </div>
+
+                <div v-else>
                 <div v-if="!sessionStandalone" class="selector-section">
                     <div class="selector-header">
                         <span class="selector-title">会话来源</span>
@@ -2664,7 +2704,7 @@
                                             <span class="session-preview-meta-item">{{ activeSession.cwd }}</span>
                                         </div>
                                     </div>
-                                    <div class="session-actions">
+                                    <div v-if="!sessionStandalone" class="session-actions">
                                         <button class="btn-session-refresh" @click="loadActiveSessionDetail" :disabled="sessionDetailLoading || !activeSession">
                                             {{ sessionDetailLoading ? '加载中...' : '刷新内容' }}
                                         </button>
@@ -2734,6 +2774,7 @@
                         <span v-if="sessionStandaloneError">{{ sessionStandaloneError }}</span>
                         <span v-else>请先在左侧选择一个会话</span>
                     </div>
+                </div>
                 </div>
                 </div>
             </div>
@@ -3329,6 +3370,11 @@
                     sessionDetailRequestSeq: 0,
                     sessionStandalone: false,
                     sessionStandaloneError: '',
+                    sessionStandaloneText: '',
+                    sessionStandaloneTitle: '',
+                    sessionStandaloneSourceLabel: '',
+                    sessionStandaloneLoading: false,
+                    sessionStandaloneRequestSeq: 0,
                     speedResults: {},
                     speedLoading: {},
                     newProvider: { name: '', url: '', key: '' },
@@ -3681,7 +3727,10 @@
                     this.activeSessionDetailError = '';
                     this.activeSessionDetailClipped = false;
                     this.sessionStandaloneError = '';
-                    this.loadActiveSessionDetail();
+                    this.sessionStandaloneText = '';
+                    this.sessionStandaloneTitle = this.activeSession.title || '会话';
+                    this.sessionStandaloneSourceLabel = sourceLabel;
+                    this.loadSessionStandalonePlain();
                 },
 
                 buildSessionStandaloneUrl(session) {
@@ -4097,6 +4146,51 @@
                     this.activeSessionDetailError = '';
                     this.activeSessionDetailClipped = false;
                     await this.loadActiveSessionDetail();
+                },
+
+                async loadSessionStandalonePlain() {
+                    if (!this.activeSession) {
+                        this.sessionStandaloneText = '';
+                        this.sessionStandaloneTitle = '会话';
+                        this.sessionStandaloneSourceLabel = '';
+                        this.sessionStandaloneError = '';
+                        return;
+                    }
+
+                    const requestSeq = ++this.sessionStandaloneRequestSeq;
+                    this.sessionStandaloneLoading = true;
+                    this.sessionStandaloneError = '';
+                    try {
+                        const res = await api('session-plain', {
+                            source: this.activeSession.source,
+                            sessionId: this.activeSession.sessionId,
+                            filePath: this.activeSession.filePath
+                        });
+
+                        if (requestSeq !== this.sessionStandaloneRequestSeq) {
+                            return;
+                        }
+
+                        if (res.error) {
+                            this.sessionStandaloneText = '';
+                            this.sessionStandaloneError = res.error;
+                            return;
+                        }
+
+                        this.sessionStandaloneSourceLabel = res.sourceLabel || this.activeSession.sourceLabel || '';
+                        this.sessionStandaloneTitle = res.sessionId || this.activeSession.title || '会话';
+                        this.sessionStandaloneText = typeof res.text === 'string' ? res.text : '';
+                    } catch (e) {
+                        if (requestSeq !== this.sessionStandaloneRequestSeq) {
+                            return;
+                        }
+                        this.sessionStandaloneText = '';
+                        this.sessionStandaloneError = '加载会话内容失败: ' + e.message;
+                    } finally {
+                        if (requestSeq === this.sessionStandaloneRequestSeq) {
+                            this.sessionStandaloneLoading = false;
+                        }
+                    }
                 },
 
                 async loadActiveSessionDetail() {

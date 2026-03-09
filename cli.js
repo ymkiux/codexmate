@@ -3198,6 +3198,27 @@ function buildSessionMarkdown(payload) {
     return lines.join('\n');
 }
 
+function buildSessionPlainText(messages) {
+    if (!Array.isArray(messages) || messages.length === 0) {
+        return '';
+    }
+
+    const lines = [];
+    messages.forEach((message) => {
+        const role = normalizeRole(message && message.role) || 'unknown';
+        const text = message && typeof message.text === 'string' ? message.text : '';
+        lines.push(role);
+        lines.push(text);
+        lines.push('');
+    });
+
+    while (lines.length > 0 && lines[lines.length - 1] === '') {
+        lines.pop();
+    }
+
+    return lines.join('\n');
+}
+
 function resolveStateMaxMessages(state) {
     if (!state || typeof state !== 'object') {
         return MAX_EXPORT_MESSAGES;
@@ -3407,6 +3428,51 @@ async function readSessionDetail(params = {}) {
         messageLimit,
         messages: clippedMessages,
         filePath
+    };
+}
+
+async function readSessionPlain(params = {}) {
+    const source = params.source === 'claude' ? 'claude' : (params.source === 'codex' ? 'codex' : '');
+    if (!source) {
+        return { error: 'Invalid source' };
+    }
+
+    const filePath = resolveSessionFilePath(source, params.filePath, params.sessionId);
+    if (!filePath) {
+        return { error: 'Session file not found' };
+    }
+
+    let extracted;
+    try {
+        extracted = await extractMessagesFromFile(filePath, source, { maxMessages: Infinity });
+    } catch (e) {
+        extracted = null;
+    }
+
+    if (!extracted) {
+        return { error: 'Failed to parse session file' };
+    }
+
+    if ((!extracted.messages || extracted.messages.length === 0) && !extracted.sessionId && !extracted.cwd) {
+        const fallbackRecords = readJsonlRecords(filePath);
+        if (fallbackRecords.length === 0) {
+            return { error: 'Session file is empty' };
+        }
+        extracted = extractMessagesFromRecords(fallbackRecords, source, { maxMessages: Infinity });
+    }
+
+    const sessionId = extracted.sessionId || params.sessionId || path.basename(filePath, '.jsonl');
+    const sourceLabel = source === 'codex' ? 'Codex' : 'Claude Code';
+    const messages = removeLeadingSystemMessage(Array.isArray(extracted.messages) ? extracted.messages : []);
+    const text = buildSessionPlainText(messages);
+
+    return {
+        source,
+        sourceLabel,
+        sessionId,
+        title: sessionId,
+        filePath,
+        text
     };
 }
 
@@ -4718,6 +4784,9 @@ function cmdStart() {
                         case 'session-detail':
                             result = await readSessionDetail(params);
                             break;
+                        case 'session-plain':
+                            result = await readSessionPlain(params);
+                            break;
                         default:
                             result = { error: '未知操作' };
                     }
@@ -4834,3 +4903,4 @@ main().catch((err) => {
     console.error('错误:', err && err.message ? err.message : err);
     process.exit(1);
 });
+
