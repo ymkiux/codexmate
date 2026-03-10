@@ -49,7 +49,7 @@ Codex Mate 让 Codex 与 Claude Code 的提供商/模型切换变成“一条命
 
 - 只做 Codex、Claude Code 与 OpenClaw 的配置管理，不做全量多工具一体化
 - 不内置代理/转发/费用面板/云同步（保持轻量）
-- Web UI 仅在你启动时运行（`codexmate start`）
+- Web UI 仅在你启动时运行（`codexmate run`）
 
 ## 30 秒上手（免安装）
 
@@ -58,7 +58,7 @@ npx codexmate@latest status
 ```
 
 ```bash
-npx codexmate@latest start
+npx codexmate@latest run
 ```
 
 然后在浏览器中打开 `http://localhost:3737`。
@@ -87,7 +87,7 @@ codexmate status
 
 4. 启动 Web 界面：
 ```bash
-codexmate start
+codexmate run
 ```
 
 然后在浏览器中打开 `http://localhost:3737`。
@@ -123,7 +123,7 @@ npx codexmate@latest status
 ```
 
 ```bash
-npx codexmate@latest start
+npx codexmate@latest run
 ```
 
 ### 从源码安装
@@ -155,7 +155,7 @@ npm link
 | `codexmate models` | 列出所有模型 |
 | `codexmate add-model <模型名称>` | 添加模型 |
 | `codexmate delete-model <模型名称>` | 删除模型 |
-| `codexmate start` | 启动 Web 界面 |
+| `codexmate run` | 启动 Web 界面 |
 | `codexmate export-session --source <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]` | 导出指定会话为 Markdown |
 
 ## Web 界面
@@ -163,7 +163,7 @@ npm link
 启动 Web 界面（自动打开浏览器）：
 
 ```bash
-codexmate start
+codexmate run
 ```
 
 ### Codex 配置模式
@@ -260,7 +260,7 @@ codexmate export-session --source claude --file "~/.claude/projects/demo/session
 
 ### 配置 Claude Code（跨平台）
 
-1. 启动 Web 界面：`codexmate start`
+1. 启动 Web 界面：`codexmate run`
 2. 在浏览器中切换到 "Claude Code 配置" 模式
 3. 添加配置方案（例如智谱 GLM）：配置名称=智谱GLM，API Key=你的 API Key，Base URL=`https://open.bigmodel.cn/api/anthropic`，模型=`glm-4.7`
 4. 点击配置卡片直接应用，或在编辑弹窗点击“保存并应用到 Claude 配置”
@@ -270,13 +270,13 @@ codexmate export-session --source claude --file "~/.claude/projects/demo/session
 ### 启动 Web 界面
 
 ```bash
-codexmate start
+codexmate run
 ```
 
 默认仅监听 `127.0.0.1`。如需局域网访问，可用 `--host` 或 `CODEXMATE_HOST`：
 
 ```bash
-codexmate start --host 0.0.0.0
+codexmate run --host 0.0.0.0
 ```
 
 然后在浏览器中打开 `http://localhost:3737`（或你指定的地址）。注意：监听 `0.0.0.0` 在不可信网络下不安全。

@@ -5279,7 +5279,7 @@ async function main() {
         console.log('  codexmate delete <名称>    删除提供商');
         console.log('  codexmate add-model <模型> 添加模型');
         console.log('  codexmate delete-model <模型> 删除模型');
-        console.log('  codexmate start [--host <HOST>]  启动 Web 界面');
+        console.log('  codexmate run [--host <HOST>]    启动 Web 界面');
         console.log('  codexmate codex [参数...]  等同于 codex --yolo');
         console.log('  codexmate export-session --source <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]');
         console.log('  codexmate zip <路径> [--max:级别]  压缩（7-Zip 优先）');
@@ -5301,7 +5301,11 @@ async function main() {
         case 'delete': cmdDelete(args[1]); break;
         case 'add-model': cmdAddModel(args[1]); break;
         case 'delete-model': cmdDeleteModel(args[1]); break;
-        case 'start': cmdStart(parseStartOptions(args.slice(1))); break;
+        case 'run': cmdStart(parseStartOptions(args.slice(1))); break;
+        case 'start':
+            console.error('错误: 命令已更名为 "run"，请使用: codexmate run');
+            process.exit(1);
+            break;
         case 'codex': {
             const exitCode = await cmdCodex(args.slice(1));
             process.exit(exitCode);
