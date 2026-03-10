@@ -1,11 +1,12 @@
 ﻿name: release
-run-name: "${{ github.event.repository.name }} ${{ inputs.tag }}"
+run-name: "${{ github.event.repository.name }} ${{ inputs.tag || 'auto' }}"
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release (e.g., v0.0.1)'
-        required: true
+        description: 'Tag (e.g., v0.0.1). Empty = latest tag.'
+        required: false
+        default: ''
 permissions:
   contents: write
 
@@ -13,21 +14,134 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout tag
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag }}
           fetch-depth: 0
+          fetch-tags: true
+      - name: Fetch tags
+        run: git fetch --tags --force
       - uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
+      - name: Resolve release tag
+        id: resolve
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          node - <<'NODE'
+          const { execSync } = require('child_process');
+          const fs = require('fs');
+
+          const inputTagRaw = (process.env.INPUT_TAG || '').trim();
+          const normalizeTag = (tag) => tag.startsWith('v') ? tag.slice(1) : tag;
+          const isSemver = (version) => /^\d+\.\d+\.\d+$/.test(version);
+          const parseSemver = (version) => {
+            if (!isSemver(version)) return null;
+            const [major, minor, patch] = version.split('.').map(n => Number(n));
+            return { major, minor, patch };
+          };
+
+          let latestTag = '';
+          try {
+            latestTag = execSync("git tag --list 'v*' --sort=-v:refname | head -n 1", { encoding: 'utf8' }).trim();
+          } catch (e) {
+            latestTag = '';
+          }
+
+          const pkg = require('./package.json');
+          const pkgVersion = pkg.version;
+          if (!isSemver(pkgVersion)) {
+            console.error(`package.json version ${pkgVersion} is not a valid semver.`);
+            process.exit(1);
+          }
+
+          const latestVersion = latestTag ? normalizeTag(latestTag) : '';
+          const latestSemver = latestVersion ? parseSemver(latestVersion) : null;
+
+          let resolvedTag = '';
+          let expectedVersion = '';
+          let mode = '';
+          let baseVersion = '';
+          let baseSource = '';
+
+          if (inputTagRaw) {
+            if (!/^v?\d+\.\d+\.\d+$/.test(inputTagRaw)) {
+              console.error('Invalid tag format. Use vX.Y.Z or X.Y.Z.');
+              process.exit(1);
+            }
+            resolvedTag = inputTagRaw.startsWith('v') ? inputTagRaw : `v${inputTagRaw}`;
+            expectedVersion = normalizeTag(resolvedTag);
+            mode = 'manual';
+          } else {
+            mode = 'auto';
+            if (!latestTag) {
+              console.error('No git tag found. Please create an initial tag or use manual tag input.');
+              process.exit(1);
+            }
+            if (!latestSemver) {
+              console.error(`Latest tag ${latestTag} is not a valid semver.`);
+              process.exit(1);
+            }
+            resolvedTag = latestTag;
+            expectedVersion = latestVersion;
+            baseVersion = latestVersion;
+            baseSource = 'latest_tag';
+          }
+
+          const envLines = [
+            `RELEASE_TAG=${resolvedTag}`,
+            `RELEASE_VERSION=${expectedVersion}`,
+            `RELEASE_MODE=${mode}`,
+            `LATEST_TAG=${latestTag}`,
+            `PACKAGE_VERSION=${pkgVersion}`,
+            `BASE_VERSION=${baseVersion}`,
+            `BASE_SOURCE=${baseSource}`
+          ].join('\n') + '\n';
+          fs.appendFileSync(process.env.GITHUB_ENV, envLines);
+
+          const outputLines = [
+            `release_tag=${resolvedTag}`,
+            `release_version=${expectedVersion}`,
+            `release_mode=${mode}`,
+            `latest_tag=${latestTag}`,
+            `package_version=${pkgVersion}`,
+            `base_version=${baseVersion}`,
+            `base_source=${baseSource}`
+          ].join('\n') + '\n';
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, outputLines);
+
+          const summaryLines = [
+            '### Release Preview',
+            `- mode: ${mode}`,
+            `- input_tag: ${inputTagRaw || '(empty)'}`,
+            `- latest_tag: ${latestTag || '(none)'}`,
+            `- package_version: ${pkgVersion}`,
+            `- base_version: ${baseVersion || '(none)'}`,
+            `- base_source: ${baseSource || '(none)'}`,
+            `- resolved_tag: ${resolvedTag}`,
+            `- expected_version: ${expectedVersion}`
+          ].join('\n');
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summaryLines + '\n');
+          console.log(`::notice title=Resolved Tag::${resolvedTag}`);
+          NODE
+      - name: Checkout target tag
+        env:
+          RELEASE_TAG: ${{ steps.resolve.outputs.release_tag }}
+        run: |
+          git rev-parse "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1
+          git checkout "${RELEASE_TAG}"
       - name: Verify tag matches package.json version
+        env:
+          RELEASE_TAG: ${{ steps.resolve.outputs.release_tag }}
         run: |
-          node -e "const pkg=require('./package.json'); const tag='${{ inputs.tag }}'; const expected='v'+pkg.version; if(tag!==expected){ console.error('Tag '+tag+' does not match package.json version '+expected); process.exit(1);} console.log('Tag matches '+expected);"
+          node -e "const pkg=require('./package.json'); const tag=process.env.RELEASE_TAG; const expected='v'+pkg.version; if(tag!==expected){ console.error('Tag '+tag+' does not match package.json version '+expected); process.exit(1);} console.log('Tag matches '+expected);"
       - name: Compute release name
+        env:
+          RELEASE_TAG: ${{ steps.resolve.outputs.release_tag }}
         run: |
-          node -e "const p=require('./package.json'); const tag='${{ inputs.tag }}'; const name=p.name.includes('/')? p.name.split('/')[1]: p.name; const value=name+' '+tag; console.log('RELEASE_NAME='+value);" >> "$GITHUB_ENV"
+          node -e "const p=require('./package.json'); const tag=process.env.RELEASE_TAG; const name=p.name.includes('/')? p.name.split('/')[1]: p.name; const value=name+' '+tag; console.log('RELEASE_NAME='+value);" >> "$GITHUB_ENV"
       - name: Pack npm artifact
         run: |
           name=$(node -e "const p=require('./package.json'); const n=p.name.replace('@','').replace('/','-'); process.stdout.write(n+'-'+p.version+'.tgz');")
@@ -37,7 +151,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.tag }}
+          tag_name: ${{ steps.resolve.outputs.release_tag }}
           name: ${{ env.RELEASE_NAME }}
           prerelease: false
           draft: false
