@@ -759,6 +759,32 @@
             justify-content: flex-end;
         }
 
+        .session-toolbar-footer {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: var(--spacing-xs);
+            margin-top: -2px;
+            padding-top: 6px;
+            margin-bottom: 12px;
+            border-top: 1px dashed var(--color-border-soft);
+        }
+
+        .session-toolbar-footer .quick-option {
+            margin: 0;
+            padding: 6px 10px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--color-border-soft);
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.8) 100%);
+            box-shadow: inset 0 1px 2px rgba(31, 26, 23, 0.04);
+            transition: all var(--transition-fast) var(--ease-spring);
+            line-height: 1.2;
+        }
+
+        .session-toolbar-footer .quick-option:hover {
+            border-color: var(--color-border-strong);
+        }
+
         .session-source-select,
         .session-path-select,
         .session-query-input,
@@ -1459,6 +1485,10 @@
             }
 
             .session-toolbar-actions {
+                justify-content: flex-start;
+            }
+
+            .session-toolbar-footer {
                 justify-content: flex-start;
             }
 
@@ -2577,10 +2607,15 @@
                             </button>
                         </div>
                     </div>
-                    <div class="session-hint">
-                        关键词检索仅 Codex 可用；<br>
-                        角色/时间筛选暂不可用；<br>
-                        仅支持来源与路径筛选，右侧仅查看/导出。
+                    <div class="session-toolbar-footer">
+                        <label class="quick-option">
+                            <input
+                                type="checkbox"
+                                v-model="sessionResumeWithYolo"
+                                @change="onSessionResumeYoloChange"
+                            >
+                            复制恢复命令附带 --yolo
+                        </label>
                     </div>
                 </div>
 
@@ -3309,6 +3344,7 @@
                     sessionQuery: '',
                     sessionRoleFilter: 'all',
                     sessionTimePreset: 'all',
+                    sessionResumeWithYolo: true,
                     sessionPathOptions: [],
                     sessionPathOptionsLoading: false,
                     sessionPathOptionsMap: {
@@ -3413,6 +3449,12 @@
             },
             mounted() {
                 this.initSessionStandalone();
+                const savedSessionYolo = localStorage.getItem('codexmateSessionResumeYolo');
+                if (savedSessionYolo === '0' || savedSessionYolo === 'false') {
+                    this.sessionResumeWithYolo = false;
+                } else if (savedSessionYolo === '1' || savedSessionYolo === 'true') {
+                    this.sessionResumeWithYolo = true;
+                }
                 const savedConfigs = localStorage.getItem('claudeConfigs');
                 if (savedConfigs) {
                     try {
@@ -3863,7 +3905,11 @@
 
                 buildResumeCommand(session) {
                     const sessionId = session && session.sessionId ? String(session.sessionId).trim() : '';
-                    return `codex resume ${this.quoteResumeArg(sessionId)}`;
+                    const arg = this.quoteResumeArg(sessionId);
+                    if (this.sessionResumeWithYolo) {
+                        return `codex --yolo resume ${arg}`;
+                    }
+                    return `codex resume ${arg}`;
                 },
 
                 quoteShellArg(value) {
@@ -4172,6 +4218,11 @@
                             this.sessionPathOptionsLoading = false;
                         }
                     }
+                },
+
+                onSessionResumeYoloChange() {
+                    const value = this.sessionResumeWithYolo ? '1' : '0';
+                    localStorage.setItem('codexmateSessionResumeYolo', value);
                 },
 
                 async onSessionSourceChange() {
