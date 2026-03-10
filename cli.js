@@ -4516,6 +4516,28 @@ function applyToClaudeSettings(config = {}) {
     }
 }
 
+function readClaudeSettingsInfo() {
+    const readResult = readJsonObjectFromFile(CLAUDE_SETTINGS_FILE, {});
+    if (!readResult.ok) {
+        return {
+            error: readResult.error || '读取 Claude 配置失败',
+            exists: !!readResult.exists,
+            path: CLAUDE_SETTINGS_FILE
+        };
+    }
+
+    const settings = readResult.data || {};
+    const env = (settings.env && typeof settings.env === 'object' && !Array.isArray(settings.env))
+        ? settings.env
+        : {};
+
+    return {
+        exists: !!readResult.exists,
+        path: CLAUDE_SETTINGS_FILE,
+        env
+    };
+}
+
 function commandExists(command, args = '') {
     try {
         execSync(`${command} ${args}`, { stdio: 'ignore' });
@@ -5038,6 +5060,9 @@ function cmdStart(options = {}) {
                         case 'delete-model':
                             cmdDeleteModel(params.model, true);
                             result = { success: true };
+                            break;
+                        case 'get-claude-settings':
+                            result = readClaudeSettingsInfo();
                             break;
                         case 'apply-claude-config':
                             result = applyToClaudeSettings(params.config);
