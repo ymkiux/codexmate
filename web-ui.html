@@ -524,54 +524,6 @@
             gap: var(--spacing-xs);
         }
 
-        .recent-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 8px;
-        }
-
-        .recent-item {
-            border: 1px solid var(--color-border-soft);
-            background: var(--color-surface-elevated);
-            border-radius: var(--radius-md);
-            padding: 10px 12px;
-            min-width: 170px;
-            text-align: left;
-            cursor: pointer;
-            transition: all var(--transition-fast) var(--ease-spring);
-            box-shadow: 0 2px 6px rgba(27, 23, 20, 0.06);
-        }
-
-        .recent-item:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(27, 23, 20, 0.12);
-            border-color: var(--color-border);
-        }
-
-        .recent-item:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        .recent-provider {
-            font-size: var(--font-size-body);
-            font-weight: var(--font-weight-secondary);
-            color: var(--color-text-primary);
-            margin-bottom: 4px;
-        }
-
-        .recent-model {
-            font-size: var(--font-size-caption);
-            color: var(--color-text-tertiary);
-            line-height: 1.4;
-        }
-
-        .recent-empty {
-            font-size: var(--font-size-caption);
-            color: var(--color-text-tertiary);
-        }
-
         .health-report {
             margin-top: 10px;
             padding: 10px 12px;
@@ -2320,22 +2272,14 @@
 
                 <div class="selector-section">
                     <div class="selector-header">
-                        <span class="selector-title">最近使用</span>
-                        <span v-if="recentLoading" class="selector-title">加载中...</span>
+                        <span class="selector-title">服务档位</span>
                     </div>
-                    <div v-if="recentConfigs.length === 0" class="recent-empty">
-                        暂无记录
-                    </div>
-                    <div v-else class="recent-list">
-                        <button
-                            v-for="item in recentConfigs"
-                            :key="item.provider + '::' + item.model + '::' + (item.usedAt || '')"
-                            class="recent-item"
-                            @click="applyRecentConfig(item)"
-                            :disabled="loading || !!initError">
-                            <div class="recent-provider">{{ item.provider }}</div>
-                            <div class="recent-model">{{ item.model }}</div>
-                        </button>
+                    <select class="model-select" v-model="serviceTier" @change="onServiceTierChange">
+                        <option value="fast">fast（默认）</option>
+                        <option value="standard">standard</option>
+                    </select>
+                    <div class="config-template-hint">
+                        仅 fast 会写入 <code>service_tier</code>。
                     </div>
                 </div>
 
@@ -2382,6 +2326,13 @@
                                 <button class="card-action-btn" :class="{ loading: speedLoading[provider.name] }" @click="runSpeedTest(provider.name)" title="Speed Test">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M13 2L3 14h7l-1 8 12-14h-7l-1-6z"/>
+                                    </svg>
+                                </button>
+                                <button class="card-action-btn" :class="{ loading: providerShareLoading[provider.name] }" @click="copyProviderShareCommand(provider)" title="分享导入命令">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/>
+                                        <path d="M16 6l-4-4-4 4"/>
+                                        <path d="M12 2v14"/>
                                     </svg>
                                 </button>
                                 <button class="card-action-btn" @click="openEditModal(provider)" title="编辑">
@@ -3308,6 +3259,7 @@
                     configMode: 'codex',
                     currentProvider: '',
                     currentModel: '',
+                    serviceTier: 'fast',
                     providersList: [],
                     models: [],
                     codexModelsLoading: false,
@@ -3379,6 +3331,7 @@
                     sessionStandaloneRequestSeq: 0,
                     speedResults: {},
                     speedLoading: {},
+                    providerShareLoading: {},
                     newProvider: { name: '', url: '', key: '' },
                     editingProvider: { name: '', url: '', key: '' },
                     newModelName: '',
@@ -3444,8 +3397,6 @@
                     openclawAgentsList: [],
                     openclawProviders: [],
                     openclawMissingProviders: [],
-                    recentConfigs: [],
-                    recentLoading: false,
                     healthCheckLoading: false,
                     healthCheckResult: null,
                     healthCheckRemote: false
@@ -3464,22 +3415,11 @@
                             }
                         }
                         localStorage.setItem('claudeConfigs', JSON.stringify(this.claudeConfigs));
-
-                        const configNames = Object.keys(this.claudeConfigs);
-                        if (configNames.length > 0) {
-                            this.currentClaudeConfig = configNames[0];
-                        }
                     } catch (e) {
                         console.error('加载 Claude 配置失败:', e);
                     }
                 }
-                if (!this.currentClaudeConfig) {
-                    const configNames = Object.keys(this.claudeConfigs);
-                    if (configNames.length > 0) {
-                        this.currentClaudeConfig = configNames[0];
-                    }
-                }
-                this.syncClaudeModelFromConfig();
+                void this.refreshClaudeSelectionFromSettings({ silent: true });
                 const savedOpenclawConfigs = localStorage.getItem('openclawConfigs');
                 if (savedOpenclawConfigs) {
                     try {
@@ -3498,7 +3438,6 @@
                     }
                 }
                 this.loadAll();
-                void this.refreshClaudeSelectionFromSettings();
             },
 
             computed: {
@@ -3522,6 +3461,12 @@
                         } else {
                             this.currentProvider = statusRes.provider;
                             this.currentModel = statusRes.model;
+                            {
+                                const tier = typeof statusRes.serviceTier === 'string'
+                                    ? statusRes.serviceTier.trim().toLowerCase()
+                                    : '';
+                                this.serviceTier = tier === 'fast' ? 'fast' : (tier ? 'standard' : 'fast');
+                            }
                             this.providersList = listRes.providers;
                             await this.loadModelsForProvider(this.currentProvider);
                             if (statusRes.configReady === false) {
@@ -3532,7 +3477,6 @@
                             }
                             this.maybeShowStarPrompt();
                         }
-                        await this.loadRecentConfigs();
                     } catch (e) {
                         this.initError = '连接失败: ' + e.message;
                     } finally {
@@ -3583,43 +3527,39 @@
                     return this.claudeConfigs[this.currentClaudeConfig] || null;
                 },
 
-                getClaudeDefaults() {
-                    return {
-                        baseUrl: 'https://open.bigmodel.cn/api/anthropic',
-                        model: 'glm-4.7'
-                    };
-                },
-
-                normalizeClaudeValue(value, fallback = '') {
-                    const trimmed = typeof value === 'string' ? value.trim() : '';
-                    return trimmed ? trimmed : (fallback || '');
+                normalizeClaudeValue(value) {
+                    return typeof value === 'string' ? value.trim() : '';
                 },
 
                 normalizeClaudeConfig(config) {
-                    const defaults = this.getClaudeDefaults();
                     const safe = config && typeof config === 'object' ? config : {};
                     return {
-                        apiKey: this.normalizeClaudeValue(safe.apiKey, ''),
-                        baseUrl: this.normalizeClaudeValue(safe.baseUrl, defaults.baseUrl),
-                        model: this.normalizeClaudeValue(safe.model, defaults.model)
+                        apiKey: this.normalizeClaudeValue(safe.apiKey),
+                        baseUrl: this.normalizeClaudeValue(safe.baseUrl),
+                        model: this.normalizeClaudeValue(safe.model)
                     };
                 },
 
                 normalizeClaudeSettingsEnv(env) {
-                    const defaults = this.getClaudeDefaults();
                     const safe = env && typeof env === 'object' ? env : {};
                     return {
-                        apiKey: this.normalizeClaudeValue(safe.ANTHROPIC_API_KEY, ''),
-                        baseUrl: this.normalizeClaudeValue(safe.ANTHROPIC_BASE_URL, defaults.baseUrl),
-                        model: this.normalizeClaudeValue(safe.ANTHROPIC_MODEL, defaults.model)
+                        apiKey: this.normalizeClaudeValue(safe.ANTHROPIC_API_KEY),
+                        baseUrl: this.normalizeClaudeValue(safe.ANTHROPIC_BASE_URL),
+                        model: this.normalizeClaudeValue(safe.ANTHROPIC_MODEL)
                     };
                 },
 
                 matchClaudeConfigFromSettings(env) {
                     const normalizedSettings = this.normalizeClaudeSettingsEnv(env);
+                    if (!normalizedSettings.apiKey || !normalizedSettings.baseUrl || !normalizedSettings.model) {
+                        return '';
+                    }
                     const entries = Object.entries(this.claudeConfigs || {});
                     for (const [name, config] of entries) {
                         const normalizedConfig = this.normalizeClaudeConfig(config);
+                        if (!normalizedConfig.apiKey || !normalizedConfig.baseUrl || !normalizedConfig.model) {
+                            continue;
+                        }
                         if (normalizedConfig.apiKey === normalizedSettings.apiKey
                             && normalizedConfig.baseUrl === normalizedSettings.baseUrl
                             && normalizedConfig.model === normalizedSettings.model) {
@@ -3629,19 +3569,44 @@
                     return '';
                 },
 
+                findDuplicateClaudeConfigName(config) {
+                    const normalized = this.normalizeClaudeConfig(config);
+                    if (!normalized.apiKey || !normalized.baseUrl || !normalized.model) {
+                        return '';
+                    }
+                    const entries = Object.entries(this.claudeConfigs || {});
+                    for (const [name, existing] of entries) {
+                        const normalizedExisting = this.normalizeClaudeConfig(existing);
+                        if (!normalizedExisting.apiKey || !normalizedExisting.baseUrl || !normalizedExisting.model) {
+                            continue;
+                        }
+                        if (normalizedExisting.apiKey === normalized.apiKey
+                            && normalizedExisting.baseUrl === normalized.baseUrl
+                            && normalizedExisting.model === normalized.model) {
+                            return name;
+                        }
+                    }
+                    return '';
+                },
+
                 async refreshClaudeSelectionFromSettings(options = {}) {
                     const configNames = Object.keys(this.claudeConfigs || {});
-                    if (configNames.length === 0) return;
+                    if (configNames.length === 0) {
+                        this.currentClaudeConfig = '';
+                        this.currentClaudeModel = '';
+                        this.resetClaudeModelsState();
+                        return;
+                    }
                     const silent = !!options.silent;
                     try {
                         const res = await api('get-claude-settings');
-                        if (res.error) {
+                        if (res && res.error) {
                             if (!silent) {
                                 this.showMessage('读取 Claude 配置失败: ' + res.error, 'error');
                             }
                             return;
                         }
-                        const matchName = this.matchClaudeConfigFromSettings(res.env || {});
+                        const matchName = this.matchClaudeConfigFromSettings((res && res.env) || {});
                         if (matchName) {
                             if (this.currentClaudeConfig !== matchName) {
                                 this.currentClaudeConfig = matchName;
@@ -3653,7 +3618,7 @@
                         this.currentClaudeModel = '';
                         this.resetClaudeModelsState();
                         if (!silent) {
-                            const tip = res.exists
+                            const tip = res && res.exists
                                 ? '当前 Claude settings.json 与本地配置不匹配，已取消选中'
                                 : '未检测到 Claude settings.json，已取消选中';
                             this.showMessage(tip, 'info');
@@ -3689,6 +3654,10 @@
 
                 async loadClaudeModels() {
                     const config = this.getCurrentClaudeConfig();
+                    if (!config) {
+                        this.resetClaudeModelsState();
+                        return;
+                    }
                     const baseUrl = (config.baseUrl || '').trim();
                     const apiKey = (config.apiKey || '').trim();
 
@@ -3877,12 +3846,16 @@
                     return `codex resume ${this.quoteResumeArg(sessionId)}`;
                 },
 
-                quoteResumeArg(value) {
+                quoteShellArg(value) {
                     const text = typeof value === 'string' ? value : String(value || '');
                     if (!text) return "''";
                     if (/^[a-zA-Z0-9._-]+$/.test(text)) return text;
                     const escaped = text.replace(/'/g, "'\\''");
                     return `'${escaped}'`;
+                },
+
+                quoteResumeArg(value) {
+                    return this.quoteShellArg(value);
                 },
 
                 fallbackCopyText(text) {
@@ -3943,6 +3916,68 @@
                         // keep fallback failure message
                     }
                     this.showMessage('复制失败，请手动复制命令', 'error');
+                },
+
+                buildProviderShareCommand(payload) {
+                    if (!payload || typeof payload !== 'object') return '';
+                    const name = typeof payload.name === 'string' ? payload.name.trim() : '';
+                    const baseUrl = typeof payload.baseUrl === 'string' ? payload.baseUrl.trim() : '';
+                    const apiKey = typeof payload.apiKey === 'string' ? payload.apiKey : '';
+                    if (!name || !baseUrl) return '';
+
+                    const nameArg = this.quoteShellArg(name);
+                    const urlArg = this.quoteShellArg(baseUrl);
+                    const keyArg = apiKey ? this.quoteShellArg(apiKey) : '';
+                    const addCmd = apiKey
+                        ? `codexmate add ${nameArg} ${urlArg} ${keyArg}`
+                        : `codexmate add ${nameArg} ${urlArg}`;
+                    const updateCmd = apiKey
+                        ? `codexmate update ${nameArg} ${urlArg} ${keyArg}`
+                        : `codexmate update ${nameArg} ${urlArg}`;
+                    return `${addCmd} || ${updateCmd}`;
+                },
+
+                async copyProviderShareCommand(provider) {
+                    const name = provider && typeof provider.name === 'string' ? provider.name.trim() : '';
+                    if (!name) {
+                        this.showMessage('提供商名称无效', 'error');
+                        return;
+                    }
+                    if (this.providerShareLoading[name]) {
+                        return;
+                    }
+                    this.providerShareLoading[name] = true;
+                    try {
+                        const res = await api('export-provider', { name });
+                        if (res && res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        const command = this.buildProviderShareCommand(res && res.payload ? res.payload : null);
+                        if (!command) {
+                            this.showMessage('分享命令生成失败', 'error');
+                            return;
+                        }
+                        const ok = this.fallbackCopyText(command);
+                        if (ok) {
+                            this.showMessage('已复制分享命令', 'success');
+                            return;
+                        }
+                        try {
+                            if (navigator.clipboard && window.isSecureContext) {
+                                await navigator.clipboard.writeText(command);
+                                this.showMessage('已复制分享命令', 'success');
+                                return;
+                            }
+                        } catch (e) {
+                            // keep fallback failure message
+                        }
+                        this.showMessage('复制失败，请手动复制命令', 'error');
+                    } catch (e) {
+                        this.showMessage('生成分享命令失败: ' + e.message, 'error');
+                    } finally {
+                        this.providerShareLoading[name] = false;
+                    }
                 },
 
                 async cloneSession(session) {
@@ -4398,32 +4433,8 @@
                     await this.openConfigTemplateEditor();
                 },
 
-                async loadRecentConfigs() {
-                    this.recentLoading = true;
-                    try {
-                        const res = await api('get-recent-configs');
-                        if (res && Array.isArray(res.items)) {
-                            this.recentConfigs = res.items;
-                        } else {
-                            this.recentConfigs = [];
-                        }
-                    } catch (e) {
-                        this.recentConfigs = [];
-                    } finally {
-                        this.recentLoading = false;
-                    }
-                },
-
-                async applyRecentConfig(item) {
-                    if (!item || !item.provider || !item.model) {
-                        this.showMessage('最近配置无效，无法应用', 'error');
-                        return;
-                    }
-                    this.currentProvider = item.provider;
-                    this.currentModel = item.model;
-                    await this.openConfigTemplateEditor({
-                        appendHint: '最近使用配置，确认后将写入 config.toml'
-                    });
+                async onServiceTierChange() {
+                    await this.openConfigTemplateEditor();
                 },
 
                 async runHealthCheck() {
@@ -4492,7 +4503,8 @@
                     try {
                         const res = await api('get-config-template', {
                             provider: this.currentProvider,
-                            model: this.currentModel
+                            model: this.currentModel,
+                            serviceTier: this.serviceTier
                         });
                         if (res.error) {
                             this.showMessage(res.error, 'error');
@@ -4900,6 +4912,10 @@
                     const name = this.newClaudeConfig.name.trim();
                     if (this.claudeConfigs[name]) {
                         return this.showMessage('配置名称已存在', 'error');
+                    }
+                    const duplicateName = this.findDuplicateClaudeConfigName(this.newClaudeConfig);
+                    if (duplicateName) {
+                        return this.showMessage('已存在相同配置，已忽略添加', 'info');
                     }
 
                     this.claudeConfigs[name] = {
