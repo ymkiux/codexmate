@@ -3498,6 +3498,7 @@
                     }
                 }
                 this.loadAll();
+                void this.refreshClaudeSelectionFromSettings();
             },
 
             computed: {
@@ -3580,6 +3581,88 @@
                 getCurrentClaudeConfig() {
                     if (!this.currentClaudeConfig) return null;
                     return this.claudeConfigs[this.currentClaudeConfig] || null;
+                },
+
+                getClaudeDefaults() {
+                    return {
+                        baseUrl: 'https://open.bigmodel.cn/api/anthropic',
+                        model: 'glm-4.7'
+                    };
+                },
+
+                normalizeClaudeValue(value, fallback = '') {
+                    const trimmed = typeof value === 'string' ? value.trim() : '';
+                    return trimmed ? trimmed : (fallback || '');
+                },
+
+                normalizeClaudeConfig(config) {
+                    const defaults = this.getClaudeDefaults();
+                    const safe = config && typeof config === 'object' ? config : {};
+                    return {
+                        apiKey: this.normalizeClaudeValue(safe.apiKey, ''),
+                        baseUrl: this.normalizeClaudeValue(safe.baseUrl, defaults.baseUrl),
+                        model: this.normalizeClaudeValue(safe.model, defaults.model)
+                    };
+                },
+
+                normalizeClaudeSettingsEnv(env) {
+                    const defaults = this.getClaudeDefaults();
+                    const safe = env && typeof env === 'object' ? env : {};
+                    return {
+                        apiKey: this.normalizeClaudeValue(safe.ANTHROPIC_API_KEY, ''),
+                        baseUrl: this.normalizeClaudeValue(safe.ANTHROPIC_BASE_URL, defaults.baseUrl),
+                        model: this.normalizeClaudeValue(safe.ANTHROPIC_MODEL, defaults.model)
+                    };
+                },
+
+                matchClaudeConfigFromSettings(env) {
+                    const normalizedSettings = this.normalizeClaudeSettingsEnv(env);
+                    const entries = Object.entries(this.claudeConfigs || {});
+                    for (const [name, config] of entries) {
+                        const normalizedConfig = this.normalizeClaudeConfig(config);
+                        if (normalizedConfig.apiKey === normalizedSettings.apiKey
+                            && normalizedConfig.baseUrl === normalizedSettings.baseUrl
+                            && normalizedConfig.model === normalizedSettings.model) {
+                            return name;
+                        }
+                    }
+                    return '';
+                },
+
+                async refreshClaudeSelectionFromSettings(options = {}) {
+                    const configNames = Object.keys(this.claudeConfigs || {});
+                    if (configNames.length === 0) return;
+                    const silent = !!options.silent;
+                    try {
+                        const res = await api('get-claude-settings');
+                        if (res.error) {
+                            if (!silent) {
+                                this.showMessage('读取 Claude 配置失败: ' + res.error, 'error');
+                            }
+                            return;
+                        }
+                        const matchName = this.matchClaudeConfigFromSettings(res.env || {});
+                        if (matchName) {
+                            if (this.currentClaudeConfig !== matchName) {
+                                this.currentClaudeConfig = matchName;
+                            }
+                            this.refreshClaudeModelContext();
+                            return;
+                        }
+                        this.currentClaudeConfig = '';
+                        this.currentClaudeModel = '';
+                        this.resetClaudeModelsState();
+                        if (!silent) {
+                            const tip = res.exists
+                                ? '当前 Claude settings.json 与本地配置不匹配，已取消选中'
+                                : '未检测到 Claude settings.json，已取消选中';
+                            this.showMessage(tip, 'info');
+                        }
+                    } catch (e) {
+                        if (!silent) {
+                            this.showMessage('读取 Claude 配置失败: ' + e.message, 'error');
+                        }
+                    }
                 },
 
                 syncClaudeModelFromConfig() {
