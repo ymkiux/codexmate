@@ -2370,7 +2370,16 @@
                     <div class="selector-header">
                         <span class="selector-title">模型</span>
                     </div>
+                    <select
+                        v-if="claudeModelHasList"
+                        class="model-select"
+                        v-model="currentClaudeModel"
+                        @change="onClaudeModelChange"
+                    >
+                        <option v-for="model in claudeModelOptions" :key="model" :value="model">{{ model }}</option>
+                    </select>
                     <input
+                        v-else
                         class="model-input"
                         v-model="currentClaudeModel"
                         @blur="onClaudeModelChange"
@@ -3446,6 +3455,17 @@
                 },
                 sessionQueryPlaceholder() {
                     return this.isSessionQueryEnabled ? '关键词检索' : '仅 Codex 支持关键词检索';
+                },
+                claudeModelHasList() {
+                    return Array.isArray(this.claudeModels) && this.claudeModels.length > 0;
+                },
+                claudeModelOptions() {
+                    const list = Array.isArray(this.claudeModels) ? [...this.claudeModels] : [];
+                    const current = (this.currentClaudeModel || '').trim();
+                    if (current && !list.includes(current)) {
+                        list.unshift(current);
+                    }
+                    return list;
                 }
             },
             methods: {

@@ -439,6 +439,7 @@ async function fetchModelsFromBaseUrlCore(baseUrl, apiKey) {
         };
         if (apiKey) {
             headers['Authorization'] = `Bearer ${apiKey}`;
+            headers['x-api-key'] = apiKey;
         }
 
         const result = await new Promise((innerResolve) => {
