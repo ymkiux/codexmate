@@ -49,7 +49,7 @@ Codex Mate makes frequent provider/model switching for Codex and Claude Code a s
 
 - Only configuration management for Codex, Claude Code, and OpenClaw, not a full all-in-one tool suite
 - No built-in proxy/relay/billing dashboard/cloud sync (kept lightweight)
-- Web UI runs only when you start it (`codexmate start`)
+- Web UI runs only when you start it (`codexmate run`)
 
 ## 30-Second Start (No Install)
 
@@ -58,7 +58,7 @@ npx codexmate@latest status
 ```
 
 ```bash
-npx codexmate@latest start
+npx codexmate@latest run
 ```
 
 Then open `http://localhost:3737` in your browser.
@@ -87,7 +87,7 @@ codexmate status
 
 4. Start the Web UI:
 ```bash
-codexmate start
+codexmate run
 ```
 
 Then open `http://localhost:3737` in your browser.
@@ -123,7 +123,7 @@ npx codexmate@latest status
 ```
 
 ```bash
-npx codexmate@latest start
+npx codexmate@latest run
 ```
 
 ### From Source
@@ -155,7 +155,7 @@ npm link
 | `codexmate models` | List all models |
 | `codexmate add-model <model>` | Add a model |
 | `codexmate delete-model <model>` | Delete a model |
-| `codexmate start` | Start the Web UI |
+| `codexmate run` | Start the Web UI |
 | `codexmate export-session --source <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]` | Export a session to Markdown |
 
 ## Web UI
@@ -163,7 +163,7 @@ npm link
 Start the Web UI (auto opens browser):
 
 ```bash
-codexmate start
+codexmate run
 ```
 
 ### Codex Config Mode
@@ -260,7 +260,7 @@ By default, exports are capped at 1000 messages. Use `--max-messages=all` (or `I
 
 ### Configure Claude Code (Cross-Platform)
 
-1. Start the Web UI: `codexmate start`
+1. Start the Web UI: `codexmate run`
 2. Switch to "Claude Code Config" mode in the browser
 3. Add a profile (example Zhipu GLM): Name=ZhipuGLM, API Key=your API key, Base URL=`https://open.bigmodel.cn/api/anthropic`, Model=`glm-4.7`
 4. Click the card to apply, or use "Save & Apply to Claude Config" in the editor
@@ -270,13 +270,13 @@ By default, exports are capped at 1000 messages. Use `--max-messages=all` (or `I
 ### Start the Web UI
 
 ```bash
-codexmate start
+codexmate run
 ```
 
 By default it binds to `127.0.0.1`. To expose on LAN, use `--host` or `CODEXMATE_HOST`:
 
 ```bash
-codexmate start --host 0.0.0.0
+codexmate run --host 0.0.0.0
 ```
 
 Then open `http://localhost:3737` (or your chosen host). Note: binding to `0.0.0.0` is unsafe on untrusted networks.
