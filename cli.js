@@ -1712,6 +1712,22 @@ function normalizeTopLevelConfigWithTemplate(template, selectedProvider, selecte
     return content;
 }
 
+function applyServiceTierToTemplate(template, serviceTier) {
+    let content = typeof template === 'string' ? template : '';
+    const tier = typeof serviceTier === 'string' ? serviceTier.trim().toLowerCase() : '';
+    if (!tier) {
+        return content;
+    }
+
+    content = content.replace(/^\s*service_tier\s*=\s*["'][^"']*["']\s*\n?/gmi, '');
+    if (tier !== 'fast') {
+        return content;
+    }
+
+    content = content.replace(/^\s*\n*/, '');
+    return `service_tier = "fast"\n${content}`;
+}
+
 function getConfigTemplate(params = {}) {
     let content = EMPTY_CONFIG_FALLBACK_TEMPLATE;
     if (fs.existsSync(CONFIG_FILE)) {
@@ -1724,8 +1740,12 @@ function getConfigTemplate(params = {}) {
     }
     const selectedProvider = params.provider || '';
     const selectedModel = params.model || '';
+    let template = normalizeTopLevelConfigWithTemplate(content, selectedProvider, selectedModel);
+    if (typeof params.serviceTier === 'string') {
+        template = applyServiceTierToTemplate(template, params.serviceTier);
+    }
     return {
-        template: normalizeTopLevelConfigWithTemplate(content, selectedProvider, selectedModel)
+        template
     };
 }
 
@@ -3646,6 +3666,37 @@ function buildExportPayload(includeKeys) {
     };
 }
 
+function buildProviderSharePayload(params = {}) {
+    const name = typeof params.name === 'string' ? params.name.trim() : '';
+    if (!name) {
+        return { error: '缺少提供商名称' };
+    }
+
+    const { config } = readConfigOrVirtualDefault();
+    const providers = config.model_providers || {};
+    const provider = providers[name];
+    if (!provider || typeof provider !== 'object') {
+        return { error: `提供商不存在: ${name}` };
+    }
+
+    const baseUrl = typeof provider.base_url === 'string' ? provider.base_url.trim() : '';
+    const apiKey = typeof provider.preferred_auth_method === 'string'
+        ? provider.preferred_auth_method
+        : '';
+
+    if (!baseUrl) {
+        return { error: `提供商 ${name} 缺少 base_url` };
+    }
+
+    return {
+        payload: {
+            name,
+            baseUrl,
+            apiKey
+        }
+    };
+}
+
 function normalizeImportPayload(payload) {
     if (!payload || typeof payload !== 'object') {
         return { error: 'Invalid import payload' };
@@ -4534,6 +4585,9 @@ function readClaudeSettingsInfo() {
     return {
         exists: !!readResult.exists,
         path: CLAUDE_SETTINGS_FILE,
+        apiKey: typeof env.ANTHROPIC_API_KEY === 'string' ? env.ANTHROPIC_API_KEY : '',
+        baseUrl: typeof env.ANTHROPIC_BASE_URL === 'string' ? env.ANTHROPIC_BASE_URL : '',
+        model: typeof env.ANTHROPIC_MODEL === 'string' ? env.ANTHROPIC_MODEL : '',
         env
     };
 }
@@ -4959,9 +5013,11 @@ function cmdStart(options = {}) {
                         case 'status':
                             const statusConfigResult = readConfigOrVirtualDefault();
                             const config = statusConfigResult.config;
+                            const serviceTier = typeof config.service_tier === 'string' ? config.service_tier.trim() : '';
                             result = {
                                 provider: config.model_provider || '未设置',
                                 model: config.model || '未设置',
+                                serviceTier,
                                 configReady: !statusConfigResult.isVirtual,
                                 configNotice: statusConfigResult.reason || '',
                                 initNotice: consumeInitNotice()
@@ -5066,6 +5122,9 @@ function cmdStart(options = {}) {
                             break;
                         case 'apply-claude-config':
                             result = applyToClaudeSettings(params.config);
+                            break;
+                        case 'export-provider':
+                            result = buildProviderSharePayload(params || {});
                             break;
                         case 'export-config':
                             result = {
@@ -5276,4 +5335,3 @@ main().catch((err) => {
     console.error('错误:', err && err.message ? err.message : err);
     process.exit(1);
 });
-

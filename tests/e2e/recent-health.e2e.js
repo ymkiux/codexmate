@@ -96,6 +96,12 @@ async function run() {
         await request('apply-config-template', { template: buildTemplate('gamma', 'm-gamma', 'https://example.com', 'sk-gamma') });
         await request('apply-config-template', { template: buildTemplate('delta', 'm-delta', 'https://example.com', 'sk-delta') });
 
+        const share = await request('export-provider', { name: 'delta' });
+        assert(share && share.payload, 'share payload should exist');
+        assert(share.payload.name === 'delta', 'share name should be delta');
+        assert(share.payload.baseUrl === 'https://example.com', 'share baseUrl mismatch');
+        assert(share.payload.apiKey === 'sk-delta', 'share apiKey mismatch');
+
         const recent = await request('get-recent-configs');
         assert(Array.isArray(recent.items), 'recent list should be array');
         assert(recent.items.length === 3, 'recent list should keep 3 items');
