@@ -7,6 +7,7 @@
   },
   "scripts": {
     "start": "node cli.js",
+    "test": "npm run test:e2e",
     "test:e2e": "node tests/e2e/run.js"
   },
   "dependencies": {
