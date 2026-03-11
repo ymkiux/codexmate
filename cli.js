@@ -10,6 +10,48 @@ const { exec, execSync, spawn } = require('child_process');
 const http = require('http');
 const https = require('https');
 const readline = require('readline');
+const {
+    expandHomePath,
+    resolveExistingDir,
+    resolveHomePath,
+    hasUtf8Bom,
+    stripUtf8Bom,
+    ensureUtf8Bom,
+    detectLineEnding,
+    normalizeLineEnding,
+    isValidProviderName,
+    buildModelsCandidates,
+    isValidHttpUrl,
+    normalizeBaseUrl,
+    joinApiUrl
+} = require('./lib/cli-utils');
+const {
+    ensureDir,
+    readJsonFile,
+    readJsonArrayFile,
+    readJsonObjectFromFile,
+    backupFileIfNeededOnce,
+    writeJsonAtomic,
+    formatTimestampForFileName
+} = require('./lib/cli-file-utils');
+const {
+    extractModelNames,
+    hasModelsListPayload,
+    extractModelIds,
+    buildModelsProbeUrl,
+    buildModelProbeSpec,
+    buildModelsCacheKey
+} = require('./lib/cli-models-utils');
+const { probeUrl, probeJsonPost } = require('./lib/cli-network-utils');
+const {
+    toIsoTime,
+    updateLatestIso,
+    truncateText,
+    extractMessageText,
+    normalizeRole,
+    parseMaxMessagesValue,
+    resolveMaxMessagesValue
+} = require('./lib/cli-session-utils');
 
 const DEFAULT_WEB_PORT = 3737;
 const DEFAULT_WEB_HOST = '127.0.0.1';
@@ -49,7 +91,6 @@ const SESSION_SCAN_FACTOR = 4;
 const SESSION_SCAN_MIN_FILES = 800;
 const MAX_SESSION_PATH_LIST_SIZE = 2000;
 const AGENTS_FILE_NAME = 'AGENTS.md';
-const UTF8_BOM = '\ufeff';
 const MODELS_CACHE_TTL_MS = 60 * 1000;
 const MODELS_NEGATIVE_CACHE_TTL_MS = 5 * 1000;
 const MODELS_CACHE_MAX_ENTRIES = 50;
@@ -178,69 +219,6 @@ function updateAuthJson(apiKey) {
     fs.writeFileSync(AUTH_FILE, JSON.stringify(authData, null, 2), 'utf-8');
 }
 
-function readJsonFile(filePath, fallback = null) {
-    if (!fs.existsSync(filePath)) {
-        return fallback;
-    }
-    try {
-        return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-    } catch (e) {
-        return fallback;
-    }
-}
-
-function readJsonArrayFile(filePath, fallback = []) {
-    if (!fs.existsSync(filePath)) {
-        return Array.isArray(fallback) ? [...fallback] : [];
-    }
-    try {
-        const content = fs.readFileSync(filePath, 'utf-8');
-        if (!content.trim()) {
-            return Array.isArray(fallback) ? [...fallback] : [];
-        }
-        const parsed = JSON.parse(content);
-        return Array.isArray(parsed) ? parsed : (Array.isArray(fallback) ? [...fallback] : []);
-    } catch (e) {
-        return Array.isArray(fallback) ? [...fallback] : [];
-    }
-}
-
-function ensureDir(dirPath) {
-    if (!fs.existsSync(dirPath)) {
-        fs.mkdirSync(dirPath, { recursive: true });
-    }
-}
-
-function expandHomePath(value) {
-    if (typeof value !== 'string') {
-        return '';
-    }
-    const trimmed = value.trim();
-    if (!trimmed) {
-        return '';
-    }
-    if (trimmed === '~') {
-        return os.homedir();
-    }
-    if (trimmed.startsWith(`~${path.sep}`) || trimmed.startsWith('~/') || trimmed.startsWith('~\\')) {
-        return path.resolve(os.homedir(), trimmed.slice(2));
-    }
-    return trimmed;
-}
-
-function resolveExistingDir(candidates = [], fallback = '') {
-    for (const raw of candidates) {
-        const candidate = expandHomePath(raw);
-        if (!candidate) continue;
-        try {
-            if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
-                return candidate;
-            }
-        } catch (e) {}
-    }
-    return fallback;
-}
-
 function getCodexSessionsDir() {
     const candidates = [];
     const envCodexHome = process.env.CODEX_HOME;
@@ -269,100 +247,6 @@ function getClaudeProjectsDir() {
     candidates.push(path.join(os.homedir(), '.config', 'claude', 'projects'));
     candidates.push(CLAUDE_PROJECTS_DIR);
     return resolveExistingDir(candidates, CLAUDE_PROJECTS_DIR);
-}
-
-function hasUtf8Bom(text) {
-    return typeof text === 'string' && text.charCodeAt(0) === 0xfeff;
-}
-
-function stripUtf8Bom(text) {
-    if (!text) return '';
-    return hasUtf8Bom(text) ? text.slice(1) : text;
-}
-
-function ensureUtf8Bom(text) {
-    const content = typeof text === 'string' ? text : '';
-    return hasUtf8Bom(content) ? content : UTF8_BOM + content;
-}
-
-function detectLineEnding(text) {
-    return typeof text === 'string' && text.includes('\r\n') ? '\r\n' : '\n';
-}
-
-function normalizeLineEnding(text, lineEnding) {
-    const normalized = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-    return lineEnding === '\r\n' ? normalized.replace(/\n/g, '\r\n') : normalized;
-}
-
-function isValidProviderName(name) {
-    return typeof name === 'string' && /^[a-zA-Z0-9._-]+$/.test(name.trim());
-}
-
-function buildModelsCandidates(baseUrl) {
-    const trimmed = typeof baseUrl === 'string' ? baseUrl.trim() : '';
-    if (!trimmed) return [];
-    if (/\/models\/?$/.test(trimmed)) {
-        return [trimmed];
-    }
-    const normalized = trimmed.replace(/\/+$/, '');
-    const candidates = [];
-    const pushUnique = (url) => {
-        if (url && !candidates.includes(url)) {
-            candidates.push(url);
-        }
-    };
-
-    if (/\/v1$/i.test(normalized)) {
-        pushUnique(normalized + '/models');
-    } else {
-        pushUnique(normalized + '/v1/models');
-        pushUnique(normalized + '/models');
-    }
-
-    pushUnique(trimmed);
-    return candidates;
-}
-
-function extractModelNames(payload) {
-    if (!payload || typeof payload !== 'object') return [];
-    const data = Array.isArray(payload.data)
-        ? payload.data
-        : (Array.isArray(payload.models) ? payload.models : []);
-    const names = [];
-    for (const item of data) {
-        if (typeof item === 'string') {
-            if (item.trim()) names.push(item.trim());
-            continue;
-        }
-        if (!item || typeof item !== 'object') continue;
-        const name = item.id || item.name || item.model || '';
-        if (typeof name === 'string' && name.trim()) {
-            names.push(name.trim());
-        }
-    }
-    return Array.from(new Set(names));
-}
-
-function hasModelsListPayload(payload) {
-    if (!payload || typeof payload !== 'object') return false;
-    return Array.isArray(payload.data) || Array.isArray(payload.models);
-}
-
-function hashModelsCacheValue(value) {
-    if (!value) return '';
-    try {
-        return crypto.createHash('sha256').update(String(value)).digest('hex');
-    } catch (e) {
-        return '';
-    }
-}
-
-function buildModelsCacheKey(baseUrl, apiKey) {
-    const normalizedUrl = typeof baseUrl === 'string'
-        ? baseUrl.trim().replace(/\/+$/, '')
-        : '';
-    const apiKeyHash = hashModelsCacheValue(apiKey);
-    return `${normalizedUrl}|${apiKeyHash}`;
 }
 
 function readModelsCacheEntry(cacheKey) {
@@ -595,16 +479,6 @@ function applyAgentsFile(params = {}) {
     } catch (e) {
         return { error: `写入 AGENTS.md 失败: ${e.message}` };
     }
-}
-
-function resolveHomePath(input) {
-    const raw = typeof input === 'string' ? input.trim() : '';
-    if (!raw) return '';
-    if (raw === '~') return os.homedir();
-    if (raw.startsWith('~/') || raw.startsWith('~\\')) {
-        return path.join(os.homedir(), raw.slice(2));
-    }
-    return raw;
 }
 
 function resolveOpenclawWorkspaceDir(config) {
@@ -848,83 +722,6 @@ function applyOpenclawConfig(params = {}) {
     }
 }
 
-function readJsonObjectFromFile(filePath, fallback = {}) {
-    if (!fs.existsSync(filePath)) {
-        return { ok: true, exists: false, data: { ...fallback } };
-    }
-
-    try {
-        const content = fs.readFileSync(filePath, 'utf-8');
-        if (!content.trim()) {
-            return { ok: true, exists: true, data: { ...fallback } };
-        }
-
-        const parsed = JSON.parse(content);
-        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-            return {
-                ok: false,
-                exists: true,
-                error: `配置文件格式错误（根节点必须是对象）: ${filePath}`
-            };
-        }
-        return { ok: true, exists: true, data: parsed };
-    } catch (e) {
-        return {
-            ok: false,
-            exists: true,
-            error: `配置文件解析失败: ${e.message}`
-        };
-    }
-}
-
-function backupFileIfNeededOnce(filePath, backupPrefix = 'codexmate-backup') {
-    if (!fs.existsSync(filePath)) {
-        return '';
-    }
-
-    const dirPath = path.dirname(filePath);
-    const baseName = path.basename(filePath);
-    const existingPrefix = `${baseName}.${backupPrefix}-`;
-    const hasBackup = fs.readdirSync(dirPath).some(fileName =>
-        fileName.startsWith(existingPrefix) && fileName.endsWith('.bak')
-    );
-
-    if (hasBackup) {
-        return '';
-    }
-
-    const backupPath = path.join(dirPath, `${existingPrefix}${formatTimestampForFileName()}.bak`);
-    fs.copyFileSync(filePath, backupPath);
-    return backupPath;
-}
-
-function writeJsonAtomic(filePath, data) {
-    const dirPath = path.dirname(filePath);
-    ensureDir(dirPath);
-
-    const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
-    const content = `${JSON.stringify(data, null, 2)}\n`;
-
-    try {
-        fs.writeFileSync(tmpPath, content, 'utf-8');
-        try {
-            fs.renameSync(tmpPath, filePath);
-        } catch (renameError) {
-            if (process.platform === 'win32') {
-                fs.copyFileSync(tmpPath, filePath);
-                fs.unlinkSync(tmpPath);
-            } else {
-                throw renameError;
-            }
-        }
-    } catch (e) {
-        if (fs.existsSync(tmpPath)) {
-            try { fs.unlinkSync(tmpPath); } catch (_) {}
-        }
-        throw new Error(`写入 JSON 文件失败: ${e.message}`);
-    }
-}
-
 function normalizeRecentConfigs(items) {
     if (!Array.isArray(items)) return [];
     const output = [];
@@ -974,252 +771,6 @@ function recordRecentConfig(provider, model) {
 
     const trimmed = next.slice(0, MAX_RECENT_CONFIGS);
     writeRecentConfigs(trimmed);
-}
-
-function isValidHttpUrl(value) {
-    if (typeof value !== 'string' || !value.trim()) return false;
-    try {
-        const parsed = new URL(value);
-        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-    } catch (e) {
-        return false;
-    }
-}
-
-function normalizeBaseUrl(value) {
-    if (typeof value !== 'string') return '';
-    return value.trim().replace(/\/+$/g, '');
-}
-
-function joinApiUrl(baseUrl, pathSuffix) {
-    const trimmed = normalizeBaseUrl(baseUrl);
-    if (!trimmed) return '';
-    const safeSuffix = String(pathSuffix || '').replace(/^\/+/g, '');
-    if (!safeSuffix) return trimmed;
-    if (/\/v1$/i.test(trimmed)) {
-        return `${trimmed}/${safeSuffix}`;
-    }
-    return `${trimmed}/v1/${safeSuffix}`;
-}
-
-function buildModelsProbeUrl(baseUrl) {
-    return joinApiUrl(baseUrl, 'models');
-}
-
-function normalizeWireApi(value) {
-    const raw = typeof value === 'string' ? value.trim().toLowerCase() : '';
-    if (!raw) return 'responses';
-    return raw.replace(/[\s-]/g, '_');
-}
-
-function buildModelProbeSpec(provider, modelName, baseUrl) {
-    const model = typeof modelName === 'string' ? modelName.trim() : '';
-    if (!model) return null;
-
-    const wireApi = normalizeWireApi(provider && provider.wire_api);
-    if (wireApi === 'chat_completions' || wireApi === 'chat') {
-        return {
-            url: joinApiUrl(baseUrl, 'chat/completions'),
-            body: {
-                model,
-                messages: [{ role: 'user', content: 'ping' }],
-                max_tokens: 1,
-                temperature: 0
-            }
-        };
-    }
-
-    if (wireApi === 'completions') {
-        return {
-            url: joinApiUrl(baseUrl, 'completions'),
-            body: {
-                model,
-                prompt: 'ping',
-                max_tokens: 1,
-                temperature: 0
-            }
-        };
-    }
-
-    return {
-        url: joinApiUrl(baseUrl, 'responses'),
-        body: {
-            model,
-            input: 'ping',
-            max_output_tokens: 1
-        }
-    };
-}
-
-function probeUrl(targetUrl, options = {}) {
-    return new Promise((resolve) => {
-        let parsed;
-        try {
-            parsed = new URL(targetUrl);
-        } catch (e) {
-            return resolve({ ok: false, error: 'Invalid URL' });
-        }
-
-        const transport = parsed.protocol === 'https:' ? https : http;
-        const headers = {
-            'User-Agent': 'codexmate-health-check',
-            'Accept': 'application/json'
-        };
-        if (options.apiKey) {
-            headers['Authorization'] = `Bearer ${options.apiKey}`;
-        }
-
-        const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : HEALTH_CHECK_TIMEOUT_MS;
-        const maxBytes = Number.isFinite(options.maxBytes) ? options.maxBytes : 256 * 1024;
-        const start = Date.now();
-        const req = transport.request(parsed, { method: 'GET', headers }, (res) => {
-            const chunks = [];
-            let size = 0;
-            res.on('data', (chunk) => {
-                if (!chunk) return;
-                size += chunk.length;
-                if (size <= maxBytes) {
-                    chunks.push(chunk);
-                }
-            });
-            res.on('end', () => {
-                const body = chunks.length > 0 ? Buffer.concat(chunks).toString('utf-8') : '';
-                resolve({
-                    ok: true,
-                    status: res.statusCode || 0,
-                    durationMs: Date.now() - start,
-                    body
-                });
-            });
-        });
-
-        req.setTimeout(timeoutMs, () => {
-            req.destroy(new Error('timeout'));
-        });
-
-        req.on('error', (err) => {
-            resolve({
-                ok: false,
-                error: err.message || 'request failed',
-                durationMs: Date.now() - start
-            });
-        });
-
-        req.end();
-    });
-}
-
-function probeJsonPost(targetUrl, body, options = {}) {
-    return new Promise((resolve) => {
-        let parsed;
-        try {
-            parsed = new URL(targetUrl);
-        } catch (e) {
-            return resolve({ ok: false, error: 'Invalid URL' });
-        }
-
-        const transport = parsed.protocol === 'https:' ? https : http;
-        const headers = {
-            'User-Agent': 'codexmate-health-check',
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-        };
-        if (options.apiKey) {
-            headers['Authorization'] = `Bearer ${options.apiKey}`;
-        }
-
-        const payload = JSON.stringify(body || {});
-        headers['Content-Length'] = Buffer.byteLength(payload);
-
-        const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : HEALTH_CHECK_TIMEOUT_MS;
-        const maxBytes = Number.isFinite(options.maxBytes) ? options.maxBytes : 256 * 1024;
-        const start = Date.now();
-        const req = transport.request(parsed, { method: 'POST', headers }, (res) => {
-            const chunks = [];
-            let size = 0;
-            res.on('data', (chunk) => {
-                if (!chunk) return;
-                size += chunk.length;
-                if (size <= maxBytes) {
-                    chunks.push(chunk);
-                }
-            });
-            res.on('end', () => {
-                const bodyText = chunks.length > 0 ? Buffer.concat(chunks).toString('utf-8') : '';
-                resolve({
-                    ok: true,
-                    status: res.statusCode || 0,
-                    durationMs: Date.now() - start,
-                    body: bodyText
-                });
-            });
-        });
-
-        req.setTimeout(timeoutMs, () => {
-            req.destroy(new Error('timeout'));
-        });
-
-        req.on('error', (err) => {
-            resolve({
-                ok: false,
-                error: err.message || 'request failed',
-                durationMs: Date.now() - start
-            });
-        });
-
-        req.write(payload);
-        req.end();
-    });
-}
-
-function extractModelIds(payload) {
-    const ids = [];
-    const pushValue = (value) => {
-        if (typeof value === 'string' && value.trim()) {
-            ids.push(value.trim());
-        }
-    };
-
-    if (!payload) return ids;
-
-    if (Array.isArray(payload)) {
-        for (const item of payload) {
-            if (item && typeof item === 'object') {
-                pushValue(item.id);
-                pushValue(item.model);
-                pushValue(item.name);
-            } else {
-                pushValue(item);
-            }
-        }
-        return ids;
-    }
-
-    if (Array.isArray(payload.data)) {
-        for (const item of payload.data) {
-            if (item && typeof item === 'object') {
-                pushValue(item.id);
-                pushValue(item.model);
-                pushValue(item.name);
-            } else {
-                pushValue(item);
-            }
-        }
-    }
-
-    if (Array.isArray(payload.models)) {
-        for (const item of payload.models) {
-            if (item && typeof item === 'object') {
-                pushValue(item.id);
-                pushValue(item.model);
-                pushValue(item.name);
-            } else {
-                pushValue(item);
-            }
-        }
-    }
-
-    return ids;
 }
 
 async function runRemoteHealthCheck(provider, modelName, options = {}) {
@@ -1557,84 +1108,6 @@ async function buildConfigHealthReport(params = {}) {
         },
         remote
     };
-}
-
-function formatTimestampForFileName(value) {
-    const date = value ? new Date(value) : new Date();
-    const normalized = Number.isNaN(date.getTime()) ? new Date() : date;
-    const pad = (num) => String(num).padStart(2, '0');
-    return [
-        normalized.getFullYear(),
-        pad(normalized.getMonth() + 1),
-        pad(normalized.getDate()),
-        '-',
-        pad(normalized.getHours()),
-        pad(normalized.getMinutes()),
-        pad(normalized.getSeconds())
-    ].join('');
-}
-
-function toIsoTime(value, fallback = '') {
-    if (value === undefined || value === null || value === '') {
-        return fallback;
-    }
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-        return fallback;
-    }
-    return date.toISOString();
-}
-
-function updateLatestIso(currentIso, candidate) {
-    const currentTime = Date.parse(currentIso || '') || 0;
-    const candidateIso = toIsoTime(candidate, '');
-    const candidateTime = Date.parse(candidateIso || '') || 0;
-    if (!candidateTime) {
-        return currentIso;
-    }
-    return candidateTime > currentTime ? candidateIso : currentIso;
-}
-
-function truncateText(text, maxLength = 90) {
-    if (!text) return '';
-    const normalized = String(text).replace(/\s+/g, ' ').trim();
-    if (normalized.length <= maxLength) return normalized;
-    return normalized.slice(0, maxLength - 1) + '…';
-}
-
-function extractMessageText(content) {
-    if (typeof content === 'string') {
-        return content.trim();
-    }
-
-    if (Array.isArray(content)) {
-        const parts = content
-            .map(item => extractMessageText(item))
-            .filter(Boolean);
-        return parts.join('\n').trim();
-    }
-
-    if (!content || typeof content !== 'object') {
-        return '';
-    }
-
-    if (typeof content.text === 'string') {
-        return content.text.trim();
-    }
-
-    if (typeof content.value === 'string') {
-        return content.value.trim();
-    }
-
-    if (content.content !== undefined) {
-        return extractMessageText(content.content);
-    }
-
-    if (typeof content.output === 'string') {
-        return content.output.trim();
-    }
-
-    return '';
 }
 
 function buildDefaultConfigContent(initializedAt) {
@@ -2041,17 +1514,6 @@ function parseJsonlHeadRecords(filePath, maxBytes = SESSION_SUMMARY_READ_BYTES) 
     }
 
     return parseJsonlContent(headText);
-}
-
-function normalizeRole(value) {
-    if (typeof value !== 'string') {
-        return '';
-    }
-    const role = value.trim().toLowerCase();
-    if (role === 'assistant' || role === 'user' || role === 'system') {
-        return role;
-    }
-    return '';
 }
 
 function isBootstrapLikeText(text) {
@@ -3251,44 +2713,6 @@ function buildSessionPlainText(messages) {
     }
 
     return lines.join('\n');
-}
-
-function parseMaxMessagesValue(value) {
-    if (value === Infinity) {
-        return Infinity;
-    }
-
-    if (typeof value === 'string') {
-        const trimmed = value.trim();
-        if (!trimmed) {
-            return null;
-        }
-        const lower = trimmed.toLowerCase();
-        if (lower === 'all' || lower === 'infinity' || lower === 'inf') {
-            return Infinity;
-        }
-        const parsed = Number(trimmed);
-        if (Number.isFinite(parsed)) {
-            return parsed;
-        }
-        return null;
-    }
-
-    if (Number.isFinite(value)) {
-        return value;
-    }
-    return null;
-}
-
-function resolveMaxMessagesValue(value, fallback) {
-    const parsed = parseMaxMessagesValue(value);
-    if (parsed === null) {
-        return fallback;
-    }
-    if (parsed === Infinity) {
-        return Infinity;
-    }
-    return Math.max(1, Math.floor(parsed));
 }
 
 function resolveStateMaxMessages(state) {
