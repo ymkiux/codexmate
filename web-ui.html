@@ -393,6 +393,11 @@
             transform: translateX(0);
         }
 
+        .mode-cards .card-actions {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
         .card-action-btn {
             width: 28px;
             height: 28px;
@@ -1185,32 +1190,10 @@
             transition: all var(--transition-fast) var(--ease-spring);
         }
 
-        .session-item-delete {
-            border: 1px solid rgba(189, 70, 68, 0.35);
-            background: rgba(189, 70, 68, 0.08);
-            color: #b74545;
-            width: 28px;
-            height: 28px;
-            border-radius: 8px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            flex-shrink: 0;
-            transition: all var(--transition-fast) var(--ease-spring);
-        }
-
         .session-item-copy:hover {
             border-color: rgba(70, 86, 110, 0.7);
             background: rgba(70, 86, 110, 0.16);
             color: var(--color-text-primary);
-            transform: translateY(-1px);
-        }
-
-        .session-item-delete:hover {
-            border-color: rgba(189, 70, 68, 0.7);
-            background: rgba(189, 70, 68, 0.18);
-            color: #9f3b3b;
             transform: translateY(-1px);
         }
 
@@ -1220,18 +1203,7 @@
             transform: none;
         }
 
-        .session-item-delete:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-
         .session-item-copy svg {
-            width: 16px;
-            height: 16px;
-        }
-
-        .session-item-delete svg {
             width: 16px;
             height: 16px;
         }
@@ -2248,7 +2220,7 @@
         <!-- 内容包裹器 - 稳定布局 -->
         <div class="content-wrapper">
             <!-- Codex 配置模式 -->
-            <div v-show="configMode === 'codex'" class="mode-content">
+            <div v-show="configMode === 'codex'" class="mode-content mode-cards">
                 <!-- 添加提供商按钮 -->
                 <button class="btn-add" @click="showAddModal = true" v-if="!loading && !initError">
                     <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
@@ -2384,7 +2356,7 @@
             </div>
 
             <!-- Claude Code 配置模式 -->
-            <div v-show="configMode === 'claude'" class="mode-content">
+            <div v-show="configMode === 'claude'" class="mode-content mode-cards">
                 <!-- 添加提供商按钮 -->
                 <button class="btn-add" @click="openClaudeConfigModal" v-if="!loading && !initError">
                     <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
@@ -2421,6 +2393,15 @@
                     </div>
                 </div>
 
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">配置健康检查</span>
+                    </div>
+                    <button class="btn-tool" @click="runHealthCheck" :disabled="healthCheckLoading || loading || !!initError">
+                        {{ healthCheckLoading ? '检查中...' : '运行检查' }}
+                    </button>
+                </div>
+
                 <div class="card-list">
                     <div v-for="(config, name) in claudeConfigs" :key="name"
                          :class="['card', { active: currentClaudeConfig === name }]"
@@ -2435,6 +2416,9 @@
                         <div class="card-trailing">
                             <span :class="['pill', config.hasKey ? 'configured' : 'empty']">
                                 {{ config.hasKey ? '已配置' : '未配置' }}
+                            </span>
+                            <span v-if="claudeSpeedResults[name]" :class="['latency', claudeSpeedResults[name].ok ? 'ok' : 'error']">
+                                {{ formatLatency(claudeSpeedResults[name]) }}
                             </span>
                             <div class="card-actions" @click.stop>
                                 <button class="card-action-btn" @click="openEditConfigModal(name)" title="编辑">
@@ -2456,7 +2440,7 @@
             </div>
 
             <!-- OpenClaw 配置模式 -->
-            <div v-show="configMode === 'openclaw'" class="mode-content">
+            <div v-show="configMode === 'openclaw'" class="mode-content mode-cards">
                 <button class="btn-add" @click="openOpenclawAddModal" v-if="!loading && !initError">
                     <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M10 4v12M4 10h12"/>
@@ -2654,21 +2638,6 @@
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <rect x="8" y="8" width="12" height="12" rx="2"></rect>
                                             <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path>
-                                        </svg>
-                                    </button>
-                                    <button
-                                        v-if="isDeleteAvailable(session)"
-                                        class="session-item-delete"
-                                        @click.stop="deleteSession(session)"
-                                        :disabled="sessionsLoading || sessionDeleting[getSessionExportKey(session)]"
-                                        aria-label="删除会话"
-                                        title="删除会话">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M3 6h18"></path>
-                                            <path d="M8 6V4h8v2"></path>
-                                            <path d="M19 6l-1 14H6L5 6"></path>
-                                            <path d="M10 11v6"></path>
-                                            <path d="M14 11v6"></path>
                                         </svg>
                                     </button>
                                 </div>
@@ -3376,6 +3345,8 @@
                     sessionStandaloneRequestSeq: 0,
                     speedResults: {},
                     speedLoading: {},
+                    claudeSpeedResults: {},
+                    claudeSpeedLoading: {},
                     providerShareLoading: {},
                     newProvider: { name: '', url: '', key: '' },
                     editingProvider: { name: '', url: '', key: '' },
@@ -4560,6 +4531,12 @@
                         this.healthCheckResult = null;
                         this.showMessage('健康检查失败: ' + e.message, 'error');
                     } finally {
+                        if (this.configMode === 'claude') {
+                            try {
+                                const entries = Object.entries(this.claudeConfigs || {});
+                                await Promise.all(entries.map(([name, config]) => this.runClaudeSpeedTest(name, config)));
+                            } catch (e) {}
+                        }
                         this.healthCheckLoading = false;
                     }
                 },
@@ -6079,6 +6056,33 @@
                         return { ok: false, error: message };
                     } finally {
                         this.speedLoading[name] = false;
+                    }
+                },
+
+                async runClaudeSpeedTest(name, config) {
+                    if (!name || this.claudeSpeedLoading[name]) return null;
+                    const baseUrl = config && typeof config.baseUrl === 'string' ? config.baseUrl.trim() : '';
+                    this.claudeSpeedLoading[name] = true;
+                    try {
+                        if (!baseUrl) {
+                            const res = { ok: false, error: 'Missing base URL' };
+                            this.claudeSpeedResults[name] = res;
+                            return res;
+                        }
+                        const res = await api('speed-test', { url: baseUrl });
+                        if (res.error) {
+                            this.claudeSpeedResults[name] = { ok: false, error: res.error };
+                            return { ok: false, error: res.error };
+                        }
+                        this.claudeSpeedResults[name] = res;
+                        return res;
+                    } catch (e) {
+                        const message = e && e.message ? e.message : 'Speed test failed';
+                        const res = { ok: false, error: message };
+                        this.claudeSpeedResults[name] = res;
+                        return res;
+                    } finally {
+                        this.claudeSpeedLoading[name] = false;
                     }
                 },
 
