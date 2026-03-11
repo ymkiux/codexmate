@@ -3,6 +3,8 @@ const os = require('os');
 const path = require('path');
 const http = require('http');
 const { spawnSync, spawn } = require('child_process');
+const { writeJsonAtomic } = require('../../lib/cli-file-utils');
+const { normalizeWireApi, buildModelProbeSpec } = require('../../lib/cli-models-utils');
 
 const debug = (...args) => {
     if (process.env.E2E_DEBUG) {
@@ -14,6 +16,10 @@ function assert(condition, message) {
     if (!condition) {
         throw new Error(message);
     }
+}
+
+function fileMode(filePath) {
+    return fs.existsSync(filePath) ? (fs.statSync(filePath).mode & 0o777) : 0;
 }
 
 function captureFileState(filePath) {
@@ -651,6 +657,24 @@ async function main() {
                 params: { url: 'http://127.0.0.1:1' }
             }, 4000);
             assert(speedUnreachable.ok === false, 'speed-test unreachable should fail');
+
+            // normalizeWireApi should handle slash-delimited values
+            assert(normalizeWireApi('chat/completions') === 'chat_completions', 'normalizeWireApi should replace "/" with "_"');
+            const probeSpec = buildModelProbeSpec({ wire_api: 'chat/completions' }, 'e2e-chat', mockProviderUrl);
+            assert(probeSpec && probeSpec.url.endsWith('/chat/completions'), 'buildModelProbeSpec should use chat/completions endpoint for slash wire_api');
+
+            // writeJsonAtomic should preserve or set secure permissions
+            const permDir = fs.mkdtempSync(path.join(tmpHome, 'perm-'));
+            const existingPath = path.join(permDir, 'secret.json');
+            fs.writeFileSync(existingPath, JSON.stringify({ a: 1 }), { mode: 0o640 });
+            const origMode = fileMode(existingPath);
+            writeJsonAtomic(existingPath, { a: 2 });
+            assert(fileMode(existingPath) === origMode, 'writeJsonAtomic should preserve mode of existing file');
+
+            const newPath = path.join(permDir, 'new.json');
+            writeJsonAtomic(newPath, { b: 1 });
+            assert(fileMode(newPath) === 0o600, 'writeJsonAtomic should default to 600 for new file');
+
             debug('tests done');
         } finally {
             const waitForExit = new Promise((resolve) => {
