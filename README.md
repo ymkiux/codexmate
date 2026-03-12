@@ -3,6 +3,7 @@
 > A lightweight AI configuration assistant: quickly switch Codex providers/models and Claude Code configs, with a unified session browser
 
 [![Build](https://img.shields.io/github/actions/workflow/status/ymkiux/codexmate/release.yml?label=build)](https://github.com/ymkiux/codexmate/actions/workflows/release.yml) [![Version](https://img.shields.io/npm/v/codexmate?label=version&registry_uri=https%3A%2F%2Fregistry.npmjs.org)](https://www.npmjs.com/package/codexmate) [![Status](https://img.shields.io/badge/status-alpha-orange)](https://github.com/ymkiux/codexmate)
+[Current version: v0.0.8](https://www.npmjs.com/package/codexmate)
 [![Maintain](https://img.shields.io/github/commit-activity/m/ymkiux/codexmate?label=maintain%2Fmonth)](https://github.com/ymkiux/codexmate/commits) [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE) [![Node](https://img.shields.io/badge/node-%3E%3D14.0.0-green.svg)](https://nodejs.org)
 
 English | [Chinese](README.zh-CN.md)
@@ -359,7 +360,7 @@ Note: 7-Zip is optional. If missing, the built-in JS library is used. `--max` on
 
 ## Release (GitHub Actions)
 
-Create a tag that matches `package.json` (for example `v0.0.1`). Then run the `release` workflow in GitHub Actions and input that tag. It will create a GitHub Release and attach the `npm pack` `.tgz` artifact.
+Create a tag that matches `package.json` (for example `v0.0.8`). Then run the `release` workflow in GitHub Actions and input that tag. It will create a GitHub Release and attach the `npm pack` `.tgz` artifact.
 
 ## License
 
