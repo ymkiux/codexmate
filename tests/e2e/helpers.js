@@ -67,11 +67,27 @@ function runSync(node, args, options = {}) {
 
 function runWithInput(node, args, input, options = {}) {
     return new Promise((resolve) => {
-        const child = spawn(node, args, { ...options, stdio: ['pipe', 'pipe', 'pipe'] });
+        let child;
+        try {
+            child = spawn(node, args, { ...options, stdio: ['pipe', 'pipe', 'pipe'] });
+        } catch (err) {
+            return resolve({
+                status: 1,
+                stdout: '',
+                stderr: err && err.message ? err.message : String(err)
+            });
+        }
         let stdout = '';
         let stderr = '';
         child.stdout.on('data', chunk => stdout += chunk.toString());
         child.stderr.on('data', chunk => stderr += chunk.toString());
+        child.on('error', (err) => {
+            resolve({
+                status: 1,
+                stdout,
+                stderr: stderr || (err && err.message ? err.message : String(err))
+            });
+        });
         child.on('close', (code) => resolve({ status: code, stdout, stderr }));
         if (input) {
             child.stdin.write(input);

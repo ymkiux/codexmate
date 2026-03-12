@@ -92,18 +92,20 @@ async function main() {
 
     } finally {
         const waitForExit = new Promise((resolve) => {
-            if (!webServer || webServer.exitCode !== null || webServer.signalCode) {
-                return resolve();
-            }
+            if (!webServer) return resolve();
             const forceKill = setTimeout(() => {
                 try {
                     webServer.kill('SIGKILL');
                 } catch (e) {}
             }, 2000);
-            webServer.on('exit', () => {
+            webServer.once('exit', () => {
                 clearTimeout(forceKill);
                 resolve();
             });
+            if (webServer.exitCode !== null || webServer.signalCode) {
+                clearTimeout(forceKill);
+                resolve();
+            }
         });
         try {
             if (webServer) {

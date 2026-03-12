@@ -27,7 +27,7 @@ module.exports = async function testSetup(ctx) {
     assert(/model_provider\s*=\s*"e2e"/.test(configContent), 'model_provider not set');
     assert(/model\s*=\s*"e2e-model"/.test(configContent), 'model not set');
     assert(/\[model_providers\.e2e\]/.test(configContent), 'provider block missing');
-    assert(/base_url\s*=\s*"http:\/\/127\.0\.0\.1:\d+"/.test(configContent), 'base_url missing');
+    assert(configContent.includes(`base_url = "${mockProviderUrl}"`), 'base_url missing or mismatched');
 
     const authPath = path.join(tmpHome, '.codex', 'auth.json');
     const auth = JSON.parse(fs.readFileSync(authPath, 'utf-8'));

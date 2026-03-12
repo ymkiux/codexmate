@@ -73,6 +73,7 @@ const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 const CLAUDE_SETTINGS_FILE = path.join(CLAUDE_DIR, 'settings.json');
 const CLAUDE_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
 const RECENT_CONFIGS_FILE = path.join(CONFIG_DIR, 'recent-configs.json');
+const DEFAULT_CLAUDE_MODEL = 'glm-4.7';
 
 const DEFAULT_MODELS = ['gpt-5.3-codex', 'gpt-5.1-codex-max', 'gpt-4-turbo', 'gpt-4'];
 const SPEED_TEST_TIMEOUT_MS = 8000;
@@ -3103,7 +3104,7 @@ function buildClaudeSharePayload(config = {}) {
         payload: {
             baseUrl: baseUrl.trim(),
             apiKey: apiKey.trim(),
-            model: (model && model.trim()) || 'glm-4.7'
+            model: (model && model.trim()) || DEFAULT_CLAUDE_MODEL
         }
     };
 }
@@ -3957,7 +3958,7 @@ function applyToClaudeSettings(config = {}) {
         }
 
         const baseUrl = (config.baseUrl || 'https://open.bigmodel.cn/api/anthropic').trim();
-        const model = (config.model || 'glm-4.7').trim();
+        const model = (config.model || DEFAULT_CLAUDE_MODEL).trim();
         const readResult = readJsonObjectFromFile(CLAUDE_SETTINGS_FILE, {});
         if (!readResult.ok) {
             return { success: false, mode: 'settings-file', error: readResult.error };
@@ -4040,7 +4041,7 @@ function cmdClaude(baseUrl, apiKey, model, silent = false) {
     const normalizedKey = typeof apiKey === 'string' ? apiKey.trim() : '';
     const normalizedModel = typeof model === 'string' && model.trim()
         ? model.trim()
-        : 'glm-4.7';
+        : DEFAULT_CLAUDE_MODEL;
 
     if (!normalizedBaseUrl || !normalizedKey) {
         if (!silent) {

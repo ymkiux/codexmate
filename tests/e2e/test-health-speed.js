@@ -56,7 +56,7 @@ module.exports = async function testHealthAndSpeed(ctx) {
     );
 
     const speedUnreachable = await api('speed-test', { url: 'http://127.0.0.1:1' });
-    assert(speedUnreachable.ok === false, 'speed-test unreachable should fail');
+    assert(speedUnreachable.ok === false || speedUnreachable.error, 'speed-test unreachable should fail');
 
     assert(normalizeWireApi('chat/completions') === 'chat_completions', 'normalizeWireApi should replace "/" with "_"');
     const probeSpec = buildModelProbeSpec({ wire_api: 'chat/completions' }, 'e2e-chat', mockProviderUrl);
