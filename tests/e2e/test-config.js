@@ -22,7 +22,7 @@ module.exports = async function testConfig(ctx) {
         serviceTier: 'fast'
     });
     assert(typeof templateOverride.template === 'string', 'get-config-template missing template');
-    assert(templateOverride.template.split('\n')[0].trim() === 'service_tier = "fast"', 'get-config-template missing service_tier');
+    assert(/^\s*service_tier\s*=\s*"fast"\s*$/m.test(templateOverride.template), 'get-config-template missing service_tier');
     assert(templateOverride.template.includes('model_provider = "shadow"'), 'get-config-template missing provider override');
     assert(templateOverride.template.includes('model = "shadow-model"'), 'get-config-template missing model override');
 

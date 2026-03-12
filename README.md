@@ -187,7 +187,7 @@ codexmate run
 codexmate claude https://api.example.com/v1 sk-ant-xxx claude-3-7-sonnet
 ```
 
-- In Web UI, each Claude config卡片 now有“分享导入命令”按钮，可复制一键导入命令（会输出如 `codexmate claude <BaseURL> <API Key> <Model>`）。
+- In the Web UI, each Claude configuration card now has a "Share Import Command" button that copies a one-click import command (for example: `codexmate claude <BaseURL> <API Key> <Model>`).
 
 ### OpenClaw Config Mode
 
