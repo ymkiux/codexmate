@@ -2562,7 +2562,7 @@
                 padding: 0 var(--spacing-sm) var(--spacing-md);
             }
             .hero-title {
-                font-size: 36px;
+                font-size: 32px;
             }
             .hero-subtitle {
                 font-size: var(--font-size-secondary);
@@ -2598,10 +2598,17 @@
             .btn-session-open,
             .btn-session-clone,
             .btn-session-refresh,
-            .btn-session-delete {
+            .btn-session-delete,
+            .btn-icon,
+            .session-item-copy {
                 min-height: 44px;
                 padding-top: 12px;
                 padding-bottom: 12px;
+            }
+
+            .btn-icon,
+            .session-item-copy {
+                min-width: 44px;
             }
 
             .session-item {
@@ -2654,20 +2661,20 @@
             </div>
         </div>
 
-        <div v-if="!sessionStandalone" class="top-tabs">
-            <button class="top-tab"
-                :class="{ active: mainTab === 'config' && configMode === 'codex' }"
-                @click="switchMainTab('config'); switchConfigMode('codex')">Codex 配置</button>
-            <button class="top-tab"
-                :class="{ active: mainTab === 'config' && configMode === 'claude' }"
-                @click="switchMainTab('config'); switchConfigMode('claude')">Claude Code 配置</button>
-            <button class="top-tab"
-                :class="{ active: mainTab === 'config' && configMode === 'openclaw' }"
-                @click="switchMainTab('config'); switchConfigMode('openclaw')">OpenClaw 配置</button>
-            <button class="top-tab"
-                :class="{ active: mainTab === 'sessions' }"
-                @click="switchMainTab('sessions')">会话浏览</button>
-        </div>
+            <div v-if="!sessionStandalone" class="top-tabs">
+                <button class="top-tab"
+                    :class="{ active: mainTab === 'config' && configMode === 'codex' }"
+                    @click="switchConfigMode('codex')">Codex 配置</button>
+                <button class="top-tab"
+                    :class="{ active: mainTab === 'config' && configMode === 'claude' }"
+                    @click="switchConfigMode('claude')">Claude Code 配置</button>
+                <button class="top-tab"
+                    :class="{ active: mainTab === 'config' && configMode === 'openclaw' }"
+                    @click="switchConfigMode('openclaw')">OpenClaw 配置</button>
+                <button class="top-tab"
+                    :class="{ active: mainTab === 'sessions' }"
+                    @click="switchMainTab('sessions')">会话浏览</button>
+            </div>
 
         <div :class="['app-shell', { standalone: sessionStandalone }]">
             <aside class="side-rail" v-if="!sessionStandalone">
@@ -2684,7 +2691,7 @@
                     <div class="side-section-title">配置管理</div>
                     <button
                         :class="['side-item', { active: mainTab === 'config' && configMode === 'codex' }]"
-                        @click="switchMainTab('config'); switchConfigMode('codex')">
+                        @click="switchConfigMode('codex')">
                         <div class="side-item-title">Codex 配置</div>
                         <div class="side-item-meta">
                             <span>提供商 / 模型</span>
@@ -2693,7 +2700,7 @@
                     </button>
                     <button
                         :class="['side-item', { active: mainTab === 'config' && configMode === 'claude' }]"
-                        @click="switchMainTab('config'); switchConfigMode('claude')">
+                        @click="switchConfigMode('claude')">
                         <div class="side-item-title">Claude Code 配置</div>
                         <div class="side-item-meta">
                             <span>Base URL / Key</span>
@@ -2702,7 +2709,7 @@
                     </button>
                     <button
                         :class="['side-item', { active: mainTab === 'config' && configMode === 'openclaw' }]"
-                        @click="switchMainTab('config'); switchConfigMode('openclaw')">
+                        @click="switchConfigMode('openclaw')">
                         <div class="side-item-title">OpenClaw 配置</div>
                         <div class="side-item-meta">
                             <span>JSON5 / Workspace</span>
