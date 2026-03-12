@@ -3496,6 +3496,16 @@
         document.addEventListener('DOMContentLoaded', () => {
             if (typeof Vue === 'undefined') {
                 console.error('Vue 库未能在 DOMContentLoaded 触发前加载完成。');
+                const fallbackTarget = document.querySelector('#app') || document.querySelector('[v-cloak]');
+                if (fallbackTarget) {
+                    fallbackTarget.removeAttribute('v-cloak');
+                    fallbackTarget.classList.remove('v-cloak');
+                    fallbackTarget.innerHTML = '';
+                    const notice = document.createElement('div');
+                    notice.className = 'fallback-message';
+                    notice.textContent = 'Web UI 加载失败：Vue 未加载。请检查网络或刷新页面。';
+                    fallbackTarget.appendChild(notice);
+                }
                 return;
             }
             const { createApp } = Vue;
