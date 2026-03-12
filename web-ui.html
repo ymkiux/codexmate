@@ -1476,13 +1476,21 @@
             font-size: var(--font-size-body);
             font-weight: var(--font-weight-secondary);
             color: var(--color-text-primary);
-            line-height: 1.35;
+            line-height: 1.45;
             display: -webkit-box;
-            -webkit-line-clamp: 2;
+            -webkit-line-clamp: 3;
             -webkit-box-orient: vertical;
             overflow: hidden;
             word-break: break-word;
             flex: 1;
+            max-height: calc(1.45em * 3);
+        }
+
+        @media (max-width: 768px) {
+            .session-item-title {
+                -webkit-line-clamp: 4;
+                max-height: calc(1.45em * 4);
+            }
         }
 
         .session-item-actions {
