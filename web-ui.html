@@ -4219,13 +4219,16 @@
                     const nameArg = this.quoteShellArg(name);
                     const urlArg = this.quoteShellArg(baseUrl);
                     const keyArg = apiKey ? this.quoteShellArg(apiKey) : '';
+                    const switchCmd = `codexmate switch ${nameArg}`;
                     const addCmd = apiKey
                         ? `codexmate add ${nameArg} ${urlArg} ${keyArg}`
                         : `codexmate add ${nameArg} ${urlArg}`;
                     const updateCmd = apiKey
                         ? `codexmate update ${nameArg} ${urlArg} ${keyArg}`
                         : `codexmate update ${nameArg} ${urlArg}`;
-                    return `${addCmd} || ${updateCmd}`;
+                    const addAndSwitch = `${addCmd} && ${switchCmd}`;
+                    const updateAndSwitch = `${updateCmd} && ${switchCmd}`;
+                    return `${addAndSwitch} || ${updateAndSwitch}`;
                 },
 
                 async copyProviderShareCommand(provider) {
