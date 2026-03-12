@@ -28,7 +28,7 @@ Codex Mate makes frequent provider/model switching for Codex and Claude Code a s
 | Codex Config | Switching providers/models is painful | Provider/model switching, model management, CLI + Web entry points, template-confirmed writes |
 | Claude Code Config | Multiple profiles and inconsistent write paths | Profile management, default write to `~/.claude/settings.json` |
 | OpenClaw Config | OpenClaw configs are scattered | JSON5 profiles, apply to `~/.openclaw/openclaw.json`, AGENTS workspace management |
-| Session Browser | Local sessions are hard to track | List/filter sessions, export to Markdown, copy resume command (when available), delete and batch cleanup |
+| Session Browser | Local sessions are hard to track | List/filter sessions, keyword search (Codex only), export to Markdown, copy resume command (when available), delete and batch cleanup |
 | Utilities | Compression/extraction requires extra tools | 7-Zip preferred, JS fallback |
 
 ## Why Codex Mate
@@ -42,7 +42,7 @@ Codex Mate makes frequent provider/model switching for Codex and Claude Code a s
 
 - Frequent provider/model switching, want a one-command flow
 - Use both Codex and Claude Code, want a single entry point
-- Need to browse/export local Codex + Claude Code sessions and copy resume commands when available
+- Need to browse/export local Codex + Claude Code sessions and copy resume commands when available; keyword search currently for Codex sessions only
 - Use OpenClaw with multiple profiles, want quick switching
 - Multi-project or multi-environment setups that need quick config changes
 - Want a visual UI without a heavy client
