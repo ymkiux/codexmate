@@ -9,7 +9,7 @@ description: Run iterative CodeRabbit PR review loops without stopping; handle r
 
 ## 快速起步
 1. 确认当前分支是 PR 分支，工作区干净。
-2. 拉取最新：`git pull`.
+2. 拉取最新：`git pull --ff-only`（避免误 merge PR 分支）。如遇 non-ff，可用 `git fetch --all && git reset --hard origin/<branch>`（会丢本地改动，谨慎）。
 3. 核心循环按「执行循环」节。
 
 ## 执行循环（不得跳过）
