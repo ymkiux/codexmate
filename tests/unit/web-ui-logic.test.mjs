@@ -5,7 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const logic = await import(pathToFileURL(path.join(__dirname, '..', '..', 'web-ui', 'logic.js')));
+const logic = await import(pathToFileURL(path.join(__dirname, '..', '..', 'web-ui', 'logic.mjs')));
 const {
     normalizeClaudeValue,
     normalizeClaudeConfig,
