@@ -7,6 +7,8 @@
 
 [English](README.md) | 中文
 
+![Codex Mate Web UI](res/screenshot.png)
+
 ## 概览
 
 Codex Mate 让 Codex 与 Claude Code 的提供商/模型切换变成“一条命令或一次点击”，并在同一 Web 页面浏览、导出两者的本地会话记录。
@@ -95,10 +97,6 @@ codexmate run
 ## 竞品/替代
 
 - cc-switch: https://github.com/farion1231/cc-switch
-
-## 界面预览
-
-![Codex Mate Web UI](res/screenshot.png)
 
 ## 安装
 
