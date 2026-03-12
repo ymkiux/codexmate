@@ -11,15 +11,14 @@ English | [Chinese](README.zh-CN.md)
 
 ## Overview
 
-Codex Mate makes frequent provider/model switching for Codex and Claude Code a single command or click, and gives you a unified session browser to view/export local sessions from both.
+One tool to switch Codex/Claude Code providers & models and browse local sessions in one click.
 
 ## What You Get
 
-- Faster provider/model switching
-- More controllable local configuration management
-- A visual Web UI to reduce CLI burden
-- Change tracking with backups
-- A unified session browser for Codex + Claude Code (view/export/copy resume command when available)
+- One-command provider/model switching
+- Local config control with backups
+- Lightweight Web UI instead of heavy clients
+- Unified session browser (view/export/resume when available)
 
 ## Feature Overview
 
