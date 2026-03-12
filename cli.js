@@ -4675,7 +4675,7 @@ function cmdStart(options = {}) {
         } else if (requestPath.startsWith('/res/')) {
             const normalized = path.normalize(requestPath).replace(/^([\\.\\/])+/, '');
             const filePath = path.join(__dirname, normalized);
-            if (!filePath.startsWith(assetsDir)) {
+            if (!isPathInside(filePath, assetsDir)) {
                 res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
                 res.end('Forbidden');
                 return;
