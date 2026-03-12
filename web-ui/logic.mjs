@@ -125,3 +125,32 @@ export function buildSpeedTestIssue(name, result) {
     }
     return null;
 }
+
+// Session filtering helpers
+export function isSessionQueryEnabled(source) {
+    return (source || '').toLowerCase() === 'codex';
+}
+
+export function buildSessionListParams(options = {}) {
+    const {
+        source = 'all',
+        pathFilter = '',
+        query = '',
+        roleFilter = 'all',
+        timeRangePreset = 'all',
+        limit = 200
+    } = options;
+    const queryValue = isSessionQueryEnabled(source) ? query : '';
+    return {
+        source,
+        pathFilter,
+        query: queryValue,
+        queryMode: 'and',
+        queryScope: 'content',
+        contentScanLimit: 50,
+        roleFilter,
+        timeRangePreset,
+        limit,
+        forceRefresh: true
+    };
+}
