@@ -4223,12 +4223,7 @@
                     const addCmd = apiKey
                         ? `codexmate add ${nameArg} ${urlArg} ${keyArg}`
                         : `codexmate add ${nameArg} ${urlArg}`;
-                    const updateCmd = apiKey
-                        ? `codexmate update ${nameArg} ${urlArg} ${keyArg}`
-                        : `codexmate update ${nameArg} ${urlArg}`;
-                    const addAndSwitch = `${addCmd} && ${switchCmd}`;
-                    const updateAndSwitch = `${updateCmd} && ${switchCmd}`;
-                    return `${addAndSwitch} || ${updateAndSwitch}`;
+                    return `${addCmd} && ${switchCmd}`;
                 },
 
                 async copyProviderShareCommand(provider) {
