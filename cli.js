@@ -4483,13 +4483,15 @@ function formatHostForUrl(host) {
 // 打开 Web UI
 function cmdStart(options = {}) {
     const htmlPath = path.join(__dirname, 'web-ui.html');
+    const assetsDir = path.join(__dirname, 'res');
     if (!fs.existsSync(htmlPath)) {
         console.error('错误: web-ui.html 不存在');
         process.exit(1);
     }
 
     const server = http.createServer((req, res) => {
-        if (req.url === '/api') {
+        const requestPath = (req.url || '/').split('?')[0];
+        if (requestPath === '/api') {
             let body = '';
             req.on('data', chunk => body += chunk);
             req.on('end', async () => {
@@ -4670,6 +4672,27 @@ function cmdStart(options = {}) {
                     res.end(JSON.stringify({ error: e.message }));
                 }
             });
+        } else if (requestPath.startsWith('/res/')) {
+            const normalized = path.normalize(requestPath).replace(/^([\\.\\/])+/, '');
+            const filePath = path.join(__dirname, normalized);
+            if (!isPathInside(filePath, assetsDir)) {
+                res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+                res.end('Forbidden');
+                return;
+            }
+            if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+                res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+                res.end('Not Found');
+                return;
+            }
+            const ext = path.extname(filePath).toLowerCase();
+            const mime = ext === '.js'
+                ? 'application/javascript; charset=utf-8'
+                : ext === '.json'
+                    ? 'application/json; charset=utf-8'
+                    : 'application/octet-stream';
+            res.writeHead(200, { 'Content-Type': mime });
+            fs.createReadStream(filePath).pipe(res);
         } else {
             const html = fs.readFileSync(htmlPath, 'utf-8');
             res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });

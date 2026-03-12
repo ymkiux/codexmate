@@ -71,5 +71,9 @@ module.exports = async function testHealthAndSpeed(ctx) {
 
     const newPath = path.join(permDir, 'new.json');
     writeJsonAtomic(newPath, { b: 1 });
-    assert(fileMode(newPath) === 0o600, 'writeJsonAtomic should default to 600 for new file');
+    const expectedNewMode = process.platform === 'win32' ? 0o666 : 0o600;
+    assert(
+        fileMode(newPath) === expectedNewMode,
+        `writeJsonAtomic should default to ${expectedNewMode.toString(8)} for new file (got ${fileMode(newPath).toString(8)})`
+    );
 };
