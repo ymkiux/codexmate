@@ -6,7 +6,7 @@
     findDuplicateClaudeConfigName,
     formatLatency,
     buildSpeedTestIssue
-} from './logic.js';
+} from './logic.mjs';
 
         document.addEventListener('DOMContentLoaded', () => {
             if (typeof Vue === 'undefined') {
