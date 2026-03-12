@@ -168,113 +168,25 @@
            ============================================ */
         .container {
             width: 100%;
-            max-width: 1280px;
+            max-width: 1200px;
             margin: 0 auto;
-            padding: 16px 12px 28px;
+            padding: var(--spacing-md) var(--spacing-sm) var(--spacing-lg);
             position: relative;
             z-index: 1;
         }
 
         /* ============================================
-           布局：双列（侧栏 + 主区）
+           布局：单列居中
            ============================================ */
         .app-shell {
             display: grid;
-            grid-template-columns: 320px minmax(0, 1fr);
+            grid-template-columns: 1fr;
             gap: var(--spacing-md);
             align-items: flex-start;
         }
 
-        .app-shell.standalone {
-            grid-template-columns: 1fr;
-        }
-
-        .side-rail {
-            position: sticky;
-            top: var(--spacing-md);
-            align-self: start;
-            display: flex;
-            flex-direction: column;
-            gap: var(--spacing-sm);
-            padding: var(--spacing-md) var(--spacing-sm);
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 250, 245, 0.9) 100%);
-            border: 1px solid rgba(216, 201, 184, 0.65);
-            border-radius: var(--radius-xl);
-            box-shadow: var(--shadow-card);
-            min-height: 420px;
-        }
-
-        .side-rail .brand-title {
-            font-size: 24px;
-            margin-bottom: 2px;
-        }
-
-        .side-section {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .side-section-title {
-            font-size: var(--font-size-secondary);
-            font-weight: var(--font-weight-secondary);
-            color: var(--color-text-tertiary);
-            letter-spacing: 0.01em;
-            padding: 0 var(--spacing-xs);
-        }
-
-        .side-item {
-            width: 100%;
-            text-align: left;
-            padding: 12px var(--spacing-sm);
-            border-radius: var(--radius-lg);
-            border: 1px solid var(--color-border-soft);
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 247, 240, 0.95) 100%);
-            color: var(--color-text-secondary);
-            cursor: pointer;
-            transition: all var(--transition-normal) var(--ease-spring);
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            box-shadow: var(--shadow-subtle);
-        }
-
-        .side-item:hover {
-            border-color: var(--color-brand);
-            color: var(--color-text-primary);
-            transform: translateY(-1px);
-            box-shadow: var(--shadow-card-hover);
-        }
-
-        .side-item.active {
-            border-color: var(--color-brand);
-            background: linear-gradient(135deg, rgba(201, 94, 75, 0.14), rgba(255, 255, 255, 0.96));
-            color: var(--color-text-primary);
-            box-shadow: var(--shadow-float);
-        }
-
-        .side-item-title {
-            font-size: var(--font-size-body);
-            font-weight: var(--font-weight-secondary);
-            letter-spacing: -0.01em;
-        }
-
-        .side-item-meta {
-            font-size: var(--font-size-caption);
-            color: var(--color-text-tertiary);
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .side-item-meta > span {
-            min-width: 0;
-            overflow-wrap: anywhere;
-            word-break: break-word;
-        }
-
-        .top-tabs {
-            display: none !important;
+        .side-nav {
+            display: none;
         }
 
         .brand-block {
@@ -333,40 +245,6 @@
             background: linear-gradient(135deg, rgba(201, 94, 75, 0.12), rgba(255, 255, 255, 0.95));
         }
 
-        .status-strip {
-            display: flex;
-            flex-wrap: wrap;
-            gap: var(--spacing-xs);
-            margin-bottom: var(--spacing-sm);
-            margin-top: 6px;
-        }
-
-        .status-chip {
-            min-width: 200px;
-            padding: 10px 12px;
-            border-radius: var(--radius-lg);
-            border: 1px solid var(--color-border-soft);
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 247, 240, 0.96) 100%);
-            box-shadow: var(--shadow-subtle);
-        }
-
-        .status-chip .label {
-            display: block;
-            font-size: var(--font-size-caption);
-            color: var(--color-text-tertiary);
-            margin-bottom: 4px;
-        }
-
-        .status-chip .value {
-            font-size: var(--font-size-body);
-            font-weight: var(--font-weight-secondary);
-            color: var(--color-text-primary);
-            letter-spacing: -0.01em;
-            white-space: normal;
-            overflow-wrap: anywhere;
-            word-break: break-word;
-        }
-
         .main-panel {
             min-width: 0;
             background: rgba(255, 255, 255, 0.9);
@@ -375,9 +253,6 @@
             box-shadow: 0 12px 30px rgba(27, 23, 20, 0.08);
             padding: var(--spacing-md) var(--spacing-lg);
             backdrop-filter: blur(8px);
-            position: relative;
-            overflow-x: hidden;
-            overflow-y: visible;
         }
 
         .panel-header {
@@ -488,14 +363,14 @@
             border: 1px solid rgba(255, 255, 255, 0.7);
             border-radius: var(--radius-lg);
             box-shadow: var(--shadow-card);
-            padding: 0;
+            padding: var(--spacing-md);
         }
 
         .mode-content {
             border-radius: var(--radius-lg);
             background: rgba(255, 255, 255, 0.85);
             box-shadow: var(--shadow-subtle);
-            padding: 10px;
+            padding: var(--spacing-sm);
         }
 
         /* ============================================
@@ -587,7 +462,7 @@
         .card {
             background: linear-gradient(180deg, #fffdf9 0%, #fff8f2 100%);
             border-radius: var(--radius-lg);
-            padding: 10px;
+            padding: var(--spacing-sm);
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -640,9 +515,9 @@
         }
 
         .card.active {
-            background: linear-gradient(to bottom, rgba(210, 107, 90, 0.14) 0%, rgba(255, 255, 255, 0.98) 100%);
-            border-color: rgba(201, 94, 75, 0.55);
-            box-shadow: 0 10px 28px rgba(210, 107, 90, 0.14);
+            background: linear-gradient(to bottom, rgba(210, 107, 90, 0.12) 0%, rgba(255, 255, 255, 0.98) 100%);
+            border-color: rgba(201, 94, 75, 0.45);
+            box-shadow: var(--shadow-float);
         }
 
         .card.active::before {
@@ -722,7 +597,7 @@
         /* 卡片操作按钮 - hover 显示 */
         .card-actions {
             display: flex;
-            gap: 8px;
+            gap: 4px;
             opacity: 0;
             transform: translateX(4px);
             transition: all var(--transition-normal) var(--ease-spring);
@@ -739,24 +614,23 @@
         }
 
         .card-action-btn {
-            width: 40px;
-            height: 40px;
-            border-radius: 10px;
-            border: 1px solid rgba(70, 86, 110, 0.22);
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.9));
-            color: var(--color-text-secondary);
+            width: 28px;
+            height: 28px;
+            border-radius: var(--radius-sm);
+            border: none;
+            background: transparent;
+            color: var(--color-text-tertiary);
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             transition: all var(--transition-fast) var(--ease-spring);
-            box-shadow: inset 0 1px 2px rgba(31, 26, 23, 0.04);
         }
 
         .card-action-btn:hover {
-            background: linear-gradient(135deg, rgba(210, 107, 90, 0.08) 0%, rgba(255, 255, 255, 0.95) 100%);
-            color: var(--color-text-primary);
-            transform: translateY(-1px);
+            background: linear-gradient(135deg, var(--color-bg) 0%, rgba(247, 241, 232, 0.8) 100%);
+            color: var(--color-text-secondary);
+            transform: scale(1.08);
         }
 
         .card-action-btn.delete:hover {
@@ -765,8 +639,8 @@
         }
 
         .card-action-btn svg {
-            width: 18px;
-            height: 18px;
+            width: 16px;
+            height: 16px;
         }
 
         /* ============================================
@@ -1420,8 +1294,6 @@
             transition: all var(--transition-fast) var(--ease-spring);
             user-select: none;
             min-width: 0;
-            position: relative;
-            overflow: hidden;
         }
 
         .session-item-header {
@@ -1446,18 +1318,6 @@
             transform: translateY(-1px);
         }
 
-        .session-item::before {
-            content: "";
-            position: absolute;
-            left: 0;
-            top: 10px;
-            bottom: 10px;
-            width: 3px;
-            border-radius: 999px;
-            background: rgba(210, 107, 90, 0.15);
-            transition: background var(--transition-fast) var(--ease-spring);
-        }
-
         .session-item:active {
             transform: scale(0.99);
         }
@@ -1466,10 +1326,6 @@
             border-color: var(--color-brand);
             background: linear-gradient(to bottom, rgba(210, 107, 90, 0.1) 0%, rgba(255, 255, 255, 0.98) 100%);
             box-shadow: 0 6px 16px rgba(210, 107, 90, 0.12);
-        }
-
-        .session-item.active::before {
-            background: linear-gradient(180deg, rgba(201, 94, 75, 0.9), rgba(201, 94, 75, 0.4));
         }
 
         .session-item-title {
@@ -1573,13 +1429,6 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            transform: translateX(4px);
-            transition: transform var(--transition-normal) var(--ease-spring-soft), box-shadow var(--transition-normal) var(--ease-spring-soft);
-        }
-
-        .session-preview.active {
-            box-shadow: var(--shadow-float);
-            transform: translateX(0);
         }
 
         .session-preview-scroll {
@@ -1798,9 +1647,6 @@
                 min-height: 360px;
                 max-height: none;
                 height: auto;
-                position: relative;
-                transform: none;
-                box-shadow: var(--shadow-card);
             }
 
             .session-preview-header {
@@ -1810,10 +1656,6 @@
 
             .session-actions {
                 justify-content: flex-start;
-            }
-
-            .session-preview.active {
-                box-shadow: var(--shadow-float);
             }
         }
 
@@ -2508,39 +2350,20 @@
 
         @media (max-width: 960px) {
             .container {
-                padding: 12px;
-            }
-            .app-shell {
-                grid-template-columns: 1fr;
-            }
-            .side-rail {
-                display: none;
+                padding: var(--spacing-sm);
             }
             .main-panel {
                 padding: var(--spacing-sm) var(--spacing-sm);
                 border-radius: 14px;
             }
             .top-tabs {
-                display: grid !important;
                 grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
-            .status-strip {
-                gap: var(--spacing-sm);
-                margin-top: 4px;
-            }
-            .status-chip {
-                flex: 1 1 calc(50% - var(--spacing-sm));
-                min-width: 0;
             }
         }
 
         @media (max-width: 720px) {
             .main-title {
                 font-size: 40px;
-            }
-
-            .hero-title {
-                font-size: 32px;
             }
 
             .subtitle {
@@ -2552,15 +2375,6 @@
                 flex-direction: column;
                 gap: 6px;
             }
-
-            .status-strip {
-                flex-direction: row;
-                flex-wrap: wrap;
-            }
-
-            .status-chip {
-                flex: 1 1 100%;
-            }
         }
 
         @media (max-width: 540px) {
@@ -2571,7 +2385,7 @@
                 padding: 0 var(--spacing-sm) var(--spacing-md);
             }
             .hero-title {
-                font-size: 32px;
+                font-size: 36px;
             }
             .hero-subtitle {
                 font-size: var(--font-size-secondary);
@@ -2590,72 +2404,6 @@
                 height: auto;
                 min-height: 0;
             }
-
-            .status-strip {
-                gap: var(--spacing-xs);
-            }
-
-            .status-chip {
-                flex: 1 1 100%;
-                min-width: 100%;
-            }
-
-            .btn-add,
-            .btn-tool,
-            .card-action-btn,
-            .btn-session-export,
-            .btn-session-open,
-            .btn-session-clone,
-            .btn-session-refresh,
-            .btn-session-delete,
-            .btn-icon,
-            .session-item-copy {
-                min-height: 44px;
-                padding-top: 12px;
-                padding-bottom: 12px;
-            }
-
-            .btn-icon,
-            .session-item-copy {
-                min-width: 44px;
-            }
-
-            .session-item {
-                min-height: 48px;
-            }
-
-            .card {
-                padding: 8px;
-            }
-
-            .card-list {
-                gap: 4px;
-                margin-bottom: 4px;
-            }
-
-            .card-actions {
-                gap: 8px;
-            }
-
-            .card-action-btn {
-                width: 40px;
-                height: 40px;
-                border-radius: 10px;
-            }
-
-            .card-action-btn svg {
-                width: 18px;
-                height: 18px;
-            }
-
-            /* 移动端不显示配置状态 pill，节省空间 */
-            .card-trailing .pill {
-                display: none;
-            }
-
-            .session-preview {
-                border-radius: var(--radius-lg);
-            }
         }
     </style>
 </head>
@@ -2670,124 +2418,22 @@
             </div>
         </div>
 
-        <div v-if="!sessionStandalone" class="top-tabs" role="tablist" aria-label="主导航">
+        <div v-if="!sessionStandalone" class="top-tabs">
             <button class="top-tab"
-                id="tab-config-codex"
-                role="tab"
-                :tabindex="mainTab === 'config' && configMode === 'codex' ? 0 : -1"
-                :aria-selected="mainTab === 'config' && configMode === 'codex'"
-                :aria-pressed="mainTab === 'config' && configMode === 'codex'"
-                aria-controls="panel-config-codex"
                 :class="{ active: mainTab === 'config' && configMode === 'codex' }"
                 @click="switchConfigMode('codex')">Codex 配置</button>
             <button class="top-tab"
-                id="tab-config-claude"
-                role="tab"
-                :tabindex="mainTab === 'config' && configMode === 'claude' ? 0 : -1"
-                :aria-selected="mainTab === 'config' && configMode === 'claude'"
-                :aria-pressed="mainTab === 'config' && configMode === 'claude'"
-                aria-controls="panel-config-claude"
                 :class="{ active: mainTab === 'config' && configMode === 'claude' }"
                 @click="switchConfigMode('claude')">Claude Code 配置</button>
             <button class="top-tab"
-                id="tab-config-openclaw"
-                role="tab"
-                :tabindex="mainTab === 'config' && configMode === 'openclaw' ? 0 : -1"
-                :aria-selected="mainTab === 'config' && configMode === 'openclaw'"
-                :aria-pressed="mainTab === 'config' && configMode === 'openclaw'"
-                aria-controls="panel-config-openclaw"
                 :class="{ active: mainTab === 'config' && configMode === 'openclaw' }"
                 @click="switchConfigMode('openclaw')">OpenClaw 配置</button>
             <button class="top-tab"
-                id="tab-sessions"
-                role="tab"
-                :tabindex="mainTab === 'sessions' ? 0 : -1"
-                :aria-selected="mainTab === 'sessions'"
-                :aria-pressed="mainTab === 'sessions'"
-                aria-controls="panel-sessions"
                 :class="{ active: mainTab === 'sessions' }"
                 @click="switchMainTab('sessions')">会话浏览</button>
         </div>
 
         <div :class="['app-shell', { standalone: sessionStandalone }]">
-            <aside class="side-rail" v-if="!sessionStandalone">
-                <div class="brand-block">
-                    <div class="brand-title">
-                        Codex <span class="accent">Mate</span>
-                    </div>
-                    <div class="brand-subtitle">
-                        配置 / 会话切换器
-                    </div>
-                </div>
-
-                <div class="side-section" role="tablist" aria-label="配置管理">
-                    <div class="side-section-title">配置管理</div>
-                    <button
-                        role="tab"
-                        id="side-tab-config-codex"
-                        aria-controls="panel-config-codex"
-                        :tabindex="mainTab === 'config' && configMode === 'codex' ? 0 : -1"
-                        :aria-selected="mainTab === 'config' && configMode === 'codex'"
-                        :aria-pressed="mainTab === 'config' && configMode === 'codex'"
-                        :class="['side-item', { active: mainTab === 'config' && configMode === 'codex' }]"
-                        @click="switchConfigMode('codex')">
-                        <div class="side-item-title">Codex 配置</div>
-                        <div class="side-item-meta">
-                            <span>提供商 / 模型</span>
-                            <span v-if="currentProvider">当前 {{ currentProvider }}</span>
-                        </div>
-                    </button>
-                    <button
-                        role="tab"
-                        id="side-tab-config-claude"
-                        aria-controls="panel-config-claude"
-                        :tabindex="mainTab === 'config' && configMode === 'claude' ? 0 : -1"
-                        :aria-selected="mainTab === 'config' && configMode === 'claude'"
-                        :aria-pressed="mainTab === 'config' && configMode === 'claude'"
-                        :class="['side-item', { active: mainTab === 'config' && configMode === 'claude' }]"
-                        @click="switchConfigMode('claude')">
-                        <div class="side-item-title">Claude Code 配置</div>
-                        <div class="side-item-meta">
-                            <span>Base URL / Key</span>
-                            <span v-if="currentClaudeConfig">当前 {{ currentClaudeConfig }}</span>
-                        </div>
-                    </button>
-                    <button
-                        role="tab"
-                        id="side-tab-config-openclaw"
-                        aria-controls="panel-config-openclaw"
-                        :tabindex="mainTab === 'config' && configMode === 'openclaw' ? 0 : -1"
-                        :aria-selected="mainTab === 'config' && configMode === 'openclaw'"
-                        :aria-pressed="mainTab === 'config' && configMode === 'openclaw'"
-                        :class="['side-item', { active: mainTab === 'config' && configMode === 'openclaw' }]"
-                        @click="switchConfigMode('openclaw')">
-                        <div class="side-item-title">OpenClaw 配置</div>
-                        <div class="side-item-meta">
-                            <span>JSON5 / Workspace</span>
-                            <span v-if="currentOpenclawConfig">当前 {{ currentOpenclawConfig }}</span>
-                        </div>
-                    </button>
-                </div>
-
-                <div class="side-section" role="tablist" aria-label="会话管理">
-                    <div class="side-section-title">会话管理</div>
-                    <button
-                        role="tab"
-                        id="side-tab-sessions"
-                        aria-controls="panel-sessions"
-                        :tabindex="mainTab === 'sessions' ? 0 : -1"
-                        :aria-selected="mainTab === 'sessions'"
-                        :aria-pressed="mainTab === 'sessions'"
-                        :class="['side-item', { active: mainTab === 'sessions' }]"
-                        @click="switchMainTab('sessions')">
-                        <div class="side-item-title">会话浏览</div>
-                        <div class="side-item-meta">
-                            <span>快速预览 / 导出</span>
-                            <span>来源：{{ sessionFilterSource === 'all' ? '全部' : (sessionFilterSource === 'codex' ? 'Codex' : 'Claude') }}</span>
-                        </div>
-                    </button>
-                </div>
-            </aside>
             <main class="main-panel">
                 <div class="panel-header" v-if="!sessionStandalone">
                     <h1 class="main-title">
@@ -2799,49 +2445,6 @@
                     <p class="subtitle" v-else>
                         浏览、导出或独立查看 Codex / Claude 会话记录。
                     </p>
-                </div>
-
-                <div class="status-strip" v-if="!sessionStandalone && mainTab === 'config'">
-                    <template v-if="configMode === 'codex'">
-                        <div class="status-chip">
-                            <span class="label">Codex 提供商</span>
-                            <span class="value">{{ currentProvider || '未选择' }}</span>
-                        </div>
-                        <div class="status-chip">
-                            <span class="label">Codex 模型</span>
-                            <span class="value">{{ currentModel || '未选择' }}</span>
-                        </div>
-                    </template>
-                    <template v-else-if="configMode === 'claude'">
-                        <div class="status-chip">
-                            <span class="label">Claude 配置</span>
-                            <span class="value">{{ currentClaudeConfig || '未选择' }}</span>
-                        </div>
-                        <div class="status-chip">
-                            <span class="label">Claude 模型</span>
-                            <span class="value">{{ currentClaudeModel || '未选择' }}</span>
-                        </div>
-                    </template>
-                    <template v-else>
-                        <div class="status-chip">
-                            <span class="label">OpenClaw 配置</span>
-                            <span class="value">{{ currentOpenclawConfig || '未选择' }}</span>
-                        </div>
-                        <div class="status-chip">
-                            <span class="label">工作区文件</span>
-                            <span class="value">{{ openclawWorkspaceFileName || '未选择' }}</span>
-                        </div>
-                    </template>
-                </div>
-                <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'sessions'">
-                    <div class="status-chip">
-                        <span class="label">当前来源</span>
-                        <span class="value">{{ sessionFilterSource === 'all' ? 'Codex + Claude' : (sessionFilterSource === 'codex' ? '仅 Codex' : '仅 Claude') }}</span>
-                    </div>
-                    <div class="status-chip">
-                        <span class="label">会话数</span>
-                        <span class="value">{{ sessionsList.length }}</span>
-                    </div>
                 </div>
 
                 <div v-if="false && mainTab === 'config' && !sessionStandalone" class="config-subtabs">
@@ -2859,12 +2462,7 @@
                 <!-- 内容包裹器 - 稳定布局 -->
                 <div class="content-wrapper">
                     <!-- Codex 配置模式 -->
-                    <div
-                        v-show="mainTab === 'config' && configMode === 'codex'"
-                        class="mode-content mode-cards"
-                        id="panel-config-codex"
-                        role="tabpanel"
-                        :aria-labelledby="'tab-config-codex'">
+                    <div v-show="mainTab === 'config' && configMode === 'codex'" class="mode-content mode-cards">
                 <!-- 添加提供商按钮 -->
                 <button class="btn-add" @click="showAddModal = true" v-if="!loading && !initError">
                     <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
@@ -2999,13 +2597,8 @@
                 </div>
             </div>
 
-                <!-- Claude Code 配置模式 -->
-                <div
-                    v-show="mainTab === 'config' && configMode === 'claude'"
-                    class="mode-content mode-cards"
-                    id="panel-config-claude"
-                    role="tabpanel"
-                    :aria-labelledby="'tab-config-claude'">
+            <!-- Claude Code 配置模式 -->
+            <div v-show="mainTab === 'config' && configMode === 'claude'" class="mode-content mode-cards">
                 <!-- 添加提供商按钮 -->
                 <button class="btn-add" @click="openClaudeConfigModal" v-if="!loading && !initError">
                     <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
@@ -3095,13 +2688,8 @@
                 </div>
             </div>
 
-                <!-- OpenClaw 配置模式 -->
-                <div
-                    v-show="mainTab === 'config' && configMode === 'openclaw'"
-                    class="mode-content mode-cards"
-                    id="panel-config-openclaw"
-                    role="tabpanel"
-                    :aria-labelledby="'tab-config-openclaw'">
+            <!-- OpenClaw 配置模式 -->
+            <div v-show="mainTab === 'config' && configMode === 'openclaw'" class="mode-content mode-cards">
                 <button class="btn-add" @click="openOpenclawAddModal" v-if="!loading && !initError">
                     <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M10 4v12M4 10h12"/>
@@ -3174,13 +2762,8 @@
                 </div>
             </div>
 
-                <!-- 会话浏览模式 -->
-                <div
-                    v-show="mainTab === 'sessions'"
-                    class="mode-content"
-                    id="panel-sessions"
-                    role="tabpanel"
-                    :aria-labelledby="'tab-sessions'">
+            <!-- 会话浏览模式 -->
+            <div v-show="mainTab === 'sessions'" class="mode-content">
                 <div v-if="sessionStandalone" class="session-standalone-page">
                     <div v-if="sessionStandaloneLoading" class="state-message">
                         加载中...
@@ -3320,7 +2903,7 @@
                         </div>
                     </div>
 
-                    <div :class="['session-preview', { active: !!activeSession }]">
+                    <div class="session-preview">
                         <template v-if="activeSession">
                             <div class="session-preview-scroll">
                                 <div class="session-preview-header">
