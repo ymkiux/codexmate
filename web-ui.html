@@ -356,6 +356,9 @@
             font-weight: var(--font-weight-secondary);
             color: var(--color-text-primary);
             letter-spacing: -0.01em;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }
 
         .main-panel {
@@ -2661,20 +2664,40 @@
             </div>
         </div>
 
-            <div v-if="!sessionStandalone" class="top-tabs">
-                <button class="top-tab"
-                    :class="{ active: mainTab === 'config' && configMode === 'codex' }"
-                    @click="switchConfigMode('codex')">Codex 配置</button>
-                <button class="top-tab"
-                    :class="{ active: mainTab === 'config' && configMode === 'claude' }"
-                    @click="switchConfigMode('claude')">Claude Code 配置</button>
-                <button class="top-tab"
-                    :class="{ active: mainTab === 'config' && configMode === 'openclaw' }"
-                    @click="switchConfigMode('openclaw')">OpenClaw 配置</button>
-                <button class="top-tab"
-                    :class="{ active: mainTab === 'sessions' }"
-                    @click="switchMainTab('sessions')">会话浏览</button>
-            </div>
+        <div v-if="!sessionStandalone" class="top-tabs" role="tablist" aria-label="主导航">
+            <button class="top-tab"
+                id="tab-config-codex"
+                role="tab"
+                :tabindex="mainTab === 'config' && configMode === 'codex' ? 0 : -1"
+                :aria-selected="mainTab === 'config' && configMode === 'codex'"
+                aria-controls="panel-config-codex"
+                :class="{ active: mainTab === 'config' && configMode === 'codex' }"
+                @click="switchConfigMode('codex')">Codex 配置</button>
+            <button class="top-tab"
+                id="tab-config-claude"
+                role="tab"
+                :tabindex="mainTab === 'config' && configMode === 'claude' ? 0 : -1"
+                :aria-selected="mainTab === 'config' && configMode === 'claude'"
+                aria-controls="panel-config-claude"
+                :class="{ active: mainTab === 'config' && configMode === 'claude' }"
+                @click="switchConfigMode('claude')">Claude Code 配置</button>
+            <button class="top-tab"
+                id="tab-config-openclaw"
+                role="tab"
+                :tabindex="mainTab === 'config' && configMode === 'openclaw' ? 0 : -1"
+                :aria-selected="mainTab === 'config' && configMode === 'openclaw'"
+                aria-controls="panel-config-openclaw"
+                :class="{ active: mainTab === 'config' && configMode === 'openclaw' }"
+                @click="switchConfigMode('openclaw')">OpenClaw 配置</button>
+            <button class="top-tab"
+                id="tab-sessions"
+                role="tab"
+                :tabindex="mainTab === 'sessions' ? 0 : -1"
+                :aria-selected="mainTab === 'sessions'"
+                aria-controls="panel-sessions"
+                :class="{ active: mainTab === 'sessions' }"
+                @click="switchMainTab('sessions')">会话浏览</button>
+        </div>
 
         <div :class="['app-shell', { standalone: sessionStandalone }]">
             <aside class="side-rail" v-if="!sessionStandalone">
@@ -2687,9 +2710,14 @@
                     </div>
                 </div>
 
-                <div class="side-section">
+                <div class="side-section" role="tablist" aria-label="配置管理">
                     <div class="side-section-title">配置管理</div>
                     <button
+                        role="tab"
+                        id="side-tab-config-codex"
+                        aria-controls="panel-config-codex"
+                        :tabindex="mainTab === 'config' && configMode === 'codex' ? 0 : -1"
+                        :aria-selected="mainTab === 'config' && configMode === 'codex'"
                         :class="['side-item', { active: mainTab === 'config' && configMode === 'codex' }]"
                         @click="switchConfigMode('codex')">
                         <div class="side-item-title">Codex 配置</div>
@@ -2699,6 +2727,11 @@
                         </div>
                     </button>
                     <button
+                        role="tab"
+                        id="side-tab-config-claude"
+                        aria-controls="panel-config-claude"
+                        :tabindex="mainTab === 'config' && configMode === 'claude' ? 0 : -1"
+                        :aria-selected="mainTab === 'config' && configMode === 'claude'"
                         :class="['side-item', { active: mainTab === 'config' && configMode === 'claude' }]"
                         @click="switchConfigMode('claude')">
                         <div class="side-item-title">Claude Code 配置</div>
@@ -2708,6 +2741,11 @@
                         </div>
                     </button>
                     <button
+                        role="tab"
+                        id="side-tab-config-openclaw"
+                        aria-controls="panel-config-openclaw"
+                        :tabindex="mainTab === 'config' && configMode === 'openclaw' ? 0 : -1"
+                        :aria-selected="mainTab === 'config' && configMode === 'openclaw'"
                         :class="['side-item', { active: mainTab === 'config' && configMode === 'openclaw' }]"
                         @click="switchConfigMode('openclaw')">
                         <div class="side-item-title">OpenClaw 配置</div>
@@ -2718,9 +2756,14 @@
                     </button>
                 </div>
 
-                <div class="side-section">
+                <div class="side-section" role="tablist" aria-label="会话管理">
                     <div class="side-section-title">会话管理</div>
                     <button
+                        role="tab"
+                        id="side-tab-sessions"
+                        aria-controls="panel-sessions"
+                        :tabindex="mainTab === 'sessions' ? 0 : -1"
+                        :aria-selected="mainTab === 'sessions'"
                         :class="['side-item', { active: mainTab === 'sessions' }]"
                         @click="switchMainTab('sessions')">
                         <div class="side-item-title">会话浏览</div>
@@ -2788,7 +2831,12 @@
                 <!-- 内容包裹器 - 稳定布局 -->
                 <div class="content-wrapper">
                     <!-- Codex 配置模式 -->
-                    <div v-show="mainTab === 'config' && configMode === 'codex'" class="mode-content mode-cards">
+                    <div
+                        v-show="mainTab === 'config' && configMode === 'codex'"
+                        class="mode-content mode-cards"
+                        id="panel-config-codex"
+                        role="tabpanel"
+                        :aria-labelledby="'tab-config-codex'">
                 <!-- 添加提供商按钮 -->
                 <button class="btn-add" @click="showAddModal = true" v-if="!loading && !initError">
                     <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
@@ -2923,8 +2971,13 @@
                 </div>
             </div>
 
-            <!-- Claude Code 配置模式 -->
-            <div v-show="mainTab === 'config' && configMode === 'claude'" class="mode-content mode-cards">
+                <!-- Claude Code 配置模式 -->
+                <div
+                    v-show="mainTab === 'config' && configMode === 'claude'"
+                    class="mode-content mode-cards"
+                    id="panel-config-claude"
+                    role="tabpanel"
+                    :aria-labelledby="'tab-config-claude'">
                 <!-- 添加提供商按钮 -->
                 <button class="btn-add" @click="openClaudeConfigModal" v-if="!loading && !initError">
                     <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
@@ -3014,8 +3067,13 @@
                 </div>
             </div>
 
-            <!-- OpenClaw 配置模式 -->
-            <div v-show="mainTab === 'config' && configMode === 'openclaw'" class="mode-content mode-cards">
+                <!-- OpenClaw 配置模式 -->
+                <div
+                    v-show="mainTab === 'config' && configMode === 'openclaw'"
+                    class="mode-content mode-cards"
+                    id="panel-config-openclaw"
+                    role="tabpanel"
+                    :aria-labelledby="'tab-config-openclaw'">
                 <button class="btn-add" @click="openOpenclawAddModal" v-if="!loading && !initError">
                     <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M10 4v12M4 10h12"/>
@@ -3088,8 +3146,13 @@
                 </div>
             </div>
 
-            <!-- 会话浏览模式 -->
-            <div v-show="mainTab === 'sessions'" class="mode-content">
+                <!-- 会话浏览模式 -->
+                <div
+                    v-show="mainTab === 'sessions'"
+                    class="mode-content"
+                    id="panel-sessions"
+                    role="tabpanel"
+                    :aria-labelledby="'tab-sessions'">
                 <div v-if="sessionStandalone" class="session-standalone-page">
                     <div v-if="sessionStandaloneLoading" class="state-message">
                         加载中...
