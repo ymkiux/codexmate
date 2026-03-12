@@ -267,6 +267,12 @@
             flex-wrap: wrap;
         }
 
+        .side-item-meta > span {
+            min-width: 0;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
         .top-tabs {
             display: none !important;
         }
@@ -2670,6 +2676,7 @@
                 role="tab"
                 :tabindex="mainTab === 'config' && configMode === 'codex' ? 0 : -1"
                 :aria-selected="mainTab === 'config' && configMode === 'codex'"
+                :aria-pressed="mainTab === 'config' && configMode === 'codex'"
                 aria-controls="panel-config-codex"
                 :class="{ active: mainTab === 'config' && configMode === 'codex' }"
                 @click="switchConfigMode('codex')">Codex 配置</button>
@@ -2678,6 +2685,7 @@
                 role="tab"
                 :tabindex="mainTab === 'config' && configMode === 'claude' ? 0 : -1"
                 :aria-selected="mainTab === 'config' && configMode === 'claude'"
+                :aria-pressed="mainTab === 'config' && configMode === 'claude'"
                 aria-controls="panel-config-claude"
                 :class="{ active: mainTab === 'config' && configMode === 'claude' }"
                 @click="switchConfigMode('claude')">Claude Code 配置</button>
@@ -2686,6 +2694,7 @@
                 role="tab"
                 :tabindex="mainTab === 'config' && configMode === 'openclaw' ? 0 : -1"
                 :aria-selected="mainTab === 'config' && configMode === 'openclaw'"
+                :aria-pressed="mainTab === 'config' && configMode === 'openclaw'"
                 aria-controls="panel-config-openclaw"
                 :class="{ active: mainTab === 'config' && configMode === 'openclaw' }"
                 @click="switchConfigMode('openclaw')">OpenClaw 配置</button>
@@ -2694,6 +2703,7 @@
                 role="tab"
                 :tabindex="mainTab === 'sessions' ? 0 : -1"
                 :aria-selected="mainTab === 'sessions'"
+                :aria-pressed="mainTab === 'sessions'"
                 aria-controls="panel-sessions"
                 :class="{ active: mainTab === 'sessions' }"
                 @click="switchMainTab('sessions')">会话浏览</button>
@@ -2718,6 +2728,7 @@
                         aria-controls="panel-config-codex"
                         :tabindex="mainTab === 'config' && configMode === 'codex' ? 0 : -1"
                         :aria-selected="mainTab === 'config' && configMode === 'codex'"
+                        :aria-pressed="mainTab === 'config' && configMode === 'codex'"
                         :class="['side-item', { active: mainTab === 'config' && configMode === 'codex' }]"
                         @click="switchConfigMode('codex')">
                         <div class="side-item-title">Codex 配置</div>
@@ -2732,6 +2743,7 @@
                         aria-controls="panel-config-claude"
                         :tabindex="mainTab === 'config' && configMode === 'claude' ? 0 : -1"
                         :aria-selected="mainTab === 'config' && configMode === 'claude'"
+                        :aria-pressed="mainTab === 'config' && configMode === 'claude'"
                         :class="['side-item', { active: mainTab === 'config' && configMode === 'claude' }]"
                         @click="switchConfigMode('claude')">
                         <div class="side-item-title">Claude Code 配置</div>
@@ -2746,6 +2758,7 @@
                         aria-controls="panel-config-openclaw"
                         :tabindex="mainTab === 'config' && configMode === 'openclaw' ? 0 : -1"
                         :aria-selected="mainTab === 'config' && configMode === 'openclaw'"
+                        :aria-pressed="mainTab === 'config' && configMode === 'openclaw'"
                         :class="['side-item', { active: mainTab === 'config' && configMode === 'openclaw' }]"
                         @click="switchConfigMode('openclaw')">
                         <div class="side-item-title">OpenClaw 配置</div>
@@ -2764,6 +2777,7 @@
                         aria-controls="panel-sessions"
                         :tabindex="mainTab === 'sessions' ? 0 : -1"
                         :aria-selected="mainTab === 'sessions'"
+                        :aria-pressed="mainTab === 'sessions'"
                         :class="['side-item', { active: mainTab === 'sessions' }]"
                         @click="switchMainTab('sessions')">
                         <div class="side-item-title">会话浏览</div>
@@ -2788,22 +2802,36 @@
                 </div>
 
                 <div class="status-strip" v-if="!sessionStandalone && mainTab === 'config'">
-                    <div class="status-chip">
-                        <span class="label">当前提供商</span>
-                        <span class="value">{{ currentProvider || '未选择' }}</span>
-                    </div>
-                    <div class="status-chip">
-                        <span class="label">当前模型</span>
-                        <span class="value">{{ currentModel || '未选择' }}</span>
-                    </div>
-                    <div class="status-chip" v-if="configMode === 'claude'">
-                        <span class="label">Claude 配置</span>
-                        <span class="value">{{ currentClaudeConfig || '未选择' }}</span>
-                    </div>
-                    <div class="status-chip" v-if="configMode === 'openclaw'">
-                        <span class="label">OpenClaw 配置</span>
-                        <span class="value">{{ currentOpenclawConfig || '未选择' }}</span>
-                    </div>
+                    <template v-if="configMode === 'codex'">
+                        <div class="status-chip">
+                            <span class="label">Codex 提供商</span>
+                            <span class="value">{{ currentProvider || '未选择' }}</span>
+                        </div>
+                        <div class="status-chip">
+                            <span class="label">Codex 模型</span>
+                            <span class="value">{{ currentModel || '未选择' }}</span>
+                        </div>
+                    </template>
+                    <template v-else-if="configMode === 'claude'">
+                        <div class="status-chip">
+                            <span class="label">Claude 配置</span>
+                            <span class="value">{{ currentClaudeConfig || '未选择' }}</span>
+                        </div>
+                        <div class="status-chip">
+                            <span class="label">Claude 模型</span>
+                            <span class="value">{{ currentClaudeModel || '未选择' }}</span>
+                        </div>
+                    </template>
+                    <template v-else>
+                        <div class="status-chip">
+                            <span class="label">OpenClaw 配置</span>
+                            <span class="value">{{ currentOpenclawConfig || '未选择' }}</span>
+                        </div>
+                        <div class="status-chip">
+                            <span class="label">工作区文件</span>
+                            <span class="value">{{ openclawWorkspaceFileName || '未选择' }}</span>
+                        </div>
+                    </template>
                 </div>
                 <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'sessions'">
                     <div class="status-chip">
