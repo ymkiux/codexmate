@@ -4484,6 +4484,7 @@ function formatHostForUrl(host) {
 function cmdStart(options = {}) {
     const htmlPath = path.join(__dirname, 'web-ui.html');
     const assetsDir = path.join(__dirname, 'res');
+    const webDir = path.join(__dirname, 'web-ui');
     if (!fs.existsSync(htmlPath)) {
         console.error('错误: web-ui.html 不存在');
         process.exit(1);
@@ -4672,6 +4673,29 @@ function cmdStart(options = {}) {
                     res.end(JSON.stringify({ error: e.message }));
                 }
             });
+        } else if (requestPath.startsWith('/web-ui/')) {
+            const normalized = path.normalize(requestPath).replace(/^([\\.\\/])+/, '');
+            const filePath = path.join(__dirname, normalized);
+            if (!isPathInside(filePath, webDir)) {
+                res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+                res.end('Forbidden');
+                return;
+            }
+            if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+                res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+                res.end('Not Found');
+                return;
+            }
+            const ext = path.extname(filePath).toLowerCase();
+            const mime = ext === '.js' || ext === '.mjs'
+                ? 'application/javascript; charset=utf-8'
+                : ext === '.css'
+                    ? 'text/css; charset=utf-8'
+                    : ext === '.json'
+                        ? 'application/json; charset=utf-8'
+                        : 'application/octet-stream';
+            res.writeHead(200, { 'Content-Type': mime });
+            fs.createReadStream(filePath).pipe(res);
         } else if (requestPath.startsWith('/res/')) {
             const normalized = path.normalize(requestPath).replace(/^([\\.\\/])+/, '');
             const filePath = path.join(__dirname, normalized);
