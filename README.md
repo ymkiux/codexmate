@@ -11,7 +11,7 @@ English | [Chinese](README.zh-CN.md)
 
 ## Overview
 
-One tool to switch Codex/Claude Code providers & models and browse local sessions in one click.
+One tool to switch Codex/Claude Code providers & models and manage/browse local sessions in one click.
 
 ## What You Get
 
@@ -19,6 +19,7 @@ One tool to switch Codex/Claude Code providers & models and browse local session
 - Local config control with backups
 - Lightweight Web UI instead of heavy clients
 - Unified session browser (view/export/resume when available)
+- Session management: list/filter/export/delete local sessions; keyword search is Codex-only
 
 ## Feature Overview
 

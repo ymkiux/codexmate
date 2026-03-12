@@ -23,7 +23,9 @@ Codex Mate 让 Codex 与 Claude Code 的提供商/模型切换变成“一条命
 
 ## 概览
 
-一键切换 Codex/Claude Code 提供商与模型，顺便把本地会话统一浏览导出。
+一键切换 Codex/Claude Code 提供商与模型，并把本地会话统一管理/浏览/导出。
+
+- 会话管理：列表/筛选/导出/删除 Codex/Claude 本地会话；关键词搜索暂限 Codex
 
 ## 功能总览
 
