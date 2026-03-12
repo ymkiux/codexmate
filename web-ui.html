@@ -2349,14 +2349,15 @@
         }
 
         @media (max-width: 960px) {
-            .app-shell {
-                grid-template-columns: 1fr;
+            .container {
+                padding: var(--spacing-sm);
             }
-            .side-nav {
-                position: static;
+            .main-panel {
+                padding: var(--spacing-sm) var(--spacing-sm);
+                border-radius: 14px;
             }
-            .config-subtabs {
-                flex-wrap: wrap;
+            .top-tabs {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
 
@@ -2373,6 +2374,35 @@
             .segmented-control {
                 flex-direction: column;
                 gap: 6px;
+            }
+        }
+
+        @media (max-width: 540px) {
+            body {
+                padding: var(--spacing-md) var(--spacing-sm);
+            }
+            .container {
+                padding: 0 var(--spacing-sm) var(--spacing-md);
+            }
+            .hero-title {
+                font-size: 36px;
+            }
+            .hero-subtitle {
+                font-size: var(--font-size-secondary);
+            }
+            .top-tabs {
+                grid-template-columns: repeat(1, minmax(0, 1fr));
+            }
+            .main-panel {
+                padding: var(--spacing-sm);
+            }
+            .card {
+                padding: 12px;
+            }
+            .session-layout {
+                grid-template-columns: 1fr;
+                height: auto;
+                min-height: 0;
             }
         }
     </style>
