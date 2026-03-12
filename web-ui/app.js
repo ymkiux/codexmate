@@ -5,7 +5,9 @@
     matchClaudeConfigFromSettings,
     findDuplicateClaudeConfigName,
     formatLatency,
-    buildSpeedTestIssue
+    buildSpeedTestIssue,
+    isSessionQueryEnabled,
+    buildSessionListParams
 } from './logic.mjs';
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -248,7 +250,7 @@
 
             computed: {
                 isSessionQueryEnabled() {
-                    return this.sessionFilterSource === 'codex';
+                    return isSessionQueryEnabled(this.sessionFilterSource);
                 },
                 sessionQueryPlaceholder() {
                     return this.isSessionQueryEnabled ? '关键词检索' : '仅 Codex 支持关键词检索';
@@ -1051,20 +1053,15 @@
                     if (this.sessionsLoading) return;
                     this.sessionsLoading = true;
                     this.activeSessionDetailError = '';
-                    const query = this.isSessionQueryEnabled ? this.sessionQuery : '';
+                    const params = buildSessionListParams({
+                        source: this.sessionFilterSource,
+                        pathFilter: this.sessionPathFilter,
+                        query: this.sessionQuery,
+                        roleFilter: this.sessionRoleFilter,
+                        timeRangePreset: this.sessionTimePreset
+                    });
                     try {
-                        const res = await api('list-sessions', {
-                            source: this.sessionFilterSource,
-                            pathFilter: this.sessionPathFilter,
-                            query,
-                            queryMode: 'and',
-                            queryScope: 'content',
-                            contentScanLimit: 50,
-                            roleFilter: this.sessionRoleFilter,
-                            timeRangePreset: this.sessionTimePreset,
-                            limit: 200,
-                            forceRefresh: true
-                        });
+                        const res = await api('list-sessions', params);
                         if (res.error) {
                             this.showMessage(res.error, 'error');
                             this.sessionsList = [];

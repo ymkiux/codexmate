@@ -13,17 +13,30 @@ const {
     matchClaudeConfigFromSettings,
     findDuplicateClaudeConfigName,
     formatLatency,
-    buildSpeedTestIssue
+    buildSpeedTestIssue,
+    isSessionQueryEnabled,
+    buildSessionListParams
 } = logic;
 
 test('normalizeClaudeValue trims strings and ignores non-string', () => {
     assert.strictEqual(normalizeClaudeValue('  abc  '), 'abc');
     assert.strictEqual(normalizeClaudeValue(123), '');
+    assert.strictEqual(normalizeClaudeValue(null), '');
 });
 
 test('normalizeClaudeConfig trims all fields', () => {
     const cfg = normalizeClaudeConfig({ apiKey: ' key ', baseUrl: ' url ', model: ' model ' });
     assert.deepStrictEqual(cfg, { apiKey: 'key', baseUrl: 'url', model: 'model' });
+});
+
+test('normalizeClaudeSettingsEnv trims settings env', () => {
+    const env = { ANTHROPIC_API_KEY: ' key ', ANTHROPIC_BASE_URL: ' url ', ANTHROPIC_MODEL: ' model ' };
+    assert.deepStrictEqual(normalizeClaudeSettingsEnv(env), { apiKey: 'key', baseUrl: 'url', model: 'model' });
+});
+
+test('normalizeClaudeSettingsEnv fills missing fields with empty strings', () => {
+    const env = { ANTHROPIC_API_KEY: 'k' };
+    assert.deepStrictEqual(normalizeClaudeSettingsEnv(env), { apiKey: 'k', baseUrl: '', model: '' });
 });
 
 test('matchClaudeConfigFromSettings matches identical config', () => {
@@ -38,6 +51,12 @@ test('matchClaudeConfigFromSettings returns empty when incomplete', () => {
     assert.strictEqual(matchClaudeConfigFromSettings(configs, env), '');
 });
 
+test('findDuplicateClaudeConfigName returns empty on missing fields', () => {
+    const configs = { only: { apiKey: 'k', baseUrl: 'u', model: 'm' } };
+    const incomplete = { apiKey: 'k', baseUrl: '', model: '' };
+    assert.strictEqual(findDuplicateClaudeConfigName(configs, incomplete), '');
+});
+
 test('findDuplicateClaudeConfigName detects duplicates', () => {
     const configs = {
         first: { apiKey: 'k1', baseUrl: 'u1', model: 'm1' },
@@ -47,10 +66,19 @@ test('findDuplicateClaudeConfigName detects duplicates', () => {
     assert.strictEqual(findDuplicateClaudeConfigName(configs, duplicate), 'second');
 });
 
+test('findDuplicateClaudeConfigName returns empty when no match', () => {
+    const configs = { only: { apiKey: 'k', baseUrl: 'u', model: 'm' } };
+    const another = { apiKey: 'k', baseUrl: 'u', model: 'm-2' };
+    assert.strictEqual(findDuplicateClaudeConfigName(configs, another), '');
+});
+
 test('formatLatency formats success and errors', () => {
     assert.strictEqual(formatLatency({ ok: true, durationMs: 120 }), '120ms');
     assert.strictEqual(formatLatency({ ok: false, status: 404 }), 'ERR 404');
     assert.strictEqual(formatLatency({ ok: false }), 'ERR');
+    assert.strictEqual(formatLatency(null), '');
+    assert.strictEqual(formatLatency({ ok: true, durationMs: undefined }), '0ms');
+    assert.strictEqual(formatLatency({ ok: true, durationMs: '12' }), '0ms');
 });
 
 test('buildSpeedTestIssue maps errors and status codes', () => {
@@ -69,4 +97,60 @@ test('buildSpeedTestIssue maps errors and status codes', () => {
 
     const ok = buildSpeedTestIssue('p1', { ok: true, status: 200 });
     assert.strictEqual(ok, null);
+
+    const invalidUrl = buildSpeedTestIssue('p1', { error: 'Invalid URL' });
+    assert.strictEqual(invalidUrl.code, 'remote-speedtest-invalid-url');
+
+    const missingUrl = buildSpeedTestIssue('p1', { error: 'Missing name or url' });
+    assert.strictEqual(missingUrl.code, 'remote-speedtest-baseurl-missing');
+
+    const timeoutLower = buildSpeedTestIssue('p1', { error: 'timeout while fetching' });
+    assert.strictEqual(timeoutLower.code, 'remote-speedtest-timeout');
+
+    const generic = buildSpeedTestIssue('p1', { error: 'network unreachable' });
+    assert.strictEqual(generic.code, 'remote-speedtest-unreachable');
+
+    const auth403 = buildSpeedTestIssue('p1', { ok: false, status: 403 });
+    assert.strictEqual(auth403.code, 'remote-speedtest-auth-failed');
+
+    const http400 = buildSpeedTestIssue('p1', { ok: false, status: 400 });
+    assert.strictEqual(http400.code, 'remote-speedtest-http-error');
+});
+
+test('isSessionQueryEnabled only for codex', () => {
+    assert.strictEqual(isSessionQueryEnabled('codex'), true);
+    assert.strictEqual(isSessionQueryEnabled('CODEX'), true);
+    assert.strictEqual(isSessionQueryEnabled('claude'), false);
+    assert.strictEqual(isSessionQueryEnabled(''), false);
+});
+
+test('buildSessionListParams clears query when source not codex', () => {
+    const params = buildSessionListParams({
+        source: 'claude',
+        query: 'hello',
+        pathFilter: '/tmp',
+        roleFilter: 'user',
+        timeRangePreset: '7d',
+        limit: 50
+    });
+    assert.strictEqual(params.query, '');
+    assert.strictEqual(params.source, 'claude');
+    assert.strictEqual(params.pathFilter, '/tmp');
+    assert.strictEqual(params.roleFilter, 'user');
+    assert.strictEqual(params.timeRangePreset, '7d');
+    assert.strictEqual(params.limit, 50);
+    assert.strictEqual(params.forceRefresh, true);
+    assert.strictEqual(params.queryScope, 'content');
+    assert.strictEqual(params.contentScanLimit, 50);
+});
+
+test('buildSessionListParams keeps query for codex', () => {
+    const params = buildSessionListParams({
+        source: 'codex',
+        query: 'test',
+        pathFilter: ''
+    });
+    assert.strictEqual(params.query, 'test');
+    assert.strictEqual(params.source, 'codex');
+    assert.strictEqual(params.limit, 200);
 });
