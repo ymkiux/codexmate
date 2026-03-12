@@ -7,6 +7,8 @@
 
 English | [Chinese](README.zh-CN.md)
 
+![Codex Mate Web UI](res/screenshot.png)
+
 ## Overview
 
 Codex Mate makes frequent provider/model switching for Codex and Claude Code a single command or click, and gives you a unified session browser to view/export local sessions from both.
@@ -95,10 +97,6 @@ Then open `http://localhost:3737` in your browser.
 ## Alternatives
 
 - cc-switch: https://github.com/farion1231/cc-switch
-
-## UI Preview
-
-![Codex Mate Web UI](res/screenshot.png)
 
 ## Install
 
