@@ -42,7 +42,7 @@ Codex Mate makes frequent provider/model switching for Codex and Claude Code a s
 
 - Frequent provider/model switching, want a one-command flow
 - Use both Codex and Claude Code, want a single entry point
-- Need to browse/export local Codex + Claude Code sessions and copy resume commands when available; keyword search currently for Codex sessions only
+- Need to browse/export local Codex + Claude Code sessions and copy resume commands when available
 - Use OpenClaw with multiple profiles, want quick switching
 - Multi-project or multi-environment setups that need quick config changes
 - Want a visual UI without a heavy client
