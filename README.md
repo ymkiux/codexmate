@@ -152,6 +152,7 @@ npm link
 | `codexmate use <model>` | Switch model |
 | `codexmate add <name> <URL> [API key]` | Add a provider |
 | `codexmate delete <provider>` | Delete a provider |
+| `codexmate claude <BaseURL> <API key> [model]` | Write Claude Code config to `~/.claude/settings.json` |
 | `codexmate models` | List all models |
 | `codexmate add-model <model>` | Add a model |
 | `codexmate delete-model <model>` | Delete a model |
@@ -180,6 +181,13 @@ codexmate run
 - Manage multiple Claude Code profiles
 - Configure API key, Base URL, and model
 - Default write to `env` in `~/.claude/settings.json`: `env.ANTHROPIC_API_KEY` / `env.ANTHROPIC_BASE_URL` / `env.ANTHROPIC_MODEL`
+- One-liner apply via CLI:
+
+```bash
+codexmate claude https://api.example.com/v1 sk-ant-xxx claude-3-7-sonnet
+```
+
+- In Web UI, each Claude config卡片 now有“分享导入命令”按钮，可复制一键导入命令（会输出如 `codexmate claude <BaseURL> <API Key> <Model>`）。
 
 ### OpenClaw Config Mode
 

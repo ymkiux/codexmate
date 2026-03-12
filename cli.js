@@ -3091,6 +3091,23 @@ function buildExportPayload(includeKeys) {
     };
 }
 
+function buildClaudeSharePayload(config = {}) {
+    const apiKey = typeof config.apiKey === 'string' ? config.apiKey : '';
+    const baseUrl = typeof config.baseUrl === 'string' ? config.baseUrl : '';
+    const model = typeof config.model === 'string' ? config.model : '';
+
+    if (!baseUrl) return { error: 'Claude Base URL 未设置' };
+    if (!apiKey) return { error: 'Claude API 密钥未设置' };
+
+    return {
+        payload: {
+            baseUrl: baseUrl.trim(),
+            apiKey: apiKey.trim(),
+            model: (model && model.trim()) || 'glm-4.7'
+        }
+    };
+}
+
 function buildProviderSharePayload(params = {}) {
     const name = typeof params.name === 'string' ? params.name.trim() : '';
     if (!name) {
@@ -4017,6 +4034,51 @@ function readClaudeSettingsInfo() {
     };
 }
 
+// CLI: 一行写入 Claude Code 配置
+function cmdClaude(baseUrl, apiKey, model, silent = false) {
+    const normalizedBaseUrl = typeof baseUrl === 'string' ? baseUrl.trim() : '';
+    const normalizedKey = typeof apiKey === 'string' ? apiKey.trim() : '';
+    const normalizedModel = typeof model === 'string' && model.trim()
+        ? model.trim()
+        : 'glm-4.7';
+
+    if (!normalizedBaseUrl || !normalizedKey) {
+        if (!silent) {
+            console.error('用法: codexmate claude <BaseURL> <API密钥> [模型]');
+            console.log('\n示例:');
+            console.log('  codexmate claude https://open.bigmodel.cn/api/anthropic sk-ant-xxx glm-4.7');
+        }
+        throw new Error('BaseURL 和 API 密钥必填');
+    }
+
+    const result = applyToClaudeSettings({
+        baseUrl: normalizedBaseUrl,
+        apiKey: normalizedKey,
+        model: normalizedModel
+    });
+
+    if (!result || result.success === false) {
+        const message = (result && result.error) || '应用 Claude 配置失败';
+        if (!silent) console.error('错误:', message);
+        throw new Error(message);
+    }
+
+    if (!silent) {
+        console.log('✓ 已写入 Claude Code 配置');
+        console.log('  Base URL:', normalizedBaseUrl);
+        console.log('  模型:', normalizedModel);
+        if (result.targetPath) {
+            console.log('  目标文件:', result.targetPath);
+        }
+        if (result.backupPath) {
+            console.log('  已自动备份:', result.backupPath);
+        }
+        console.log();
+    }
+
+    return result;
+}
+
 function commandExists(command, args = '') {
     try {
         execSync(`${command} ${args}`, { stdio: 'ignore' });
@@ -4548,6 +4610,9 @@ function cmdStart(options = {}) {
                         case 'apply-claude-config':
                             result = applyToClaudeSettings(params.config);
                             break;
+                        case 'export-claude-share':
+                            result = buildClaudeSharePayload(params && params.config ? params.config : {});
+                            break;
                         case 'export-provider':
                             result = buildProviderSharePayload(params || {});
                             break;
@@ -4702,6 +4767,7 @@ async function main() {
         console.log('  codexmate use <模型>       切换模型');
         console.log('  codexmate add <名称> <URL> [密钥]');
         console.log('  codexmate delete <名称>    删除提供商');
+        console.log('  codexmate claude <BaseURL> <API密钥> [模型]  写入 Claude Code 配置');
         console.log('  codexmate add-model <模型> 添加模型');
         console.log('  codexmate delete-model <模型> 删除模型');
         console.log('  codexmate run [--host <HOST>]    启动 Web 界面');
@@ -4724,6 +4790,7 @@ async function main() {
         case 'use': cmdUseModel(args[1]); break;
         case 'add': cmdAdd(args[1], args[2], args[3]); break;
         case 'delete': cmdDelete(args[1]); break;
+        case 'claude': cmdClaude(args[1], args[2], args[3]); break;
         case 'add-model': cmdAddModel(args[1]); break;
         case 'delete-model': cmdDeleteModel(args[1]); break;
         case 'run': cmdStart(parseStartOptions(args.slice(1))); break;

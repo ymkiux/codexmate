@@ -2669,6 +2669,13 @@
                                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                                     </svg>
                                 </button>
+                                <button class="card-action-btn" :class="{ loading: claudeShareLoading[name] }" @click="copyClaudeShareCommand(name)" title="分享导入命令">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/>
+                                        <path d="M16 6l-4-4-4 4"/>
+                                        <path d="M12 2v14"/>
+                                    </svg>
+                                </button>
                                 <button class="card-action-btn delete" @click="deleteClaudeConfig(name)" title="删除">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M3 6h18"/>
@@ -3593,6 +3600,7 @@
                     speedLoading: {},
                     claudeSpeedResults: {},
                     claudeSpeedLoading: {},
+                    claudeShareLoading: {},
                     providerShareLoading: {},
                     newProvider: { name: '', url: '', key: '' },
                     editingProvider: { name: '', url: '', key: '' },
@@ -4226,6 +4234,20 @@
                     return `${addCmd} && ${switchCmd}`;
                 },
 
+                buildClaudeShareCommand(payload) {
+                    if (!payload || typeof payload !== 'object') return '';
+                    const baseUrl = typeof payload.baseUrl === 'string' ? payload.baseUrl.trim() : '';
+                    const apiKey = typeof payload.apiKey === 'string' ? payload.apiKey : '';
+                    const model = typeof payload.model === 'string' && payload.model.trim()
+                        ? payload.model.trim()
+                        : 'glm-4.7';
+                    if (!baseUrl || !apiKey) return '';
+                    const urlArg = this.quoteShellArg(baseUrl);
+                    const keyArg = this.quoteShellArg(apiKey);
+                    const modelArg = this.quoteShellArg(model);
+                    return `codexmate claude ${urlArg} ${keyArg} ${modelArg}`;
+                },
+
                 async copyProviderShareCommand(provider) {
                     const name = provider && typeof provider.name === 'string' ? provider.name.trim() : '';
                     if (!name) {
@@ -4266,6 +4288,47 @@
                         this.showMessage('生成分享命令失败: ' + e.message, 'error');
                     } finally {
                         this.providerShareLoading[name] = false;
+                    }
+                },
+
+                async copyClaudeShareCommand(name) {
+                    const config = this.claudeConfigs[name];
+                    if (!config) {
+                        this.showMessage('配置不存在', 'error');
+                        return;
+                    }
+                    if (this.claudeShareLoading[name]) return;
+                    this.claudeShareLoading[name] = true;
+                    try {
+                        const res = await api('export-claude-share', { config });
+                        if (res && res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        const command = this.buildClaudeShareCommand(res && res.payload ? res.payload : null);
+                        if (!command) {
+                            this.showMessage('分享命令生成失败', 'error');
+                            return;
+                        }
+                        const ok = this.fallbackCopyText(command);
+                        if (ok) {
+                            this.showMessage('已复制分享命令', 'success');
+                            return;
+                        }
+                        try {
+                            if (navigator.clipboard && window.isSecureContext) {
+                                await navigator.clipboard.writeText(command);
+                                this.showMessage('已复制分享命令', 'success');
+                                return;
+                            }
+                        } catch (e) {
+                            // fall through
+                        }
+                        this.showMessage('复制失败，请手动复制命令', 'error');
+                    } catch (e) {
+                        this.showMessage('生成分享命令失败: ' + e.message, 'error');
+                    } finally {
+                        this.claudeShareLoading[name] = false;
                     }
                 },
 
