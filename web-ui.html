@@ -1220,11 +1220,16 @@
         }
 
         .session-count-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             font-size: var(--font-size-caption);
             color: var(--color-text-secondary);
             border: 1px solid var(--color-border-soft);
             border-radius: 999px;
-            padding: 2px 8px;
+            padding: 0 8px;
+            height: 22px;
+            line-height: 1;
             background: rgba(247, 241, 232, 0.7);
             white-space: nowrap;
             margin-left: auto;
@@ -2630,8 +2635,60 @@
             }
 
             .session-item {
-                min-height: 96px;
-                padding: 16px;
+                min-height: 75px;
+                height: 75px;
+                padding: 12px 14px;
+            }
+
+            .session-item-header {
+                flex-direction: row;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .session-item-main {
+                align-items: center;
+            }
+
+            .session-item-copy {
+                width: 20px;
+                height: 20px;
+                min-width: 20px;
+                min-height: 20px;
+                border-radius: 6px;
+                padding: 2px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                transform: translate(-3px, 0);
+            }
+
+            .session-item-copy svg {
+                width: 12px;
+                height: 12px;
+            }
+
+            .session-item-title {
+                -webkit-line-clamp: 1;
+                max-height: none;
+                white-space: nowrap;
+                text-overflow: ellipsis;
+                overflow: hidden;
+            }
+
+            .session-item-actions {
+                margin-top: 0;
+            }
+
+            .session-item-meta {
+                margin-top: -2px;
+                margin-bottom: 0;
+                gap: 4px;
+                align-items: center;
+            }
+
+            .session-count-pill {
+                transform: translateY(-6px);
             }
 
             .card {
