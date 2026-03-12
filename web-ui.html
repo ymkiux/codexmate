@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Codex Mate</title>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <script src="https://unpkg.com/json5@2/dist/index.min.js"></script>
+    <script src="res/vue.global.js"></script>
+    <script src="res/json5.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Source+Sans+3:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
@@ -3493,11 +3493,16 @@
     </div>
 
     <script>
-        const { createApp } = Vue;
-        const API_BASE = (location && location.origin && location.origin !== 'null')
-            ? location.origin
-            : 'http://localhost:3737';
-        const DEFAULT_OPENCLAW_TEMPLATE = `{
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof Vue === 'undefined') {
+                console.error('Vue 库未能在 DOMContentLoaded 触发前加载完成。');
+                return;
+            }
+            const { createApp } = Vue;
+            const API_BASE = (location && location.origin && location.origin !== 'null')
+                ? location.origin
+                : 'http://localhost:3737';
+            const DEFAULT_OPENCLAW_TEMPLATE = `{
   // OpenClaw config (JSON5)
   agent: {
     model: "gpt-4.1"
@@ -3509,16 +3514,16 @@
   }
 }`;
 
-        async function api(action, params = {}) {
-            const res = await fetch(`${API_BASE}/api`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action, params })
-            });
-            return await res.json();
-        }
+            async function api(action, params = {}) {
+                const res = await fetch(`${API_BASE}/api`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action, params })
+                });
+                return await res.json();
+            }
 
-        const app = createApp({
+            const app = createApp({
             data() {
                 return {
                     mainTab: 'config',
@@ -6412,6 +6417,7 @@
         });
 
         app.mount('#app');
+    });
     </script>
 </body>
 </html>
