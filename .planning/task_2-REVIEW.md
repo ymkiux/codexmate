@@ -1,27 +1,24 @@
-御坂结论：本次改动符合需求，搜索框已对 Claude/All 开放查询并提示示例，未发现阻断问题。  
+御坂结论：发现 1 个需求符合性风险（关键词命名不符），标记 WARN。
 
 ## 结论
-- [PASS] task_2: Session query enabling now includes codex/claude/all and placeholder reflects support (severity: minor) Location: web-ui/logic.mjs:130; web-ui/app.js:252-259 Suggestion: None
+- task_2 存在 1 个 major 级风险，需修正后再视为通过。
 
 ## 行动项
-- 如需自验：`Set-Location -Path "D:\android\project\11\8"; node tests/unit/run.mjs`
+- 在 `tests/fixtures/conversations.json` 将关键词数组加入 `"claude code"`（可保留 `"claude_code"` 作为别名），确保搜索按空格分词能命中。
 
 ## 改动
-- 评审 `web-ui/logic.mjs`: `isSessionQueryEnabled` 现接受 codex/claude/all，确保查询参数传递。
-- 评审 `web-ui/app.js`: 启用态占位符更新为“支持 Codex/Claude，例：claude code”，未启用时提示来源不支持。
+- 仅审阅：`tests/fixtures/conversations.json`
 
 ## 验证
-- 测试：未执行（建议运行单测命令）
+- 未执行测试（⏭）
 
-## 风险/后续
-- 风险判定：0
-- 证据链：已归零
-- 不确定项：无
-- 建议：无
+[WARN] task_2: 新增会话的 `keywords` 使用 `"claude_code"` 而非需求指定的 `"claude code"`，若搜索按空格分词或精确匹配关键词，将无法命中（severity: major)
+Location: tests/fixtures/conversations.json:63-66
+Suggestion: 将关键词列表改为包含 `"claude code"`（可同时保留 `"claude_code"` 以兼容下划线查询）
 
 ## AWSL_RESULT
-- 评审结论：通过
-- 产出文件：无
-- 测试结果：未运行（可执行 `node tests/unit/run.mjs` 验证）
+- Summary: 发现 keywords 命名不符合“claude code”要求，建议补充空格版本以确保搜索命中。
+- Files touched: 无（仅审阅）
+- Tests: 未执行
 
-——御坂留
+御坂已完成审阅。
