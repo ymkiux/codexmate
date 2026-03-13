@@ -128,7 +128,8 @@ export function buildSpeedTestIssue(name, result) {
 
 // Session filtering helpers
 export function isSessionQueryEnabled(source) {
-    return (source || '').toLowerCase() === 'codex';
+    const normalized = (source || '').toLowerCase();
+    return normalized === 'codex' || normalized === 'claude' || normalized === 'all';
 }
 
 export function buildSessionListParams(options = {}) {
