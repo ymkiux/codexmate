@@ -1,8 +1,8 @@
-const path = require('path');
+﻿const path = require('path');
 const { assert } = require('./helpers');
 
 module.exports = async function testSessions(ctx) {
-    const { api, sessionId, tmpHome } = ctx;
+    const { api, sessionId, tmpHome, claudeSessionId } = ctx;
 
     const apiSessions = await api('list-sessions', { source: 'codex', limit: 50, forceRefresh: true });
     assert(Array.isArray(apiSessions.sessions), 'api sessions missing');
@@ -11,6 +11,14 @@ module.exports = async function testSessions(ctx) {
     const apiSessionsAll = await api('list-sessions', { source: 'all', limit: 50, forceRefresh: true });
     assert(Array.isArray(apiSessionsAll.sessions), 'api sessions(all) missing');
     assert(apiSessionsAll.sessions.some(item => item.sessionId === sessionId), 'api sessions(all) missing codex entry');
+
+    const claudeCodeQuery = await api('list-sessions', { source: 'all', query: 'claude code', limit: 50, forceRefresh: true });
+    assert(Array.isArray(claudeCodeQuery.sessions), 'claude code query missing sessions');
+    const claudeCodeHit = claudeCodeQuery.sessions.find(item => item.sessionId === claudeSessionId);
+    assert(claudeCodeHit, 'claude code query missing Claude session');
+    assert(claudeCodeHit.provider === 'claude', 'claude code query provider mismatch');
+    assert(claudeCodeHit.capabilities && claudeCodeHit.capabilities.code === true, 'claude code query missing code capability');
+    assert(Array.isArray(claudeCodeHit.keywords) && claudeCodeHit.keywords.includes('claude_code'), 'claude code query missing keyword');
 
     const sessionDetail = await api('session-detail', { source: 'codex', sessionId });
     assert(Array.isArray(sessionDetail.messages), 'session-detail missing messages');
@@ -58,3 +66,4 @@ module.exports = async function testSessions(ctx) {
 
     Object.assign(ctx, { cloneSessionId });
 };
+
