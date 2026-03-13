@@ -1,4 +1,4 @@
-import assert from 'assert';
+﻿import assert from 'assert';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 
@@ -117,40 +117,78 @@ test('buildSpeedTestIssue maps errors and status codes', () => {
     assert.strictEqual(http400.code, 'remote-speedtest-http-error');
 });
 
-test('isSessionQueryEnabled only for codex', () => {
+test('isSessionQueryEnabled supports codex, claude and all', () => {
     assert.strictEqual(isSessionQueryEnabled('codex'), true);
     assert.strictEqual(isSessionQueryEnabled('CODEX'), true);
-    assert.strictEqual(isSessionQueryEnabled('claude'), false);
+    assert.strictEqual(isSessionQueryEnabled('claude'), true);
+    assert.strictEqual(isSessionQueryEnabled('ALL'), true);
+    assert.strictEqual(isSessionQueryEnabled('openai'), false);
     assert.strictEqual(isSessionQueryEnabled(''), false);
 });
 
-test('buildSessionListParams clears query when source not codex', () => {
-    const params = buildSessionListParams({
+test('buildSessionListParams keeps claude code lexicon query when enabled', () => {
+    const paramsClaude = buildSessionListParams({
         source: 'claude',
-        query: 'hello',
-        pathFilter: '/tmp',
-        roleFilter: 'user',
-        timeRangePreset: '7d',
-        limit: 50
+        query: 'claude code',
+        roleFilter: 'all'
     });
-    assert.strictEqual(params.query, '');
-    assert.strictEqual(params.source, 'claude');
-    assert.strictEqual(params.pathFilter, '/tmp');
-    assert.strictEqual(params.roleFilter, 'user');
-    assert.strictEqual(params.timeRangePreset, '7d');
-    assert.strictEqual(params.limit, 50);
-    assert.strictEqual(params.forceRefresh, true);
-    assert.strictEqual(params.queryScope, 'content');
-    assert.strictEqual(params.contentScanLimit, 50);
+    assert.strictEqual(paramsClaude.query, 'claude code');
+    assert.strictEqual(paramsClaude.queryMode, 'and');
+    assert.strictEqual(paramsClaude.queryScope, 'content');
+
+    const paramsAll = buildSessionListParams({
+        source: 'all',
+        query: 'claude code',
+        timeRangePreset: '30d'
+    });
+    assert.strictEqual(paramsAll.query, 'claude code');
+    assert.strictEqual(paramsAll.timeRangePreset, '30d');
 });
 
-test('buildSessionListParams keeps query for codex', () => {
-    const params = buildSessionListParams({
+test('buildSessionListParams keeps query for enabled sources', () => {
+    const paramsCodex = buildSessionListParams({
         source: 'codex',
         query: 'test',
         pathFilter: ''
     });
-    assert.strictEqual(params.query, 'test');
-    assert.strictEqual(params.source, 'codex');
+    assert.strictEqual(paramsCodex.query, 'test');
+    assert.strictEqual(paramsCodex.source, 'codex');
+    assert.strictEqual(paramsCodex.limit, 200);
+
+    const paramsClaude = buildSessionListParams({
+        source: 'claude',
+        query: 'claude code',
+        roleFilter: 'user'
+    });
+    assert.strictEqual(paramsClaude.query, 'claude code');
+    assert.strictEqual(paramsClaude.source, 'claude');
+    assert.strictEqual(paramsClaude.roleFilter, 'user');
+    assert.strictEqual(paramsClaude.limit, 200);
+
+    const paramsAll = buildSessionListParams({
+        source: 'all',
+        query: 'claudecode',
+        timeRangePreset: '7d'
+    });
+    assert.strictEqual(paramsAll.query, 'claudecode');
+    assert.strictEqual(paramsAll.source, 'all');
+    assert.strictEqual(paramsAll.timeRangePreset, '7d');
+    assert.strictEqual(paramsAll.limit, 200);
+});
+
+test('buildSessionListParams clears query for unsupported sources', () => {
+    const params = buildSessionListParams({
+        source: 'openai',
+        query: 'hello',
+        pathFilter: '/tmp',
+        roleFilter: 'assistant'
+    });
+    assert.strictEqual(params.query, '');
+    assert.strictEqual(params.source, 'openai');
+    assert.strictEqual(params.pathFilter, '/tmp');
+    assert.strictEqual(params.roleFilter, 'assistant');
     assert.strictEqual(params.limit, 200);
+    assert.strictEqual(params.forceRefresh, true);
+    assert.strictEqual(params.queryScope, 'content');
+    assert.strictEqual(params.contentScanLimit, 50);
 });

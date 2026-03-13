@@ -1,0 +1,14 @@
+{
+  "test": {
+    "key": "2026-03-13T04:23:17.373Z",
+    "result": [
+      {
+        "taskId": "test",
+        "command": "npm test",
+        "passed": false,
+        "output": "\n> codexmate@0.0.8 test\n> npm run test:unit && npm run test:e2e\n\n\n> codexmate@0.0.8 test:unit\n> node tests/unit/run.mjs\n\n✓ normalizeClaudeValue trims strings and ignores non-string\n✓ normalizeClaudeConfig trims all fields\n✓ normalizeClaudeSettingsEnv trims settings env\n✓ normalizeClaudeSettingsEnv fills missing fields with empty strings\n✓ matchClaudeConfigFromSettings matches identical config\n✓ matchClaudeConfigFromSettings returns empty when incomplete\n✓ findDuplicateClaudeConfigName returns empty on missing fields\n✓ findDuplicateClaudeConfigName detects duplicates\n✓ findDuplicateClaudeConfigName returns empty when no match\n✓ formatLatency formats success and errors\n✓ buildSpeedTestIssue maps errors and status codes\n✓ isSessionQueryEnabled supports codex, claude and all\n✓ buildSessionListParams keeps claude code lexicon query when enabled\n✓ buildSessionListParams keeps query for enabled sources\n✓ buildSessionListParams clears query for unsupported sources\nAll 15 tests passed.\n\n> codexmate@0.0.8 test:e2e\n> node tests/e2e/run.js\n\nE2E failed: combined query missing Claude session\n"
+      }
+    ],
+    "timestamp": "2026-03-13T04:31:38.895Z"
+  }
+}
