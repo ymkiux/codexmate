@@ -8,6 +8,7 @@ const tests = [];
 globalThis.test = (name, fn) => tests.push({ name, fn });
 
 await import(pathToFileURL(path.join(__dirname, 'web-ui-logic.test.mjs')));
+await import(pathToFileURL(path.join(__dirname, 'reset-main.test.mjs')));
 
 let failures = 0;
 for (const { name, fn } of tests) {
