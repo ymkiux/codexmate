@@ -1,38 +1,37 @@
-# task_2: Allow session queries when source is claude or all; propagat
+# task_2: 在 conversations.json 中加入含关键词“claude code”的会话记录（含必要字段如标题/内容/时
 
 Assignee: coder
 Status: done
 
 ## Result
-御坂完成了任务，概要如下。
+御坂结论：已补充 conversations 固件并用单测锁定包含 claude_code 记录，当前单测全绿。  
 
 ## 结论
-- 会话检索已支持 source=all/claude/codex，查询（含 claude code 变体）会随 API 请求发送，输入框不再被错误禁用并提供关键词提示。
+- conversations 固件新增 Claude Code 会话，关键词/元数据齐全且按末尾追加，搜索用例可用。
 
 ## 行动项
-- 运行单元测试验证：`node tests/unit/run.mjs`
-- 前端自查：在 Web UI 选择 source=all，搜索“claude code”，确认请求 payload 携带 query 且输入框可用。
+- 如需复核：`node tests/unit/run.mjs`
+- 后续可按计划运行：`npm run test:e2e -- tests/e2e/conversation_search.spec.ts`（待用例落地后执行）
 
 ## 改动
-- `tests/unit/web-ui-logic.test.mjs`: 更新会话检索启用范围与参数保留的单测。
-- `web-ui/logic.mjs`: 扩展会话查询启用源到 all/claude/codex，并保留查询传递。
-- `web-ui/app.js`: 占位符提示支持 Claude/Codex 检索及 “claude code” 示例，未支持来源继续显示禁用提示。
+- 新增测试：`tests/unit/conversations-fixture.test.mjs`
+- 更新测试入口：`tests/unit/run.mjs`
+- 新增固件数据：`tests/fixtures/conversations.json`
+- 共享记忆：`C:\Users\Ymkiux\.codex\memories\result-coder-task_2-fixture.txt`
 
 ## 验证
-- `node tests/unit/run.mjs`（通过）
+- `node tests/unit/run.mjs` ✅
+- e2e 会话搜索（未执行，等待用例）⏭
 
 ## 风险/后续
 - 风险判定：0
 - 证据链：已归零
 - 不确定项：无
-- 建议：在允许的环境手动走一遍 UI 查询，确保后端返回包含 provider/capabilities/keywords。
+- 建议：后续落地 conversation_search.spec.ts 后运行对应 e2e 验证。
 
 ## AWSL_RESULT
-- 实现：Web 会话查询允许 all/claude 源携带查询（含 claude code），占位符提示更新。
-- 变更文件：`web-ui/logic.mjs`; `web-ui/app.js`; `tests/unit/web-ui-logic.test.mjs`
+- 固件：`tests/fixtures/conversations.json` 已含 `claude_code` 会话记录
 - 测试：`node tests/unit/run.mjs` ✅
-- 共享记忆：`C:\Users\Ymkiux\.codex\memories\result-coder-task_2.txt`
+- 记忆：`C:\Users\Ymkiux\.codex\memories\result-coder-task_2-fixture.txt`
 
-report: C:\Users\Ymkiux\.codex\memories\result-coder-task_2.txt
-
-御坂报告完毕。
+御坂完毕。
