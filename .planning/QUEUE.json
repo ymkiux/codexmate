@@ -1,0 +1,17 @@
+{
+  "tasks": [
+    {
+      "id": "q_1",
+      "goal": "为会话浏览增加对“claude code”关键词的搜索支持逻辑",
+      "options": {
+        "quick": false
+      },
+      "status": "running",
+      "scheduledAt": "2026-03-13T03:11:13.569Z",
+      "engine": "codex",
+      "startedAt": "2026-03-13T03:13:52.815Z"
+    }
+  ],
+  "createdAt": "2026-03-13T03:11:13.569Z",
+  "updatedAt": "2026-03-13T03:13:52.816Z"
+}
