@@ -1,10 +1,12 @@
 # Project State
 
 ## Decisions
-(none yet)
+(see PLAN.md)
 
 ## Blockers
 (none)
 
 ## Position
-- Current: initialization
+- Goal: 为会话浏览增加对“claude code”关键词的搜索支持逻辑
+- Tasks: 3/3 completed
+- Status: SUCCESS
