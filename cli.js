@@ -87,7 +87,7 @@ const CODEXMATE_MANAGED_MARKER = '# codexmate-managed: true';
 const SESSION_LIST_CACHE_TTL_MS = 4000;
 const SESSION_SUMMARY_READ_BYTES = 256 * 1024;
 const SESSION_CONTENT_READ_BYTES = SESSION_SUMMARY_READ_BYTES;
-const DEFAULT_CONTENT_SCAN_LIMIT = 10;
+const DEFAULT_CONTENT_SCAN_LIMIT = 50;
 const SESSION_SCAN_FACTOR = 4;
 const SESSION_SCAN_MIN_FILES = 800;
 const MAX_SESSION_PATH_LIST_SIZE = 2000;
@@ -1535,7 +1535,7 @@ function removeLeadingSystemMessage(messages) {
         return [];
     }
 
-    let startIndex = 1;
+    let startIndex = 0;
     while (startIndex < messages.length) {
         const item = messages[startIndex];
         const role = item ? normalizeRole(item.role) : '';
@@ -1638,6 +1638,75 @@ function normalizeQueryTokens(query) {
         .filter(Boolean);
 }
 
+function expandSessionQueryTokens(tokens) {
+    const base = Array.isArray(tokens) ? tokens.map(t => String(t || '').toLowerCase()).filter(Boolean) : [];
+    const result = [];
+    const seen = new Set();
+    let hasClaudeAlias = false;
+    let hasDaudeAlias = false;
+
+    for (const token of base) {
+        if (/^claude[-_ ]?code$/.test(token) || token === 'claudecode') {
+            hasClaudeAlias = true;
+            continue;
+        }
+        if (/^daude[-_ ]?code$/.test(token) || token === 'daudecode') {
+            hasDaudeAlias = true;
+            continue;
+        }
+        if (!seen.has(token)) {
+            seen.add(token);
+            result.push(token);
+        }
+    }
+
+    const push = (token) => {
+        const normalized = String(token || '').toLowerCase();
+        if (!normalized || seen.has(normalized)) return;
+        seen.add(normalized);
+        result.push(normalized);
+    };
+
+    if (hasClaudeAlias) {
+        push('claude');
+        push('code');
+    }
+    if (hasDaudeAlias) {
+        push('daude');
+        push('code');
+    }
+
+    return result;
+}
+
+function normalizeKeywords(value) {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+    const seen = new Set();
+    const result = [];
+    for (const item of value) {
+        const normalized = typeof item === 'string' ? item.trim() : String(item || '').trim();
+        if (!normalized) continue;
+        const lower = normalized.toLowerCase();
+        if (seen.has(lower)) continue;
+        seen.add(lower);
+        result.push(normalized);
+    }
+    return result;
+}
+
+function normalizeCapabilities(value) {
+    const result = {};
+    if (!value || typeof value !== 'object') {
+        return result;
+    }
+    if (value.code === true) {
+        result.code = true;
+    }
+    return result;
+}
+
 function normalizeQueryMode(mode) {
     return mode === 'or' ? 'or' : 'and';
 }
@@ -1675,12 +1744,16 @@ function buildSessionSummaryText(session) {
     if (!session) {
         return '';
     }
+    const keywords = Array.isArray(session.keywords) ? session.keywords.join(' ') : '';
+    const provider = typeof session.provider === 'string' ? session.provider : '';
     return [
         session.title,
         session.sessionId,
         session.cwd,
         session.filePath,
-        session.sourceLabel
+        session.sourceLabel,
+        provider,
+        keywords
     ].filter(Boolean).join(' ');
 }
 
@@ -1805,23 +1878,23 @@ function applySessionQueryFilter(sessions, options = {}) {
         let contentHit = false;
         let contentInfo = null;
 
-        if (scope !== 'summary' && (!summaryHit || scope === 'content')) {
-            if (scanned < contentScanLimit) {
-                scanned += 1;
-                contentInfo = scanSessionContentForQuery(session, tokens, {
-                    mode,
-                    roleFilter,
-                    maxBytes: contentScanBytes,
-                    maxMatches: 1,
-                    snippetLimit: 2
-                });
-                contentHit = contentInfo.hit;
-            }
+        const shouldScanContent = scope === 'content' || scope === 'all' || !summaryHit;
+        if (shouldScanContent && scanned < contentScanLimit) {
+            scanned += 1;
+            contentInfo = scanSessionContentForQuery(session, tokens, {
+                mode,
+                roleFilter,
+                maxBytes: contentScanBytes,
+                maxMatches: 1,
+                snippetLimit: 2
+            });
+            contentHit = contentInfo.hit;
         }
 
         const hit = scope === 'summary'
             ? summaryHit
             : (scope === 'content' ? contentHit : (summaryHit || contentHit));
+
         if (!hit) {
             continue;
         }
@@ -2004,13 +2077,16 @@ function parseCodexSessionSummary(filePath) {
     return {
         source: 'codex',
         sourceLabel: 'Codex',
+        provider: 'codex',
         sessionId,
         title: firstPrompt || sessionId,
         cwd,
         createdAt,
         updatedAt,
         messageCount,
-        filePath
+        filePath,
+        keywords: [],
+        capabilities: {}
     };
 }
 
@@ -2090,13 +2166,16 @@ function parseClaudeSessionSummary(filePath) {
     return {
         source: 'claude',
         sourceLabel: 'Claude Code',
+        provider: 'claude',
         sessionId,
         title: firstPrompt || sessionId,
         cwd,
         createdAt,
         updatedAt,
         messageCount,
-        filePath
+        filePath,
+        keywords: [],
+        capabilities: { code: true }
     };
 }
 
@@ -2221,16 +2300,25 @@ function listClaudeSessions(limit, options = {}) {
                 }
             }
 
+            const provider = typeof entry.provider === 'string' && entry.provider.trim()
+                ? entry.provider.trim()
+                : 'claude';
+            const keywords = normalizeKeywords(entry.keywords);
+            const capabilities = normalizeCapabilities(entry.capabilities);
+
             sessions.push({
                 source: 'claude',
                 sourceLabel: 'Claude Code',
+                provider,
                 sessionId,
                 title,
                 cwd: entry.projectPath || index.originalPath || '',
                 createdAt,
                 updatedAt,
                 messageCount,
-                filePath
+                filePath,
+                keywords,
+                capabilities
             });
 
             if (sessions.length >= targetCount) {
@@ -2275,7 +2363,7 @@ function listAllSessions(params = {}) {
     const forceRefresh = !!params.forceRefresh;
     const normalizedPathFilter = normalizeSessionPathFilter(params.pathFilter);
     const hasPathFilter = !!normalizedPathFilter;
-    const queryTokens = normalizeQueryTokens(params.query);
+    const queryTokens = expandSessionQueryTokens(normalizeQueryTokens(params.query));
     const hasQuery = queryTokens.length > 0;
     const cacheKey = hasQuery ? '' : `${source}:${limit}:${normalizedPathFilter}`;
     if (!hasQuery) {
@@ -2392,7 +2480,7 @@ function resolveSessionFilePath(source, filePath, sessionId) {
     if (typeof sessionId === 'string' && sessionId.trim()) {
         const targetId = sessionId.trim().toLowerCase();
         const files = collectJsonlFiles(root, 5000);
-        const matchedFile = files.find(item => path.basename(item).toLowerCase().includes(targetId));
+        const matchedFile = files.find(item => path.basename(item, '.jsonl').toLowerCase() === targetId);
         if (matchedFile && fs.existsSync(matchedFile)) {
             return matchedFile;
         }

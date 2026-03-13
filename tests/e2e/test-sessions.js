@@ -8,11 +8,11 @@ module.exports = async function testSessions(ctx) {
     assert(Array.isArray(apiSessions.sessions), 'api sessions missing');
     assert(apiSessions.sessions.some(item => item.sessionId === sessionId), 'api sessions missing codex entry');
 
-    const apiSessionsAll = await api('list-sessions', { source: 'all', limit: 50, forceRefresh: true });
-    assert(Array.isArray(apiSessionsAll.sessions), 'api sessions(all) missing');
-    assert(apiSessionsAll.sessions.some(item => item.sessionId === sessionId), 'api sessions(all) missing codex entry');
+    const apiSessionsClaude = await api('list-sessions', { source: 'claude', limit: 50, forceRefresh: true });
+    assert(Array.isArray(apiSessionsClaude.sessions), 'api sessions(claude) missing');
+    assert(apiSessionsClaude.sessions.some(item => item.sessionId === claudeSessionId), 'api sessions(claude) missing claude entry');
 
-    const claudeCodeQuery = await api('list-sessions', { source: 'all', query: 'claude code', limit: 50, forceRefresh: true });
+    const claudeCodeQuery = await api('list-sessions', { source: 'claude', query: 'claude code', limit: 50, forceRefresh: true });
     assert(Array.isArray(claudeCodeQuery.sessions), 'claude code query missing sessions');
     const claudeCodeHit = claudeCodeQuery.sessions.find(item => item.sessionId === claudeSessionId);
     assert(claudeCodeHit, 'claude code query missing Claude session');

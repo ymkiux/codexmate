@@ -93,7 +93,7 @@
                     agentsModalHint: '保存后会写入目标 AGENTS.md（与 config.toml 同级）。',
                     sessionsList: [],
                     sessionsLoading: false,
-                    sessionFilterSource: 'all',
+                    sessionFilterSource: 'codex',
                     sessionPathFilter: '',
                     sessionQuery: '',
                     sessionRoleFilter: 'all',
@@ -932,7 +932,7 @@
                 },
 
                 syncSessionPathOptionsForSource(source, nextOptions, mergeWithExisting = false) {
-                    const targetSource = source === 'codex' || source === 'claude' ? source : 'all';
+                    const targetSource = source === 'claude' ? 'claude' : 'codex';
                     const current = Array.isArray(this.sessionPathOptionsMap[targetSource])
                         ? this.sessionPathOptionsMap[targetSource]
                         : [];
@@ -947,7 +947,7 @@
                 },
 
                 refreshSessionPathOptions(source) {
-                    const targetSource = source === 'codex' || source === 'claude' ? source : 'all';
+                    const targetSource = source === 'claude' ? 'claude' : 'codex';
                     const base = Array.isArray(this.sessionPathOptionsMap[targetSource])
                         ? [...this.sessionPathOptionsMap[targetSource]]
                         : [];
@@ -961,9 +961,7 @@
                 },
 
                 async loadSessionPathOptions(options = {}) {
-                    const source = options.source === 'codex' || options.source === 'claude'
-                        ? options.source
-                        : 'all';
+                    const source = options.source === 'claude' ? 'claude' : 'codex';
                     const forceRefresh = !!options.forceRefresh;
                     const loaded = !!this.sessionPathOptionsLoadedMap[source];
                     if (!forceRefresh && loaded) {
@@ -1016,7 +1014,7 @@
                 },
 
                 async clearSessionFilters() {
-                    this.sessionFilterSource = 'all';
+                    this.sessionFilterSource = 'codex';
                     this.sessionPathFilter = '';
                     this.sessionQuery = '';
                     this.sessionRoleFilter = 'all';

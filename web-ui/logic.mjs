@@ -129,12 +129,12 @@ export function buildSpeedTestIssue(name, result) {
 // Session filtering helpers
 export function isSessionQueryEnabled(source) {
     const normalized = (source || '').toLowerCase();
-    return normalized === 'codex' || normalized === 'claude' || normalized === 'all';
+    return normalized === 'codex' || normalized === 'claude';
 }
 
 export function buildSessionListParams(options = {}) {
     const {
-        source = 'all',
+        source = 'codex',
         pathFilter = '',
         query = '',
         roleFilter = 'all',

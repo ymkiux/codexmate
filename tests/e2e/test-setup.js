@@ -86,6 +86,27 @@ module.exports = async function testSetup(ctx) {
     ];
     fs.writeFileSync(sessionPath, sessionRecords.map(record => JSON.stringify(record)).join('\n') + '\n', 'utf-8');
 
+    const daudeSessionId = 'daude-e2e-session';
+    const daudeSessionPath = path.join(sessionsDir, `${daudeSessionId}.jsonl`);
+    const daudeRecords = [
+        {
+            type: 'session_meta',
+            payload: { id: daudeSessionId, cwd: '/tmp/daude' },
+            timestamp: '2025-02-02T00:00:00.000Z'
+        },
+        {
+            type: 'response_item',
+            payload: { type: 'message', role: 'user', content: 'daude code quick start 222' },
+            timestamp: '2025-02-02T00:00:01.000Z'
+        },
+        {
+            type: 'response_item',
+            payload: { type: 'message', role: 'assistant', content: 'sharing daude-code bootstrap' },
+            timestamp: '2025-02-02T00:00:02.000Z'
+        }
+    ];
+    fs.writeFileSync(daudeSessionPath, daudeRecords.map(record => JSON.stringify(record)).join('\n') + '\n', 'utf-8');
+
     const claudeProjectsDir = path.join(tmpHome, '.claude', 'projects');
     const claudeProjectDir = path.join(claudeProjectsDir, 'e2e-project');
     fs.mkdirSync(claudeProjectDir, { recursive: true });
@@ -127,6 +148,8 @@ module.exports = async function testSetup(ctx) {
         claudeModel,
         sessionId,
         sessionPath,
+        daudeSessionId,
+        daudeSessionPath,
         claudeSessionId,
         claudeSessionPath,
         noModelsUrl,
