@@ -25,7 +25,7 @@ Codex Mate 让 Codex 与 Claude Code 的提供商/模型切换变成“一条命
 
 一键切换 Codex/Claude Code 提供商与模型，并把本地会话统一管理/浏览/导出。
 
-- 会话管理：列表/筛选/导出/删除 Codex/Claude 本地会话；关键词搜索暂限 Codex
+- 会话管理：列表/筛选/导出/删除 Codex/Claude 本地会话；关键词搜索支持 Codex/Claude
 
 ## 功能总览
 
@@ -34,7 +34,7 @@ Codex Mate 让 Codex 与 Claude Code 的提供商/模型切换变成“一条命
 | Codex 配置 | 多提供商/多模型切换麻烦 | 提供商/模型切换、模型管理、CLI + Web 双入口、模板确认写入 |
 | Claude Code 配置 | 多方案共存、写入路径不统一 | 多配置方案管理、默认写入 `~/.claude/settings.json` |
 | OpenClaw 配置 | OpenClaw 配置分散 | JSON5 多配置管理、应用到 `~/.openclaw/openclaw.json`、Workspace 指令文件管理 |
-| 会话浏览 | 本地会话难以追踪 | 会话列表/筛选、关键词搜索（仅 Codex）、Markdown 导出、可用时复制恢复命令、删除与批量清理 |
+| 会话浏览 | 本地会话难以追踪 | 会话列表/筛选、关键词搜索（支持 Codex/Claude）、Markdown 导出、可用时复制恢复命令、删除与批量清理 |
 | 附属工具 | 压缩/解压需额外工具 | 优先 7-Zip，JS 库兜底 |
 
 ## 为什么选 Codex Mate

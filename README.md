@@ -19,7 +19,7 @@ One tool to switch Codex/Claude Code providers & models and manage/browse local 
 - Local config control with backups
 - Lightweight Web UI instead of heavy clients
 - Unified session browser (view/export/resume when available)
-- Session management: list/filter/export/delete local sessions; keyword search is Codex-only
+- Session management: list/filter/export/delete local sessions; keyword search supports Codex and Claude
 
 ## Feature Overview
 
@@ -28,7 +28,7 @@ One tool to switch Codex/Claude Code providers & models and manage/browse local 
 | Codex Config | Switching providers/models is painful | Provider/model switching, model management, CLI + Web entry points, template-confirmed writes |
 | Claude Code Config | Multiple profiles and inconsistent write paths | Profile management, default write to `~/.claude/settings.json` |
 | OpenClaw Config | OpenClaw configs are scattered | JSON5 profiles, apply to `~/.openclaw/openclaw.json`, AGENTS workspace management |
-| Session Browser | Local sessions are hard to track | List/filter sessions, keyword search (Codex only), export to Markdown, copy resume command (when available), delete and batch cleanup |
+| Session Browser | Local sessions are hard to track | List/filter sessions, keyword search (Codex + Claude), export to Markdown, copy resume command (when available), delete and batch cleanup |
 | Utilities | Compression/extraction requires extra tools | 7-Zip preferred, JS fallback |
 
 ## Why Codex Mate
