@@ -1,41 +1,69 @@
 # Execution Plan
 
-## task_1: 完善搜索 e2e 场景
-- **Assignee:** coder
-- **Files:** tests/e2e/conversation_search.spec.ts
+## task_1: Design daude code search plan
+- **Assignee:** architect
+- **Files:** .planning/daude-code-plan.md
 
 ### Action
-在 conversation_search.spec.ts 中新增覆盖“claude code”关键词的会话浏览搜索用例，断言结果列表含预期会话并校验高亮/分页等行为；保持现有测试风格与选择器。
+Review cli session search flow, define normalization for daude code variants (space/hyphen/concat) into tokens/keywords, decide content scan scope/bytes and record decisions plus 222 case in .planning/daude-code-plan.md.
 
 ### Verify
-npm run test:e2e -- tests/e2e/conversation_search.spec.ts
+Open .planning/daude-code-plan.md and confirm it records lexicon, content-scan defaults, fixture/test updates.
 
 ### Done
-新增的“claude code”搜索用例能独立通过并与现有用例共存
+Design doc exists with normalization, scope, fixture, and test expectations.
 
-## task_2: 补充 e2e 固件数据
+## task_2: Normalize daude code query in CLI
 - **Assignee:** coder
-- **Files:** tests/fixtures/conversations.json
+- **Dependencies:** task_1
+- **Files:** cli.js
 
 ### Action
-在 conversations.json 中加入含关键词“claude code”的会话记录（含必要字段如标题/内容/时间戳/ID），确保数据被 e2e 种子或 mock 服务加载，避免破坏既有数据顺序。
+In cli.js add daude code lexicon mapping so list-sessions builds normalized tokens/keywords and content scan supports the variant without hardcoding session ids.
 
 ### Verify
-npm run test:e2e -- tests/e2e/conversation_search.spec.ts
+node tests/unit/run.mjs
 
 ### Done
-fixture 加入新会话且被搜索用例成功检索
+list-sessions query 'daude code' returns code-capable sessions via summary/content without regressions.
 
-## task_3: 运行回归验证
+## task_3: Add fixture session with daude code & 222
+- **Assignee:** coder
+- **Dependencies:** task_1
+- **Files:** tests/e2e/test-setup.js
+
+### Action
+Update tests/e2e/test-setup.js to create a fixture session containing daude code text and 222 in message content, with keywords/capabilities set and sessionId stored in ctx.
+
+### Verify
+node tests/e2e/run.js
+
+### Done
+Fixture session with daude code and 222 is available for e2e search assertions.
+
+## task_4: Cover daude code search in e2e
 - **Assignee:** tester
-- **Dependencies:** task_1, task_2
-- **Files:** tests/e2e
+- **Dependencies:** task_2, task_3
+- **Files:** tests/e2e/test-session-search.js
 
 ### Action
-在更新完成后运行完整 e2e 套件，记录结果；若有波动失败，收集日志并反馈。
+Expand tests/e2e/test-session-search.js to assert list-sessions with queryScope content finds the daude code session (and 222 query) with match.snippets and expected provider/keyword fields.
 
 ### Verify
-npm run test:e2e
+node tests/e2e/run.js
 
 ### Done
-全量 e2e 测试通过，无新增失败
+Session search e2e covers daude code and 222 and passes.
+
+## task_5: Full test sweep
+- **Assignee:** tester
+- **Dependencies:** task_2, task_3, task_4
+
+### Action
+Run the full suite after changes to ensure no regressions.
+
+### Verify
+node tests/unit/run.mjs; node tests/e2e/run.js
+
+### Done
+All unit and e2e tests pass.
