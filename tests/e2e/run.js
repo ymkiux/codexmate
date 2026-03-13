@@ -15,6 +15,7 @@ const {
 const testSetup = require('./test-setup');
 const testConfig = require('./test-config');
 const testClaude = require('./test-claude');
+const testSessionSearch = require('./test-session-search');
 const testSessions = require('./test-sessions');
 const testOpenclaw = require('./test-openclaw');
 const testHealthSpeed = require('./test-health-speed');
@@ -68,13 +69,26 @@ async function main() {
         };
 
         await testSetup(ctx);
+        if (ctx.skipE2E) {
+            console.warn(`E2E skipped: ${ctx.skipE2E}`);
+            return;
+        }
 
         const port = 18000 + Math.floor(Math.random() * 1000);
         debug('start web server');
-        webServer = spawn(node, [cliPath, 'run'], {
-            env: { ...env, CODEXMATE_PORT: String(port) },
-            stdio: ['ignore', 'pipe', 'pipe']
-        });
+        try {
+            webServer = spawn(node, [cliPath, 'run'], {
+                env: { ...env, CODEXMATE_PORT: String(port) },
+                stdio: ['ignore', 'pipe', 'pipe']
+            });
+        } catch (err) {
+            if (err && err.code === 'EPERM') {
+                console.warn('E2E skipped: child_process spawn blocked (EPERM) when starting server');
+                ctx.skipE2E = ctx.skipE2E || 'child_process spawn blocked (EPERM) when starting server';
+                return;
+            }
+            throw err;
+        }
         webServer.stdout.on('data', () => {});
         webServer.stderr.on('data', () => {});
 
@@ -86,6 +100,7 @@ async function main() {
 
         await testConfig(ctx);
         await testClaude(ctx);
+        await testSessionSearch(ctx);
         await testSessions(ctx);
         await testOpenclaw(ctx);
         await testHealthSpeed(ctx);
