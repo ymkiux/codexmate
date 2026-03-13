@@ -98,7 +98,27 @@
         "tester"
       ],
       "maxConcurrency": 1
+    },
+    {
+      "id": "h_2",
+      "date": "2026-03-13T06:30:45.492Z",
+      "project": "8",
+      "projectPath": "D:\\android\\project\\11\\8",
+      "queueTaskId": "q_1",
+      "goal": "为会话浏览增加对daude code关键词的搜索支持 注意要按搜索会话内容的那种 搜本地文件 必须严格测试到位 注意我已经发现有222这个关键词的会话存在 所以你需要根据这个作测试 也别在实际使用时写死 具体实现你自行判断 我只需要结果 最后补齐e2e相关测试 必须全跑通 不然继续干活",
+      "status": "failed",
+      "startedAt": "2026-03-13T06:30:44.828Z",
+      "completedAt": "2026-03-13T06:30:45.491Z",
+      "duration": 663,
+      "tasksCompleted": 0,
+      "tasksTotal": 0,
+      "summary": "Planning failed: Spawn error: spawn claude ENOENT",
+      "engine": "claude-code",
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "costUsd": 0,
+      "source": "queue"
     }
   ],
-  "updatedAt": "2026-03-13T04:32:53.534Z"
+  "updatedAt": "2026-03-13T06:30:45.493Z"
 }
