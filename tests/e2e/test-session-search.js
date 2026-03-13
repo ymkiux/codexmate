@@ -1,4 +1,25 @@
+const http = require('http');
 const { assert } = require('./helpers');
+
+async function fetchHtml(port) {
+    return new Promise((resolve, reject) => {
+        const req = http.get({
+            hostname: '127.0.0.1',
+            port,
+            path: '/',
+            timeout: 2000
+        }, (res) => {
+            let body = '';
+            res.setEncoding('utf-8');
+            res.on('data', chunk => body += chunk);
+            res.on('end', () => resolve(body));
+        });
+        req.on('error', reject);
+        req.on('timeout', () => {
+            req.destroy(new Error('timeout'));
+        });
+    });
+}
 
 module.exports = async function testSessionSearch(ctx) {
     const { api, sessionId, claudeSessionId, daudeSessionId } = ctx;
@@ -84,4 +105,10 @@ module.exports = async function testSessionSearch(ctx) {
     });
     assert(Array.isArray(paged.sessions) && paged.sessions.length === 1, 'paged search should return first page only');
     assert(paged.sessions[0].sessionId === claudeSessionId, 'paged search first item should be Claude session');
+
+    const html = await fetchHtml(ctx.port);
+    assert(html && html.includes('.session-item-snippet'), 'session snippet style missing');
+    const lowerHtml = (html || '').toLowerCase();
+    assert(lowerHtml.includes('white-space: nowrap'), 'snippet nowrap missing');
+    assert(lowerHtml.includes('text-overflow: ellipsis'), 'snippet ellipsis missing');
 };
