@@ -253,7 +253,10 @@
                     return isSessionQueryEnabled(this.sessionFilterSource);
                 },
                 sessionQueryPlaceholder() {
-                    return this.isSessionQueryEnabled ? '关键词检索' : '仅 Codex 支持关键词检索';
+                    if (this.isSessionQueryEnabled) {
+                        return '关键词检索（支持 Codex/Claude，例：claude code）';
+                    }
+                    return '当前来源暂不支持关键词检索';
                 },
                 claudeModelHasList() {
                     return Array.isArray(this.claudeModels) && this.claudeModels.length > 0;
