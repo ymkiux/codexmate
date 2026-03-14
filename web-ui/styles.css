@@ -108,6 +108,19 @@
     box-sizing: border-box;
 }
 
+/* 仅屏幕阅读器可见 */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 body {
     font-family: var(--font-family-body);
     background-color: var(--color-bg);
@@ -122,6 +135,41 @@ body {
     -moz-osx-font-smoothing: grayscale;
     position: relative;
     overflow-x: hidden;
+}
+
+.fab-install {
+    position: fixed;
+    left: 16px;
+    bottom: 16px;
+    z-index: 90;
+    padding: 12px 16px;
+    border-radius: var(--radius-full);
+    border: none;
+    background: linear-gradient(135deg, var(--color-brand) 0%, var(--color-brand-dark) 100%);
+    color: #fff;
+    font-weight: var(--font-weight-secondary);
+    letter-spacing: 0.02em;
+    box-shadow: var(--shadow-float);
+    cursor: pointer;
+    transition: transform var(--transition-fast) var(--ease-spring), box-shadow var(--transition-fast) var(--ease-spring);
+}
+
+.fab-install:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-raised);
+}
+
+.fab-install:active {
+    transform: translateY(0);
+}
+
+@media (max-width: 640px) {
+    .fab-install {
+        left: 12px;
+        bottom: 12px;
+        padding: 10px 14px;
+        font-size: var(--font-size-secondary);
+    }
 }
 
 /* ============================================
@@ -1974,6 +2022,39 @@ body::after {
     margin-bottom: var(--spacing-md);
     color: var(--color-text-primary);
     letter-spacing: -0.01em;
+}
+
+.install-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
+}
+
+.install-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 10px 12px;
+    border: 1px solid var(--color-border-soft);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface-alt);
+}
+
+.install-command {
+    flex: 1;
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-secondary);
+    color: var(--color-text-primary);
+    word-break: break-all;
+    background: rgba(255, 255, 255, 0.7);
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border-soft);
+}
+
+.install-row .btn-mini {
+    white-space: nowrap;
 }
 
 .modal-header {

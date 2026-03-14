@@ -80,6 +80,7 @@
                     showOpenclawConfigModal: false,
                     showConfigTemplateModal: false,
                     showAgentsModal: false,
+                    showInstallModal: false,
                     configTemplateContent: '',
                     configTemplateApplying: false,
                     codexApplying: false,
@@ -135,6 +136,10 @@
                     claudeSpeedLoading: {},
                     claudeShareLoading: {},
                     providerShareLoading: {},
+                    installCommands: [
+                        'npm install -g @anthropic-ai/claude-code',
+                        'npm i -g @openai/codex'
+                    ],
                     newProvider: { name: '', url: '', key: '' },
                     editingProvider: { name: '', url: '', key: '' },
                     newModelName: '',
@@ -689,6 +694,20 @@
                         return;
                     }
                     this.showMessage('复制失败，请手动复制内容', 'error');
+                },
+
+                copyInstallCommand(cmd) {
+                    const text = typeof cmd === 'string' ? cmd.trim() : '';
+                    if (!text) {
+                        this.showMessage('没有可复制的命令', 'info');
+                        return;
+                    }
+                    const ok = this.fallbackCopyText(text);
+                    if (ok) {
+                        this.showMessage('已复制命令', 'success');
+                        return;
+                    }
+                    this.showMessage('复制失败，请手动复制命令', 'error');
                 },
 
                 async copyResumeCommand(session) {
@@ -2689,6 +2708,14 @@
                     this.openclawApplying = false;
                     this.resetOpenclawStructured();
                     this.resetOpenclawQuick();
+                },
+
+                openInstallModal() {
+                    this.showInstallModal = true;
+                },
+
+                closeInstallModal() {
+                    this.showInstallModal = false;
                 },
 
                 async loadOpenclawConfigFromFile(options = {}) {
