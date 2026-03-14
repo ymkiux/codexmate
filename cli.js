@@ -4570,11 +4570,13 @@ function formatHostForUrl(host) {
 
 // 打开 Web UI
 function cmdStart(options = {}) {
-    const htmlPath = path.join(__dirname, 'web-ui.html');
-    const assetsDir = path.join(__dirname, 'res');
     const webDir = path.join(__dirname, 'web-ui');
+    const newHtmlPath = path.join(webDir, 'index.html');
+    const legacyHtmlPath = path.join(__dirname, 'web-ui.html');
+    const htmlPath = fs.existsSync(newHtmlPath) ? newHtmlPath : legacyHtmlPath;
+    const assetsDir = path.join(__dirname, 'res');
     if (!fs.existsSync(htmlPath)) {
-        console.error('错误: web-ui.html 不存在');
+        console.error('错误: Web UI 页面不存在（尝试路径: web-ui/index.html, web-ui.html）');
         process.exit(1);
     }
 
