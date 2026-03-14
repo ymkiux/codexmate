@@ -82,6 +82,7 @@
                     showAgentsModal: false,
                     configTemplateContent: '',
                     configTemplateApplying: false,
+                    codexApplying: false,
                     agentsContent: '',
                     agentsPath: '',
                     agentsExists: false,
@@ -1267,15 +1268,18 @@
                 async switchProvider(name) {
                     this.currentProvider = name;
                     await this.loadModelsForProvider(name);
-                    await this.openConfigTemplateEditor();
+                    if (this.modelsSource === 'remote' && this.models.length > 0 && !this.models.includes(this.currentModel)) {
+                        this.currentModel = this.models[0];
+                    }
+                    await this.applyCodexConfigDirect({ silent: true });
                 },
 
                 async onModelChange() {
-                    await this.openConfigTemplateEditor();
+                    await this.applyCodexConfigDirect();
                 },
 
                 async onServiceTierChange() {
-                    await this.openConfigTemplateEditor();
+                    await this.applyCodexConfigDirect({ silent: true });
                 },
 
                 async runHealthCheck() {
@@ -1370,6 +1374,48 @@
                         this.showConfigTemplateModal = true;
                     } catch (e) {
                         this.showMessage('加载模板失败: ' + e.message, 'error');
+                    }
+                },
+
+                async applyCodexConfigDirect(options = {}) {
+                    if (this.codexApplying) return;
+
+                    const provider = (this.currentProvider || '').trim();
+                    const model = (this.currentModel || '').trim();
+                    if (!provider || !model) {
+                        this.showMessage('请选择提供商和模型后再应用。', 'error');
+                        return;
+                    }
+
+                    this.codexApplying = true;
+                    try {
+                        const tplRes = await api('get-config-template', {
+                            provider,
+                            model,
+                            serviceTier: this.serviceTier
+                        });
+                        if (tplRes.error) {
+                            this.showMessage('获取模板失败: ' + tplRes.error, 'error');
+                            return;
+                        }
+
+                        const applyRes = await api('apply-config-template', {
+                            template: tplRes.template
+                        });
+                        if (applyRes.error) {
+                            this.showMessage('应用模板失败: ' + applyRes.error, 'error');
+                            return;
+                        }
+
+                        if (options.silent !== true) {
+                            this.showMessage('Codex 配置已自动应用', 'success');
+                        }
+
+                        await this.loadAll();
+                    } catch (e) {
+                        this.showMessage('应用失败: ' + e.message, 'error');
+                    } finally {
+                        this.codexApplying = false;
                     }
                 },
 
@@ -1551,18 +1597,23 @@
                         return this.showMessage('提供商已存在', 'error');
                     }
 
-                    const safeName = this.escapeTomlString(name);
-                    const safeUrl = this.escapeTomlString(this.newProvider.url.trim());
-                    const safeKey = this.escapeTomlString(this.newProvider.key || '');
-                    const newProviderBlock = `[model_providers.${safeName}]\nname = "${safeName}"\nbase_url = "${safeUrl}"\nwire_api = "responses"\nrequires_openai_auth = false\npreferred_auth_method = "${safeKey}"\nrequest_max_retries = 4\nstream_max_retries = 10\nstream_idle_timeout_ms = 300000`;
+                    try {
+                        const res = await api('add-provider', {
+                            name,
+                            url: this.newProvider.url.trim(),
+                            key: this.newProvider.key || ''
+                        });
+                        if (res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
 
-                    this.currentProvider = name;
-                    this.showMessage('已生成新增模板，请确认后应用', 'info');
-                    this.closeAddModal();
-                    await this.openConfigTemplateEditor({
-                        appendHint: `新增 provider: ${name}（请检查字段后应用）`,
-                        appendBlock: newProviderBlock
-                    });
+                        this.showMessage('提供商已添加', 'success');
+                        this.closeAddModal();
+                        await this.loadAll();
+                    } catch (e) {
+                        this.showMessage('添加提供商失败: ' + e.message, 'error');
+                    }
                 },
 
                 async deleteProvider(name) {

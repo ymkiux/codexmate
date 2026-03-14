@@ -120,5 +120,22 @@ module.exports = async function testConfig(ctx) {
     assert(Array.isArray(apiPaths.paths), 'api session paths missing');
     assert(apiPaths.paths.includes('/tmp/e2e'), 'api session paths missing cwd');
 
+    const addProvider = await api('add-provider', { name: 'e2e-api', url: mockProviderUrl, key: 'sk-e2e-api' });
+    assert(addProvider.success === true, 'add-provider failed');
+
+    const apiListAfterAdd = await api('list');
+    assert(Array.isArray(apiListAfterAdd.providers) && apiListAfterAdd.providers.some(p => p.name === 'e2e-api'), 'add-provider not reflected in list');
+
+    const exportProviderNew = await api('export-provider', { name: 'e2e-api' });
+    assert(exportProviderNew.payload, 'export-provider(e2e-api) missing payload');
+    assert(exportProviderNew.payload.baseUrl === mockProviderUrl, 'export-provider(e2e-api) baseUrl mismatch');
+    assert(exportProviderNew.payload.apiKey === 'sk-e2e-api', 'export-provider(e2e-api) apiKey mismatch');
+
+    const statusAfterAdd = await api('status');
+    assert(statusAfterAdd.provider === 'e2e2', 'add-provider should not change current provider');
+
+    const addProviderDup = await api('add-provider', { name: 'e2e-api', url: mockProviderUrl });
+    assert(addProviderDup.error, 'add-provider should reject duplicate provider');
+
     ctx.importPayload = importPayload;
 };

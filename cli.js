@@ -1273,6 +1273,77 @@ function applyConfigTemplate(params = {}) {
     return { success: true };
 }
 
+function addProviderToConfig(params = {}) {
+    const name = typeof params.name === 'string' ? params.name.trim() : '';
+    const url = typeof params.url === 'string' ? params.url.trim() : '';
+    const key = typeof params.key === 'string' ? params.key.trim() : '';
+
+    if (!name) return { error: '名称不能为空' };
+    if (!url) return { error: 'URL 不能为空' };
+
+    ensureConfigDir();
+
+    let content = '';
+    if (fs.existsSync(CONFIG_FILE)) {
+        try {
+            content = fs.readFileSync(CONFIG_FILE, 'utf-8');
+        } catch (e) {
+            return { error: `读取 config.toml 失败: ${e.message}` };
+        }
+    } else {
+        content = EMPTY_CONFIG_FALLBACK_TEMPLATE;
+    }
+
+    if (!content || !content.trim()) {
+        content = EMPTY_CONFIG_FALLBACK_TEMPLATE;
+    }
+
+    let parsed;
+    try {
+        parsed = toml.parse(content);
+    } catch (e) {
+        return { error: `config.toml 解析失败: ${e.message}` };
+    }
+
+    if (!parsed.model_providers || typeof parsed.model_providers !== 'object') {
+        parsed.model_providers = {};
+    }
+
+    if (parsed.model_providers[name]) {
+        return { error: '提供商已存在' };
+    }
+
+    const escapeTomlString = (value) => String(value || '')
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"');
+
+    const lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
+    const safeName = escapeTomlString(name);
+    const safeUrl = escapeTomlString(url);
+    const safeKey = escapeTomlString(key);
+    const block = [
+        `[model_providers.${safeName}]`,
+        `name = "${safeName}"`,
+        `base_url = "${safeUrl}"`,
+        `wire_api = "responses"`,
+        `requires_openai_auth = false`,
+        `preferred_auth_method = "${safeKey}"`,
+        `request_max_retries = 4`,
+        `stream_max_retries = 10`,
+        `stream_idle_timeout_ms = 300000`
+    ].join(lineEnding);
+
+    const newContent = content.trimEnd() + lineEnding + lineEnding + block + lineEnding;
+
+    try {
+        writeConfig(newContent);
+    } catch (e) {
+        return { error: `写入配置失败: ${e.message}` };
+    }
+
+    return { success: true };
+}
+
 function ensureSupportFiles(defaultProvider, defaultModel) {
     if (!fs.existsSync(MODELS_FILE)) {
         writeModels([...DEFAULT_MODELS]);
@@ -4652,6 +4723,9 @@ function cmdStart(options = {}) {
                             break;
                         case 'apply-config-template':
                             result = applyConfigTemplate(params || {});
+                            break;
+                        case 'add-provider':
+                            result = addProviderToConfig(params || {});
                             break;
                         case 'get-recent-configs':
                             result = { items: readRecentConfigs() };

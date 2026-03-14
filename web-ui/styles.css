@@ -746,9 +746,23 @@ body::after {
 }
 
 .card-trailing {
-    display: flex;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    column-gap: var(--spacing-xs);
+    row-gap: 6px;
     align-items: center;
-    gap: var(--spacing-xs);
+    justify-content: end;
+}
+
+.card-trailing .card-actions {
+    margin-left: 0;
+    justify-self: end;
+}
+
+.card-trailing .pill,
+.card-trailing .latency {
+    justify-self: end;
 }
 
 /* 卡片操作按钮 - hover 显示 */
@@ -837,6 +851,12 @@ body::after {
     background: var(--color-bg);
     color: var(--color-text-tertiary);
     letter-spacing: 0.02em;
+    min-width: 64px;
+    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
 }
 
 .latency.ok {
@@ -2754,6 +2774,19 @@ textarea:focus-visible {
     .card-action-btn svg {
         width: 18px;
         height: 18px;
+    }
+
+    .card-trailing {
+        grid-auto-flow: row;
+        grid-auto-columns: 1fr;
+        justify-content: stretch;
+        justify-items: end;
+    }
+
+    .card-trailing .card-actions {
+        width: 100%;
+        justify-content: flex-end;
+        justify-self: end;
     }
 
     /* 移动端不显示配置状态 pill，节省空间 */
