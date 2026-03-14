@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Codex Mate</title>
+    <link rel="icon" type="image/png" href="/res/logo.png">
+    <link rel="apple-touch-icon" href="/res/logo.png">
     <script src="/res/vue.global.js"></script>
     <script src="/res/json5.min.js"></script>
     <link rel="stylesheet" href="/web-ui/styles.css">
@@ -12,6 +14,7 @@
 <body>
     <div id="app" class="container" v-cloak>
         <div class="hero" v-if="!sessionStandalone">
+            <img class="hero-logo" src="/res/logo.png" alt="Codex Mate logo">
             <div class="hero-title">
                 Codex <span class="accent">Mate.</span>
             </div>
@@ -62,6 +65,9 @@
         <div :class="['app-shell', { standalone: sessionStandalone }]">
             <aside class="side-rail" v-if="!sessionStandalone">
                 <div class="brand-block">
+                    <div class="brand-logo-wrap">
+                        <img class="brand-logo" src="/res/logo.png" alt="Codex Mate logo">
+                    </div>
                     <div class="brand-title">
                         Codex <span class="accent">Mate</span>
                     </div>
@@ -551,6 +557,11 @@
                 <div v-if="!sessionStandalone" class="selector-section">
                     <div class="selector-header">
                         <span class="selector-title">会话来源</span>
+                        <div class="selector-actions">
+                            <button class="btn-tool btn-tool-compact" @click="loadSessions" :disabled="sessionsLoading">
+                                {{ sessionsLoading ? '刷新中...' : '刷新会话' }}
+                            </button>
+                        </div>
                     </div>
                     <div class="session-toolbar">
                         <div class="session-toolbar-group">
@@ -597,11 +608,6 @@
                                 <option value="90d">近 90 天</option>
                             </select>
                         </div>
-                        <div class="session-toolbar-group session-toolbar-actions">
-                            <button class="btn-tool btn-tool-compact" @click="loadSessions" :disabled="sessionsLoading">
-                                {{ sessionsLoading ? '刷新中...' : '刷新会话' }}
-                            </button>
-                        </div>
                     </div>
                     <div class="session-toolbar-footer">
                         <label class="quick-option">
@@ -638,6 +644,7 @@
                             <div class="session-item-header">
                                 <div class="session-item-main">
                                     <div class="session-item-title">{{ session.title || session.sessionId }}</div>
+                                    <span class="session-count-badge">{{ session.messageCount ?? 0 }}</span>
                                 </div>
                                 <div class="session-item-actions">
                                     <button
@@ -657,7 +664,6 @@
                             <div class="session-item-meta">
                                 <span class="session-source">{{ session.sourceLabel }}</span>
                                 <span class="session-item-time">{{ session.updatedAt || 'unknown time' }}</span>
-                                <span class="session-count-pill">{{ session.messageCount || 0 }} 条</span>
                             </div>
                             <div v-if="session.match && session.match.hit" class="session-item-sub session-item-snippet">
                                 <span v-if="session.match.snippets && session.match.snippets.length">{{ session.match.snippets.join(' · ') }}</span>
