@@ -13,13 +13,18 @@
 </head>
 <body>
     <div id="app" class="container" v-cloak>
+        <button class="fab-install" @click="openInstallModal" aria-label="安装 CLI">
+            安装 CLI
+        </button>
+
         <div class="hero" v-if="!sessionStandalone">
             <img class="hero-logo" src="/res/logo.png" alt="Codex Mate logo">
             <div class="hero-title">
                 Codex <span class="accent">Mate.</span>
             </div>
             <div class="hero-subtitle">
-                本地配置中枢，统一管理 Codex / Claude Code / OpenClaw / 会话。
+                配置中枢：管理 Codex / Claude / OpenClaw / 会话
+                <span class="sr-only">本地配置中枢，统一管理 Codex / Claude Code / OpenClaw / 会话。</span>
             </div>
         </div>
 
@@ -150,7 +155,8 @@
                         {{ mainTab === 'config' ? '配置中心' : '会话浏览' }}
                     </h1>
                     <p class="subtitle" v-if="mainTab === 'config'">
-                        本地配置中枢，统一管理 Codex / Claude Code / OpenClaw。
+                        配置中枢：管理 Codex / Claude / OpenClaw
+                        <span class="sr-only">本地配置中枢，统一管理 Codex / Claude Code / OpenClaw。</span>
                     </p>
                     <p class="subtitle" v-else>
                         浏览、导出或独立查看 Codex / Claude 会话记录。
@@ -799,6 +805,24 @@
                 <div class="btn-group">
                     <button class="btn btn-cancel" @click="closeAddModal">取消</button>
                     <button class="btn btn-confirm" @click="addProvider">添加</button>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="showInstallModal" class="modal-overlay" @click.self="closeInstallModal">
+            <div class="modal">
+                <div class="modal-header">
+                    <div class="modal-title">安装 CLI</div>
+                    <button class="btn-mini" @click="closeInstallModal">关闭</button>
+                </div>
+                <div class="install-list">
+                    <div
+                        class="install-row"
+                        v-for="cmd in installCommands"
+                        :key="cmd">
+                        <code class="install-command">{{ cmd }}</code>
+                        <button class="btn-mini" @click="copyInstallCommand(cmd)">复制</button>
+                    </div>
                 </div>
             </div>
         </div>
