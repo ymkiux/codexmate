@@ -94,7 +94,7 @@
                     agentsModalHint: '保存后会写入目标 AGENTS.md（与 config.toml 同级）。',
                     sessionsList: [],
                     sessionsLoading: false,
-                    sessionFilterSource: 'codex',
+                    sessionFilterSource: 'all',
                     sessionPathFilter: '',
                     sessionQuery: '',
                     sessionRoleFilter: 'all',
@@ -276,8 +276,7 @@
                     this.loading = true;
                     this.initError = '';
                     try {
-                        const statusRes = await api('status');
-                        const listRes = await api('list');
+                        const [statusRes, listRes] = await Promise.all([api('status'), api('list')]);
 
                         if (statusRes.error) {
                             this.initError = statusRes.error;
@@ -291,7 +290,6 @@
                                 this.serviceTier = tier === 'fast' ? 'fast' : (tier ? 'standard' : 'fast');
                             }
                             this.providersList = listRes.providers;
-                            await this.loadModelsForProvider(this.currentProvider);
                             if (statusRes.configReady === false) {
                                 this.showMessage(statusRes.configNotice || '未检测到 config.toml，已加载默认模板。请在模板编辑器确认后创建。', 'info');
                             }
@@ -304,6 +302,13 @@
                         this.initError = '连接失败: ' + e.message;
                     } finally {
                         this.loading = false;
+                    }
+
+                    // 模型加载单独异步，不阻塞主 loading
+                    try {
+                        await this.loadModelsForProvider(this.currentProvider);
+                    } catch (e) {
+                        // loadModelsForProvider 内部已有 toast，这里吞掉防止抛出
                     }
                 },
 
@@ -933,7 +938,7 @@
                 },
 
                 syncSessionPathOptionsForSource(source, nextOptions, mergeWithExisting = false) {
-                    const targetSource = source === 'claude' ? 'claude' : 'codex';
+                    const targetSource = source === 'claude' ? 'claude' : (source === 'all' ? 'all' : 'codex');
                     const current = Array.isArray(this.sessionPathOptionsMap[targetSource])
                         ? this.sessionPathOptionsMap[targetSource]
                         : [];
@@ -948,7 +953,7 @@
                 },
 
                 refreshSessionPathOptions(source) {
-                    const targetSource = source === 'claude' ? 'claude' : 'codex';
+                    const targetSource = source === 'claude' ? 'claude' : (source === 'all' ? 'all' : 'codex');
                     const base = Array.isArray(this.sessionPathOptionsMap[targetSource])
                         ? [...this.sessionPathOptionsMap[targetSource]]
                         : [];
@@ -962,7 +967,7 @@
                 },
 
                 async loadSessionPathOptions(options = {}) {
-                    const source = options.source === 'claude' ? 'claude' : 'codex';
+                    const source = options.source === 'claude' ? 'claude' : (options.source === 'all' ? 'all' : 'codex');
                     const forceRefresh = !!options.forceRefresh;
                     const loaded = !!this.sessionPathOptionsLoadedMap[source];
                     if (!forceRefresh && loaded) {
@@ -1015,7 +1020,7 @@
                 },
 
                 async clearSessionFilters() {
-                    this.sessionFilterSource = 'codex';
+                    this.sessionFilterSource = 'all';
                     this.sessionPathFilter = '';
                     this.sessionQuery = '';
                     this.sessionRoleFilter = 'all';
@@ -1617,11 +1622,17 @@
                 },
 
                 async deleteProvider(name) {
-                    if (!confirm(`确定删除提供商 "${name}"?`)) return;
-                    this.showMessage('请在模板中手动删除该 provider 配置块后应用', 'info');
-                    await this.openConfigTemplateEditor({
-                        appendHint: `请手动删除 [model_providers.${name}] 配置块，并确认 model_provider 指向有效 provider`
-                    });
+                    const res = await api('delete-provider', { name });
+                    if (res.error) {
+                        this.showMessage(res.error, 'error');
+                        return;
+                    }
+                    if (res.switched && res.provider) {
+                        this.showMessage(`已删除提供商，自动切换到 ${res.provider}${res.model ? ` / ${res.model}` : ''}`, 'success');
+                    } else {
+                        this.showMessage('提供商已删除', 'success');
+                    }
+                    await this.loadAll();
                 },
 
                 openEditModal(provider) {
@@ -1668,7 +1679,6 @@
                 },
 
                 async removeModel(model) {
-                    if (!confirm(`确定删除模型 "${model}"?`)) return;
                     const res = await api('delete-model', { model });
                     if (res.error) {
                         this.showMessage(res.error, 'error');
