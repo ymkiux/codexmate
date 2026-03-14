@@ -1,11 +1,23 @@
 ﻿# Codex Mate
 
-> 轻量级 AI 工具配置助手：快速切换 Codex 提供商/模型与 Claude Code 配置，并统一管理两者会话
+<div align="center">
 
-[![Build](https://img.shields.io/github/actions/workflow/status/ymkiux/codexmate/release.yml?label=build)](https://github.com/ymkiux/codexmate/actions/workflows/release.yml) [![Version](https://img.shields.io/npm/v/codexmate?label=version&registry_uri=https%3A%2F%2Fregistry.npmjs.org)](https://www.npmjs.com/package/codexmate) [![Status](https://img.shields.io/badge/status-alpha-orange)](https://github.com/ymkiux/codexmate)
-[![Maintain](https://img.shields.io/github/commit-activity/m/ymkiux/codexmate?label=maintain%2Fmonth)](https://github.com/ymkiux/codexmate/commits) [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE) [![Node](https://img.shields.io/badge/node-%3E%3D14.0.0-green.svg)](https://nodejs.org)
+<img src="res/logo.png" alt="Codex Mate logo" width="110">
 
-[English](README.md) | 中文
+[![Build](https://img.shields.io/github/actions/workflow/status/ymkiux/codexmate/release.yml?label=build)](https://github.com/ymkiux/codexmate/actions/workflows/release.yml)
+[![Version](https://img.shields.io/npm/v/codexmate?label=version&registry_uri=https%3A%2F%2Fregistry.npmjs.org)](https://www.npmjs.com/package/codexmate)
+[![Status](https://img.shields.io/badge/status-alpha-orange)](https://github.com/ymkiux/codexmate)
+[![Maintain](https://img.shields.io/github/commit-activity/m/ymkiux/codexmate?label=maintain%2Fmonth)](https://github.com/ymkiux/codexmate/commits)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D14.0.0-green.svg)](https://nodejs.org)
+
+**轻量级 AI 配置助手：快速切换 Codex 提供商/模型与 Claude Code 配置，统一浏览本地会话**
+
+</div>
+
+---
+
+<p align="center"><a href="README.md">English</a> · 中文</p>
 
 ![Codex Mate Web UI](res/screenshot.png)
 

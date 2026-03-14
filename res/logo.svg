@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title>Codex Mate Logo</title>
+  <desc>Rounded square with warm gradient and CM initials</desc>
+  <defs>
+    <linearGradient id="g" x1="12%" y1="8%" x2="88%" y2="92%" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F7C7A2"/>
+      <stop offset="35%" stop-color="#E89A72"/>
+      <stop offset="100%" stop-color="#D0583A"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#C44536" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <rect x="18" y="18" width="220" height="220" rx="48" fill="url(#g)" filter="url(#shadow)"/>
+  <g fill="#fff" font-family="'Space Grotesk','Inter','Segoe UI',sans-serif" font-weight="700" font-size="110" letter-spacing="-4">
+    <text x="64" y="148">C</text>
+    <text x="138" y="182">M</text>
+  </g>
+</svg>
