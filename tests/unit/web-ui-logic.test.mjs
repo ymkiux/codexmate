@@ -117,11 +117,11 @@ test('buildSpeedTestIssue maps errors and status codes', () => {
     assert.strictEqual(http400.code, 'remote-speedtest-http-error');
 });
 
-test('isSessionQueryEnabled supports codex and claude only', () => {
+test('isSessionQueryEnabled supports codex/claude/all', () => {
     assert.strictEqual(isSessionQueryEnabled('codex'), true);
     assert.strictEqual(isSessionQueryEnabled('CODEX'), true);
     assert.strictEqual(isSessionQueryEnabled('claude'), true);
-    assert.strictEqual(isSessionQueryEnabled('ALL'), false);
+    assert.strictEqual(isSessionQueryEnabled('ALL'), true);
     assert.strictEqual(isSessionQueryEnabled('openai'), false);
     assert.strictEqual(isSessionQueryEnabled(''), false);
 });
@@ -158,12 +158,12 @@ test('buildSessionListParams keeps query for enabled sources', () => {
     assert.strictEqual(paramsClaude.limit, 200);
 
     const paramsAll = buildSessionListParams({
-        source: 'codex',
+        source: 'all',
         query: 'claudecode',
         timeRangePreset: '7d'
     });
     assert.strictEqual(paramsAll.query, 'claudecode');
-    assert.strictEqual(paramsAll.source, 'codex');
+    assert.strictEqual(paramsAll.source, 'all');
     assert.strictEqual(paramsAll.timeRangePreset, '7d');
     assert.strictEqual(paramsAll.limit, 200);
 });

@@ -192,7 +192,9 @@
                 <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'sessions'">
                     <div class="status-chip">
                         <span class="label">当前来源</span>
-                        <span class="value">{{ sessionFilterSource === 'claude' ? 'Claude Code' : 'Codex' }}</span>
+                        <span class="value">
+                            {{ sessionFilterSource === 'all' ? '全部' : (sessionFilterSource === 'claude' ? 'Claude Code' : 'Codex') }}
+                        </span>
                     </div>
                     <div class="status-chip">
                         <span class="label">会话数</span>
@@ -566,6 +568,7 @@
                     <div class="session-toolbar">
                         <div class="session-toolbar-group">
                             <select class="session-source-select" v-model="sessionFilterSource" @change="onSessionSourceChange" :disabled="sessionsLoading">
+                                <option value="all">全部</option>
                                 <option value="codex">Codex</option>
                                 <option value="claude">Claude Code</option>
                             </select>

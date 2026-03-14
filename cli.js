@@ -1344,6 +1344,130 @@ function addProviderToConfig(params = {}) {
     return { success: true };
 }
 
+function deleteProviderFromConfig(params = {}) {
+    const name = typeof params.name === 'string' ? params.name.trim() : '';
+    if (!name) return { error: '名称不能为空' };
+    if (!fs.existsSync(CONFIG_FILE)) {
+        return { error: 'config.toml 不存在' };
+    }
+
+    let config;
+    try {
+        config = readConfig();
+    } catch (e) {
+        return { error: `读取配置失败: ${e.message}` };
+    }
+
+    const result = performProviderDeletion(name, { silent: true, config });
+    if (result.error) {
+        return { error: result.error };
+    }
+    return {
+        success: true,
+        switched: !!result.switched,
+        provider: result.provider || '',
+        model: result.model || ''
+    };
+}
+
+function performProviderDeletion(name, options = {}) {
+    const silent = !!options.silent;
+    const config = options.config || readConfig();
+    if (!config.model_providers || !config.model_providers[name]) {
+        const msg = '提供商不存在';
+        if (!silent) console.error('错误:', msg, name);
+        return { error: msg };
+    }
+
+    const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
+    const lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
+    const hasBom = content.charCodeAt(0) === 0xFEFF;
+    const safeName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const sectionRegex = new RegExp(`\\[\\s*model_providers\\s*\\.\\s*(?:"${safeName}"|'${safeName}'|${safeName})\\s*\\]`);
+
+    const remainingProviders = Object.keys(config.model_providers || {}).filter(item => item !== name);
+    if (remainingProviders.length === 0) {
+        const msg = '删除后将没有可用提供商';
+        if (!silent) console.error('错误:', msg);
+        return { error: msg };
+    }
+
+    const currentProvider = typeof config.model_provider === 'string' ? config.model_provider.trim() : '';
+    const currentModels = readCurrentModels();
+    const models = readModels();
+    const result = { success: true, switched: false, provider: '', model: '' };
+
+    if (currentModels[name]) {
+        delete currentModels[name];
+    }
+
+    let fallbackProvider = currentProvider;
+    let fallbackModel = typeof config.model === 'string' ? config.model.trim() : '';
+    if (currentProvider === name) {
+        fallbackProvider = remainingProviders[0];
+        fallbackModel = currentModels[fallbackProvider]
+            || (Array.isArray(models) && models.length > 0 ? models[0] : (DEFAULT_MODELS[0] || ''));
+        result.switched = true;
+        result.provider = fallbackProvider;
+        result.model = fallbackModel;
+    }
+
+    const upsertTopLevel = (text, key, value) => {
+        if (!value && value !== '') return text;
+        const regex = new RegExp(`^\\s*${key}\\s*=.*$`, 'm');
+        if (regex.test(text)) {
+            return text.replace(regex, `${key} = "${value}"`);
+        }
+        return `${key} = "${value}"${lineEnding}${text}`;
+    };
+
+    let updatedContent = null;
+    const match = content.match(sectionRegex);
+    if (match) {
+        const startIdx = match.index;
+        const rest = content.slice(startIdx + match[0].length);
+        const nextIdx = rest.indexOf('[');
+        const endIdx = nextIdx === -1 ? content.length : (startIdx + match[0].length + nextIdx);
+
+        const removedContent = (content.slice(0, startIdx) + content.slice(endIdx))
+            .replace(/\n{3,}/g, lineEnding + lineEnding);
+
+        updatedContent = removedContent;
+    }
+
+    if (updatedContent) {
+        if (result.switched) {
+            updatedContent = upsertTopLevel(updatedContent, 'model_provider', fallbackProvider);
+            updatedContent = upsertTopLevel(updatedContent, 'model', fallbackModel);
+            currentModels[fallbackProvider] = fallbackModel;
+        }
+    } else {
+        // 回退：重建 TOML，保持行尾风格
+        const rebuilt = JSON.parse(JSON.stringify(config));
+        delete rebuilt.model_providers[name];
+        if (result.switched) {
+            rebuilt.model_provider = fallbackProvider;
+            rebuilt.model = fallbackModel;
+            currentModels[fallbackProvider] = fallbackModel;
+        }
+        const hasMarker = content.includes(CODEXMATE_MANAGED_MARKER);
+        let rebuiltToml = toml.stringify(rebuilt).trimEnd();
+        rebuiltToml = rebuiltToml.replace(/\n/g, lineEnding);
+        if (hasMarker && !rebuiltToml.includes(CODEXMATE_MANAGED_MARKER)) {
+            rebuiltToml = `${CODEXMATE_MANAGED_MARKER}${lineEnding}${rebuiltToml}`;
+        }
+        updatedContent = rebuiltToml + lineEnding;
+        if (hasBom && updatedContent.charCodeAt(0) !== 0xFEFF) {
+            updatedContent = '\uFEFF' + updatedContent;
+        }
+    }
+
+    writeCurrentModels(currentModels);
+    writeConfig(updatedContent.trimEnd() + lineEnding);
+
+    return result;
+}
+
 function ensureSupportFiles(defaultProvider, defaultModel) {
     if (!fs.existsSync(MODELS_FILE)) {
         writeModels([...DEFAULT_MODELS]);
@@ -3945,36 +4069,15 @@ stream_idle_timeout_ms = 300000
 
 // 删除提供商
 function cmdDelete(name, silent = false) {
-    const config = readConfig();
-    if (!config.model_providers || !config.model_providers[name]) {
-        if (!silent) console.error('错误: 提供商不存在:', name);
-        throw new Error('提供商不存在');
+    const res = performProviderDeletion(name, { silent });
+    if (res.error) {
+        throw new Error(res.error);
     }
-
-    const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
-    const safeName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const sectionRegex = new RegExp(`\\[\\s*model_providers\\s*\\.\\s*${safeName}\\s*\\]`);
-    const match = content.match(sectionRegex);
-    if (!match) {
-        if (!silent) console.error('错误: 无法找到提供商配置块');
-        throw new Error('无法找到提供商配置块');
-    }
-
-    const startIdx = match.index;
-    const rest = content.slice(startIdx + match[0].length);
-    const nextIdx = rest.indexOf('[');
-    const endIdx = nextIdx === -1 ? content.length : (startIdx + match[0].length + nextIdx);
-
-    const newContent = content.slice(0, startIdx) + content.slice(endIdx);
-    writeConfig(newContent.trim());
-
-    // 删除当前模型记录
-    const currentModels = readCurrentModels();
-    delete currentModels[name];
-    writeCurrentModels(currentModels);
-
     if (!silent) {
         console.log('✓ 已删除提供商:', name);
+        if (res.switched && res.provider) {
+            console.log(`  已自动切换到 provider: ${res.provider}，model: ${res.model || '(未设置)'}`);
+        }
         console.log();
     }
 }
@@ -4639,18 +4742,50 @@ function formatHostForUrl(host) {
     return value;
 }
 
-// 打开 Web UI
-function cmdStart(options = {}) {
-    const webDir = path.join(__dirname, 'web-ui');
-    const newHtmlPath = path.join(webDir, 'index.html');
-    const legacyHtmlPath = path.join(__dirname, 'web-ui.html');
-    const htmlPath = fs.existsSync(newHtmlPath) ? newHtmlPath : legacyHtmlPath;
-    const assetsDir = path.join(__dirname, 'res');
-    if (!fs.existsSync(htmlPath)) {
-        console.error('错误: Web UI 页面不存在（尝试路径: web-ui/index.html, web-ui.html）');
-        process.exit(1);
+function watchPathsForRestart(targets, onChange) {
+    const disposers = [];
+    const debounceMs = 300;
+    let timer = null;
+
+    const trigger = (info) => {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => {
+            timer = null;
+            onChange(info);
+        }, debounceMs);
+    };
+
+    const addWatcher = (target, recursive) => {
+        if (!fs.existsSync(target)) return;
+        try {
+            const watcher = fs.watch(target, { recursive }, (eventType, filename) => {
+                if (!filename) return;
+                const lower = filename.toLowerCase();
+                if (!(/\.(html|js|mjs|css)$/.test(lower))) return;
+                trigger({ target, eventType, filename });
+            });
+            disposers.push(() => watcher.close());
+            return true;
+        } catch (e) {
+            return false;
+        }
+    };
+
+    for (const target of targets) {
+        const ok = addWatcher(target, true);
+        if (!ok) {
+            addWatcher(target, false);
+        }
     }
 
+    return () => {
+        for (const dispose of disposers) {
+            try { dispose(); } catch (_) {}
+        }
+    };
+}
+
+function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser }) {
     const server = http.createServer((req, res) => {
         const requestPath = (req.url || '/').split('?')[0];
         if (requestPath === '/api') {
@@ -4726,6 +4861,9 @@ function cmdStart(options = {}) {
                             break;
                         case 'add-provider':
                             result = addProviderToConfig(params || {});
+                            break;
+                        case 'delete-provider':
+                            result = deleteProviderFromConfig(params || {});
                             break;
                         case 'get-recent-configs':
                             result = { items: readRecentConfigs() };
@@ -4888,8 +5026,6 @@ function cmdStart(options = {}) {
         }
     });
 
-    const port = resolveWebPort();
-    const host = resolveWebHost(options);
     const openHost = isAnyAddressHost(host) ? DEFAULT_WEB_HOST : host;
     const openUrl = `http://${formatHostForUrl(openHost)}:${port}`;
     server.listen(port, host, () => {
@@ -4903,26 +5039,90 @@ function cmdStart(options = {}) {
             console.warn('  建议仅在可信网络使用，或改用 --host 127.0.0.1。');
         }
 
-        // 打开浏览器
-        const platform = process.platform;
-        let command;
-        const url = openUrl;
+        if (!process.env.CODEXMATE_NO_BROWSER && openBrowser) {
+            const platform = process.platform;
+            let command;
+            const url = openUrl;
 
-        if (platform === 'win32') {
-            command = `start "" "${url}"`;
-        } else if (platform === 'darwin') {
-            command = `open "${url}"`;
-        } else {
-            command = `xdg-open "${url}"`;
-        }
+            if (platform === 'win32') {
+                command = `start \"\" \"${url}\"`;
+            } else if (platform === 'darwin') {
+                command = `open \"${url}\"`;
+            } else {
+                command = `xdg-open \"${url}\"`;
+            }
 
-        const disableBrowser = process.env.CODEXMATE_NO_BROWSER === '1';
-        if (!disableBrowser) {
             exec(command, (error) => {
                 if (error) console.warn('无法自动打开浏览器，请手动访问:', url);
             });
         }
     });
+
+    const stop = () => new Promise((resolve) => {
+        server.close(() => resolve());
+        setTimeout(() => resolve(), 500);
+    });
+
+    return { server, stop };
+}
+
+// 打开 Web UI
+function cmdStart(options = {}) {
+    const webDir = path.join(__dirname, 'web-ui');
+    const newHtmlPath = path.join(webDir, 'index.html');
+    const legacyHtmlPath = path.join(__dirname, 'web-ui.html');
+    const htmlPath = fs.existsSync(newHtmlPath) ? newHtmlPath : legacyHtmlPath;
+    const assetsDir = path.join(__dirname, 'res');
+    if (!fs.existsSync(htmlPath)) {
+        console.error('错误: Web UI 页面不存在（尝试路径: web-ui/index.html, web-ui.html）');
+        process.exit(1);
+    }
+
+    const port = resolveWebPort();
+    const host = resolveWebHost(options);
+
+    let serverHandle = createWebServer({
+        htmlPath,
+        assetsDir,
+        webDir,
+        host,
+        port,
+        openBrowser: true
+    });
+
+    const stopWatch = watchPathsForRestart(
+        [webDir, path.join(__dirname, 'web-ui.html')],
+        async (info) => {
+            const fileLabel = info && info.filename ? info.filename : (info && info.target ? path.basename(info.target) : 'unknown');
+            console.log(`\n~ 侦测到前端变更 (${fileLabel})，重启中...`);
+            try {
+                await serverHandle.stop();
+            } catch (e) {
+                console.warn('! 停止旧服务失败:', e.message || e);
+            }
+            try {
+                serverHandle = createWebServer({
+                    htmlPath,
+                    assetsDir,
+                    webDir,
+                    host,
+                    port,
+                    openBrowser: false
+                });
+                console.log('✓ 已重启 Web UI 服务\n');
+            } catch (e) {
+                console.error('! 重启失败:', e.message || e);
+            }
+        }
+    );
+
+    const handleExit = () => {
+        stopWatch();
+        serverHandle.stop().then(() => process.exit(0));
+    };
+
+    process.on('SIGINT', handleExit);
+    process.on('SIGTERM', handleExit);
 }
 
 async function cmdCodex(args = []) {
