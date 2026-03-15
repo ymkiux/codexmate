@@ -58,6 +58,7 @@
                     currentProvider: '',
                     currentModel: '',
                     serviceTier: 'fast',
+                    modelReasoningEffort: 'high',
                     providersList: [],
                     models: [],
                     codexModelsLoading: false,
@@ -294,6 +295,12 @@
                                     ? statusRes.serviceTier.trim().toLowerCase()
                                     : '';
                                 this.serviceTier = tier === 'fast' ? 'fast' : (tier ? 'standard' : 'fast');
+                            }
+                            {
+                                const effort = typeof statusRes.modelReasoningEffort === 'string'
+                                    ? statusRes.modelReasoningEffort.trim().toLowerCase()
+                                    : '';
+                                this.modelReasoningEffort = effort || 'high';
                             }
                             this.providersList = listRes.providers;
                             if (statusRes.configReady === false) {
@@ -1309,6 +1316,10 @@
                     await this.applyCodexConfigDirect({ silent: true });
                 },
 
+                async onReasoningEffortChange() {
+                    await this.applyCodexConfigDirect({ silent: true });
+                },
+
                 async runHealthCheck() {
                     this.healthCheckLoading = true;
                     this.healthCheckResult = null;
@@ -1419,7 +1430,8 @@
                         const tplRes = await api('get-config-template', {
                             provider,
                             model,
-                            serviceTier: this.serviceTier
+                            serviceTier: this.serviceTier,
+                            reasoningEffort: this.modelReasoningEffort
                         });
                         if (tplRes.error) {
                             this.showMessage('获取模板失败', 'error');
