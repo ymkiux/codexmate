@@ -19,6 +19,7 @@ const testSessionSearch = require('./test-session-search');
 const testSessions = require('./test-sessions');
 const testOpenclaw = require('./test-openclaw');
 const testHealthSpeed = require('./test-health-speed');
+const testMessages = require('./test-messages');
 
 async function main() {
     const realHome = os.homedir();
@@ -104,6 +105,7 @@ async function main() {
         await testSessions(ctx);
         await testOpenclaw(ctx);
         await testHealthSpeed(ctx);
+        await testMessages(ctx);
 
     } finally {
         const waitForExit = new Promise((resolve) => {
