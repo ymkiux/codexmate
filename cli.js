@@ -5244,6 +5244,72 @@ async function cmdCodex(args = []) {
     });
 }
 
+async function cmdQwen(args = []) {
+    const extraArgs = Array.isArray(args) ? args.filter(arg => arg !== undefined) : [];
+    const hasYolo = extraArgs.includes('--yolo');
+    const finalArgs = hasYolo ? extraArgs : ['--yolo', ...extraArgs];
+
+    return new Promise((resolve, reject) => {
+        const child = spawn('qwen', finalArgs, {
+            stdio: 'inherit',
+            shell: process.platform === 'win32'
+        });
+
+        child.on('error', (err) => {
+            reject(new Error(`无法启动 qwen，请确认已安装并在 PATH 中：${err.message}`));
+        });
+
+        child.on('exit', (code, signal) => {
+            if (typeof code === 'number') {
+                resolve(code);
+                return;
+            }
+            if (signal === 'SIGINT') {
+                resolve(130);
+                return;
+            }
+            if (signal === 'SIGTERM') {
+                resolve(143);
+                return;
+            }
+            resolve(1);
+        });
+    });
+}
+
+async function cmdGemini(args = []) {
+    const extraArgs = Array.isArray(args) ? args.filter(arg => arg !== undefined) : [];
+    const hasYolo = extraArgs.includes('--yolo');
+    const finalArgs = hasYolo ? extraArgs : ['--yolo', ...extraArgs];
+
+    return new Promise((resolve, reject) => {
+        const child = spawn('gemini', finalArgs, {
+            stdio: 'inherit',
+            shell: process.platform === 'win32'
+        });
+
+        child.on('error', (err) => {
+            reject(new Error(`无法启动 gemini，请确认已安装并在 PATH 中：${err.message}`));
+        });
+
+        child.on('exit', (code, signal) => {
+            if (typeof code === 'number') {
+                resolve(code);
+                return;
+            }
+            if (signal === 'SIGINT') {
+                resolve(130);
+                return;
+            }
+            if (signal === 'SIGTERM') {
+                resolve(143);
+                return;
+            }
+            resolve(1);
+        });
+    });
+}
+
 // ============================================================================
 // 主程序
 // ============================================================================
@@ -5270,6 +5336,8 @@ async function main() {
         console.log('  codexmate delete-model <模型> 删除模型');
         console.log('  codexmate run [--host <HOST>]    启动 Web 界面');
         console.log('  codexmate codex [参数...]  等同于 codex --yolo');
+        console.log('  codexmate qwen [参数...]   等同于 qwen --yolo');
+        console.log('  codexmate gemini [参数...] 等同于 gemini --yolo');
         console.log('  codexmate export-session --source <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]');
         console.log('  codexmate zip <路径> [--max:级别]  压缩（7-Zip 优先）');
         console.log('  codexmate unzip <zip文件> [输出目录]  解压（7-Zip 优先）');
@@ -5298,6 +5366,16 @@ async function main() {
             break;
         case 'codex': {
             const exitCode = await cmdCodex(args.slice(1));
+            process.exit(exitCode);
+            break;
+        }
+        case 'qwen': {
+            const exitCode = await cmdQwen(args.slice(1));
+            process.exit(exitCode);
+            break;
+        }
+        case 'gemini': {
+            const exitCode = await cmdGemini(args.slice(1));
             process.exit(exitCode);
             break;
         }
