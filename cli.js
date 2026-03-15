@@ -1203,6 +1203,21 @@ function applyServiceTierToTemplate(template, serviceTier) {
     return `service_tier = "fast"\n${content}`;
 }
 
+function applyReasoningEffortToTemplate(template, reasoningEffort) {
+    let content = typeof template === 'string' ? template : '';
+    const effort = typeof reasoningEffort === 'string' ? reasoningEffort.trim().toLowerCase() : '';
+    if (!effort) {
+        return content;
+    }
+
+    content = content.replace(/^\s*model_reasoning_effort\s*=\s*["'][^"']*["']\s*\n?/gmi, '');
+    if (effort === 'high' || effort === 'xhigh') {
+        content = content.replace(/^\s*\n*/, '');
+        return `model_reasoning_effort = "${effort}"\n${content}`;
+    }
+    return content;
+}
+
 function getConfigTemplate(params = {}) {
     let content = EMPTY_CONFIG_FALLBACK_TEMPLATE;
     if (fs.existsSync(CONFIG_FILE)) {
@@ -1218,6 +1233,9 @@ function getConfigTemplate(params = {}) {
     let template = normalizeTopLevelConfigWithTemplate(content, selectedProvider, selectedModel);
     if (typeof params.serviceTier === 'string') {
         template = applyServiceTierToTemplate(template, params.serviceTier);
+    }
+    if (typeof params.reasoningEffort === 'string') {
+        template = applyReasoningEffortToTemplate(template, params.reasoningEffort);
     }
     return {
         template
@@ -2650,15 +2668,17 @@ function listAllSessions(params = {}) {
 }
 
 function listSessionPaths(params = {}) {
-    const source = params.source === 'codex' || params.source === 'claude'
-        ? params.source
-        : 'all';
+    const source = typeof params.source === 'string' ? params.source.trim().toLowerCase() : '';
+    if (source && source !== 'codex' && source !== 'claude' && source !== 'all') {
+        return [];
+    }
+    const validSource = source === 'codex' || source === 'claude' ? source : 'all';
     const rawLimit = Number(params.limit);
     const limit = Number.isFinite(rawLimit)
         ? Math.max(1, Math.min(rawLimit, MAX_SESSION_PATH_LIST_SIZE))
         : 500;
     const forceRefresh = !!params.forceRefresh;
-    const cacheKey = `paths:${source}:${limit}`;
+    const cacheKey = `paths:${validSource}:${limit}`;
     const cached = getSessionListCache(cacheKey, forceRefresh);
     if (cached) {
         return cached;
@@ -2672,10 +2692,10 @@ function listSessionPaths(params = {}) {
     };
 
     let sessions = [];
-    if (source === 'all' || source === 'codex') {
+    if (validSource === 'all' || validSource === 'codex') {
         sessions = sessions.concat(listCodexSessions(gatherLimit, scanOptions));
     }
-    if (source === 'all' || source === 'claude') {
+    if (validSource === 'all' || validSource === 'claude') {
         sessions = sessions.concat(listClaudeSessions(gatherLimit, scanOptions));
     }
 
@@ -3493,6 +3513,10 @@ function normalizeImportPayload(payload) {
                 providers[name] = { baseUrl, apiKey };
             }
         }
+    }
+
+    if (Object.keys(providers).length === 0 && (!payload.models || payload.models.length === 0)) {
+        return { error: 'Invalid import payload' };
     }
 
     return {
@@ -4322,7 +4346,7 @@ function readClaudeSettingsInfo() {
         return {
             error: readResult.error || '读取 Claude 配置失败',
             exists: !!readResult.exists,
-            path: CLAUDE_SETTINGS_FILE
+            targetPath: CLAUDE_SETTINGS_FILE
         };
     }
 
@@ -4333,7 +4357,7 @@ function readClaudeSettingsInfo() {
 
     return {
         exists: !!readResult.exists,
-        path: CLAUDE_SETTINGS_FILE,
+        targetPath: CLAUDE_SETTINGS_FILE,
         apiKey: typeof env.ANTHROPIC_API_KEY === 'string' ? env.ANTHROPIC_API_KEY : '',
         baseUrl: typeof env.ANTHROPIC_BASE_URL === 'string' ? env.ANTHROPIC_BASE_URL : '',
         model: typeof env.ANTHROPIC_MODEL === 'string' ? env.ANTHROPIC_MODEL : '',
@@ -4847,10 +4871,12 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             const statusConfigResult = readConfigOrVirtualDefault();
                             const config = statusConfigResult.config;
                             const serviceTier = typeof config.service_tier === 'string' ? config.service_tier.trim() : '';
+                            const modelReasoningEffort = typeof config.model_reasoning_effort === 'string' ? config.model_reasoning_effort.trim() : '';
                             result = {
                                 provider: config.model_provider || '未设置',
                                 model: config.model || '未设置',
                                 serviceTier,
+                                modelReasoningEffort,
                                 configReady: !statusConfigResult.isVirtual,
                                 configNotice: statusConfigResult.reason || '',
                                 initNotice: consumeInitNotice()
@@ -4875,13 +4901,17 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                         case 'models':
                             {
                                 const providerName = params && typeof params.provider === 'string' ? params.provider : '';
-                                const res = await fetchProviderModels(providerName);
-                                if (res.error) {
-                                    result = { error: res.error, models: [], source: 'remote' };
-                                } else if (res.unlimited) {
-                                    result = { models: [], source: 'remote', provider: res.provider || '', unlimited: true };
+                                if (!providerName) {
+                                    result = { error: 'Provider name is required' };
                                 } else {
-                                    result = { models: res.models || [], source: 'remote', provider: res.provider || '' };
+                                    const res = await fetchProviderModels(providerName);
+                                    if (res.error) {
+                                        result = { error: res.error, models: [], source: 'remote' };
+                                    } else if (res.unlimited) {
+                                        result = { models: [], source: 'remote', provider: res.provider || '', unlimited: true };
+                                    } else {
+                                        result = { models: res.models || [], source: 'remote', provider: res.provider || '' };
+                                    }
                                 }
                             }
                             break;
@@ -4889,13 +4919,17 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             {
                                 const baseUrl = params && typeof params.baseUrl === 'string' ? params.baseUrl : '';
                                 const apiKey = params && typeof params.apiKey === 'string' ? params.apiKey : '';
-                                const res = await fetchModelsFromBaseUrl(baseUrl, apiKey);
-                                if (res.error) {
-                                    result = { error: res.error, models: [], source: 'remote' };
-                                } else if (res.unlimited) {
-                                    result = { models: [], source: 'remote', unlimited: true };
+                                if (!baseUrl) {
+                                    result = { error: 'Base URL is required' };
                                 } else {
-                                    result = { models: res.models || [], source: 'remote' };
+                                    const res = await fetchModelsFromBaseUrl(baseUrl, apiKey);
+                                    if (res.error) {
+                                        result = { error: res.error, models: [], source: 'remote' };
+                                    } else if (res.unlimited) {
+                                        result = { models: [], source: 'remote', unlimited: true };
+                                    } else {
+                                        result = { models: res.models || [], source: 'remote' };
+                                    }
                                 }
                             }
                             break;
@@ -4992,14 +5026,29 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             break;
                         }
                         case 'list-sessions':
-                            result = {
-                                sessions: listAllSessions(params)
-                            };
+                            {
+                                const source = typeof params.source === 'string' ? params.source.trim().toLowerCase() : '';
+                                if (source && source !== 'codex' && source !== 'claude' && source !== 'all') {
+                                    result = { error: 'Invalid source. Must be codex, claude, or all' };
+                                } else {
+                                    result = {
+                                        sessions: listAllSessions(params),
+                                        source: source || 'all'
+                                    };
+                                }
+                            }
                             break;
                         case 'list-session-paths':
-                            result = {
-                                paths: listSessionPaths(params)
-                            };
+                            {
+                                const source = typeof params.source === 'string' ? params.source.trim().toLowerCase() : '';
+                                if (source && source !== 'codex' && source !== 'claude' && source !== 'all') {
+                                    result = { error: 'Invalid source. Must be codex, claude, or all' };
+                                } else {
+                                    result = {
+                                        paths: listSessionPaths(params)
+                                    };
+                                }
+                            }
                             break;
                         case 'export-session':
                             result = await exportSessionData(params);

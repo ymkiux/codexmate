@@ -295,6 +295,21 @@
 
                 <div class="selector-section">
                     <div class="selector-header">
+                        <span class="selector-title">推理努力</span>
+                    </div>
+                    <select class="model-select" v-model="modelReasoningEffort" @change="onReasoningEffortChange">
+                        <option value="high">high（默认）</option>
+                        <option value="medium">medium</option>
+                        <option value="low">low</option>
+                        <option value="xhigh">xhigh</option>
+                    </select>
+                    <div class="config-template-hint">
+                        控制模型的推理深度，high 会更深入思考。
+                    </div>
+                </div>
+
+                <div class="selector-section">
+                    <div class="selector-header">
                         <span class="selector-title">AGENTS.md</span>
                     </div>
                     <button class="btn-tool" @click="openAgentsEditor" :disabled="loading || !!initError || agentsLoading">
