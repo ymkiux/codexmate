@@ -4830,6 +4830,8 @@ function watchPathsForRestart(targets, onChange) {
 }
 
 function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser }) {
+    const connections = new Set();
+
     const server = http.createServer((req, res) => {
         const requestPath = (req.url || '/').split('?')[0];
         if (requestPath === '/api') {
@@ -5076,6 +5078,21 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
         }
     });
 
+    server.on('connection', (socket) => {
+        connections.add(socket);
+        socket.on('close', () => connections.delete(socket));
+    });
+
+    server.once('error', (err) => {
+        if (err && err.code === 'EADDRINUSE') {
+            console.error(`! 启动失败: 端口 ${port} 已被占用，可能有残留的 codexmate run 实例。`);
+            console.error('  请先停止旧实例或更换端口后重试。');
+        } else {
+            console.error('! 启动 Web UI 失败:', err && err.message ? err.message : err);
+        }
+        process.exit(1);
+    });
+
     const openHost = isAnyAddressHost(host) ? DEFAULT_WEB_HOST : host;
     const openUrl = `http://${formatHostForUrl(openHost)}:${port}`;
     server.listen(port, host, () => {
@@ -5109,8 +5126,24 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
     });
 
     const stop = () => new Promise((resolve) => {
-        server.close(() => resolve());
-        setTimeout(() => resolve(), 500);
+        let done = false;
+        const finish = () => {
+            if (done) return;
+            done = true;
+            for (const socket of connections) {
+                try { socket.destroy(); } catch (_) {}
+            }
+            connections.clear();
+            resolve();
+        };
+
+        if (!server.listening) {
+            finish();
+            return;
+        }
+
+        server.close(() => finish());
+        setTimeout(() => finish(), 800);
     });
 
     return { server, stop };
@@ -5145,11 +5178,14 @@ function cmdStart(options = {}) {
         async (info) => {
             const fileLabel = info && info.filename ? info.filename : (info && info.target ? path.basename(info.target) : 'unknown');
             console.log(`\n~ 侦测到前端变更 (${fileLabel})，重启中...`);
+            console.log('  正在停止旧服务...');
             try {
                 await serverHandle.stop();
+                console.log('  旧服务已停止');
             } catch (e) {
                 console.warn('! 停止旧服务失败:', e.message || e);
             }
+            await new Promise((resolve) => setTimeout(resolve, 80));
             try {
                 serverHandle = createWebServer({
                     htmlPath,

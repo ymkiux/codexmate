@@ -1545,7 +1545,7 @@ body::after {
 
 .session-item-header {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: 10px;
     margin-bottom: 4px;
@@ -1555,7 +1555,7 @@ body::after {
     min-width: 0;
     flex: 1;
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 8px;
 }
 
