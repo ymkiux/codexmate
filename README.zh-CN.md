@@ -387,6 +387,11 @@ Apache-2.0 © [ymkiux](https://github.com/ymkiux)
 
 欢迎提交 Issue 和 Pull Request。
 
+## 更新日志
+
+英文版见 [doc/CHANGELOG.md](doc/CHANGELOG.md)。
+中文版见 [doc/CHANGELOG.zh-CN.md](doc/CHANGELOG.zh-CN.md)。
+
 ---
 
 Made with [ymkiux](https://github.com/ymkiux)
