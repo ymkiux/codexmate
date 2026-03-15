@@ -381,6 +381,11 @@ Apache-2.0 © [ymkiux](https://github.com/ymkiux)
 
 Issues and pull requests are welcome.
 
+## Changelog
+
+See [doc/CHANGELOG.md](doc/CHANGELOG.md) for the English version.
+See [doc/CHANGELOG.zh-CN.md](doc/CHANGELOG.zh-CN.md) for the Chinese version.
+
 ---
 
 Made with [ymkiux](https://github.com/ymkiux)
