@@ -5020,11 +5020,19 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             result = { error: '未知操作' };
                     }
 
-                    res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify(result));
+                    const responseBody = JSON.stringify(result, null, 2);
+                    res.writeHead(200, {
+                        'Content-Type': 'application/json; charset=utf-8',
+                        'Content-Length': Buffer.byteLength(responseBody, 'utf-8')
+                    });
+                    res.end(responseBody, 'utf-8');
                 } catch (e) {
-                    res.writeHead(500, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: e.message }));
+                    const errorBody = JSON.stringify({ error: e.message }, null, 2);
+                    res.writeHead(500, {
+                        'Content-Type': 'application/json; charset=utf-8',
+                        'Content-Length': Buffer.byteLength(errorBody, 'utf-8')
+                    });
+                    res.end(errorBody, 'utf-8');
                 }
             });
         } else if (requestPath.startsWith('/web-ui/')) {
@@ -5043,6 +5051,8 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
             const ext = path.extname(filePath).toLowerCase();
             const mime = ext === '.js' || ext === '.mjs'
                 ? 'application/javascript; charset=utf-8'
+                : ext === '.html'
+                    ? 'text/html; charset=utf-8'
                 : ext === '.css'
                     ? 'text/css; charset=utf-8'
                     : ext === '.json'
@@ -5066,6 +5076,8 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
             const ext = path.extname(filePath).toLowerCase();
             const mime = ext === '.js'
                 ? 'application/javascript; charset=utf-8'
+                : ext === '.html'
+                    ? 'text/html; charset=utf-8'
                 : ext === '.json'
                     ? 'application/json; charset=utf-8'
                     : 'application/octet-stream';

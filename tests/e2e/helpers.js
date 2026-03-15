@@ -153,26 +153,42 @@ function startLocalServer(options = {}) {
         const server = http.createServer((req, res) => {
             if (req.url && req.url.startsWith(modelsPath)) {
                 if (mode === 'none') {
-                    res.writeHead(404, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'not found' }));
+                    const errorBody = JSON.stringify({ error: 'not found' });
+                    res.writeHead(404, {
+                        'Content-Type': 'application/json; charset=utf-8',
+                        'Content-Length': Buffer.byteLength(errorBody, 'utf-8')
+                    });
+                    res.end(errorBody, 'utf-8');
                     return;
                 }
                 if (mode === 'html') {
-                    res.writeHead(status, { 'Content-Type': 'text/html' });
-                    res.end('<!doctype html><html><body>ok</body></html>');
+                    const htmlBody = '<!doctype html><html><body>ok</body></html>';
+                    res.writeHead(status, {
+                        'Content-Type': 'text/html; charset=utf-8',
+                        'Content-Length': Buffer.byteLength(htmlBody, 'utf-8')
+                    });
+                    res.end(htmlBody, 'utf-8');
                     return;
                 }
-                res.writeHead(status, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({
+                const jsonBody = JSON.stringify({
                     data: [
                         { id: 'e2e2-model' },
                         { id: 'e2e2-model-2' }
                     ]
-                }));
+                });
+                res.writeHead(status, {
+                    'Content-Type': 'application/json; charset=utf-8',
+                    'Content-Length': Buffer.byteLength(jsonBody, 'utf-8')
+                });
+                res.end(jsonBody, 'utf-8');
                 return;
             }
-            res.writeHead(status, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: true }));
+            const okBody = JSON.stringify({ ok: true });
+            res.writeHead(status, {
+                'Content-Type': 'application/json; charset=utf-8',
+                'Content-Length': Buffer.byteLength(okBody, 'utf-8')
+            });
+            res.end(okBody, 'utf-8');
         });
         server.on('error', reject);
         server.listen(0, '127.0.0.1', () => {
