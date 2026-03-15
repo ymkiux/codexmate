@@ -1250,7 +1250,9 @@
                 },
 
                 downloadTextFile(fileName, content) {
-                    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+                    // 使用 UTF-8 BOM 确保文本编辑器正确识别编码
+                    const BOM = '\uFEFF';
+                    const blob = new Blob([BOM + content], { type: 'text/markdown;charset=utf-8' });
                     const url = URL.createObjectURL(blob);
                     const link = document.createElement('a');
                     link.href = url;
