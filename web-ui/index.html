@@ -808,17 +808,6 @@
                     <label class="form-label">认证密钥</label>
                     <input v-model="newProvider.key" class="form-input" placeholder="sk-...">
                 </div>
-                <div class="form-group">
-                    <label class="form-label">智能转换</label>
-                    <label class="checkbox-inline">
-                        <input type="checkbox" v-model="newProvider.smartConvert">
-                        启用自建转换
-                    </label>
-                    <select v-model="newProvider.smartTarget" class="form-select" :disabled="!newProvider.smartConvert">
-                        <option value="responses">转换为 /v1/responses（默认）</option>
-                        <option value="chat/completions">转换为 /v1/chat/completions</option>
-                    </select>
-                </div>
 
                 <div class="btn-group">
                     <button class="btn btn-cancel" @click="closeAddModal">取消</button>
