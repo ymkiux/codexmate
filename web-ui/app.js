@@ -297,10 +297,10 @@
                             }
                             this.providersList = listRes.providers;
                             if (statusRes.configReady === false) {
-                                this.showMessage(statusRes.configNotice || '未检测到 config.toml，已加载默认模板。请在模板编辑器确认后创建。', 'info');
+                                this.showMessage('配置已加载', 'info');
                             }
                             if (statusRes.initNotice) {
-                                this.showMessage(statusRes.initNotice, 'info');
+                                this.showMessage('配置就绪', 'info');
                             }
                             this.maybeShowStarPrompt();
                         }
@@ -336,7 +336,7 @@
                             return;
                         }
                         if (res.error) {
-                            this.showMessage('模型列表获取失败: ' + res.error, 'error');
+                            this.showMessage('获取模型列表失败', 'error');
                             this.models = [];
                             this.modelsSource = 'error';
                             this.modelsHasCurrent = true;
@@ -347,7 +347,7 @@
                         this.modelsSource = res.source || 'remote';
                         this.modelsHasCurrent = !!this.currentModel && list.includes(this.currentModel);
                     } catch (e) {
-                        this.showMessage('模型列表获取失败: ' + e.message, 'error');
+                        this.showMessage('获取模型列表失败', 'error');
                         this.models = [];
                         this.modelsSource = 'error';
                         this.modelsHasCurrent = true;
@@ -392,7 +392,7 @@
                         const res = await api('get-claude-settings');
                         if (res && res.error) {
                             if (!silent) {
-                                this.showMessage('读取 Claude 配置失败: ' + res.error, 'error');
+                                this.showMessage('读取配置失败', 'error');
                             }
                             return;
                         }
@@ -415,7 +415,7 @@
                         }
                     } catch (e) {
                         if (!silent) {
-                            this.showMessage('读取 Claude 配置失败: ' + e.message, 'error');
+                            this.showMessage('读取配置失败', 'error');
                         }
                     }
                 },
@@ -466,7 +466,7 @@
                             return;
                         }
                         if (res.error) {
-                            this.showMessage('模型列表获取失败: ' + res.error, 'error');
+                            this.showMessage('获取模型列表失败', 'error');
                             this.claudeModels = [];
                             this.claudeModelsSource = 'error';
                             this.claudeModelsHasCurrent = true;
@@ -477,7 +477,7 @@
                         this.claudeModelsSource = res.source || 'remote';
                         this.updateClaudeModelsCurrent();
                     } catch (e) {
-                        this.showMessage('模型列表获取失败: ' + e.message, 'error');
+                        this.showMessage('获取模型列表失败', 'error');
                         this.claudeModels = [];
                         this.claudeModelsSource = 'error';
                         this.claudeModelsHasCurrent = true;
@@ -495,7 +495,7 @@
                     if (localStorage.getItem(storageKey)) {
                         return;
                     }
-                    this.showMessage('如果 Codex Mate 对你有帮助，欢迎到 GitHub 点个 Star。', 'info');
+                    this.showMessage('欢迎到 GitHub 点 Star', 'info');
                     localStorage.setItem(storageKey, '1');
                 },
 
@@ -605,7 +605,7 @@
                 openSessionStandalone(session) {
                     const url = this.buildSessionStandaloneUrl(session);
                     if (!url) {
-                        this.showMessage('当前会话无法生成新页链接', 'error');
+                        this.showMessage('无法生成链接', 'error');
                         return;
                     }
                     window.open(url, '_blank', 'noopener');
@@ -686,21 +686,21 @@
                 copyAgentsContent() {
                     const text = typeof this.agentsContent === 'string' ? this.agentsContent : '';
                     if (!text) {
-                        this.showMessage('没有可复制的内容', 'info');
+                        this.showMessage('没有可复制内容', 'info');
                         return;
                     }
                     const ok = this.fallbackCopyText(text);
                     if (ok) {
-                        this.showMessage('已复制 AGENTS.md 内容', 'success');
+                        this.showMessage('已复制', 'success');
                         return;
                     }
-                    this.showMessage('复制失败，请手动复制内容', 'error');
+                    this.showMessage('复制失败', 'error');
                 },
 
                 copyInstallCommand(cmd) {
                     const text = typeof cmd === 'string' ? cmd.trim() : '';
                     if (!text) {
-                        this.showMessage('没有可复制的命令', 'info');
+                        this.showMessage('没有可复制内容', 'info');
                         return;
                     }
                     const ok = this.fallbackCopyText(text);
@@ -708,30 +708,30 @@
                         this.showMessage('已复制命令', 'success');
                         return;
                     }
-                    this.showMessage('复制失败，请手动复制命令', 'error');
+                    this.showMessage('复制失败', 'error');
                 },
 
                 async copyResumeCommand(session) {
                     if (!this.isResumeCommandAvailable(session)) {
-                        this.showMessage('当前会话不支持生成恢复命令', 'error');
+                        this.showMessage('不支持此操作', 'error');
                         return;
                     }
                     const command = this.buildResumeCommand(session);
                     const ok = this.fallbackCopyText(command);
                     if (ok) {
-                        this.showMessage('已复制恢复命令', 'success');
+                        this.showMessage('已复制', 'success');
                         return;
                     }
                     try {
                         if (navigator.clipboard && window.isSecureContext) {
                             await navigator.clipboard.writeText(command);
-                            this.showMessage('已复制恢复命令', 'success');
+                            this.showMessage('已复制', 'success');
                             return;
                         }
                     } catch (e) {
                         // keep fallback failure message
                     }
-                    this.showMessage('复制失败，请手动复制命令', 'error');
+                    this.showMessage('复制失败', 'error');
                 },
 
                 buildProviderShareCommand(payload) {
@@ -768,7 +768,7 @@
                 async copyProviderShareCommand(provider) {
                     const name = provider && typeof provider.name === 'string' ? provider.name.trim() : '';
                     if (!name) {
-                        this.showMessage('提供商名称无效', 'error');
+                        this.showMessage('参数无效', 'error');
                         return;
                     }
                     if (this.providerShareLoading[name]) {
@@ -783,26 +783,26 @@
                         }
                         const command = this.buildProviderShareCommand(res && res.payload ? res.payload : null);
                         if (!command) {
-                            this.showMessage('分享命令生成失败', 'error');
+                            this.showMessage('生成命令失败', 'error');
                             return;
                         }
                         const ok = this.fallbackCopyText(command);
                         if (ok) {
-                            this.showMessage('已复制分享命令', 'success');
+                            this.showMessage('已复制', 'success');
                             return;
                         }
                         try {
                             if (navigator.clipboard && window.isSecureContext) {
                                 await navigator.clipboard.writeText(command);
-                                this.showMessage('已复制分享命令', 'success');
+                                this.showMessage('已复制', 'success');
                                 return;
                             }
                         } catch (e) {
                             // keep fallback failure message
                         }
-                        this.showMessage('复制失败，请手动复制命令', 'error');
+                        this.showMessage('复制失败', 'error');
                     } catch (e) {
-                        this.showMessage('生成分享命令失败: ' + e.message, 'error');
+                        this.showMessage('生成命令失败', 'error');
                     } finally {
                         this.providerShareLoading[name] = false;
                     }
@@ -824,26 +824,26 @@
                         }
                         const command = this.buildClaudeShareCommand(res && res.payload ? res.payload : null);
                         if (!command) {
-                            this.showMessage('分享命令生成失败', 'error');
+                            this.showMessage('生成命令失败', 'error');
                             return;
                         }
                         const ok = this.fallbackCopyText(command);
                         if (ok) {
-                            this.showMessage('已复制分享命令', 'success');
+                            this.showMessage('已复制', 'success');
                             return;
                         }
                         try {
                             if (navigator.clipboard && window.isSecureContext) {
                                 await navigator.clipboard.writeText(command);
-                                this.showMessage('已复制分享命令', 'success');
+                                this.showMessage('已复制', 'success');
                                 return;
                             }
                         } catch (e) {
                             // fall through
                         }
-                        this.showMessage('复制失败，请手动复制命令', 'error');
+                        this.showMessage('复制失败', 'error');
                     } catch (e) {
-                        this.showMessage('生成分享命令失败: ' + e.message, 'error');
+                        this.showMessage('生成命令失败', 'error');
                     } finally {
                         this.claudeShareLoading[name] = false;
                     }
@@ -851,7 +851,7 @@
 
                 async cloneSession(session) {
                     if (!this.isCloneAvailable(session)) {
-                        this.showMessage('当前会话不支持克隆', 'error');
+                        this.showMessage('不支持此操作', 'error');
                         return;
                     }
                     const key = this.getSessionExportKey(session);
@@ -870,7 +870,7 @@
                             return;
                         }
 
-                        this.showMessage('会话已克隆', 'success');
+                        this.showMessage('操作成功', 'success');
                         await this.loadSessions();
                         if (res.sessionId) {
                             const matched = this.sessionsList.find(item => item.source === 'codex' && item.sessionId === res.sessionId);
@@ -879,7 +879,7 @@
                             }
                         }
                     } catch (e) {
-                        this.showMessage('克隆失败: ' + e.message, 'error');
+                        this.showMessage('克隆失败', 'error');
                     } finally {
                         this.sessionCloning[key] = false;
                     }
@@ -887,7 +887,7 @@
 
                 async deleteSession(session) {
                     if (!this.isDeleteAvailable(session)) {
-                        this.showMessage('当前会话不支持删除', 'error');
+                        this.showMessage('不支持此操作', 'error');
                         return;
                     }
                     const key = this.getSessionExportKey(session);
@@ -905,10 +905,10 @@
                             this.showMessage(res.error, 'error');
                             return;
                         }
-                        this.showMessage('会话已删除', 'success');
+                        this.showMessage('操作成功', 'success');
                         await this.loadSessions();
                     } catch (e) {
-                        this.showMessage('删除失败: ' + e.message, 'error');
+                        this.showMessage('删除失败', 'error');
                     } finally {
                         this.sessionDeleting[key] = false;
                     }
@@ -1119,7 +1119,7 @@
                         this.activeSession = null;
                         this.activeSessionMessages = [];
                         this.activeSessionDetailClipped = false;
-                        this.showMessage('加载会话失败: ' + e.message, 'error');
+                        this.showMessage('加载会话失败', 'error');
                     } finally {
                         this.sessionsLoading = false;
                     }
@@ -1281,10 +1281,10 @@
                             const maxLabel = res.maxMessages === 'all' ? 'all' : res.maxMessages;
                             this.showMessage(`会话导出完成（已截断：最多 ${maxLabel} 条消息）`, 'info');
                         } else {
-                            this.showMessage('会话导出完成', 'success');
+                            this.showMessage('操作成功', 'success');
                         }
                     } catch (e) {
-                        this.showMessage('导出失败: ' + e.message, 'error');
+                        this.showMessage('导出失败', 'error');
                     } finally {
                         this.sessionExporting[key] = false;
                     }
@@ -1349,15 +1349,15 @@
                                 remote
                             };
                             if (ok) {
-                                this.showMessage('健康检查通过', 'success');
+                                this.showMessage('检查通过', 'success');
                             }
                         } else {
                             this.healthCheckResult = null;
-                            this.showMessage('健康检查失败：返回数据异常', 'error');
+                            this.showMessage('检查失败', 'error');
                         }
                     } catch (e) {
                         this.healthCheckResult = null;
-                        this.showMessage('健康检查失败: ' + e.message, 'error');
+                        this.showMessage('检查失败', 'error');
                     } finally {
                         if (this.configMode === 'claude') {
                             try {
@@ -1398,7 +1398,7 @@
                         this.configTemplateContent = template;
                         this.showConfigTemplateModal = true;
                     } catch (e) {
-                        this.showMessage('加载模板失败: ' + e.message, 'error');
+                        this.showMessage('加载模板失败', 'error');
                     }
                 },
 
@@ -1408,7 +1408,7 @@
                     const provider = (this.currentProvider || '').trim();
                     const model = (this.currentModel || '').trim();
                     if (!provider || !model) {
-                        this.showMessage('请选择提供商和模型后再应用。', 'error');
+                        this.showMessage('请选择提供商和模型', 'error');
                         return;
                     }
 
@@ -1420,7 +1420,7 @@
                             serviceTier: this.serviceTier
                         });
                         if (tplRes.error) {
-                            this.showMessage('获取模板失败: ' + tplRes.error, 'error');
+                            this.showMessage('获取模板失败', 'error');
                             return;
                         }
 
@@ -1428,17 +1428,17 @@
                             template: tplRes.template
                         });
                         if (applyRes.error) {
-                            this.showMessage('应用模板失败: ' + applyRes.error, 'error');
+                            this.showMessage('应用模板失败', 'error');
                             return;
                         }
 
                         if (options.silent !== true) {
-                            this.showMessage('Codex 配置已自动应用', 'success');
+                            this.showMessage('配置已应用', 'success');
                         }
 
                         await this.loadAll();
                     } catch (e) {
-                        this.showMessage('应用失败: ' + e.message, 'error');
+                        this.showMessage('应用失败', 'error');
                     } finally {
                         this.codexApplying = false;
                     }
@@ -1451,7 +1451,7 @@
 
                 async applyConfigTemplate() {
                     if (!this.configTemplateContent || !this.configTemplateContent.trim()) {
-                        this.showMessage('模板内容不能为空', 'error');
+                        this.showMessage('模板不能为空', 'error');
                         return;
                     }
 
@@ -1464,11 +1464,11 @@
                             this.showMessage(res.error, 'error');
                             return;
                         }
-                        this.showMessage('模板已应用到 config.toml', 'success');
+                        this.showMessage('模板已应用', 'success');
                         this.closeConfigTemplateModal();
                         await this.loadAll();
                     } catch (e) {
-                        this.showMessage('应用模板失败: ' + e.message, 'error');
+                        this.showMessage('应用模板失败', 'error');
                     } finally {
                         this.configTemplateApplying = false;
                     }
@@ -1489,7 +1489,7 @@
                         this.agentsLineEnding = res.lineEnding === '\r\n' ? '\r\n' : '\n';
                         this.showAgentsModal = true;
                     } catch (e) {
-                        this.showMessage('加载 AGENTS.md 失败: ' + e.message, 'error');
+                        this.showMessage('加载文件失败', 'error');
                     } finally {
                         this.agentsLoading = false;
                     }
@@ -1513,7 +1513,7 @@
                         this.agentsLineEnding = res.lineEnding === '\r\n' ? '\r\n' : '\n';
                         this.showAgentsModal = true;
                     } catch (e) {
-                        this.showMessage('加载 OpenClaw AGENTS.md 失败: ' + e.message, 'error');
+                        this.showMessage('加载文件失败', 'error');
                     } finally {
                         this.agentsLoading = false;
                     }
@@ -1522,7 +1522,7 @@
                 async openOpenclawWorkspaceEditor() {
                     const fileName = (this.openclawWorkspaceFileName || '').trim();
                     if (!fileName) {
-                        this.showMessage('请输入工作区文件名', 'error');
+                        this.showMessage('请输入文件名', 'error');
                         return;
                     }
                     this.setAgentsModalContext('openclaw-workspace', { fileName });
@@ -1542,7 +1542,7 @@
                         this.agentsLineEnding = res.lineEnding === '\r\n' ? '\r\n' : '\n';
                         this.showAgentsModal = true;
                     } catch (e) {
-                        this.showMessage('加载 OpenClaw 工作区文件失败: ' + e.message, 'error');
+                        this.showMessage('加载文件失败', 'error');
                     } finally {
                         this.agentsLoading = false;
                     }
@@ -1604,7 +1604,7 @@
                         this.showMessage(successLabel, 'success');
                         this.closeAgentsModal();
                     } catch (e) {
-                        this.showMessage('保存文件失败: ' + e.message, 'error');
+                        this.showMessage('保存失败', 'error');
                     } finally {
                         this.agentsSaving = false;
                     }
@@ -1619,7 +1619,7 @@
                         return this.showMessage('名称不能为空', 'error');
                     }
                     if (this.providersList.some(item => item.name === name)) {
-                        return this.showMessage('提供商已存在', 'error');
+                        return this.showMessage('名称已存在', 'error');
                     }
 
                     try {
@@ -1633,11 +1633,11 @@
                             return;
                         }
 
-                        this.showMessage('提供商已添加', 'success');
+                        this.showMessage('操作成功', 'success');
                         this.closeAddModal();
                         await this.loadAll();
                     } catch (e) {
-                        this.showMessage('添加提供商失败: ' + e.message, 'error');
+                        this.showMessage('添加失败', 'error');
                     }
                 },
 
@@ -1650,7 +1650,7 @@
                     if (res.switched && res.provider) {
                         this.showMessage(`已删除提供商，自动切换到 ${res.provider}${res.model ? ` / ${res.model}` : ''}`, 'success');
                     } else {
-                        this.showMessage('提供商已删除', 'success');
+                        this.showMessage('操作成功', 'success');
                     }
                     await this.loadAll();
                 },
@@ -1679,10 +1679,10 @@
                             this.showMessage(res.error, 'error');
                             return;
                         }
-                        this.showMessage('提供商已更新', 'success');
+                        this.showMessage('操作成功', 'success');
                         await this.loadAll();
                     } catch (e) {
-                        this.showMessage('更新失败: ' + e.message, 'error');
+                        this.showMessage('更新失败', 'error');
                     }
                 },
 
@@ -1704,7 +1704,7 @@
                         this.showMessage(`配置已重装${backup}`, 'success');
                         await this.loadAll();
                     } catch (e) {
-                        this.showMessage('重装失败: ' + e.message, 'error');
+                        this.showMessage('重装失败', 'error');
                     } finally {
                         this.resetConfigLoading = false;
                     }
@@ -1712,13 +1712,13 @@
 
                 async addModel() {
                     if (!this.newModelName || !this.newModelName.trim()) {
-                        return this.showMessage('请输入模型名称', 'error');
+                        return this.showMessage('请输入模型', 'error');
                     }
                     const res = await api('add-model', { model: this.newModelName.trim() });
                     if (res.error) {
                         this.showMessage(res.error, 'error');
                     } else {
-                        this.showMessage('已添加', 'success');
+                        this.showMessage('操作成功', 'success');
                         this.closeModelModal();
                         await this.loadAll();
                     }
@@ -1729,7 +1729,7 @@
                     if (res.error) {
                         this.showMessage(res.error, 'error');
                     } else {
-                        this.showMessage('已删除', 'success');
+                        this.showMessage('操作成功', 'success');
                         await this.loadAll();
                     }
                 },
@@ -1784,7 +1784,7 @@
                     this.saveClaudeConfigs();
                     this.updateClaudeModelsCurrent();
                     if (!this.claudeConfigs[name].apiKey) {
-                        this.showMessage('该配置未设置 API Key，请先编辑', 'error');
+                        this.showMessage('请先配置 API Key', 'error');
                         return;
                     }
                     this.applyClaudeConfig(name);
@@ -1814,7 +1814,7 @@
                         hasKey: !!this.editingConfig.apiKey
                     };
                     this.saveClaudeConfigs();
-                    this.showMessage('配置已更新', 'success');
+                    this.showMessage('操作成功', 'success');
                     this.closeEditConfigModal();
                     if (name === this.currentClaudeConfig) {
                         this.refreshClaudeModelContext();
@@ -1838,7 +1838,7 @@
 
                     const config = this.claudeConfigs[name];
                     if (!config.apiKey) {
-                        this.showMessage('已保存，未应用：请先输入 API Key', 'info');
+                        this.showMessage('已保存，未应用', 'info');
                         this.closeEditConfigModal();
                         if (name === this.currentClaudeConfig) {
                             this.refreshClaudeModelContext();
@@ -1848,7 +1848,7 @@
 
                     const res = await api('apply-claude-config', { config });
                     if (res.error || res.success === false) {
-                        this.showMessage(res.error || '应用 Claude 配置失败', 'error');
+                        this.showMessage(res.error || '应用配置失败', 'error');
                     } else {
                         const targetTip = res.targetPath ? `（${res.targetPath}）` : '';
                         this.showMessage(`已保存并应用到 Claude 配置${targetTip}`, 'success');
@@ -1861,15 +1861,15 @@
 
                 addClaudeConfig() {
                     if (!this.newClaudeConfig.name || !this.newClaudeConfig.name.trim()) {
-                        return this.showMessage('请输入配置名称', 'error');
+                        return this.showMessage('请输入名称', 'error');
                     }
                     const name = this.newClaudeConfig.name.trim();
                     if (this.claudeConfigs[name]) {
-                        return this.showMessage('配置名称已存在', 'error');
+                        return this.showMessage('名称已存在', 'error');
                     }
                     const duplicateName = this.findDuplicateClaudeConfigName(this.newClaudeConfig);
                     if (duplicateName) {
-                        return this.showMessage('已存在相同配置，已忽略添加', 'info');
+                        return this.showMessage('配置已存在', 'info');
                     }
 
                     this.claudeConfigs[name] = {
@@ -1881,14 +1881,14 @@
 
                     this.currentClaudeConfig = name;
                     this.saveClaudeConfigs();
-                    this.showMessage('配置已添加', 'success');
+                    this.showMessage('操作成功', 'success');
                     this.closeClaudeConfigModal();
                     this.refreshClaudeModelContext();
                 },
 
                 deleteClaudeConfig(name) {
                     if (Object.keys(this.claudeConfigs).length <= 1) {
-                        return this.showMessage('至少保留一个配置', 'error');
+                        return this.showMessage('至少保留一项', 'error');
                     }
 
                     if (!confirm(`确定删除配置 "${name}"?`)) return;
@@ -1898,7 +1898,7 @@
                         this.currentClaudeConfig = Object.keys(this.claudeConfigs)[0];
                     }
                     this.saveClaudeConfigs();
-                    this.showMessage('配置已删除', 'success');
+                    this.showMessage('操作成功', 'success');
                     this.refreshClaudeModelContext();
                 },
 
@@ -1908,12 +1908,12 @@
                     const config = this.claudeConfigs[name];
 
                     if (!config.apiKey) {
-                        return this.showMessage('该配置未设置 API Key，请先编辑', 'error');
+                        return this.showMessage('请先配置 API Key', 'error');
                     }
 
                     const res = await api('apply-claude-config', { config });
                     if (res.error || res.success === false) {
-                        this.showMessage(res.error || '应用 Claude 配置失败', 'error');
+                        this.showMessage(res.error || '应用配置失败', 'error');
                     } else {
                         const targetTip = res.targetPath ? `（${res.targetPath}）` : '';
                         this.showMessage(`已应用配置到 Claude 设置: ${name}${targetTip}`, 'success');
@@ -2121,7 +2121,7 @@
                     }
                     this.fillOpenclawQuickFromConfig(parsed.data);
                     if (!silent) {
-                        this.showMessage('已从编辑器读取快速配置', 'success');
+                        this.showMessage('已读取配置', 'success');
                     }
                     return true;
                 },
@@ -2217,7 +2217,7 @@
                     this.refreshOpenclawProviders(parsed.data);
                     this.refreshOpenclawAgentsList(parsed.data);
                     if (!silent) {
-                        this.showMessage('已从文本刷新结构化配置', 'success');
+                        this.showMessage('已刷新配置', 'success');
                     }
                     return true;
                 },
@@ -2515,7 +2515,7 @@
                     this.refreshOpenclawProviders(config);
                     this.refreshOpenclawAgentsList(config);
                     this.fillOpenclawQuickFromConfig(config);
-                    this.showMessage('已写入编辑器', 'success');
+                    this.showMessage('已写入', 'success');
                 },
 
                 applyOpenclawQuickToText() {
@@ -2528,7 +2528,7 @@
                     const providerName = (this.openclawQuick.providerName || '').trim();
                     const modelId = (this.openclawQuick.modelId || '').trim();
                     if (!providerName) {
-                        this.showMessage('请填写 Provider 名称', 'error');
+                        this.showMessage('请填写名称', 'error');
                         return;
                     }
                     if (providerName.includes('/')) {
@@ -2536,7 +2536,7 @@
                         return;
                     }
                     if (!modelId) {
-                        this.showMessage('请填写模型 ID', 'error');
+                        this.showMessage('请填写模型', 'error');
                         return;
                     }
 
@@ -2547,7 +2547,7 @@
                     const provider = ensureObject(providers[providerName]);
                     const baseUrl = (this.openclawQuick.baseUrl || '').trim();
                     if (!baseUrl && !provider.baseUrl) {
-                        this.showMessage('请填写 Base URL', 'error');
+                        this.showMessage('请填写 URL', 'error');
                         return;
                     }
 
@@ -2633,7 +2633,7 @@
                     this.fillOpenclawStructured(config);
                     this.refreshOpenclawProviders(config);
                     this.refreshOpenclawAgentsList(config);
-                    this.showMessage('快速配置已写入编辑器', 'success');
+                    this.showMessage('配置已写入', 'success');
                 },
 
                 addOpenclawFallback() {
@@ -2770,11 +2770,11 @@
                         }
                         this.syncOpenclawStructuredFromText({ silent: true });
                         if (!silent) {
-                            this.showMessage('已加载当前 OpenClaw 配置', 'success');
+                            this.showMessage('加载完成', 'success');
                         }
                     } catch (e) {
                         if (!silent) {
-                            this.showMessage('加载 OpenClaw 配置失败: ' + e.message, 'error');
+                            this.showMessage('加载配置失败', 'error');
                         }
                     } finally {
                         this.openclawFileLoading = false;
@@ -2783,12 +2783,12 @@
 
                 persistOpenclawConfig({ closeModal = true } = {}) {
                     if (!this.openclawEditing.name || !this.openclawEditing.name.trim()) {
-                        this.showMessage('请输入配置名称', 'error');
+                        this.showMessage('请输入名称', 'error');
                         return '';
                     }
                     const name = this.openclawEditing.name.trim();
                     if (!this.openclawEditing.lockName && this.openclawConfigs[name]) {
-                        this.showMessage('配置名称已存在', 'error');
+                        this.showMessage('名称已存在', 'error');
                         return '';
                     }
                     if (!this.openclawEditing.content || !this.openclawEditing.content.trim()) {
@@ -2812,7 +2812,7 @@
                     try {
                         const name = this.persistOpenclawConfig();
                         if (!name) return;
-                        this.showMessage('OpenClaw 配置已保存', 'success');
+                        this.showMessage('操作成功', 'success');
                     } finally {
                         this.openclawSaving = false;
                     }
@@ -2829,7 +2829,7 @@
                             lineEnding: this.openclawLineEnding
                         });
                         if (res.error || res.success === false) {
-                            this.showMessage(res.error || '应用 OpenClaw 配置失败', 'error');
+                            this.showMessage(res.error || '应用配置失败', 'error');
                             return;
                         }
                         this.openclawConfigPath = res.targetPath || this.openclawConfigPath;
@@ -2838,7 +2838,7 @@
                         this.showMessage(`已保存并应用 OpenClaw 配置${targetTip}`, 'success');
                         this.closeOpenclawConfigModal();
                     } catch (e) {
-                        this.showMessage('应用 OpenClaw 配置失败: ' + e.message, 'error');
+                        this.showMessage('应用配置失败', 'error');
                     } finally {
                         this.openclawApplying = false;
                     }
@@ -2846,7 +2846,7 @@
 
                 deleteOpenclawConfig(name) {
                     if (Object.keys(this.openclawConfigs).length <= 1) {
-                        return this.showMessage('至少保留一个配置', 'error');
+                        return this.showMessage('至少保留一项', 'error');
                     }
                     if (!confirm(`确定删除配置 "${name}"?`)) return;
                     delete this.openclawConfigs[name];
@@ -2854,21 +2854,21 @@
                         this.currentOpenclawConfig = Object.keys(this.openclawConfigs)[0];
                     }
                     this.saveOpenclawConfigs();
-                    this.showMessage('OpenClaw 配置已删除', 'success');
+                    this.showMessage('操作成功', 'success');
                 },
 
                 async applyOpenclawConfig(name) {
                     this.currentOpenclawConfig = name;
                     const config = this.openclawConfigs[name];
                     if (!this.openclawHasContent(config)) {
-                        return this.showMessage('该配置为空，请先编辑', 'error');
+                        return this.showMessage('配置为空', 'error');
                     }
                     const res = await api('apply-openclaw-config', {
                         content: config.content,
                         lineEnding: this.openclawLineEnding
                     });
                     if (res.error || res.success === false) {
-                        this.showMessage(res.error || '应用 OpenClaw 配置失败', 'error');
+                        this.showMessage(res.error || '应用配置失败', 'error');
                     } else {
                         this.openclawConfigPath = res.targetPath || this.openclawConfigPath;
                         this.openclawConfigExists = true;
