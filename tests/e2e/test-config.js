@@ -126,10 +126,19 @@ module.exports = async function testConfig(ctx) {
     const apiListAfterAdd = await api('list');
     assert(Array.isArray(apiListAfterAdd.providers) && apiListAfterAdd.providers.some(p => p.name === 'e2e-api'), 'add-provider not reflected in list');
 
+    const updatedUrl = `${mockProviderUrl}/v2`;
+    const updateProvider = await api('update-provider', { name: 'e2e-api', url: updatedUrl, key: 'sk-e2e-api-upd' });
+    assert(updateProvider.success === true, 'update-provider failed');
+
+    const apiListAfterUpdate = await api('list');
+    const updatedItem = apiListAfterUpdate.providers.find(p => p.name === 'e2e-api');
+    assert(updatedItem && updatedItem.url === updatedUrl, 'update-provider url not reflected in list');
+    assert(updatedItem && updatedItem.hasKey === true, 'update-provider key not reflected in list');
+
     const exportProviderNew = await api('export-provider', { name: 'e2e-api' });
     assert(exportProviderNew.payload, 'export-provider(e2e-api) missing payload');
-    assert(exportProviderNew.payload.baseUrl === mockProviderUrl, 'export-provider(e2e-api) baseUrl mismatch');
-    assert(exportProviderNew.payload.apiKey === 'sk-e2e-api', 'export-provider(e2e-api) apiKey mismatch');
+    assert(exportProviderNew.payload.baseUrl === updatedUrl, 'export-provider(e2e-api) baseUrl mismatch');
+    assert(exportProviderNew.payload.apiKey === 'sk-e2e-api-upd', 'export-provider(e2e-api) apiKey mismatch');
 
     const statusAfterAdd = await api('status');
     assert(statusAfterAdd.provider === 'e2e2', 'add-provider should not change current provider');

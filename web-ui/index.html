@@ -297,9 +297,6 @@
                     <div class="selector-header">
                         <span class="selector-title">AGENTS.md</span>
                     </div>
-                    <div class="config-template-hint">
-                        Codex 指令：<code>~/.codex/AGENTS.md</code>（同级 <code>config.toml</code>）。
-                    </div>
                     <button class="btn-tool" @click="openAgentsEditor" :disabled="loading || !!initError || agentsLoading">
                         {{ agentsLoading ? '加载中...' : '打开 AGENTS.md 编辑器' }}
                     </button>
@@ -311,6 +308,16 @@
                     </div>
                     <button class="btn-tool" @click="runHealthCheck" :disabled="healthCheckLoading || loading || !!initError">
                         {{ healthCheckLoading ? '检查中...' : '运行检查' }}
+                    </button>
+                </div>
+
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">配置维护</span>
+                    </div>
+                    <div class="config-template-hint">备份当前 config.toml 后写入默认配置。</div>
+                    <button class="btn-tool" @click="resetConfig" :disabled="resetConfigLoading || loading || !!initError">
+                        {{ resetConfigLoading ? '重装中...' : '一键重装配置' }}
                     </button>
                 </div>
 
@@ -800,6 +807,17 @@
                 <div class="form-group">
                     <label class="form-label">认证密钥</label>
                     <input v-model="newProvider.key" class="form-input" placeholder="sk-...">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">智能转换</label>
+                    <label class="checkbox-inline">
+                        <input type="checkbox" v-model="newProvider.smartConvert">
+                        启用自建转换
+                    </label>
+                    <select v-model="newProvider.smartTarget" class="form-select" :disabled="!newProvider.smartConvert">
+                        <option value="responses">转换为 /v1/responses（默认）</option>
+                        <option value="chat/completions">转换为 /v1/chat/completions</option>
+                    </select>
                 </div>
 
                 <div class="btn-group">
