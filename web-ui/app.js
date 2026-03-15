@@ -140,7 +140,7 @@
                         'npm install -g @anthropic-ai/claude-code',
                         'npm i -g @openai/codex'
                     ],
-                    newProvider: { name: '', url: '', key: '', smartConvert: false, smartTarget: 'responses' },
+                    newProvider: { name: '', url: '', key: '' },
                     resetConfigLoading: false,
                     editingProvider: { name: '', url: '', key: '' },
                     newModelName: '',
@@ -1626,9 +1626,7 @@
                         const res = await api('add-provider', {
                             name,
                             url: this.newProvider.url.trim(),
-                            key: this.newProvider.key || '',
-                            smartConvert: !!this.newProvider.smartConvert,
-                            smartTarget: this.newProvider.smartTarget || 'responses'
+                            key: this.newProvider.key || ''
                         });
                         if (res.error) {
                             this.showMessage(res.error, 'error');
@@ -1738,7 +1736,7 @@
 
                 closeAddModal() {
                     this.showAddModal = false;
-                    this.newProvider = { name: '', url: '', key: '', smartConvert: false, smartTarget: 'responses' };
+                    this.newProvider = { name: '', url: '', key: '' };
                 },
 
                 closeModelModal() {
