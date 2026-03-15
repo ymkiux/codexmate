@@ -1344,6 +1344,26 @@ function addProviderToConfig(params = {}) {
     return { success: true };
 }
 
+function updateProviderInConfig(params = {}) {
+    const name = typeof params.name === 'string' ? params.name.trim() : '';
+    const url = typeof params.url === 'string' ? params.url.trim() : '';
+    const key = params.key !== undefined && params.key !== null
+        ? String(params.key).trim()
+        : undefined;
+
+    if (!name) return { error: '名称不能为空' };
+    if (!url && key === undefined) {
+        return { error: 'URL 或密钥至少填写一项' };
+    }
+
+    try {
+        cmdUpdate(name, url || undefined, key, true);
+        return { success: true };
+    } catch (e) {
+        return { error: e.message || '更新失败' };
+    }
+}
+
 function deleteProviderFromConfig(params = {}) {
     const name = typeof params.name === 'string' ? params.name.trim() : '';
     if (!name) return { error: '名称不能为空' };
@@ -1578,6 +1598,30 @@ function ensureManagedConfigBootstrap() {
     });
     g_initNotice = '首次使用已创建默认配置。';
     return { notice: g_initNotice };
+}
+
+function resetConfigToDefault() {
+    ensureConfigDir();
+    const initializedAt = new Date().toISOString();
+    const defaultProvider = 'openai';
+    const defaultModel = DEFAULT_MODELS[0] || 'gpt-4';
+
+    let backupFile = '';
+    if (fs.existsSync(CONFIG_FILE)) {
+        backupFile = `config.toml.reset-${formatTimestampForFileName(initializedAt)}.bak`;
+        fs.copyFileSync(CONFIG_FILE, path.join(CONFIG_DIR, backupFile));
+    }
+
+    writeConfig(buildDefaultConfigContent(initializedAt));
+    ensureSupportFiles(defaultProvider, defaultModel);
+    writeInitMark({
+        version: 1,
+        initializedAt,
+        mode: 'manual-reset',
+        backupFile
+    });
+
+    return { success: true, backupFile };
 }
 
 function consumeInitNotice() {
@@ -4862,6 +4906,9 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                         case 'add-provider':
                             result = addProviderToConfig(params || {});
                             break;
+                        case 'update-provider':
+                            result = updateProviderInConfig(params || {});
+                            break;
                         case 'delete-provider':
                             result = deleteProviderFromConfig(params || {});
                             break;
@@ -4882,6 +4929,9 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             break;
                         case 'apply-openclaw-config':
                             result = applyOpenclawConfig(params || {});
+                            break;
+                        case 'reset-config':
+                            result = resetConfigToDefault();
                             break;
                         case 'get-openclaw-agents-file':
                             result = readOpenclawAgentsFile();

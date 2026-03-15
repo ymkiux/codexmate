@@ -140,7 +140,8 @@
                         'npm install -g @anthropic-ai/claude-code',
                         'npm i -g @openai/codex'
                     ],
-                    newProvider: { name: '', url: '', key: '' },
+                    newProvider: { name: '', url: '', key: '', smartConvert: false, smartTarget: 'responses' },
+                    resetConfigLoading: false,
                     editingProvider: { name: '', url: '', key: '' },
                     newModelName: '',
                     currentClaudeConfig: '',
@@ -1625,7 +1626,9 @@
                         const res = await api('add-provider', {
                             name,
                             url: this.newProvider.url.trim(),
-                            key: this.newProvider.key || ''
+                            key: this.newProvider.key || '',
+                            smartConvert: !!this.newProvider.smartConvert,
+                            smartTarget: this.newProvider.smartTarget || 'responses'
                         });
                         if (res.error) {
                             this.showMessage(res.error, 'error');
@@ -1669,18 +1672,44 @@
                     }
 
                     const name = this.editingProvider.name;
-                    const safeUrl = this.escapeTomlString(this.editingProvider.url.trim());
-                    const safeKey = this.escapeTomlString(this.editingProvider.key || '');
+                    const url = this.editingProvider.url.trim();
+                    const key = this.editingProvider.key || '';
                     this.closeEditModal();
-                    this.showMessage('已生成更新模板，请确认后应用', 'info');
-                    await this.openConfigTemplateEditor({
-                        appendHint: `请将 [model_providers.${name}] 中 base_url 更新为 ${safeUrl}${safeKey ? '，并更新 preferred_auth_method' : ''}`
-                    });
+                    try {
+                        const res = await api('update-provider', { name, url, key });
+                        if (res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        this.showMessage('提供商已更新', 'success');
+                        await this.loadAll();
+                    } catch (e) {
+                        this.showMessage('更新失败: ' + e.message, 'error');
+                    }
                 },
 
                 closeEditModal() {
                     this.showEditModal = false;
                     this.editingProvider = { name: '', url: '', key: '' };
+                },
+
+                async resetConfig() {
+                    if (this.resetConfigLoading) return;
+                    this.resetConfigLoading = true;
+                    try {
+                        const res = await api('reset-config');
+                        if (res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        const backup = res.backupFile ? `（已备份: ${res.backupFile}）` : '';
+                        this.showMessage(`配置已重装${backup}`, 'success');
+                        await this.loadAll();
+                    } catch (e) {
+                        this.showMessage('重装失败: ' + e.message, 'error');
+                    } finally {
+                        this.resetConfigLoading = false;
+                    }
                 },
 
                 async addModel() {
@@ -1709,7 +1738,7 @@
 
                 closeAddModal() {
                     this.showAddModal = false;
-                    this.newProvider = { name: '', url: '', key: '' };
+                    this.newProvider = { name: '', url: '', key: '', smartConvert: false, smartTarget: 'responses' };
                 },
 
                 closeModelModal() {
