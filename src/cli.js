@@ -4412,7 +4412,7 @@ function cmdClaude(baseUrl, apiKey, model, silent = false) {
 
 function commandExists(command, args = '') {
     try {
-        execSync(`${command} ${args}`, { stdio: 'ignore' });
+        execSync(`${command} ${args}`, { stdio: 'ignore', shell: process.platform === 'win32' });
         return true;
     } catch (e) {
         return false;
@@ -5282,19 +5282,40 @@ function cmdStart(options = {}) {
     process.on('SIGTERM', handleExit);
 }
 
-async function cmdCodex(args = []) {
+async function runProxyCommand(displayName, binNames, args = [], installTip = '') {
     const extraArgs = Array.isArray(args) ? args.filter(arg => arg !== undefined) : [];
     const hasYolo = extraArgs.includes('--yolo');
     const finalArgs = hasYolo ? extraArgs : ['--yolo', ...extraArgs];
 
+    const names = Array.isArray(binNames) ? binNames : [binNames];
+    let selectedBin = names[0];
+    let exists = false;
+
+    // Detect if any of the bin names exist
+    for (const name of names) {
+        if (commandExists(name, '--version')) {
+            selectedBin = name;
+            exists = true;
+            break;
+        }
+    }
+
+    if (!exists) {
+        let msg = `无法启动 ${displayName}，请确认已安装并在 PATH 中。`;
+        if (installTip) {
+            msg += `\n安装建议: ${installTip}`;
+        }
+        throw new Error(msg);
+    }
+
     return new Promise((resolve, reject) => {
-        const child = spawn('codex', finalArgs, {
+        const child = spawn(selectedBin, finalArgs, {
             stdio: 'inherit',
             shell: process.platform === 'win32'
         });
 
         child.on('error', (err) => {
-            reject(new Error(`无法启动 codex，请确认已安装并在 PATH 中: ${err.message}`));
+            reject(new Error(`运行 ${selectedBin} 失败: ${err.message}`));
         });
 
         child.on('exit', (code, signal) => {
@@ -5313,72 +5334,18 @@ async function cmdCodex(args = []) {
             resolve(1);
         });
     });
+}
+
+async function cmdCodex(args = []) {
+    return runProxyCommand('Codex', 'codex', args);
 }
 
 async function cmdQwen(args = []) {
-    const extraArgs = Array.isArray(args) ? args.filter(arg => arg !== undefined) : [];
-    const hasYolo = extraArgs.includes('--yolo');
-    const finalArgs = hasYolo ? extraArgs : ['--yolo', ...extraArgs];
-
-    return new Promise((resolve, reject) => {
-        const child = spawn('qwen', finalArgs, {
-            stdio: 'inherit',
-            shell: process.platform === 'win32'
-        });
-
-        child.on('error', (err) => {
-            reject(new Error(`无法启动 qwen，请确认已安装并在 PATH 中：${err.message}`));
-        });
-
-        child.on('exit', (code, signal) => {
-            if (typeof code === 'number') {
-                resolve(code);
-                return;
-            }
-            if (signal === 'SIGINT') {
-                resolve(130);
-                return;
-            }
-            if (signal === 'SIGTERM') {
-                resolve(143);
-                return;
-            }
-            resolve(1);
-        });
-    });
+    return runProxyCommand('Qwen', ['qwen', 'qwen-code'], args, 'npm install -g @qwen-code/qwen-code');
 }
 
 async function cmdGemini(args = []) {
-    const extraArgs = Array.isArray(args) ? args.filter(arg => arg !== undefined) : [];
-    const hasYolo = extraArgs.includes('--yolo');
-    const finalArgs = hasYolo ? extraArgs : ['--yolo', ...extraArgs];
-
-    return new Promise((resolve, reject) => {
-        const child = spawn('gemini', finalArgs, {
-            stdio: 'inherit',
-            shell: process.platform === 'win32'
-        });
-
-        child.on('error', (err) => {
-            reject(new Error(`无法启动 gemini，请确认已安装并在 PATH 中：${err.message}`));
-        });
-
-        child.on('exit', (code, signal) => {
-            if (typeof code === 'number') {
-                resolve(code);
-                return;
-            }
-            if (signal === 'SIGINT') {
-                resolve(130);
-                return;
-            }
-            if (signal === 'SIGTERM') {
-                resolve(143);
-                return;
-            }
-            resolve(1);
-        });
-    });
+    return runProxyCommand('Gemini', ['gemini', 'gemini-cli'], args, 'npm install -g @google/gemini-cli');
 }
 
 // ============================================================================
