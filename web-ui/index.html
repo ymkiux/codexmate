@@ -717,13 +717,6 @@
                                             {{ sessionDetailLoading ? '加载中...' : '刷新内容' }}
                                         </button>
                                         <button
-                                            v-if="isCloneAvailable(activeSession)"
-                                            class="btn-session-clone"
-                                            @click="cloneSession(activeSession)"
-                                            :disabled="!activeSession || sessionsLoading || sessionCloning[getSessionExportKey(activeSession)]">
-                                            {{ (activeSession && sessionCloning[getSessionExportKey(activeSession)]) ? '克隆中...' : '克隆会话' }}
-                                        </button>
-                                        <button
                                             v-if="isDeleteAvailable(activeSession)"
                                             class="btn-session-delete"
                                             @click="deleteSession(activeSession)"
