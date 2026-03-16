@@ -1,6 +1,12 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to this project will be documented in this file.
+
+## [0.0.12] - 2026-03-16
+
+### Changed
+- 版本号升级到 0.0.12
+- 同步 package-lock.json 版本号，准备 npm 发布
 
 ## [0.0.11] - 2026-03-16
 
