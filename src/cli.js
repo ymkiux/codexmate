@@ -1902,7 +1902,24 @@ function expandSessionQueryTokens(tokens) {
     let hasClaudeAlias = false;
     let hasDaudeAlias = false;
 
-    for (const token of base) {
+    // First pass: detect multi-token aliases (e.g., "claude code", "daude code")
+    for (let i = 0; i < base.length; i++) {
+        const token = base[i];
+        const nextToken = base[i + 1] || '';
+
+        // Check for "claude code" pattern (two separate tokens)
+        if (token === 'claude' && nextToken === 'code') {
+            hasClaudeAlias = true;
+            i++; // Skip next token
+            continue;
+        }
+        // Check for "daude code" pattern (two separate tokens)
+        if (token === 'daude' && nextToken === 'code') {
+            hasDaudeAlias = true;
+            i++; // Skip next token
+            continue;
+        }
+        // Check for combined patterns (e.g., "claude-code", "claude_code", "claudecode")
         if (/^claude[-_ ]?code$/.test(token) || token === 'claudecode') {
             hasClaudeAlias = true;
             continue;

@@ -1672,21 +1672,6 @@ body::after {
     white-space: nowrap;
 }
 
-.session-item-snippet {
-    color: var(--color-text-secondary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: inline-block;
-    max-width: 60%;
-    background: rgba(210, 107, 90, 0.08);
-    border-radius: 8px;
-    padding: 2px 6px;
-    border: 1px solid rgba(210, 107, 90, 0.15);
-    font-size: var(--font-size-caption);
-    line-height: 1.35;
-}
-
 .session-preview {
     border: 1px solid var(--color-border-soft);
     border-radius: var(--radius-xl);
