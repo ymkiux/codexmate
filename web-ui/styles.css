@@ -1644,6 +1644,12 @@ body::after {
     height: 16px;
 }
 
+.session-item-sub.session-item-snippet,
+.session-preview-meta,
+.session-preview-title {
+    display: none !important;
+}
+
 .session-item-sub {
     font-size: var(--font-size-caption);
     color: var(--color-text-tertiary);
