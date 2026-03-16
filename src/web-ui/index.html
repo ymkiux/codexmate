@@ -9,7 +9,6 @@
     <script src="/res/vue.global.js"></script>
     <script src="/res/json5.min.js"></script>
     <link rel="stylesheet" href="/web-ui/styles.css">
-    <!-- session snippet style moved到 web-ui/styles.css: .session-item-snippet { white-space: nowrap; text-overflow: ellipsis; } -->
 </head>
 <body>
     <div id="app" class="container" v-cloak>
@@ -695,10 +694,6 @@
                             <div class="session-item-meta">
                                 <span class="session-source">{{ session.sourceLabel }}</span>
                                 <span class="session-item-time">{{ session.updatedAt || 'unknown time' }}</span>
-                            </div>
-                            <div v-if="session.match && session.match.hit" class="session-item-sub session-item-snippet">
-                                <span v-if="session.match.snippets && session.match.snippets.length">{{ session.match.snippets.join(' · ') }}</span>
-                                <span v-else>命中 {{ session.match.count || 1 }} 处</span>
                             </div>
                         </div>
                     </div>
