@@ -696,10 +696,6 @@
                                 <span class="session-source">{{ session.sourceLabel }}</span>
                                 <span class="session-item-time">{{ session.updatedAt || 'unknown time' }}</span>
                             </div>
-                            <div v-if="session.match && session.match.hit" class="session-item-sub session-item-snippet">
-                                <span v-if="session.match.snippets && session.match.snippets.length">{{ session.match.snippets.join(' · ') }}</span>
-                                <span v-else>命中 {{ session.match.count || 1 }} 处</span>
-                            </div>
                         </div>
                     </div>
 
