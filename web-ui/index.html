@@ -821,6 +821,15 @@
                         <button class="btn-tool" @click="downloadClaudeDirectory" :disabled="claudeDownloadLoading">
                             {{ claudeDownloadLoading ? ('备份中 ' + claudeDownloadProgress + '%') : '一键备份 ~/.claude' }}
                         </button>
+                        <button class="btn-tool" @click="triggerClaudeImport" :disabled="claudeImportLoading">
+                            {{ claudeImportLoading ? '导入中...' : '导入 ~/.claude 备份' }}
+                        </button>
+                        <input
+                            ref="claudeImportInput"
+                            class="sr-only"
+                            type="file"
+                            accept=".zip"
+                            @change="handleClaudeImportChange">
                     </div>
                     <div class="selector-section">
                         <div class="selector-header">
@@ -829,6 +838,15 @@
                         <button class="btn-tool" @click="downloadCodexDirectory" :disabled="codexDownloadLoading">
                             {{ codexDownloadLoading ? ('备份中 ' + codexDownloadProgress + '%') : '一键备份 ~/.codex' }}
                         </button>
+                        <button class="btn-tool" @click="triggerCodexImport" :disabled="codexImportLoading">
+                            {{ codexImportLoading ? '导入中...' : '导入 ~/.codex 备份' }}
+                        </button>
+                        <input
+                            ref="codexImportInput"
+                            class="sr-only"
+                            type="file"
+                            accept=".zip"
+                            @change="handleCodexImportChange">
                     </div>
                 </div>
 
@@ -1353,3 +1371,4 @@
     <script type="module" src="web-ui/app.js"></script>
 </body>
 </html>
+

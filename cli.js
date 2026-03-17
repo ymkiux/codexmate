@@ -98,6 +98,7 @@ const MODELS_NEGATIVE_CACHE_TTL_MS = 5 * 1000;
 const MODELS_CACHE_MAX_ENTRIES = 50;
 const MODELS_RESPONSE_MAX_BYTES = 1024 * 1024;
 const MAX_RECENT_CONFIGS = 3;
+const MAX_UPLOAD_SIZE = 200 * 1024 * 1024;
 const BOOTSTRAP_TEXT_MARKERS = [
     'agents.md instructions',
     '<instructions>',
@@ -1903,7 +1904,24 @@ function expandSessionQueryTokens(tokens) {
     let hasClaudeAlias = false;
     let hasDaudeAlias = false;
 
-    for (const token of base) {
+    // First pass: detect multi-token aliases (e.g., "claude code", "daude code")
+    for (let i = 0; i < base.length; i++) {
+        const token = base[i];
+        const nextToken = base[i + 1] || '';
+
+        // Check for "claude code" pattern (two separate tokens)
+        if (token === 'claude' && nextToken === 'code') {
+            hasClaudeAlias = true;
+            i++; // Skip next token
+            continue;
+        }
+        // Check for "daude code" pattern (two separate tokens)
+        if (token === 'daude' && nextToken === 'code') {
+            hasDaudeAlias = true;
+            i++; // Skip next token
+            continue;
+        }
+        // Check for combined patterns (e.g., "claude-code", "claude_code", "claudecode")
         if (/^claude[-_ ]?code$/.test(token) || token === 'claudecode') {
             hasClaudeAlias = true;
             continue;
@@ -4366,7 +4384,7 @@ function readClaudeSettingsInfo() {
     };
 }
 
-// API: 打包 Claude 配置目录（优先 7-Zip，多线程存储；次选系统 zip；再降级 zip-lib）
+// API: 打包 Claude 配置目录（优先 7-Zip 其次系统 zip，最后 zip-lib）
 async function prepareClaudeDirDownload() {
     try {
         if (!fs.existsSync(CLAUDE_DIR)) {
@@ -4400,7 +4418,6 @@ async function prepareClaudeDirDownload() {
     }
 }
 
-
 // API: 打包 Codex 配置目录（同策略）
 async function prepareCodexDirDownload() {
     try {
@@ -4433,6 +4450,171 @@ async function prepareCodexDirDownload() {
     } catch (e) {
         return { error: `打包失败：${e.message}` };
     }
+}
+
+function copyDirRecursive(srcDir, destDir) {
+    ensureDir(destDir);
+    const entries = fs.readdirSync(srcDir, { withFileTypes: true });
+    for (const entry of entries) {
+        const srcPath = path.join(srcDir, entry.name);
+        const destPath = path.join(destDir, entry.name);
+        if (entry.isDirectory()) {
+            copyDirRecursive(srcPath, destPath);
+        } else if (entry.isSymbolicLink()) {
+            const target = fs.readlinkSync(srcPath);
+            fs.symlinkSync(target, destPath);
+        } else {
+            fs.copyFileSync(srcPath, destPath);
+        }
+    }
+}
+
+function writeUploadZip(base64, prefix, originalName = '') {
+    let buffer;
+    try {
+        buffer = Buffer.from(base64 || '', 'base64');
+    } catch (e) {
+        return { error: '备份文件内容不是有效的 base64 编码' };
+    }
+
+    if (!buffer || buffer.length === 0) {
+        return { error: '备份文件为空' };
+    }
+
+    if (buffer.length > MAX_UPLOAD_SIZE) {
+        return { error: `备份文件过大（>${Math.floor(MAX_UPLOAD_SIZE / 1024 / 1024)}MB）` };
+    }
+
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-`));
+    const fileName = path.basename(originalName && typeof originalName === 'string' ? originalName : `${prefix}.zip`);
+    const zipPath = path.join(tempDir, fileName.toLowerCase().endsWith('.zip') ? fileName : `${fileName}.zip`);
+    fs.writeFileSync(zipPath, buffer);
+    return { tempDir, zipPath };
+}
+
+async function extractUploadZip(zipPath, extractDir) {
+    const unzipTool = resolveUnzipTool();
+    ensureDir(extractDir);
+    if (unzipTool.type === '7z') {
+        const cmd = `"${unzipTool.cmd}" x -mmt=on -o"${extractDir}" "${zipPath}" -y`;
+        execSync(cmd, { stdio: 'ignore' });
+        return;
+    }
+    await unzipWithLibrary(zipPath, extractDir);
+}
+
+function findConfigSourceDir(extractedDir, markerDirName, requiredFileName) {
+    const markerPath = path.join(extractedDir, markerDirName);
+    if (fs.existsSync(markerPath) && fs.statSync(markerPath).isDirectory()) {
+        return markerPath;
+    }
+
+    const entries = fs.readdirSync(extractedDir, { withFileTypes: true }).filter((item) => item.isDirectory());
+    if (entries.length === 1) {
+        const onlyDir = path.join(extractedDir, entries[0].name);
+        const nestedMarker = path.join(onlyDir, markerDirName);
+        if (fs.existsSync(nestedMarker) && fs.statSync(nestedMarker).isDirectory()) {
+            return nestedMarker;
+        }
+        if (fs.existsSync(path.join(onlyDir, requiredFileName))) {
+            return onlyDir;
+        }
+    }
+
+    if (fs.existsSync(path.join(extractedDir, requiredFileName))) {
+        return extractedDir;
+    }
+
+    return extractedDir;
+}
+
+async function backupDirectoryIfExists(dirPath, prefix) {
+    if (!fs.existsSync(dirPath)) {
+        return { backupPath: '' };
+    }
+
+    const tempDir = os.tmpdir();
+    const timestamp = Date.now();
+    const zipFileName = `${prefix}-${timestamp}.zip`;
+    const zipFilePath = path.join(tempDir, zipFileName);
+    const zipTool = resolveZipTool();
+
+    try {
+        if (zipTool.type === '7z') {
+            const cmd = `"${zipTool.cmd}" a -tzip -mmt=on -mx=0 "${zipFilePath}" "${dirPath}"`;
+            execSync(cmd, { stdio: 'ignore' });
+        } else if (zipTool.type === 'zip') {
+            const cmd = `"${zipTool.cmd}" -0 -q -r "${zipFilePath}" "${dirPath}"`;
+            execSync(cmd, { stdio: 'ignore' });
+        } else {
+            await zipLib.archiveFolder(dirPath, zipFilePath);
+        }
+        return { backupPath: zipFilePath, fileName: zipFileName };
+    } catch (e) {
+        return { backupPath: '', warning: `备份失败: ${e.message}` };
+    }
+}
+
+async function restoreConfigDirectoryFromUpload(payload, options) {
+    const { targetDir, requiredFileName, markerDirName, tempPrefix, backupPrefix } = options;
+    if (!payload || typeof payload.fileBase64 !== 'string' || !payload.fileBase64.trim()) {
+        return { error: '缺少备份文件内容' };
+    }
+
+    const upload = writeUploadZip(payload.fileBase64, tempPrefix, payload.fileName);
+    if (upload.error) {
+        return { error: upload.error };
+    }
+
+    const tempDir = upload.tempDir;
+    const extractDir = path.join(tempDir, 'extract');
+    let backupPath = '';
+    try {
+        await extractUploadZip(upload.zipPath, extractDir);
+        const sourceDir = findConfigSourceDir(extractDir, markerDirName, requiredFileName);
+        const requiredPath = path.join(sourceDir, requiredFileName);
+        if (!fs.existsSync(requiredPath)) {
+            return { error: `无效备份，缺少 ${requiredFileName}` };
+        }
+
+        const backupResult = await backupDirectoryIfExists(targetDir, backupPrefix);
+        backupPath = backupResult.backupPath || '';
+
+        fs.rmSync(targetDir, { recursive: true, force: true });
+        copyDirRecursive(sourceDir, targetDir);
+
+        return {
+            success: true,
+            targetDir,
+            appliedFrom: payload.fileName || '',
+            backupPath,
+            backupWarning: backupResult.warning || ''
+        };
+    } catch (e) {
+        return { error: `导入失败：${e.message}` };
+    } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+}
+
+async function restoreClaudeDir(payload) {
+    return await restoreConfigDirectoryFromUpload(payload, {
+        targetDir: CLAUDE_DIR,
+        requiredFileName: 'settings.json',
+        markerDirName: '.claude',
+        tempPrefix: 'claude-restore',
+        backupPrefix: 'claude-config'
+    });
+}
+
+async function restoreCodexDir(payload) {
+    return await restoreConfigDirectoryFromUpload(payload, {
+        targetDir: CONFIG_DIR,
+        requiredFileName: 'config.toml',
+        markerDirName: '.codex',
+        tempPrefix: 'codex-restore',
+        backupPrefix: 'codex-config'
+    });
 }
 
 // CLI: 一行写入 Claude Code 配置
@@ -5164,6 +5346,12 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                         case 'download-codex-dir':
                             result = await prepareCodexDirDownload();
                             break;
+                        case 'restore-claude-dir':
+                            result = await restoreClaudeDir(params || {});
+                            break;
+                        case 'restore-codex-dir':
+                            result = await restoreCodexDir(params || {});
+                            break;
                         default:
                             result = { error: '未知操作' };
                     }
@@ -5204,7 +5392,7 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                 : ext === '.css'
                     ? 'text/css; charset=utf-8'
                     : ext === '.json'
-                    ? 'application/json; charset=utf-8'
+                        ? 'application/json; charset=utf-8'
                         : 'application/octet-stream';
             res.writeHead(200, { 'Content-Type': mime });
             fs.createReadStream(filePath).pipe(res);
@@ -5572,3 +5760,4 @@ main().catch((err) => {
     console.error('错误:', err && err.message ? err.message : err);
     process.exit(1);
 });
+

@@ -1174,6 +1174,10 @@ body::after {
     letter-spacing: -0.01em;
 }
 
+.selector-section .btn-tool + .btn-tool {
+    margin-left: var(--spacing-sm);
+}
+
 .btn-tool:hover {
     border-color: var(--color-brand);
     color: var(--color-brand);
@@ -2872,3 +2876,4 @@ textarea:focus-visible {
         border-radius: var(--radius-lg);
     }
 }
+
