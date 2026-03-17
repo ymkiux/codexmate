@@ -55,6 +55,8 @@ const {
 
 const DEFAULT_WEB_PORT = 3737;
 const DEFAULT_WEB_HOST = '127.0.0.1';
+const DEFAULT_OFFICIAL_BASE_URL = 'https://api.openai.com/v1';
+const DEFAULT_FORWARD_PORT = 15721;
 
 // ============================================================================
 // 配置
@@ -154,6 +156,23 @@ let g_initNotice = '';
 let g_sessionListCache = new Map();
 let g_modelsCache = new Map();
 let g_modelsInFlight = new Map();
+let g_forwardServer = null;
+
+function isOpenAIBaseUrl(url) {
+    if (typeof url !== 'string') return false;
+    const lower = url.trim().toLowerCase();
+    return lower.includes('api.openai.com') || lower.includes('.openai.azure.com');
+}
+
+function isOfficialProvider(provider, name = '') {
+    if (!provider || typeof provider !== 'object') return false;
+    if (provider.is_official === true) return true;
+    const baseUrl = typeof provider.base_url === 'string' ? provider.base_url : '';
+    if (isOpenAIBaseUrl(baseUrl)) return true;
+    const requiresAuth = provider.requires_openai_auth;
+    if (requiresAuth === true && /^openai(-|$)/i.test(String(name || ''))) return true;
+    return false;
+}
 
 // ============================================================================
 // 工具函数
@@ -220,6 +239,74 @@ function updateAuthJson(apiKey) {
     }
     authData['OPENAI_API_KEY'] = apiKey;
     fs.writeFileSync(AUTH_FILE, JSON.stringify(authData, null, 2), 'utf-8');
+}
+
+function ensureOfficialProviderExists(options = {}) {
+    const providerName = typeof options.name === 'string' && options.name.trim()
+        ? options.name.trim()
+        : 'openai';
+    const baseUrl = typeof options.baseUrl === 'string' && options.baseUrl.trim()
+        ? options.baseUrl.trim()
+        : DEFAULT_OFFICIAL_BASE_URL;
+
+    ensureConfigDir();
+
+    let content = '';
+    if (fs.existsSync(CONFIG_FILE)) {
+        content = fs.readFileSync(CONFIG_FILE, 'utf-8');
+    } else {
+        const initializedAt = new Date().toISOString();
+        content = buildDefaultConfigContent(initializedAt);
+    }
+    const hasBom = content.charCodeAt(0) === 0xFEFF;
+    const lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
+
+    let parsed;
+    try {
+        parsed = toml.parse(content);
+    } catch (e) {
+        parsed = buildVirtualDefaultConfig();
+    }
+
+    if (!parsed.model_providers || typeof parsed.model_providers !== 'object') {
+        parsed.model_providers = {};
+    }
+    if (parsed.model_providers[providerName]) {
+        return { providerName, created: false };
+    }
+
+    parsed.model_providers[providerName] = {
+        name: providerName,
+        base_url: baseUrl,
+        wire_api: 'responses',
+        requires_openai_auth: true,
+        preferred_auth_method: '',
+        is_official: true,
+        request_max_retries: 4,
+        stream_max_retries: 10,
+        stream_idle_timeout_ms: 300000
+    };
+
+    // 保持默认 provider/model 不变，交由调用方处理
+    let rebuilt = toml.stringify(parsed).trimEnd();
+    rebuilt = rebuilt.replace(/\n/g, lineEnding);
+    if (content.includes(CODEXMATE_MANAGED_MARKER) && !rebuilt.includes(CODEXMATE_MANAGED_MARKER)) {
+        rebuilt = `${CODEXMATE_MANAGED_MARKER}${lineEnding}${rebuilt}`;
+    }
+    if (hasBom && rebuilt.charCodeAt(0) !== 0xFEFF) {
+        rebuilt = '\uFEFF' + rebuilt;
+    }
+
+    fs.writeFileSync(CONFIG_FILE, rebuilt + lineEnding, 'utf-8');
+    return { providerName, created: true };
+}
+
+function cmdSwitchOfficial(options = {}) {
+    const targetName = typeof options.name === 'string' && options.name.trim()
+        ? options.name.trim()
+        : 'openai';
+    ensureOfficialProviderExists({ name: targetName });
+    return cmdSwitch(targetName, !!options.silent);
 }
 
 function getCodexSessionsDir() {
@@ -789,7 +876,8 @@ async function runRemoteHealthCheck(provider, modelName, options = {}) {
         return { issues, results };
     }
 
-    const requiresAuth = provider && provider.requires_openai_auth !== false;
+    const official = isOfficialProvider(provider);
+    const requiresAuth = provider && provider.requires_openai_auth !== false && !official;
     const apiKey = typeof provider.preferred_auth_method === 'string'
         ? provider.preferred_auth_method.trim()
         : '';
@@ -989,6 +1077,8 @@ async function buildConfigHealthReport(params = {}) {
         });
     }
 
+    const isOfficial = isOfficialProvider(provider, providerName);
+
     if (provider && typeof provider === 'object') {
         const baseUrl = typeof provider.base_url === 'string' ? provider.base_url.trim() : '';
         if (!isValidHttpUrl(baseUrl)) {
@@ -1000,7 +1090,7 @@ async function buildConfigHealthReport(params = {}) {
         }
 
         const requiresAuth = provider.requires_openai_auth;
-        if (requiresAuth !== false) {
+        if (requiresAuth !== false && !isOfficial) {
             const apiKey = typeof provider.preferred_auth_method === 'string'
                 ? provider.preferred_auth_method.trim()
                 : '';
@@ -1045,9 +1135,9 @@ async function buildConfigHealthReport(params = {}) {
             const timeoutMs = Number.isFinite(params.timeoutMs)
                 ? Math.max(1000, Number(params.timeoutMs))
                 : undefined;
-            const apiKey = typeof provider.preferred_auth_method === 'string'
+            const apiKey = isOfficial ? '' : (typeof provider.preferred_auth_method === 'string'
                 ? provider.preferred_auth_method.trim()
-                : '';
+                : '');
             const speedResult = await runSpeedTest(baseUrl, apiKey, { timeoutMs });
             const status = speedResult && typeof speedResult.status === 'number'
                 ? speedResult.status
@@ -1297,6 +1387,7 @@ function addProviderToConfig(params = {}) {
     const name = typeof params.name === 'string' ? params.name.trim() : '';
     const url = typeof params.url === 'string' ? params.url.trim() : '';
     const key = typeof params.key === 'string' ? params.key.trim() : '';
+    const official = !!params.official;
 
     if (!name) return { error: '名称不能为空' };
     if (!url) return { error: 'URL 不能为空' };
@@ -1346,12 +1437,13 @@ function addProviderToConfig(params = {}) {
         `name = "${safeName}"`,
         `base_url = "${safeUrl}"`,
         `wire_api = "responses"`,
-        `requires_openai_auth = false`,
+        `requires_openai_auth = ${official ? 'true' : 'false'}`,
         `preferred_auth_method = "${safeKey}"`,
+        official ? `is_official = true` : null,
         `request_max_retries = 4`,
         `stream_max_retries = 10`,
         `stream_idle_timeout_ms = 300000`
-    ].join(lineEnding);
+    ].filter(Boolean).join(lineEnding);
 
     const newContent = content.trimEnd() + lineEnding + lineEnding + block + lineEnding;
 
@@ -4232,6 +4324,64 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false) {
     }
 }
 
+function generateCopyName(base, existing) {
+    const safeBase = (base || 'provider').trim() || 'provider';
+    let candidate = `${safeBase}-copy`;
+    let counter = 2;
+    while (existing[candidate]) {
+        candidate = `${safeBase}-copy${counter}`;
+        counter += 1;
+    }
+    return candidate;
+}
+
+function cmdDuplicateProvider(sourceName, targetName, silent = false) {
+    const config = readConfig();
+    const providers = config.model_providers || {};
+    if (!providers[sourceName]) {
+        if (!silent) console.error('错误: 源提供商不存在:', sourceName);
+        throw new Error('源提供商不存在');
+    }
+    if (!targetName || !isValidProviderName(targetName)) {
+        targetName = generateCopyName(sourceName, providers);
+    }
+    if (providers[targetName]) {
+        if (!silent) console.error('错误: 目标提供商已存在:', targetName);
+        throw new Error('目标提供商已存在');
+    }
+
+    const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
+    const hasBom = content.charCodeAt(0) === 0xFEFF;
+    const lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
+
+    const cloned = JSON.parse(JSON.stringify(providers[sourceName]));
+    cloned.name = targetName;
+    providers[targetName] = cloned;
+
+    // 写入 TOML，保留管理标记与行尾风格
+    let rebuilt = toml.stringify(config).trimEnd();
+    rebuilt = rebuilt.replace(/\n/g, lineEnding);
+    if (content.includes(CODEXMATE_MANAGED_MARKER) && !rebuilt.includes(CODEXMATE_MANAGED_MARKER)) {
+        rebuilt = `${CODEXMATE_MANAGED_MARKER}${lineEnding}${rebuilt}`;
+    }
+    if (hasBom && rebuilt.charCodeAt(0) !== 0xFEFF) {
+        rebuilt = '\uFEFF' + rebuilt;
+    }
+    fs.writeFileSync(CONFIG_FILE, rebuilt + lineEnding, 'utf-8');
+
+    const currentModels = readCurrentModels();
+    if (currentModels[sourceName] && !currentModels[targetName]) {
+        currentModels[targetName] = currentModels[sourceName];
+        writeCurrentModels(currentModels);
+    }
+
+    if (!silent) {
+        console.log(`✓ 已复制提供商: ${sourceName} -> ${targetName}`);
+        console.log();
+    }
+    return targetName;
+}
+
 // 添加模型
 function cmdAddModel(modelName, silent = false) {
     if (!modelName) {
@@ -5099,7 +5249,8 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                                     url: p.base_url || '',
                                     key: maskKey(p.preferred_auth_method || ''),
                                     hasKey: !!(p.preferred_auth_method && p.preferred_auth_method.trim()),
-                                    current: name === current
+                                    current: name === current,
+                                    official: isOfficialProvider(p, name)
                                 }))
                             };
                             break;
@@ -5150,9 +5301,46 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                         case 'update-provider':
                             result = updateProviderInConfig(params || {});
                             break;
+                        case 'duplicate-provider':
+                            try {
+                                const source = params && params.source ? params.source : '';
+                                const target = params && params.target ? params.target : '';
+                                const newName = cmdDuplicateProvider(source, target, true);
+                                result = { success: true, name: newName };
+                            } catch (e) {
+                                result = { error: e.message || '复制失败' };
+                            }
+                            break;
                         case 'delete-provider':
                             result = deleteProviderFromConfig(params || {});
                             break;
+                        case 'switch-official':
+                            try {
+                                const switchedModel = cmdSwitchOfficial({ name: params && params.name, silent: true });
+                                result = { success: true, provider: params && params.name ? params.name : 'openai', model: switchedModel };
+                            } catch (e) {
+                                result = { error: e.message || '切回官方失败' };
+                            }
+                            break;
+                        case 'forward-start': {
+                            try {
+                                if (g_forwardServer) {
+                                    await stopForwardServer();
+                                }
+                                const port = params && params.port ? params.port : DEFAULT_FORWARD_PORT;
+                                const provider = params && params.provider ? params.provider : '';
+                                g_forwardServer = startForwardServer({ port, provider });
+                                result = { success: true, port: g_forwardServer.port, target: g_forwardServer.target, provider: g_forwardServer.provider };
+                            } catch (e) {
+                                result = { error: e.message || '启动转发失败' };
+                            }
+                            break;
+                        }
+                        case 'forward-stop': {
+                            const stopped = await stopForwardServer();
+                            result = { success: true, stopped: !!stopped.stopped };
+                            break;
+                        }
                         case 'get-recent-configs':
                             result = { items: readRecentConfigs() };
                             break;
@@ -5581,6 +5769,142 @@ async function runProxyCommand(displayName, binNames, args = [], installTip = ''
     });
 }
 
+function parseForwardOptions(args = []) {
+    const options = {
+        port: DEFAULT_FORWARD_PORT,
+        provider: ''
+    };
+    if (!Array.isArray(args)) return options;
+    for (let i = 0; i < args.length; i++) {
+        const arg = args[i];
+        if (!arg) continue;
+        if (arg === '--port') {
+            const next = args[i + 1];
+            if (next && /^\d+$/.test(next)) {
+                options.port = parseInt(next, 10);
+            }
+            i += 1;
+            continue;
+        }
+        if (arg.startsWith('--port=')) {
+            const raw = arg.slice('--port='.length);
+            if (raw && /^\d+$/.test(raw)) {
+                options.port = parseInt(raw, 10);
+            }
+            continue;
+        }
+        if (arg === '--provider') {
+            options.provider = args[i + 1] || '';
+            i += 1;
+            continue;
+        }
+        if (arg.startsWith('--provider=')) {
+            options.provider = arg.slice('--provider='.length);
+            continue;
+        }
+    }
+    if (!Number.isFinite(options.port) || options.port <= 0) {
+        options.port = DEFAULT_FORWARD_PORT;
+    }
+    return options;
+}
+
+function startForwardServer(options = {}) {
+    const { config } = readConfigOrVirtualDefault();
+    const providerName = (options.provider || config.model_provider || '').trim();
+    const providers = config.model_providers || {};
+    const provider = providerName ? providers[providerName] : null;
+    const baseUrl = normalizeBaseUrl(
+        provider && provider.base_url ? provider.base_url : DEFAULT_OFFICIAL_BASE_URL
+    );
+
+    if (!isValidHttpUrl(baseUrl)) {
+        throw new Error(`base_url 无效，无法启动转发: ${baseUrl || '(空)'}`);
+    }
+
+    const target = new URL(baseUrl);
+    const transport = target.protocol === 'https:' ? https : http;
+    const requiresAuth = provider ? provider.requires_openai_auth !== false : true;
+    const apiKeyEnv = process.env.CODEXMATE_FORWARD_API_KEY;
+    const apiKey = typeof apiKeyEnv === 'string' && apiKeyEnv.trim()
+        ? apiKeyEnv.trim()
+        : (provider && typeof provider.preferred_auth_method === 'string'
+            ? provider.preferred_auth_method.trim()
+            : '');
+
+    const server = http.createServer((req, res) => {
+        const upstreamPath = req.url || '/';
+        const url = `${target.origin}${upstreamPath}`;
+        const headers = { ...req.headers };
+        headers.host = target.host;
+
+        const incomingAuth = headers['authorization'];
+        const finalAuth = incomingAuth && String(incomingAuth).trim()
+            ? incomingAuth
+            : (requiresAuth && apiKey ? `Bearer ${apiKey}` : '');
+        if (finalAuth) {
+            headers['authorization'] = finalAuth;
+        } else {
+            delete headers['authorization'];
+        }
+
+        const proxyReq = transport.request(url, {
+            method: req.method,
+            headers,
+            agent: target.protocol === 'https:' ? HTTPS_KEEP_ALIVE_AGENT : HTTP_KEEP_ALIVE_AGENT,
+            timeout: SPEED_TEST_TIMEOUT_MS
+        }, (proxyRes) => {
+            res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
+            proxyRes.pipe(res);
+        });
+
+        proxyReq.on('timeout', () => {
+            proxyReq.destroy(new Error('timeout'));
+        });
+
+        proxyReq.on('error', (err) => {
+            res.statusCode = 502;
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.end(JSON.stringify({ error: err.message || 'proxy error' }));
+        });
+
+        req.pipe(proxyReq);
+    });
+
+    server.on('clientError', (err, socket) => {
+        try { socket.end('HTTP/1.1 400 Bad Request\r\n\r\n'); } catch (_) {}
+    });
+
+    const port = Number(options.port) || DEFAULT_FORWARD_PORT;
+    server.listen(port, '127.0.0.1', () => {
+        console.log(`\n✓ 转发服务已启动 -> ${baseUrl}`);
+        console.log(`  监听: http://127.0.0.1:${port}`);
+        if (providerName) {
+            console.log(`  Provider: ${providerName}`);
+        }
+        if (requiresAuth && !apiKey) {
+            console.log('! 警告: 当前为鉴权接口，但未发现密钥，需在请求头带上 Authorization。');
+        }
+        console.log('  按 Ctrl+C 退出\n');
+    });
+
+    const stop = () => new Promise(resolve => {
+        server.close(() => resolve());
+        setTimeout(() => resolve(), 500);
+    });
+
+    return { server, stop, port, target: baseUrl, provider: providerName };
+}
+
+async function stopForwardServer() {
+    if (!g_forwardServer) return { stopped: false };
+    try {
+        await g_forwardServer.stop();
+    } catch (_) {}
+    g_forwardServer = null;
+    return { stopped: true };
+}
+
 async function cmdCodex(args = []) {
     return runProxyCommand('Codex', 'codex', args);
 }
@@ -5613,6 +5937,8 @@ async function main() {
         console.log('  codexmate switch <名称>    切换提供商');
         console.log('  codexmate use <模型>       切换模型');
         console.log('  codexmate add <名称> <URL> [密钥]');
+        console.log('  codexmate official         切回官方提供商（自动创建预设）');
+        console.log('  codexmate forward [--provider <名称>] [--port <端口>]  启动本地转发代理');
         console.log('  codexmate delete <名称>    删除提供商');
         console.log('  codexmate claude <BaseURL> <API密钥> [模型]  写入 Claude Code 配置');
         console.log('  codexmate add-model <模型> 添加模型');
@@ -5638,10 +5964,22 @@ async function main() {
         case 'switch': cmdSwitch(args[1]); break;
         case 'use': cmdUseModel(args[1]); break;
         case 'add': cmdAdd(args[1], args[2], args[3]); break;
+        case 'official':
+        case 'switch-official': cmdSwitchOfficial({ name: args[1] }); break;
         case 'delete': cmdDelete(args[1]); break;
         case 'claude': cmdClaude(args[1], args[2], args[3]); break;
         case 'add-model': cmdAddModel(args[1]); break;
         case 'delete-model': cmdDeleteModel(args[1]); break;
+        case 'forward': {
+            try {
+                const opts = parseForwardOptions(args.slice(1));
+                startForwardServer(opts);
+            } catch (e) {
+                console.error('错误: 启动转发失败:', e.message || e);
+                process.exit(1);
+            }
+            break;
+        }
         case 'run': cmdStart(parseStartOptions(args.slice(1))); break;
         case 'start':
             console.error('错误: 命令已更名为 "run"，请使用: codexmate run');
@@ -5690,4 +6028,3 @@ main().catch((err) => {
     console.error('错误:', err && err.message ? err.message : err);
     process.exit(1);
 });
-

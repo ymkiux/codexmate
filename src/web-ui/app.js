@@ -136,6 +136,13 @@
                     claudeSpeedResults: {},
                     claudeSpeedLoading: {},
                     claudeShareLoading: {},
+                    duplicateLoading: {},
+                    switchingOfficial: false,
+                    forwardLoading: false,
+                    forwardRunning: false,
+                    forwardPort: 15721,
+                    forwardProvider: '',
+                    forwardTarget: '',
                     providerShareLoading: {},
                     installCommands: [
                         'npm install -g @anthropic-ai/claude-code',
@@ -298,6 +305,9 @@
                         } else {
                             this.currentProvider = statusRes.provider;
                             this.currentModel = statusRes.model;
+                            if (!this.forwardProvider && this.currentProvider) {
+                                this.forwardProvider = this.currentProvider;
+                            }
                             {
                                 const tier = typeof statusRes.serviceTier === 'string'
                                     ? statusRes.serviceTier.trim().toLowerCase()
@@ -1314,6 +1324,51 @@
                         this.currentModel = this.models[0];
                     }
                     await this.applyCodexConfigDirect({ silent: true });
+                },
+
+                openOfficialOAuth() {
+                    const url = 'https://chatgpt.com/codex';
+                    try {
+                        window.open(url, '_blank', 'noopener');
+                    } catch (e) {
+                        location.href = url;
+                    }
+                },
+
+                async switchOfficial() {
+                    if (this.switchingOfficial) return;
+                    this.switchingOfficial = true;
+                    try {
+                        const res = await api('switch-official', { name: 'openai' });
+                        if (res && res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        this.showMessage('已切回官方提供商', 'success');
+                        await this.loadAll();
+                    } catch (e) {
+                        this.showMessage('切换官方失败', 'error');
+                    } finally {
+                        this.switchingOfficial = false;
+                    }
+                },
+
+                async switchOfficial() {
+                    if (this.switchingOfficial) return;
+                    this.switchingOfficial = true;
+                    try {
+                        const res = await api('switch-official', { name: 'openai' });
+                        if (res && res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        this.showMessage('已切回官方提供商', 'success');
+                        await this.loadAll();
+                    } catch (e) {
+                        this.showMessage('切换官方失败', 'error');
+                    } finally {
+                        this.switchingOfficial = false;
+                    }
                 },
 
                 async onModelChange() {
@@ -2905,6 +2960,29 @@
                     return buildSpeedTestIssue(name, result);
                 },
 
+                async duplicateProvider(provider) {
+                    const name = provider && typeof provider.name === 'string' ? provider.name.trim() : '';
+                    if (!name) {
+                        this.showMessage('参数无效', 'error');
+                        return;
+                    }
+                    if (this.duplicateLoading[name]) return;
+                    this.duplicateLoading[name] = true;
+                    try {
+                        const res = await api('duplicate-provider', { source: name });
+                        if (res && res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        this.showMessage(`已复制提供商到 ${res && res.name ? res.name : `${name}-copy`}`, 'success');
+                        await this.loadAll();
+                    } catch (e) {
+                        this.showMessage('复制失败', 'error');
+                    } finally {
+                        this.duplicateLoading[name] = false;
+                    }
+                },
+
                 async runSpeedTest(name, options = {}) {
                     if (!name || this.speedLoading[name]) return null;
                     const silent = !!options.silent;
@@ -2933,6 +3011,48 @@
                         return { ok: false, error: message };
                     } finally {
                         this.speedLoading[name] = false;
+                    }
+                },
+
+                async startForward() {
+                    if (this.forwardLoading) return;
+                    this.forwardLoading = true;
+                    try {
+                        const provider = (this.forwardProvider || this.currentProvider || '').trim();
+                        const port = Number(this.forwardPort) || 15721;
+                        const res = await api('forward-start', { provider, port });
+                        if (res && res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        this.forwardRunning = true;
+                        this.forwardPort = res.port || port;
+                        this.forwardProvider = res.provider || provider;
+                        this.forwardTarget = res.target || '';
+                        this.showMessage(`转发已启动：127.0.0.1:${this.forwardPort} -> ${this.forwardTarget || '(未知)'}`, 'success');
+                    } catch (e) {
+                        this.showMessage('转发启动失败', 'error');
+                    } finally {
+                        this.forwardLoading = false;
+                    }
+                },
+
+                async stopForward() {
+                    if (this.forwardLoading) return;
+                    this.forwardLoading = true;
+                    try {
+                        const res = await api('forward-stop', {});
+                        if (res && res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        this.forwardRunning = false;
+                        this.forwardTarget = '';
+                        this.showMessage('转发已停止', 'success');
+                    } catch (e) {
+                        this.showMessage('停止失败', 'error');
+                    } finally {
+                        this.forwardLoading = false;
                     }
                 },
 
@@ -3164,4 +3284,3 @@
         app.mount('#app');
     });
     
-

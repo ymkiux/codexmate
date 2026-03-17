@@ -249,12 +249,12 @@
                 <!-- 内容包裹器 - 稳定布局 -->
                 <div class="content-wrapper">
                     <!-- Codex 配置模式 -->
-                    <div
-                        v-show="mainTab === 'config' && configMode === 'codex'"
-                        class="mode-content mode-cards"
-                        id="panel-config-codex"
-                        role="tabpanel"
-                        :aria-labelledby="'tab-config-codex'">
+                <div
+                    v-show="mainTab === 'config' && configMode === 'codex'"
+                    class="mode-content mode-cards"
+                    id="panel-config-codex"
+                    role="tabpanel"
+                    :aria-labelledby="'tab-config-codex'">
                 <!-- 添加提供商按钮 -->
                 <button class="btn-add" @click="showAddModal = true" v-if="!loading && !initError">
                     <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
@@ -262,6 +262,14 @@
                     </svg>
                     添加提供商
                 </button>
+                <div class="inline-actions" v-if="!loading && !initError">
+                    <button class="btn-tool" @click="switchOfficial" :disabled="switchingOfficial">
+                        {{ switchingOfficial ? '切换中...' : '切回官方（自动创建预设）' }}
+                    </button>
+                    <button class="btn-tool" @click="openOfficialOAuth">
+                        打开官方登录（浏览器 OAuth）
+                    </button>
+                </div>
 
                 <!-- 模型选择器 -->
                 <div class="selector-section">
@@ -374,6 +382,9 @@
                             </div>
                         </div>
                         <div class="card-trailing">
+                            <span v-if="provider.official" class="pill official">
+                                官方
+                            </span>
                             <span :class="['pill', provider.hasKey ? 'configured' : 'empty']">
                                 {{ provider.hasKey ? '已配置' : '未配置' }}
                             </span>
@@ -391,6 +402,12 @@
                                         <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/>
                                         <path d="M16 6l-4-4-4 4"/>
                                         <path d="M12 2v14"/>
+                                    </svg>
+                                </button>
+                                <button class="card-action-btn" :class="{ loading: duplicateLoading[provider.name] }" @click="duplicateProvider(provider)" title="复制提供商">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="4" y="4" width="12" height="12" rx="2" ry="2"/>
+                                        <path d="M8 8h12v12H8z"/>
                                     </svg>
                                 </button>
                                 <button class="card-action-btn" @click="openEditModal(provider)" title="编辑">
@@ -838,15 +855,43 @@
                         <button class="btn-tool" @click="downloadCodexDirectory" :disabled="codexDownloadLoading">
                             {{ codexDownloadLoading ? ('备份中 ' + codexDownloadProgress + '%') : '一键备份 ~/.codex' }}
                         </button>
-                        <button class="btn-tool" @click="triggerCodexImport" :disabled="codexImportLoading">
-                            {{ codexImportLoading ? '导入中...' : '导入 ~/.codex 备份' }}
-                        </button>
-                        <input
-                            ref="codexImportInput"
-                            class="sr-only"
-                            type="file"
-                            accept=".zip"
-                            @change="handleCodexImportChange">
+                    <button class="btn-tool" @click="triggerCodexImport" :disabled="codexImportLoading">
+                        {{ codexImportLoading ? '导入中...' : '导入 ~/.codex 备份' }}
+                    </button>
+                    <input
+                        ref="codexImportInput"
+                        class="sr-only"
+                        type="file"
+                        accept=".zip"
+                        @change="handleCodexImportChange">
+                </div>
+                    <div class="selector-section">
+                        <div class="selector-header">
+                            <span class="selector-title">官方 OAuth / 转发（含上传）</span>
+                        </div>
+                        <div class="form-hint">1) 点击“打开官方登录”在浏览器完成 OAuth；2) 终端无法直连时，可启用本地转发（支持上传流量）。</div>
+                        <div class="form-group-inline">
+                            <label class="form-label">提供商</label>
+                            <select v-model="forwardProvider" class="form-input">
+                                <option value="">当前: {{ currentProvider || '未选择' }}</option>
+                                <option v-for="p in providersList" :key="p.name" :value="p.name">{{ p.name }}</option>
+                            </select>
+                        </div>
+                        <div class="form-group-inline">
+                            <label class="form-label">端口</label>
+                            <input v-model.number="forwardPort" type="number" min="1" class="form-input" placeholder="默认 15721">
+                        </div>
+                        <div class="btn-group-inline">
+                            <button class="btn-tool" @click="startForward" :disabled="forwardLoading">
+                                {{ forwardLoading ? '启动中...' : '启动转发' }}
+                            </button>
+                            <button class="btn-tool" @click="stopForward" :disabled="forwardLoading || !forwardRunning">
+                                停止转发
+                            </button>
+                        </div>
+                        <div class="form-hint" v-if="forwardRunning">
+                            已启用：127.0.0.1:{{ forwardPort }} → {{ forwardTarget || '(未知)' }}
+                        </div>
                     </div>
                 </div>
 
@@ -880,6 +925,7 @@
                 <div class="form-group">
                     <label class="form-label">认证密钥</label>
                     <input v-model="newProvider.key" class="form-input" placeholder="sk-...">
+                    <div class="form-hint">官方登录无需填写 API Key，可直接使用“切回官方”。</div>
                 </div>
 
                 <div class="btn-group">
@@ -1371,4 +1417,3 @@
     <script type="module" src="web-ui/app.js"></script>
 </body>
 </html>
-
