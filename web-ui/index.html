@@ -266,7 +266,7 @@
                     <button class="btn-tool" @click="switchOfficial" :disabled="switchingOfficial">
                         {{ switchingOfficial ? '切换中...' : '切回官方（自动创建预设）' }}
                     </button>
-                    <button class="btn-tool" @click="openOfficialOAuth">
+                    <button class="btn-tool btn-tool-primary" @click="openOfficialOAuth">
                         打开官方登录（浏览器 OAuth）
                     </button>
                 </div>
@@ -407,7 +407,7 @@
                                 <button class="card-action-btn" :class="{ loading: duplicateLoading[provider.name] }" @click="duplicateProvider(provider)" title="复制提供商">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <rect x="4" y="4" width="12" height="12" rx="2" ry="2"/>
-                                        <path d="M8 8h12v12H8z"/>
+                                        <rect x="8" y="8" width="12" height="12" rx="2" ry="2"/>
                                     </svg>
                                 </button>
                                 <button class="card-action-btn" @click="openEditModal(provider)" title="编辑">
@@ -867,7 +867,10 @@
                 </div>
                     <div class="selector-section">
                         <div class="selector-header">
-                            <span class="selector-title">官方 OAuth / 转发（含上传）</span>
+                            <span class="selector-title">
+                                官方 OAuth / 转发（含上传）
+                                <span v-if="forwardRunning" class="pill configured" style="margin-left:8px;vertical-align:middle;">运行中</span>
+                            </span>
                         </div>
                         <div class="form-hint">1) 点击“打开官方登录”在浏览器完成 OAuth；2) 终端无法直连时，可启用本地转发（支持上传流量）。</div>
                         <div class="form-group-inline">

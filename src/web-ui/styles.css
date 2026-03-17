@@ -1204,6 +1204,18 @@ body::after {
     box-shadow: 0 4px 8px rgba(210, 107, 90, 0.12);
 }
 
+.btn-tool.btn-tool-primary {
+    background: linear-gradient(135deg, var(--color-brand) 0%, var(--color-brand-dark) 100%);
+    color: #ffffff;
+    border-color: transparent;
+    box-shadow: 0 3px 10px rgba(208, 88, 58, 0.28);
+}
+
+.btn-tool.btn-tool-primary:hover {
+    filter: brightness(1.06);
+    box-shadow: 0 5px 12px rgba(208, 88, 58, 0.32);
+}
+
 .btn-tool-compact {
     padding: 9px 12px;
     font-size: var(--font-size-secondary);
