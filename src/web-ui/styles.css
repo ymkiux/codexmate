@@ -947,6 +947,9 @@ body::after {
     margin-bottom: 16px;
     box-shadow: var(--shadow-card);
     border: 1px solid var(--color-border-soft);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
 }
 
 .selector-header {
@@ -1172,10 +1175,13 @@ body::after {
     transition: all var(--transition-fast) var(--ease-spring);
     box-shadow: var(--shadow-subtle);
     letter-spacing: -0.01em;
+    width: 100%;
+    text-align: center;
 }
 
 .selector-section .btn-tool + .btn-tool {
-    margin-left: var(--spacing-sm);
+    margin-left: 0;
+    margin-top: var(--spacing-xs);
 }
 
 .btn-tool:hover {
@@ -2876,4 +2882,3 @@ textarea:focus-visible {
         border-radius: var(--radius-lg);
     }
 }
-
