@@ -74,6 +74,7 @@ const CLAUDE_SETTINGS_FILE = path.join(CLAUDE_DIR, 'settings.json');
 const CLAUDE_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
 const RECENT_CONFIGS_FILE = path.join(CONFIG_DIR, 'recent-configs.json');
 const DEFAULT_CLAUDE_MODEL = 'glm-4.7';
+const CODEX_BACKUP_NAME = 'codex-config';
 
 const DEFAULT_MODELS = ['gpt-5.3-codex', 'gpt-5.1-codex-max', 'gpt-4-turbo', 'gpt-4'];
 const SPEED_TEST_TIMEOUT_MS = 8000;
@@ -4365,6 +4366,75 @@ function readClaudeSettingsInfo() {
     };
 }
 
+// API: 打包 Claude 配置目录（优先 7-Zip，多线程存储；次选系统 zip；再降级 zip-lib）
+async function prepareClaudeDirDownload() {
+    try {
+        if (!fs.existsSync(CLAUDE_DIR)) {
+            return { error: 'Claude 配置目录不存在', path: CLAUDE_DIR };
+        }
+
+        const tempDir = os.tmpdir();
+        const timestamp = Date.now();
+        const zipFileName = `claude-config-${timestamp}.zip`;
+        const zipFilePath = path.join(tempDir, zipFileName);
+
+        const zipTool = resolveZipTool();
+        if (zipTool.type === '7z') {
+            const cmd = `"${zipTool.cmd}" a -tzip -mmt=on -mx=0 "${zipFilePath}" "${CLAUDE_DIR}"`;
+            execSync(cmd, { stdio: 'ignore' });
+        } else if (zipTool.type === 'zip') {
+            const cmd = `"${zipTool.cmd}" -0 -q -r "${zipFilePath}" "${CLAUDE_DIR}"`;
+            execSync(cmd, { stdio: 'ignore' });
+        } else {
+            await zipLib.archiveFolder(CLAUDE_DIR, zipFilePath);
+        }
+
+        return {
+            success: true,
+            downloadPath: zipFilePath,
+            fileName: zipFileName,
+            sourcePath: CLAUDE_DIR
+        };
+    } catch (e) {
+        return { error: `打包失败：${e.message}` };
+    }
+}
+
+
+// API: 打包 Codex 配置目录（同策略）
+async function prepareCodexDirDownload() {
+    try {
+        if (!fs.existsSync(CONFIG_DIR)) {
+            return { error: 'Codex 配置目录不存在', path: CONFIG_DIR };
+        }
+
+        const tempDir = os.tmpdir();
+        const timestamp = Date.now();
+        const zipFileName = `${CODEX_BACKUP_NAME}-${timestamp}.zip`;
+        const zipFilePath = path.join(tempDir, zipFileName);
+
+        const zipTool = resolveZipTool();
+        if (zipTool.type === '7z') {
+            const cmd = `"${zipTool.cmd}" a -tzip -mmt=on -mx=0 "${zipFilePath}" "${CONFIG_DIR}"`;
+            execSync(cmd, { stdio: 'ignore' });
+        } else if (zipTool.type === 'zip') {
+            const cmd = `"${zipTool.cmd}" -0 -q -r "${zipFilePath}" "${CONFIG_DIR}"`;
+            execSync(cmd, { stdio: 'ignore' });
+        } else {
+            await zipLib.archiveFolder(CONFIG_DIR, zipFilePath);
+        }
+
+        return {
+            success: true,
+            downloadPath: zipFilePath,
+            fileName: zipFileName,
+            sourcePath: CONFIG_DIR
+        };
+    } catch (e) {
+        return { error: `打包失败：${e.message}` };
+    }
+}
+
 // CLI: 一行写入 Claude Code 配置
 function cmdClaude(baseUrl, apiKey, model, silent = false) {
     const normalizedBaseUrl = typeof baseUrl === 'string' ? baseUrl.trim() : '';
@@ -4425,6 +4495,10 @@ const SEVEN_ZIP_PATHS = [
     '7z'
 ];
 
+const ZIP_PATHS = [
+    'zip'
+];
+
 function findSevenZipExecutable() {
     for (const candidate of SEVEN_ZIP_PATHS) {
         try {
@@ -4440,10 +4514,29 @@ function findSevenZipExecutable() {
     return null;
 }
 
+function findZipExecutable() {
+    for (const candidate of ZIP_PATHS) {
+        try {
+            if (candidate === 'zip') {
+                if (commandExists('zip', '--help')) {
+                    return 'zip';
+                }
+            } else if (fs.existsSync(candidate)) {
+                return candidate;
+            }
+        } catch (e) {}
+    }
+    return null;
+}
+
 function resolveZipTool() {
     const sevenZipExe = findSevenZipExecutable();
     if (sevenZipExe) {
         return { type: '7z', cmd: sevenZipExe };
+    }
+    const zipExe = findZipExecutable();
+    if (zipExe) {
+        return { type: 'zip', cmd: zipExe };
     }
     return { type: 'lib', cmd: 'zip-lib' };
 }
@@ -5065,6 +5158,12 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                         case 'session-plain':
                             result = await readSessionPlain(params);
                             break;
+                        case 'download-claude-dir':
+                            result = await prepareClaudeDirDownload();
+                            break;
+                        case 'download-codex-dir':
+                            result = await prepareCodexDirDownload();
+                            break;
                         default:
                             result = { error: '未知操作' };
                     }
@@ -5105,9 +5204,37 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                 : ext === '.css'
                     ? 'text/css; charset=utf-8'
                     : ext === '.json'
-                        ? 'application/json; charset=utf-8'
+                    ? 'application/json; charset=utf-8'
                         : 'application/octet-stream';
             res.writeHead(200, { 'Content-Type': mime });
+            fs.createReadStream(filePath).pipe(res);
+        } else if (requestPath.startsWith('/download/')) {
+            const fileName = requestPath.slice('/download/'.length);
+            const decodedFileName = decodeURIComponent(fileName);
+            const tempDir = os.tmpdir();
+            const filePath = path.join(tempDir, decodedFileName);
+
+            if (!isPathInside(filePath, tempDir)) {
+                res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+                res.end('Forbidden');
+                return;
+            }
+            if (!fs.existsSync(filePath)) {
+                res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+                res.end('File Not Found');
+                return;
+            }
+            const stat = fs.statSync(filePath);
+            if (!stat.isFile()) {
+                res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+                res.end('Not a File');
+                return;
+            }
+            res.writeHead(200, {
+                'Content-Type': 'application/zip',
+                'Content-Disposition': `attachment; filename="${path.basename(filePath)}"`,
+                'Content-Length': stat.size
+            });
             fs.createReadStream(filePath).pipe(res);
         } else if (requestPath.startsWith('/res/')) {
             const normalized = path.normalize(requestPath).replace(/^([\\.\\/])+/, '');

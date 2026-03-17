@@ -64,6 +64,15 @@
                 aria-controls="panel-sessions"
                 :class="{ active: mainTab === 'sessions' }"
                 @click="switchMainTab('sessions')">会话浏览</button>
+            <button class="top-tab"
+                id="tab-settings"
+                role="tab"
+                :tabindex="mainTab === 'settings' ? 0 : -1"
+                :aria-selected="mainTab === 'settings'"
+                :aria-pressed="mainTab === 'settings'"
+                aria-controls="panel-settings"
+                :class="{ active: mainTab === 'settings' }"
+                @click="switchMainTab('settings')">设置</button>
         </div>
 
         <div :class="['app-shell', { standalone: sessionStandalone }]">
@@ -147,17 +156,35 @@
                         </div>
                     </button>
                 </div>
+
+                <div class="side-section" role="tablist" aria-label="设置">
+                    <div class="side-section-title">设置</div>
+                    <button
+                        role="tab"
+                        id="side-tab-settings"
+                        aria-controls="panel-settings"
+                        :tabindex="mainTab === 'settings' ? 0 : -1"
+                        :aria-selected="mainTab === 'settings'"
+                        :aria-pressed="mainTab === 'settings'"
+                        :class="['side-item', { active: mainTab === 'settings' }]"
+                        @click="switchMainTab('settings')">
+                        <div class="side-item-title">设置</div>
+                        <div class="side-item-meta">
+                            <span>数据管理 / 下载</span>
+                        </div>
+                    </button>
+                </div>
             </aside>
             <main class="main-panel">
                 <div class="panel-header" v-if="!sessionStandalone">
                     <h1 class="main-title">
-                        {{ mainTab === 'config' ? '配置中心' : '会话浏览' }}
+                        {{ mainTab === 'config' ? '配置中心' : (mainTab === 'sessions' ? '会话浏览' : '设置') }}
                     </h1>
                     <p class="subtitle" v-if="mainTab === 'config'">
                         配置中枢：管理 Codex / Claude / OpenClaw
                         <span class="sr-only">本地配置中枢，统一管理 Codex / Claude Code / OpenClaw。</span>
                     </p>
-                    <p class="subtitle" v-else>
+                    <p class="subtitle" v-else-if="mainTab === 'sessions'">
                         浏览、导出或独立查看 Codex / Claude 会话记录。
                     </p>
                 </div>
@@ -779,6 +806,31 @@
                 </div>
                 </div>
             </div>
+
+                <!-- 设置面板 -->
+                <div
+                    v-show="mainTab === 'settings'"
+                    class="mode-content"
+                    id="panel-settings"
+                    role="tabpanel"
+                    :aria-labelledby="'tab-settings'">
+                    <div class="selector-section">
+                        <div class="selector-header">
+                            <span class="selector-title">Claude 配置</span>
+                        </div>
+                        <button class="btn-tool" @click="downloadClaudeDirectory" :disabled="claudeDownloadLoading">
+                            {{ claudeDownloadLoading ? ('备份中 ' + claudeDownloadProgress + '%') : '一键备份 ~/.claude' }}
+                        </button>
+                    </div>
+                    <div class="selector-section">
+                        <div class="selector-header">
+                            <span class="selector-title">Codex 配置</span>
+                        </div>
+                        <button class="btn-tool" @click="downloadCodexDirectory" :disabled="codexDownloadLoading">
+                            {{ codexDownloadLoading ? ('备份中 ' + codexDownloadProgress + '%') : '一键备份 ~/.codex' }}
+                        </button>
+                    </div>
+                </div>
 
             <!-- 加载状态 -->
             <div v-if="loading" class="state-message">

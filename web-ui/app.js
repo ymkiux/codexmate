@@ -209,7 +209,13 @@
                     openclawMissingProviders: [],
                     healthCheckLoading: false,
                     healthCheckResult: null,
-                    healthCheckRemote: false
+                    healthCheckRemote: false,
+                    claudeDownloadLoading: false,
+                    claudeDownloadProgress: 0,
+                    claudeDownloadTimer: null,
+                    codexDownloadLoading: false,
+                    codexDownloadProgress: 0,
+                    codexDownloadTimer: null
                 }
             },
             mounted() {
@@ -2952,6 +2958,90 @@
                         return res;
                     } finally {
                         this.claudeSpeedLoading[name] = false;
+                    }
+                },
+
+                async downloadClaudeDirectory() {
+                    if (this.claudeDownloadLoading) return;
+                    this.claudeDownloadLoading = true;
+                    this.claudeDownloadProgress = 5;
+                    this.claudeDownloadTimer = setInterval(() => {
+                        if (this.claudeDownloadProgress < 90) {
+                            this.claudeDownloadProgress += 5;
+                        }
+                    }, 400);
+                    try {
+                        const res = await api('download-claude-dir');
+                        if (res && res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        if (!res || res.success !== true || !res.fileName) {
+                            this.showMessage('备份失败', 'error');
+                            return;
+                        }
+                        this.claudeDownloadProgress = 100;
+                        const downloadUrl = `/download/${encodeURIComponent(res.fileName)}`;
+                        const link = document.createElement('a');
+                        link.href = downloadUrl;
+                        link.download = res.fileName;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        this.showMessage('备份成功，开始下载', 'success');
+                    } catch (e) {
+                        this.showMessage('备份失败：' + (e && e.message ? e.message : '未知错误'), 'error');
+                    } finally {
+                        if (this.claudeDownloadTimer) {
+                            clearInterval(this.claudeDownloadTimer);
+                            this.claudeDownloadTimer = null;
+                        }
+                        this.claudeDownloadLoading = false;
+                        setTimeout(() => {
+                            this.claudeDownloadProgress = 0;
+                        }, 800);
+                    }
+                },
+
+                async downloadCodexDirectory() {
+                    if (this.codexDownloadLoading) return;
+                    this.codexDownloadLoading = true;
+                    this.codexDownloadProgress = 5;
+                    this.codexDownloadTimer = setInterval(() => {
+                        if (this.codexDownloadProgress < 90) {
+                            this.codexDownloadProgress += 5;
+                        }
+                    }, 400);
+                    try {
+                        const res = await api('download-codex-dir');
+                        if (res && res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        if (!res || res.success !== true || !res.fileName) {
+                            this.showMessage('备份失败', 'error');
+                            return;
+                        }
+                        this.codexDownloadProgress = 100;
+                        const downloadUrl = `/download/${encodeURIComponent(res.fileName)}`;
+                        const link = document.createElement('a');
+                        link.href = downloadUrl;
+                        link.download = res.fileName;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        this.showMessage('备份成功，开始下载', 'success');
+                    } catch (e) {
+                        this.showMessage('备份失败：' + (e && e.message ? e.message : '未知错误'), 'error');
+                    } finally {
+                        if (this.codexDownloadTimer) {
+                            clearInterval(this.codexDownloadTimer);
+                            this.codexDownloadTimer = null;
+                        }
+                        this.codexDownloadLoading = false;
+                        setTimeout(() => {
+                            this.codexDownloadProgress = 0;
+                        }, 800);
                     }
                 },
 
