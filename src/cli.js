@@ -4384,7 +4384,7 @@ function readClaudeSettingsInfo() {
     };
 }
 
-// API: 打包 Claude 配置目录（优先 7-Zip 其次系统 zip，最后 zip-lib）
+// API: 打包 Claude 配置目录（系统 zip 可用则使用，否则回退 zip-lib）
 async function prepareClaudeDirDownload() {
     try {
         if (!fs.existsSync(CLAUDE_DIR)) {
@@ -4397,10 +4397,7 @@ async function prepareClaudeDirDownload() {
         const zipFilePath = path.join(tempDir, zipFileName);
 
         const zipTool = resolveZipTool();
-        if (zipTool.type === '7z') {
-            const cmd = `"${zipTool.cmd}" a -tzip -mmt=on -mx=0 "${zipFilePath}" "${CLAUDE_DIR}"`;
-            execSync(cmd, { stdio: 'ignore' });
-        } else if (zipTool.type === 'zip') {
+        if (zipTool.type === 'zip') {
             const cmd = `"${zipTool.cmd}" -0 -q -r "${zipFilePath}" "${CLAUDE_DIR}"`;
             execSync(cmd, { stdio: 'ignore' });
         } else {
@@ -4431,10 +4428,7 @@ async function prepareCodexDirDownload() {
         const zipFilePath = path.join(tempDir, zipFileName);
 
         const zipTool = resolveZipTool();
-        if (zipTool.type === '7z') {
-            const cmd = `"${zipTool.cmd}" a -tzip -mmt=on -mx=0 "${zipFilePath}" "${CONFIG_DIR}"`;
-            execSync(cmd, { stdio: 'ignore' });
-        } else if (zipTool.type === 'zip') {
+        if (zipTool.type === 'zip') {
             const cmd = `"${zipTool.cmd}" -0 -q -r "${zipFilePath}" "${CONFIG_DIR}"`;
             execSync(cmd, { stdio: 'ignore' });
         } else {
@@ -4495,11 +4489,6 @@ function writeUploadZip(base64, prefix, originalName = '') {
 async function extractUploadZip(zipPath, extractDir) {
     const unzipTool = resolveUnzipTool();
     ensureDir(extractDir);
-    if (unzipTool.type === '7z') {
-        const cmd = `"${unzipTool.cmd}" x -mmt=on -o"${extractDir}" "${zipPath}" -y`;
-        execSync(cmd, { stdio: 'ignore' });
-        return;
-    }
     await unzipWithLibrary(zipPath, extractDir);
 }
 
@@ -4540,10 +4529,7 @@ async function backupDirectoryIfExists(dirPath, prefix) {
     const zipTool = resolveZipTool();
 
     try {
-        if (zipTool.type === '7z') {
-            const cmd = `"${zipTool.cmd}" a -tzip -mmt=on -mx=0 "${zipFilePath}" "${dirPath}"`;
-            execSync(cmd, { stdio: 'ignore' });
-        } else if (zipTool.type === 'zip') {
+        if (zipTool.type === 'zip') {
             const cmd = `"${zipTool.cmd}" -0 -q -r "${zipFilePath}" "${dirPath}"`;
             execSync(cmd, { stdio: 'ignore' });
         } else {
@@ -4671,30 +4657,9 @@ function commandExists(command, args = '') {
     }
 }
 
-const SEVEN_ZIP_PATHS = [
-    'C:\\Program Files\\7-Zip\\7z.exe',
-    'C:\\Program Files (x86)\\7-Zip\\7z.exe',
-    '7z'
-];
-
 const ZIP_PATHS = [
     'zip'
 ];
-
-function findSevenZipExecutable() {
-    for (const candidate of SEVEN_ZIP_PATHS) {
-        try {
-            if (candidate === '7z') {
-                if (commandExists('7z', '--help')) {
-                    return '7z';
-                }
-            } else if (fs.existsSync(candidate)) {
-                return candidate;
-            }
-        } catch (e) {}
-    }
-    return null;
-}
 
 function findZipExecutable() {
     for (const candidate of ZIP_PATHS) {
@@ -4712,10 +4677,6 @@ function findZipExecutable() {
 }
 
 function resolveZipTool() {
-    const sevenZipExe = findSevenZipExecutable();
-    if (sevenZipExe) {
-        return { type: '7z', cmd: sevenZipExe };
-    }
     const zipExe = findZipExecutable();
     if (zipExe) {
         return { type: 'zip', cmd: zipExe };
@@ -4724,10 +4685,6 @@ function resolveZipTool() {
 }
 
 function resolveUnzipTool() {
-    const sevenZipExe = findSevenZipExecutable();
-    if (sevenZipExe) {
-        return { type: '7z', cmd: sevenZipExe };
-    }
     return { type: 'lib', cmd: 'zip-lib' };
 }
 
@@ -4744,7 +4701,7 @@ async function unzipWithLibrary(zipPath, outputDir) {
     await zipLib.extract(zipPath, outputDir);
 }
 
-// 压缩（7-Zip 优先）
+// 压缩（系统 zip 优先，其次 zip-lib）
 async function cmdZip(targetPath, options = {}) {
     if (!targetPath) {
         console.error('用法: codexmate zip <文件或文件夹路径> [--max:压缩级别]');
@@ -4774,40 +4731,27 @@ async function cmdZip(targetPath, options = {}) {
     const outputPath = path.join(outputDir, `${baseName}.zip`);
 
     const zipTool = resolveZipTool();
+    const useZipCmd = zipTool.type === 'zip';
 
     console.log('\n压缩配置:');
     console.log('  源路径:', absPath);
     console.log('  输出文件:', outputPath);
-    console.log('  压缩级别:', compressionLevel);
-    console.log('  压缩工具:', zipTool.type === '7z' ? '7-Zip' : 'zip-lib');
-    console.log('  多线程:', zipTool.type === '7z' ? '启用' : '未启用（JS 库）');
-    if (zipTool.type !== '7z') {
-        console.log('  提示: JS 库不支持压缩级别，已忽略 --max');
+    console.log('  压缩工具:', useZipCmd ? '系统 zip' : 'zip-lib');
+    if (useZipCmd) {
+        console.log('  压缩级别:', compressionLevel);
+    } else {
+        console.log('  压缩级别: 固定（zip-lib 不支持 --max，已忽略）');
     }
     console.log('\n开始压缩...\n');
 
     try {
-        if (zipTool.type === '7z') {
-            const cmd = `"${zipTool.cmd}" a -tzip -mmt=on -mx=${compressionLevel} "${outputPath}" "${absPath}"`;
-            const result = execSync(cmd, { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 });
-            const sizeMatch = result.match(/Archive size:\s*(\d+)\s*bytes/);
-            const filesMatch = result.match(/(\d+)\s*files/);
-
-            console.log('✓ 压缩完成!');
-            console.log('  输出文件:', outputPath);
-            if (sizeMatch) {
-                const sizeBytes = parseInt(sizeMatch[1]);
-                const sizeMB = (sizeBytes / 1024 / 1024).toFixed(2);
-                console.log('  压缩大小:', sizeMB, 'MB');
-            }
-            if (filesMatch) {
-                console.log('  文件数量:', filesMatch[1]);
-            }
-            console.log();
-            return;
+        if (useZipCmd) {
+            const cmd = `"${zipTool.cmd}" -${compressionLevel} -q -r "${outputPath}" "${absPath}"`;
+            execSync(cmd, { stdio: 'ignore' });
+        } else {
+            await zipWithLibrary(absPath, outputPath);
         }
 
-        await zipWithLibrary(absPath, outputPath);
         console.log('✓ 压缩完成!');
         console.log('  输出文件:', outputPath);
         console.log();
@@ -4817,7 +4761,7 @@ async function cmdZip(targetPath, options = {}) {
     }
 }
 
-// 解压（7-Zip 优先）
+// 解压（zip-lib）
 async function cmdUnzip(zipPath, outputDir) {
     if (!zipPath) {
         console.error('用法: codexmate unzip <zip文件路径> [输出目录]');
@@ -4849,24 +4793,10 @@ async function cmdUnzip(zipPath, outputDir) {
     console.log('\n解压配置:');
     console.log('  源文件:', absZipPath);
     console.log('  输出目录:', absOutputDir);
-    console.log('  解压工具:', unzipTool.type === '7z' ? '7-Zip' : 'zip-lib');
-    console.log('  多线程:', unzipTool.type === '7z' ? '启用' : '未启用（JS 库）');
+    console.log('  解压工具:', 'zip-lib');
     console.log('\n开始解压...\n');
 
     try {
-        if (unzipTool.type === '7z') {
-            const cmd = `"${unzipTool.cmd}" x -mmt=on -o"${absOutputDir}" "${absZipPath}" -y`;
-            const result = execSync(cmd, { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 });
-            const filesMatch = result.match(/(\d+)\s*files/);
-            console.log('✓ 解压完成!');
-            console.log('  输出目录:', absOutputDir);
-            if (filesMatch) {
-                console.log('  文件数量:', filesMatch[1]);
-            }
-            console.log();
-            return;
-        }
-
         await unzipWithLibrary(absZipPath, absOutputDir);
         console.log('✓ 解压完成!');
         console.log('  输出目录:', absOutputDir);
@@ -5692,8 +5622,8 @@ async function main() {
         console.log('  codexmate qwen [参数...]   等同于 qwen --yolo');
         console.log('  codexmate gemini [参数...] 等同于 gemini --yolo');
         console.log('  codexmate export-session --source <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]');
-        console.log('  codexmate zip <路径> [--max:级别]  压缩（7-Zip 优先）');
-        console.log('  codexmate unzip <zip文件> [输出目录]  解压（7-Zip 优先）');
+        console.log('  codexmate zip <路径> [--max:级别]  压缩（系统 zip 优先，其次 zip-lib）');
+        console.log('  codexmate unzip <zip文件> [输出目录]  解压（zip-lib）');
         console.log('');
         process.exit(0);
     }
