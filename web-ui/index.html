@@ -1022,6 +1022,24 @@
                         <option value="pnpm">pnpm</option>
                         <option value="bun">bun</option>
                     </select>
+                    <label class="form-label">镜像源</label>
+                    <div class="install-action-tabs">
+                        <button class="btn-mini" :class="{ active: installRegistryPreset === 'default' }" @click="setInstallRegistryPreset('default')">官方</button>
+                        <button class="btn-mini" :class="{ active: installRegistryPreset === 'npmmirror' }" @click="setInstallRegistryPreset('npmmirror')">npmmirror</button>
+                        <button class="btn-mini" :class="{ active: installRegistryPreset === 'tencent' }" @click="setInstallRegistryPreset('tencent')">腾讯云</button>
+                        <button class="btn-mini" :class="{ active: installRegistryPreset === 'custom' }" @click="setInstallRegistryPreset('custom')">自定义</button>
+                    </div>
+                    <input
+                        v-if="installRegistryPreset === 'custom'"
+                        v-model="installRegistryCustom"
+                        class="form-input install-registry-input"
+                        placeholder="https://registry.example.com">
+                    <div class="form-hint install-registry-hint" v-if="installRegistryPreview">
+                        当前命令会附加：--registry={{ installRegistryPreview }}
+                    </div>
+                    <div class="form-hint install-registry-hint" v-else-if="installRegistryPreset === 'custom'">
+                        请输入完整 URL（含 http/https）后将自动附加到安装/升级命令。
+                    </div>
                     <label class="form-label">操作</label>
                     <div class="install-action-tabs">
                         <button class="btn-mini" :class="{ active: installCommandAction === 'install' }" @click="setInstallCommandAction('install')">安装</button>
@@ -1464,8 +1482,8 @@
         </div>
 
         <div v-if="showAgentsModal" class="modal-overlay" @click.self="closeAgentsModal">
-            <div class="modal modal-wide">
-                <div class="modal-header">
+            <div class="modal modal-wide modal-editor">
+                <div class="modal-header modal-editor-header">
                     <div class="modal-title">{{ agentsModalTitle }}</div>
                     <button
                         class="btn-mini btn-modal-copy"
@@ -1475,30 +1493,32 @@
                     </button>
                 </div>
 
-                <div class="form-group">
-                    <label class="form-label">目标文件</label>
-                    <div class="form-hint">
-                        {{ agentsPath || '未加载' }}
-                        <span v-if="agentsPath">
-                            （{{ agentsExists ? '已存在' : '不存在，将在保存时创建' }}）
-                        </span>
+                <div class="modal-editor-body">
+                    <div class="form-group">
+                        <label class="form-label">目标文件</label>
+                        <div class="form-hint">
+                            {{ agentsPath || '未加载' }}
+                            <span v-if="agentsPath">
+                                （{{ agentsExists ? '已存在' : '不存在，将在保存时创建' }}）
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">AGENTS.md 内容</label>
+                        <textarea
+                            v-model="agentsContent"
+                            class="form-input template-editor"
+                            spellcheck="false"
+                            :readonly="agentsLoading"
+                            placeholder="在这里编辑 AGENTS.md 内容"></textarea>
+                        <div class="template-editor-warning">
+                            {{ agentsModalHint }}
+                        </div>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label class="form-label">AGENTS.md 内容</label>
-                    <textarea
-                        v-model="agentsContent"
-                        class="form-input template-editor"
-                        spellcheck="false"
-                        :readonly="agentsLoading"
-                        placeholder="在这里编辑 AGENTS.md 内容"></textarea>
-                    <div class="template-editor-warning">
-                        {{ agentsModalHint }}
-                    </div>
-                </div>
-
-                <div class="btn-group">
+                <div class="btn-group modal-editor-footer">
                     <button class="btn btn-cancel" @click="closeAgentsModal">取消</button>
                     <button class="btn btn-confirm" @click="applyAgentsContent" :disabled="agentsSaving || agentsLoading">
                         {{ agentsSaving ? '保存中...' : '保存' }}

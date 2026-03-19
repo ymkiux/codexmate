@@ -2058,6 +2058,35 @@ body::after {
     max-width: 980px;
 }
 
+.modal-editor {
+    width: min(96vw, 980px);
+    max-height: calc(100vh - 24px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+}
+
+.modal-editor-header {
+    margin-bottom: 0;
+    padding: var(--spacing-md) var(--spacing-md) 0;
+}
+
+.modal-editor-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--spacing-sm) var(--spacing-md) 0;
+}
+
+.modal-editor-footer {
+    margin-top: 0;
+    padding: var(--spacing-sm) var(--spacing-md) var(--spacing-md);
+    border-top: 1px solid var(--color-border-soft);
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.96) 100%);
+    backdrop-filter: blur(2px);
+}
+
 .modal-title {
     font-size: var(--font-size-title);
     font-weight: var(--font-weight-title);
@@ -2121,6 +2150,15 @@ body::after {
     background: rgba(201, 94, 75, 0.16);
     border-color: rgba(201, 94, 75, 0.32);
     color: var(--color-text-primary);
+}
+
+.install-registry-input {
+    width: 100%;
+}
+
+.install-registry-hint {
+    width: 100%;
+    margin-top: 2px;
 }
 
 .install-help {

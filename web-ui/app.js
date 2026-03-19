@@ -139,6 +139,8 @@
                     providerShareLoading: {},
                     installPackageManager: 'npm',
                     installCommandAction: 'install',
+                    installRegistryPreset: 'default',
+                    installRegistryCustom: '',
                     installStatusTargets: [
                         {
                             id: 'claude',
@@ -349,19 +351,22 @@
                         };
                     });
                 },
+                installRegistryPreview() {
+                    return this.resolveInstallRegistryUrl(this.installRegistryPreset, this.installRegistryCustom);
+                },
                 installTroubleshootingTips() {
                     const platform = this.resolveInstallPlatform();
                     if (platform === 'win32') {
                         return [
                             'PowerShell 报权限不足（EACCES/EPERM）时，请以管理员身份执行安装命令。',
                             '安装后若仍提示找不到命令，重开终端并执行：where codex / where claude。',
-                            '公司网络受限时，先确认 npm registry 与代理配置可访问。'
+                            '公司网络受限时，可先切换镜像源快捷项（npmmirror / 腾讯云 / 自定义）。'
                         ];
                     }
                     return [
                         '出现 EACCES 权限错误时，优先修复 Node 全局目录权限，不建议直接 sudo npm。',
                         '安装后若命令未生效，重开终端并执行：which codex / which claude。',
-                        '公司网络受限时，先确认 npm registry 与代理配置可访问。'
+                        '公司网络受限时，可先切换镜像源快捷项（npmmirror / 腾讯云 / 自定义）。'
                     ];
                 }
             },
@@ -2972,6 +2977,51 @@
                     return 'install';
                 },
 
+                normalizeInstallRegistryPreset(value) {
+                    const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+                    if (normalized === 'default' || normalized === 'npmmirror' || normalized === 'tencent' || normalized === 'custom') {
+                        return normalized;
+                    }
+                    return 'default';
+                },
+
+                normalizeInstallRegistryUrl(value) {
+                    const normalized = typeof value === 'string' ? value.trim() : '';
+                    if (!normalized) return '';
+                    if (!/^https?:\/\//i.test(normalized)) {
+                        return '';
+                    }
+                    return normalized.replace(/\/+$/, '');
+                },
+
+                resolveInstallRegistryUrl(presetValue, customValue) {
+                    const preset = this.normalizeInstallRegistryPreset(presetValue);
+                    if (preset === 'npmmirror') {
+                        return 'https://registry.npmmirror.com';
+                    }
+                    if (preset === 'tencent') {
+                        return 'https://mirrors.cloud.tencent.com/npm';
+                    }
+                    if (preset === 'custom') {
+                        return this.normalizeInstallRegistryUrl(customValue);
+                    }
+                    return '';
+                },
+
+                appendInstallRegistryOption(command, actionName) {
+                    const base = typeof command === 'string' ? command.trim() : '';
+                    if (!base) return '';
+                    const action = this.normalizeInstallAction(actionName);
+                    if (action === 'uninstall') {
+                        return base;
+                    }
+                    const registry = this.resolveInstallRegistryUrl(this.installRegistryPreset, this.installRegistryCustom);
+                    if (!registry) {
+                        return base;
+                    }
+                    return `${base} --registry=${registry}`;
+                },
+
                 resolveInstallPlatform() {
                     const navPlatform = typeof navigator !== 'undefined' && typeof navigator.platform === 'string'
                         ? navigator.platform.trim().toLowerCase()
@@ -3030,11 +3080,15 @@
                     const current = currentMap[targetKey] && typeof currentMap[targetKey][action] === 'string'
                         ? currentMap[targetKey][action]
                         : '';
-                    return current;
+                    return this.appendInstallRegistryOption(current, action);
                 },
 
                 setInstallCommandAction(actionName) {
                     this.installCommandAction = this.normalizeInstallAction(actionName);
+                },
+
+                setInstallRegistryPreset(presetName) {
+                    this.installRegistryPreset = this.normalizeInstallRegistryPreset(presetName);
                 },
 
                 openInstallModal() {
