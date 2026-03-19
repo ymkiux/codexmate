@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "codexmate",
   "version": "0.0.12",
   "description": "Codex/Claude Code 配置与会话管理 CLI + Web 工具",
@@ -24,6 +24,7 @@
     "./res/*": "./res/*"
   },
   "scripts": {
+    "dev": "node cli.js run",
     "start": "node cli.js",
     "test": "npm run test:unit && npm run test:e2e",
     "test:unit": "node tests/unit/run.mjs",

@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const toml = require('@iarna/toml');
 const JSON5 = require('json5');
 const zipLib = require('zip-lib');
-const { exec, execSync, spawn } = require('child_process');
+const { exec, execSync, spawn, spawnSync } = require('child_process');
 const http = require('http');
 const https = require('https');
 const net = require('net');
@@ -119,6 +119,20 @@ const BOOTSTRAP_TEXT_MARKERS = [
     'you are a coding agent',
     'codex cli'
 ];
+const CLI_INSTALL_TARGETS = Object.freeze([
+    {
+        id: 'claude',
+        name: 'Claude Code CLI',
+        packageName: '@anthropic-ai/claude-code',
+        bins: ['claude']
+    },
+    {
+        id: 'codex',
+        name: 'Codex CLI',
+        packageName: '@openai/codex',
+        bins: ['codex']
+    }
+]);
 
 const HTTP_KEEP_ALIVE_AGENT = new http.Agent({ keepAlive: true });
 const HTTPS_KEEP_ALIVE_AGENT = new https.Agent({ keepAlive: true });
@@ -3538,6 +3552,7 @@ function getBuiltinProxyStatus() {
         settings,
         runtime: g_builtinProxyRuntime
             ? {
+                provider: DEFAULT_LOCAL_PROVIDER_NAME,
                 startedAt: g_builtinProxyRuntime.startedAt,
                 listenUrl: g_builtinProxyRuntime.listenUrl,
                 upstreamProvider: g_builtinProxyRuntime.upstream.providerName,
@@ -5563,6 +5578,186 @@ function commandExists(command, args = '') {
     }
 }
 
+function detectPreferredPackageManager() {
+    const userAgent = typeof process.env.npm_config_user_agent === 'string'
+        ? process.env.npm_config_user_agent.trim().toLowerCase()
+        : '';
+    if (userAgent.startsWith('pnpm/')) return 'pnpm';
+    if (userAgent.startsWith('bun/')) return 'bun';
+    if (userAgent.startsWith('npm/')) return 'npm';
+
+    if (commandExists('pnpm', '--version')) return 'pnpm';
+    if (commandExists('bun', '--version')) return 'bun';
+    return 'npm';
+}
+
+function resolveCommandPath(command) {
+    if (!command) return '';
+    const locator = process.platform === 'win32' ? 'where' : 'which';
+    try {
+        const probe = spawnSync(locator, [command], {
+            encoding: 'utf8',
+            windowsHide: true,
+            timeout: 2500
+        });
+        if (probe.error || probe.status !== 0) {
+            return '';
+        }
+        const lines = String(probe.stdout || '')
+            .split(/\r?\n/g)
+            .map((line) => line.trim())
+            .filter(Boolean);
+        return lines[0] || '';
+    } catch (e) {
+        return '';
+    }
+}
+
+function parseBinaryVersionOutput(text) {
+    const raw = typeof text === 'string' ? text : '';
+    const line = raw
+        .split(/\r?\n/g)
+        .map((item) => item.trim())
+        .find(Boolean) || '';
+    if (!line) return '';
+    return line.length > 120 ? `${line.slice(0, 117)}...` : line;
+}
+
+function probeCliBinary(binName) {
+    const attempts = [['--version'], ['-v'], ['version']];
+    let lastError = '';
+
+    for (const args of attempts) {
+        const argString = args.join(' ').trim();
+        const commandLine = argString ? `${binName} ${argString}` : binName;
+        try {
+            const stdout = execSync(commandLine, {
+                encoding: 'utf8',
+                windowsHide: true,
+                timeout: 5000,
+                stdio: ['ignore', 'pipe', 'pipe'],
+                shell: process.platform === 'win32'
+            });
+            const version = parseBinaryVersionOutput(String(stdout || ''));
+            return {
+                installed: true,
+                bin: binName,
+                version: version || 'unknown',
+                path: resolveCommandPath(binName),
+                error: ''
+            };
+        } catch (error) {
+            const err = error || {};
+            const stdout = typeof err.stdout === 'string' ? err.stdout : String(err.stdout || '');
+            const stderr = typeof err.stderr === 'string' ? err.stderr : String(err.stderr || '');
+            const output = `${stdout}\n${stderr}`.trim();
+            const version = parseBinaryVersionOutput(output);
+            const status = Number.isFinite(err.status) ? err.status : null;
+            if (version && status === 0) {
+                return {
+                    installed: true,
+                    bin: binName,
+                    version,
+                    path: resolveCommandPath(binName),
+                    error: ''
+                };
+            }
+            if (version) {
+                lastError = status !== null
+                    ? `${binName} exited with ${status}: ${version}`
+                    : `${binName} failed: ${version}`;
+                continue;
+            }
+            const message = err && err.message ? String(err.message) : '';
+            if (message && !/ENOENT/i.test(message)) {
+                lastError = message;
+            }
+        }
+    }
+
+    return {
+        installed: false,
+        bin: binName,
+        version: '',
+        path: '',
+        error: lastError
+    };
+}
+
+function resolveInstallCommandsByPackageManager(packageManager) {
+    const normalized = String(packageManager || '').trim().toLowerCase();
+    const manager = normalized === 'pnpm' || normalized === 'bun' || normalized === 'npm'
+        ? normalized
+        : 'npm';
+    const commandsByTarget = {};
+
+    for (const target of CLI_INSTALL_TARGETS) {
+        const pkg = target.packageName;
+        if (manager === 'pnpm') {
+            commandsByTarget[target.id] = {
+                install: `pnpm add -g ${pkg}`,
+                update: `pnpm up -g ${pkg}`,
+                uninstall: `pnpm remove -g ${pkg}`
+            };
+            continue;
+        }
+        if (manager === 'bun') {
+            commandsByTarget[target.id] = {
+                install: `bun add -g ${pkg}`,
+                update: `bun update -g ${pkg}`,
+                uninstall: `bun remove -g ${pkg}`
+            };
+            continue;
+        }
+        commandsByTarget[target.id] = {
+            install: `npm install -g ${pkg}`,
+            update: `npm update -g ${pkg}`,
+            uninstall: `npm uninstall -g ${pkg}`
+        };
+    }
+
+    return {
+        packageManager: manager,
+        commandsByTarget
+    };
+}
+
+function buildInstallStatusReport() {
+    const packageManager = detectPreferredPackageManager();
+    const targetReports = CLI_INSTALL_TARGETS.map((target) => {
+        let hit = null;
+        let lastError = '';
+        for (const binName of target.bins) {
+            const probe = probeCliBinary(binName);
+            if (probe.installed) {
+                hit = probe;
+                break;
+            }
+            if (probe.error) {
+                lastError = probe.error;
+            }
+        }
+        return {
+            id: target.id,
+            name: target.name,
+            packageName: target.packageName,
+            installed: !!(hit && hit.installed),
+            bin: hit ? hit.bin : (target.bins[0] || ''),
+            version: hit ? hit.version : '',
+            commandPath: hit ? hit.path : '',
+            error: hit ? '' : lastError
+        };
+    });
+
+    const commandSpec = resolveInstallCommandsByPackageManager(packageManager);
+    return {
+        platform: process.platform,
+        packageManager: commandSpec.packageManager,
+        targets: targetReports,
+        commandsByTarget: commandSpec.commandsByTarget
+    };
+}
+
 const ZIP_PATHS = [
     'zip'
 ];
@@ -5992,6 +6187,9 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                                 configNotice: statusConfigResult.reason || '',
                                 initNotice: consumeInitNotice()
                             };
+                            break;
+                        case 'install-status':
+                            result = buildInstallStatusReport();
                             break;
                         case 'list':
                             const listConfigResult = readConfigOrVirtualDefault();
@@ -6439,8 +6637,9 @@ function cmdStart(options = {}) {
             switchToProxy: false
         }).then((res) => {
             if (res && res.success && res.runtime && res.runtime.listenUrl) {
-                const upstreamLabel = res.runtime.upstreamProvider ? ` -> ${res.runtime.upstreamProvider}` : '';
-                console.log(`~ 内建代理已启动: ${res.runtime.listenUrl}${upstreamLabel}`);
+                const entryProvider = res.runtime.provider || DEFAULT_LOCAL_PROVIDER_NAME;
+                const upstreamLabel = res.runtime.upstreamProvider ? `（上游: ${res.runtime.upstreamProvider}）` : '';
+                console.log(`~ 内建代理已启动(${entryProvider}): ${res.runtime.listenUrl}${upstreamLabel}`);
             } else if (res && res.error) {
                 console.warn(`! 内建代理启动失败: ${res.error}`);
             }

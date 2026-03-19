@@ -345,15 +345,6 @@
 
                 <div class="selector-section">
                     <div class="selector-header">
-                        <span class="selector-title">配置健康检查</span>
-                    </div>
-                    <button class="btn-tool" @click="runHealthCheck" :disabled="healthCheckLoading || loading || !!initError">
-                        {{ healthCheckLoading ? '检查中...' : '运行检查' }}
-                    </button>
-                </div>
-
-                <div class="selector-section">
-                    <div class="selector-header">
                         <span class="selector-title">配置维护</span>
                     </div>
                     <div class="config-template-hint">备份当前 config.toml 后写入默认配置。</div>
@@ -454,8 +445,18 @@
                         <div class="form-hint">高级参数修改后自动保存。</div>
                     </div>
                     <div class="config-template-hint" v-if="proxyRuntime">
-                        运行中：上游 <code>{{ proxyRuntime.upstreamProvider }}</code>
+                        运行中：入口 <code>{{ proxyRuntimeDisplayProvider }}</code>
+                        <span v-if="proxyRuntime.upstreamProvider">（上游 <code>{{ proxyRuntime.upstreamProvider }}</code>）</span>
                     </div>
+                </div>
+
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">配置健康检查</span>
+                    </div>
+                    <button class="btn-tool" @click="runHealthCheck" :disabled="healthCheckLoading || loading || !!initError">
+                        {{ healthCheckLoading ? '检查中...' : '运行检查' }}
+                    </button>
                 </div>
 
                 <div v-if="!loading && !initError" class="card-list">
@@ -475,8 +476,8 @@
                             </div>
                         </div>
                         <div class="card-trailing">
-                            <span :class="['pill', provider.hasKey ? 'configured' : 'empty']">
-                                {{ provider.hasKey ? '已配置' : '未配置' }}
+                            <span :class="['pill', providerPillConfigured(provider) ? 'configured' : 'empty']">
+                                {{ providerPillText(provider) }}
                             </span>
                             <span v-if="speedResults[provider.name]" :class="['latency', speedResults[provider.name].ok ? 'ok' : 'error']">
                                 {{ formatLatency(speedResults[provider.name]) }}
@@ -487,7 +488,13 @@
                                         <path d="M13 2L3 14h7l-1 8 12-14h-7l-1-6z"/>
                                     </svg>
                                 </button>
-                                <button v-if="!provider.readOnly" class="card-action-btn" :class="{ loading: providerShareLoading[provider.name] }" @click="copyProviderShareCommand(provider)" title="分享导入命令">
+                                <button
+                                    v-if="!provider.readOnly"
+                                    class="card-action-btn"
+                                    :class="{ loading: providerShareLoading[provider.name], disabled: !shouldAllowProviderShare(provider) }"
+                                    :disabled="!shouldAllowProviderShare(provider)"
+                                    @click="copyProviderShareCommand(provider)"
+                                    :title="shouldAllowProviderShare(provider) ? '分享导入命令' : '本地入口不可分享'">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/>
                                         <path d="M16 6l-4-4-4 4"/>
@@ -1006,16 +1013,41 @@
             <div class="modal">
                 <div class="modal-header">
                     <div class="modal-title">安装 CLI</div>
-                    <button class="btn-mini" @click="closeInstallModal">关闭</button>
                 </div>
+
+                <div class="list-row">
+                    <label class="form-label">包管理器</label>
+                    <select class="form-input" v-model="installPackageManager">
+                        <option value="npm">npm</option>
+                        <option value="pnpm">pnpm</option>
+                        <option value="bun">bun</option>
+                    </select>
+                    <label class="form-label">操作</label>
+                    <div class="install-action-tabs">
+                        <button class="btn-mini" :class="{ active: installCommandAction === 'install' }" @click="setInstallCommandAction('install')">安装</button>
+                        <button class="btn-mini" :class="{ active: installCommandAction === 'update' }" @click="setInstallCommandAction('update')">升级</button>
+                        <button class="btn-mini" :class="{ active: installCommandAction === 'uninstall' }" @click="setInstallCommandAction('uninstall')">卸载</button>
+                    </div>
+                </div>
+
                 <div class="install-list">
                     <div
                         class="install-row"
-                        v-for="cmd in installCommands"
-                        :key="cmd">
-                        <code class="install-command">{{ cmd }}</code>
-                        <button class="btn-mini" @click="copyInstallCommand(cmd)">复制</button>
+                        v-for="target in installTargetCards"
+                        :key="'install-command-' + target.id + '-' + installCommandAction">
+                        <div class="install-row-main">
+                            <div class="install-row-title">{{ target.name }}</div>
+                            <code class="install-command">{{ target.command }}</code>
+                        </div>
+                        <button class="btn-mini" :disabled="!target.command" @click="copyInstallCommand(target.command)">复制</button>
                     </div>
+                </div>
+
+                <div class="install-help">
+                    <div class="form-label">常见失败自救</div>
+                    <ul class="install-help-list">
+                        <li v-for="tip in installTroubleshootingTips" :key="tip">{{ tip }}</li>
+                    </ul>
                 </div>
             </div>
         </div>

@@ -2083,6 +2083,18 @@ body::after {
     background: var(--color-surface-alt);
 }
 
+.install-row-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.install-row-title {
+    font-size: var(--font-size-secondary);
+    color: var(--color-text-secondary);
+}
+
 .install-command {
     flex: 1;
     font-family: var(--font-family-mono);
@@ -2097,6 +2109,35 @@ body::after {
 
 .install-row .btn-mini {
     white-space: nowrap;
+}
+
+.install-action-tabs {
+    display: flex;
+    gap: var(--spacing-xs);
+    flex-wrap: wrap;
+}
+
+.install-action-tabs .btn-mini.active {
+    background: rgba(201, 94, 75, 0.16);
+    border-color: rgba(201, 94, 75, 0.32);
+    color: var(--color-text-primary);
+}
+
+.install-help {
+    margin-top: var(--spacing-sm);
+    border-top: 1px dashed var(--color-border-soft);
+    padding-top: var(--spacing-sm);
+}
+
+.install-help-list {
+    margin: 6px 0 0;
+    padding-left: 18px;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-secondary);
+}
+
+.install-help-list li + li {
+    margin-top: 4px;
 }
 
 .modal-header {

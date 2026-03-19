@@ -137,9 +137,29 @@
                     claudeSpeedLoading: {},
                     claudeShareLoading: {},
                     providerShareLoading: {},
-                    installCommands: [
-                        'npm install -g @anthropic-ai/claude-code',
-                        'npm i -g @openai/codex'
+                    installPackageManager: 'npm',
+                    installCommandAction: 'install',
+                    installStatusTargets: [
+                        {
+                            id: 'claude',
+                            name: 'Claude Code CLI',
+                            packageName: '@anthropic-ai/claude-code',
+                            installed: false,
+                            bin: 'claude',
+                            version: '',
+                            commandPath: '',
+                            error: ''
+                        },
+                        {
+                            id: 'codex',
+                            name: 'Codex CLI',
+                            packageName: '@openai/codex',
+                            installed: false,
+                            bin: 'codex',
+                            version: '',
+                            commandPath: '',
+                            error: ''
+                        }
                     ],
                     newProvider: { name: '', url: '', key: '' },
                     resetConfigLoading: false,
@@ -303,6 +323,46 @@
                         list.unshift(current);
                     }
                     return list;
+                },
+                proxyProviderOptions() {
+                    const source = Array.isArray(this.providersList) ? this.providersList : [];
+                    const list = source
+                        .map((item) => (item && typeof item.name === 'string' ? item.name.trim() : ''))
+                        .filter((name) => name && name !== 'codexmate-proxy');
+                    return Array.from(new Set(list));
+                },
+                proxyRuntimeDisplayProvider() {
+                    if (!this.proxyRuntime) return '';
+                    const value = typeof this.proxyRuntime.provider === 'string'
+                        ? this.proxyRuntime.provider.trim()
+                        : '';
+                    return value || 'local';
+                },
+                installTargetCards() {
+                    const targets = Array.isArray(this.installStatusTargets) ? this.installStatusTargets : [];
+                    const action = this.normalizeInstallAction(this.installCommandAction);
+                    return targets.map((target) => {
+                        const id = target && typeof target.id === 'string' ? target.id : '';
+                        return {
+                            ...target,
+                            command: this.getInstallCommand(id, action)
+                        };
+                    });
+                },
+                installTroubleshootingTips() {
+                    const platform = this.resolveInstallPlatform();
+                    if (platform === 'win32') {
+                        return [
+                            'PowerShell 报权限不足（EACCES/EPERM）时，请以管理员身份执行安装命令。',
+                            '安装后若仍提示找不到命令，重开终端并执行：where codex / where claude。',
+                            '公司网络受限时，先确认 npm registry 与代理配置可访问。'
+                        ];
+                    }
+                    return [
+                        '出现 EACCES 权限错误时，优先修复 Node 全局目录权限，不建议直接 sudo npm。',
+                        '安装后若命令未生效，重开终端并执行：which codex / which claude。',
+                        '公司网络受限时，先确认 npm registry 与代理配置可访问。'
+                    ];
                 }
             },
             methods: {
@@ -740,11 +800,20 @@
                     this.showMessage('复制失败', 'error');
                 },
 
-                copyInstallCommand(cmd) {
+                async copyInstallCommand(cmd) {
                     const text = typeof cmd === 'string' ? cmd.trim() : '';
                     if (!text) {
                         this.showMessage('没有可复制内容', 'info');
                         return;
+                    }
+                    try {
+                        if (navigator.clipboard && window.isSecureContext) {
+                            await navigator.clipboard.writeText(text);
+                            this.showMessage('已复制命令', 'success');
+                            return;
+                        }
+                    } catch (e) {
+                        // fallback to legacy copy path
                     }
                     const ok = this.fallbackCopyText(text);
                     if (ok) {
@@ -812,6 +881,10 @@
                     const name = provider && typeof provider.name === 'string' ? provider.name.trim() : '';
                     if (!name) {
                         this.showMessage('参数无效', 'error');
+                        return;
+                    }
+                    if (!this.shouldAllowProviderShare(provider)) {
+                        this.showMessage('本地入口不可分享', 'info');
                         return;
                     }
                     if (this.providerShareLoading[name]) {
@@ -1694,6 +1767,42 @@
                     }
                 },
 
+                getCurrentCodexAuthProfile() {
+                    const list = Array.isArray(this.codexAuthProfiles) ? this.codexAuthProfiles : [];
+                    return list.find((item) => !!(item && item.current)) || null;
+                },
+
+                isLocalLikeProvider(providerOrName) {
+                    if (!providerOrName) return false;
+                    const rawName = typeof providerOrName === 'object'
+                        ? String(providerOrName.name || '')
+                        : String(providerOrName);
+                    const normalized = rawName.trim().toLowerCase();
+                    return normalized === 'local' || normalized === 'codexmate-proxy';
+                },
+
+                providerPillState(provider) {
+                    if (this.isLocalLikeProvider(provider)) {
+                        const currentProfile = this.getCurrentCodexAuthProfile();
+                        return currentProfile
+                            ? { configured: true, text: '已登录' }
+                            : { configured: false, text: '未登录' };
+                    }
+                    const configured = !!(provider && provider.hasKey);
+                    return {
+                        configured,
+                        text: configured ? '已配置' : '未配置'
+                    };
+                },
+
+                providerPillConfigured(provider) {
+                    return this.providerPillState(provider).configured;
+                },
+
+                providerPillText(provider) {
+                    return this.providerPillState(provider).text;
+                },
+
                 isReadOnlyProvider(providerOrName) {
                     if (!providerOrName) return false;
                     if (typeof providerOrName === 'object') {
@@ -1730,6 +1839,10 @@
 
                 shouldShowProviderEdit(provider) {
                     return !this.isReadOnlyProvider(provider) && !this.isNonDeletableProvider(provider);
+                },
+
+                shouldAllowProviderShare(provider) {
+                    return !this.isReadOnlyProvider(provider) && !this.isLocalLikeProvider(provider);
                 },
 
                 async deleteProvider(name) {
@@ -2841,6 +2954,87 @@
                     this.openclawApplying = false;
                     this.resetOpenclawStructured();
                     this.resetOpenclawQuick();
+                },
+
+                normalizeInstallPackageManager(value) {
+                    const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+                    if (normalized === 'pnpm' || normalized === 'bun' || normalized === 'npm') {
+                        return normalized;
+                    }
+                    return 'npm';
+                },
+
+                normalizeInstallAction(value) {
+                    const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+                    if (normalized === 'update' || normalized === 'uninstall' || normalized === 'install') {
+                        return normalized;
+                    }
+                    return 'install';
+                },
+
+                resolveInstallPlatform() {
+                    const navPlatform = typeof navigator !== 'undefined' && typeof navigator.platform === 'string'
+                        ? navigator.platform.trim().toLowerCase()
+                        : '';
+                    if (navPlatform.includes('win')) return 'win32';
+                    if (navPlatform.includes('mac')) return 'darwin';
+                    return 'linux';
+                },
+
+                buildInstallCommandMatrix(packageManager) {
+                    const manager = this.normalizeInstallPackageManager(packageManager);
+                    const matrix = {
+                        claude: {
+                            install: '',
+                            update: '',
+                            uninstall: ''
+                        },
+                        codex: {
+                            install: '',
+                            update: '',
+                            uninstall: ''
+                        }
+                    };
+                    if (manager === 'pnpm') {
+                        matrix.claude.install = 'pnpm add -g @anthropic-ai/claude-code';
+                        matrix.claude.update = 'pnpm up -g @anthropic-ai/claude-code';
+                        matrix.claude.uninstall = 'pnpm remove -g @anthropic-ai/claude-code';
+                        matrix.codex.install = 'pnpm add -g @openai/codex';
+                        matrix.codex.update = 'pnpm up -g @openai/codex';
+                        matrix.codex.uninstall = 'pnpm remove -g @openai/codex';
+                        return matrix;
+                    }
+                    if (manager === 'bun') {
+                        matrix.claude.install = 'bun add -g @anthropic-ai/claude-code';
+                        matrix.claude.update = 'bun update -g @anthropic-ai/claude-code';
+                        matrix.claude.uninstall = 'bun remove -g @anthropic-ai/claude-code';
+                        matrix.codex.install = 'bun add -g @openai/codex';
+                        matrix.codex.update = 'bun update -g @openai/codex';
+                        matrix.codex.uninstall = 'bun remove -g @openai/codex';
+                        return matrix;
+                    }
+                    matrix.claude.install = 'npm install -g @anthropic-ai/claude-code';
+                    matrix.claude.update = 'npm update -g @anthropic-ai/claude-code';
+                    matrix.claude.uninstall = 'npm uninstall -g @anthropic-ai/claude-code';
+                    matrix.codex.install = 'npm install -g @openai/codex';
+                    matrix.codex.update = 'npm update -g @openai/codex';
+                    matrix.codex.uninstall = 'npm uninstall -g @openai/codex';
+                    return matrix;
+                },
+
+                getInstallCommand(targetId, actionName) {
+                    const targetKey = typeof targetId === 'string' ? targetId.trim() : '';
+                    if (!targetKey) return '';
+                    const action = this.normalizeInstallAction(actionName);
+                    const currentMap = this.buildInstallCommandMatrix(this.installPackageManager);
+                    const current = currentMap[targetKey] && typeof currentMap[targetKey][action] === 'string'
+                        ? currentMap[targetKey][action]
+                        : '';
+                    return current;
+                },
+
+                setInstallCommandAction(actionName) {
+                    this.installCommandAction = this.normalizeInstallAction(actionName);
                 },
 
                 openInstallModal() {
