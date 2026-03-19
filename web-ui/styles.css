@@ -775,6 +775,10 @@ body::after {
 }
 
 .card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
     font-size: var(--font-size-body);
     font-weight: var(--font-weight-secondary);
     color: var(--color-text-primary);
@@ -782,6 +786,27 @@ body::after {
     overflow: hidden;
     text-overflow: ellipsis;
     letter-spacing: -0.01em;
+}
+
+.card-title > span:first-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.provider-readonly-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    font-size: 11px;
+    line-height: 1;
+    color: #6f4b00;
+    background: linear-gradient(135deg, rgba(246, 211, 106, 0.32) 0%, rgba(246, 211, 106, 0.2) 100%);
+    border: 1px solid rgba(191, 151, 40, 0.35);
+    flex-shrink: 0;
 }
 
 .card-subtitle {
@@ -856,6 +881,20 @@ body::after {
 .card-action-btn.delete:hover {
     background: linear-gradient(135deg, rgba(200, 74, 58, 0.1) 0%, rgba(200, 74, 58, 0.05) 100%);
     color: var(--color-error);
+}
+
+.card-action-btn:disabled,
+.card-action-btn.disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+    filter: grayscale(0.1);
+}
+
+.card-action-btn.delete:disabled:hover,
+.card-action-btn.delete.disabled:hover {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.9));
+    color: var(--color-text-secondary);
 }
 
 .card-action-btn svg {
@@ -2343,6 +2382,83 @@ body::after {
     word-break: break-all;
 }
 
+.auth-profile-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.auth-profile-item {
+    border: 1px dashed var(--color-border-soft);
+    border-radius: var(--radius-sm);
+    padding: var(--spacing-sm);
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.82) 0%, rgba(247, 241, 232, 0.4) 100%);
+}
+
+.auth-profile-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+}
+
+.auth-profile-main {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.auth-profile-title {
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-secondary);
+    color: var(--color-text-secondary);
+    letter-spacing: -0.01em;
+    word-break: break-all;
+}
+
+.auth-profile-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.auth-profile-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.auth-profile-grid {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: minmax(96px, 130px) minmax(0, 1fr);
+    gap: 8px 12px;
+    align-items: start;
+}
+
+.auth-profile-row {
+    display: contents;
+}
+
+.auth-profile-key {
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-caption);
+    color: var(--color-text-muted);
+    line-height: 1.4;
+}
+
+.auth-profile-value {
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-caption);
+    color: var(--color-text-secondary);
+    line-height: 1.4;
+    word-break: break-all;
+}
+
 .agent-list {
     display: flex;
     flex-direction: column;
@@ -2876,6 +2992,39 @@ textarea:focus-visible {
     /* 移动端不显示配置状态 pill，节省空间 */
     .card-trailing .pill {
         display: none;
+    }
+
+    .auth-profile-item {
+        padding: 10px;
+    }
+
+    .auth-profile-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .auth-profile-actions {
+        justify-content: flex-start;
+    }
+
+    .auth-profile-grid {
+        grid-template-columns: 1fr;
+        gap: 6px;
+        margin-top: 8px;
+    }
+
+    .auth-profile-row {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding-bottom: 4px;
+        border-bottom: 1px dashed rgba(160, 145, 130, 0.25);
+    }
+
+    .auth-profile-row:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
     }
 
     .session-preview {
