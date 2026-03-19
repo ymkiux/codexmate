@@ -2,12 +2,13 @@
   "name": "codexmate",
   "version": "0.0.12",
   "description": "Codex/Claude Code 配置与会话管理 CLI + Web 工具",
-  "main": "src/cli.js",
+  "main": "cli.js",
   "bin": {
-    "codexmate": "./src/cli.js"
+    "codexmate": "./cli.js"
   },
   "files": [
-    "src/",
+    "cli.js",
+    "web-ui.html",
     "lib/",
     "web-ui/",
     "res/",
@@ -17,13 +18,13 @@
     "LICENSE"
   ],
   "exports": {
-    ".": "./src/cli.js",
+    ".": "./cli.js",
     "./lib/*": "./lib/*.js",
     "./web-ui/*": "./web-ui/*",
     "./res/*": "./res/*"
   },
   "scripts": {
-    "start": "node src/cli.js",
+    "start": "node cli.js",
     "test": "npm run test:unit && npm run test:e2e",
     "test:unit": "node tests/unit/run.mjs",
     "test:e2e": "node tests/e2e/run.js"
