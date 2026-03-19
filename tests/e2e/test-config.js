@@ -244,6 +244,9 @@ module.exports = async function testConfig(ctx) {
     const addProviderDup = await api('add-provider', { name: 'e2e-api', url: mockProviderUrl });
     assert(addProviderDup.error, 'add-provider should reject duplicate provider');
 
+    const addProviderLocal = await api('add-provider', { name: 'LOCAL', url: mockProviderUrl });
+    assert(addProviderLocal.error, 'add-provider should reject reserved local name');
+
     // ========== Update Provider Tests ==========
     const updatedUrl = `${mockProviderUrl}/v2`;
     const updateProvider = await api('update-provider', { name: 'e2e-api', url: updatedUrl, key: 'sk-e2e-api-upd' });

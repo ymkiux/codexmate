@@ -143,7 +143,7 @@
                     ],
                     newProvider: { name: '', url: '', key: '' },
                     resetConfigLoading: false,
-                    editingProvider: { name: '', url: '', key: '' },
+                    editingProvider: { name: '', url: '', key: '', readOnly: false, nonEditable: false },
                     newModelName: '',
                     currentClaudeConfig: '',
                     currentClaudeModel: '',
@@ -217,7 +217,26 @@
                     codexDownloadProgress: 0,
                     codexDownloadTimer: null,
                     claudeImportLoading: false,
-                    codexImportLoading: false
+                    codexImportLoading: false,
+                    codexAuthProfiles: [],
+                    codexAuthImportLoading: false,
+                    codexAuthSwitching: {},
+                    codexAuthDeleting: {},
+                    proxySettings: {
+                        enabled: false,
+                        host: '127.0.0.1',
+                        port: 8318,
+                        provider: '',
+                        authSource: 'provider',
+                        timeoutMs: 30000
+                    },
+                    proxyRuntime: null,
+                    proxyLoading: false,
+                    proxySaving: false,
+                    proxyStarting: false,
+                    proxyStopping: false,
+                    proxyApplying: false,
+                    showProxyAdvanced: false
                 }
             },
             mounted() {
@@ -330,6 +349,15 @@
                         await this.loadModelsForProvider(this.currentProvider);
                     } catch (e) {
                         // loadModelsForProvider 内部已有 toast，这里吞掉防止抛出
+                    }
+
+                    try {
+                        await Promise.all([
+                            this.loadCodexAuthProfiles(),
+                            this.loadProxyStatus()
+                        ]);
+                    } catch (e) {
+                        // 认证/代理状态加载失败不阻塞主界面
                     }
                 },
 
@@ -1640,6 +1668,9 @@
                     if (!name) {
                         return this.showMessage('名称不能为空', 'error');
                     }
+                    if (name.toLowerCase() === 'local') {
+                        return this.showMessage('local provider 为系统保留名称，不可新增', 'error');
+                    }
                     if (this.providersList.some(item => item.name === name)) {
                         return this.showMessage('名称已存在', 'error');
                     }
@@ -1663,7 +1694,49 @@
                     }
                 },
 
+                isReadOnlyProvider(providerOrName) {
+                    if (!providerOrName) return false;
+                    if (typeof providerOrName === 'object') {
+                        return !!providerOrName.readOnly;
+                    }
+                    const name = String(providerOrName).trim();
+                    if (!name) return false;
+                    const target = (this.providersList || []).find((item) => item && item.name === name);
+                    return !!(target && target.readOnly);
+                },
+
+                isNonDeletableProvider(providerOrName) {
+                    if (!providerOrName) return false;
+                    if (typeof providerOrName === 'object') {
+                        const directName = String(providerOrName.name || '').trim().toLowerCase();
+                        if (directName === 'local' || directName === 'codexmate-proxy') {
+                            return true;
+                        }
+                        return !!providerOrName.nonDeletable;
+                    }
+                    const name = String(providerOrName).trim();
+                    if (!name) return false;
+                    const normalized = name.toLowerCase();
+                    if (normalized === 'local' || normalized === 'codexmate-proxy') {
+                        return true;
+                    }
+                    const target = (this.providersList || []).find((item) => item && item.name === name);
+                    return !!(target && target.nonDeletable);
+                },
+
+                shouldShowProviderDelete(provider) {
+                    return !this.isReadOnlyProvider(provider) && !this.isNonDeletableProvider(provider);
+                },
+
+                shouldShowProviderEdit(provider) {
+                    return !this.isReadOnlyProvider(provider) && !this.isNonDeletableProvider(provider);
+                },
+
                 async deleteProvider(name) {
+                    if (this.isNonDeletableProvider(name)) {
+                        this.showMessage('该 provider 为保留项，不可删除', 'info');
+                        return;
+                    }
                     const res = await api('delete-provider', { name });
                     if (res.error) {
                         this.showMessage(res.error, 'error');
@@ -1678,15 +1751,26 @@
                 },
 
                 openEditModal(provider) {
+                    if (!this.shouldShowProviderEdit(provider)) {
+                        this.showMessage('该 provider 为保留项，不可编辑', 'info');
+                        return;
+                    }
                     this.editingProvider = {
                         name: provider.name,
                         url: provider.url || '',
-                        key: ''
+                        key: '',
+                        readOnly: !!provider.readOnly,
+                        nonEditable: this.isNonDeletableProvider(provider)
                     };
                     this.showEditModal = true;
                 },
 
                 async updateProvider() {
+                    if (this.editingProvider.readOnly || this.editingProvider.nonEditable) {
+                        this.showMessage('该 provider 为保留项，不可编辑', 'error');
+                        this.closeEditModal();
+                        return;
+                    }
                     if (!this.editingProvider.url) {
                         return this.showMessage('URL 必填', 'error');
                     }
@@ -1710,7 +1794,7 @@
 
                 closeEditModal() {
                     this.showEditModal = false;
-                    this.editingProvider = { name: '', url: '', key: '' };
+                    this.editingProvider = { name: '', url: '', key: '', readOnly: false, nonEditable: false };
                 },
 
                 async resetConfig() {
@@ -3148,6 +3232,239 @@
                     const el = this.$refs[refName];
                     if (el) {
                         el.value = '';
+                    }
+                },
+
+                async loadCodexAuthProfiles(options = {}) {
+                    const silent = !!options.silent;
+                    try {
+                        const res = await api('list-auth-profiles');
+                        if (res && res.error) {
+                            if (!silent) {
+                                this.showMessage(res.error, 'error');
+                            }
+                            return;
+                        }
+                        const list = Array.isArray(res && res.profiles) ? res.profiles : [];
+                        this.codexAuthProfiles = list.sort((a, b) => {
+                            if (!!a.current !== !!b.current) {
+                                return a.current ? -1 : 1;
+                            }
+                            return String(a.name || '').localeCompare(String(b.name || ''));
+                        });
+                    } catch (e) {
+                        if (!silent) {
+                            this.showMessage('读取认证列表失败', 'error');
+                        }
+                    }
+                },
+
+                triggerCodexAuthUpload() {
+                    const input = this.$refs.codexAuthImportInput;
+                    if (input) {
+                        input.value = '';
+                        input.click();
+                    }
+                },
+
+                handleCodexAuthImportChange(event) {
+                    const file = event && event.target && event.target.files ? event.target.files[0] : null;
+                    if (file) {
+                        void this.importCodexAuthFile(file);
+                    }
+                },
+
+                resetCodexAuthImportInput() {
+                    const el = this.$refs.codexAuthImportInput;
+                    if (el) {
+                        el.value = '';
+                    }
+                },
+
+                async importCodexAuthFile(file) {
+                    this.codexAuthImportLoading = true;
+                    try {
+                        const base64 = await this.readFileAsBase64(file);
+                        const res = await api('import-auth-profile', {
+                            fileName: file.name || 'codex-auth.json',
+                            fileBase64: base64,
+                            activate: true
+                        });
+                        if (res && res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        await this.loadCodexAuthProfiles({ silent: true });
+                        this.showMessage('认证文件已导入并切换', 'success');
+                    } catch (e) {
+                        this.showMessage('导入认证文件失败', 'error');
+                    } finally {
+                        this.codexAuthImportLoading = false;
+                        this.resetCodexAuthImportInput();
+                    }
+                },
+
+                async switchCodexAuthProfile(name) {
+                    const key = String(name || '').trim();
+                    if (!key || this.codexAuthSwitching[key]) return;
+                    this.codexAuthSwitching[key] = true;
+                    try {
+                        const res = await api('switch-auth-profile', { name: key });
+                        if (res && res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        await this.loadCodexAuthProfiles({ silent: true });
+                        this.showMessage(`已切换认证: ${key}`, 'success');
+                    } catch (e) {
+                        this.showMessage('切换认证失败', 'error');
+                    } finally {
+                        this.codexAuthSwitching[key] = false;
+                    }
+                },
+
+                async deleteCodexAuthProfile(name) {
+                    const key = String(name || '').trim();
+                    if (!key || this.codexAuthDeleting[key]) return;
+                    this.codexAuthDeleting[key] = true;
+                    try {
+                        const res = await api('delete-auth-profile', { name: key });
+                        if (res && res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        await this.loadCodexAuthProfiles({ silent: true });
+                        const switchedTip = res && res.switchedTo ? `，已切换到 ${res.switchedTo}` : '';
+                        this.showMessage(`已删除认证${switchedTip}`, 'success');
+                    } catch (e) {
+                        this.showMessage('删除认证失败', 'error');
+                    } finally {
+                        this.codexAuthDeleting[key] = false;
+                    }
+                },
+
+                mergeProxySettings(nextSettings) {
+                    const safe = nextSettings && typeof nextSettings === 'object' ? nextSettings : {};
+                    const port = parseInt(String(safe.port), 10);
+                    const timeoutMs = parseInt(String(safe.timeoutMs), 10);
+                    this.proxySettings = {
+                        enabled: safe.enabled !== false,
+                        host: typeof safe.host === 'string' && safe.host.trim() ? safe.host.trim() : '127.0.0.1',
+                        port: Number.isFinite(port) ? port : 8318,
+                        provider: typeof safe.provider === 'string' ? safe.provider.trim() : '',
+                        authSource: safe.authSource === 'profile' || safe.authSource === 'none' ? safe.authSource : 'provider',
+                        timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : 30000
+                    };
+                },
+
+                async loadProxyStatus(options = {}) {
+                    const silent = !!options.silent;
+                    this.proxyLoading = true;
+                    try {
+                        const res = await api('proxy-status');
+                        if (res && res.error) {
+                            if (!silent) {
+                                this.showMessage(res.error, 'error');
+                            }
+                            return;
+                        }
+                        this.mergeProxySettings(res && res.settings ? res.settings : {});
+                        this.proxyRuntime = res && res.runtime ? { running: true, ...res.runtime } : null;
+                    } catch (e) {
+                        if (!silent) {
+                            this.showMessage('读取代理状态失败', 'error');
+                        }
+                    } finally {
+                        this.proxyLoading = false;
+                    }
+                },
+
+                async saveProxySettings(options = {}) {
+                    const silent = !!options.silent;
+                    this.proxySaving = true;
+                    try {
+                        const res = await api('proxy-save-config', this.proxySettings);
+                        if (res && res.error) {
+                            if (!silent) {
+                                this.showMessage(res.error, 'error');
+                            }
+                            return;
+                        }
+                        if (res && res.settings) {
+                            this.mergeProxySettings(res.settings);
+                        }
+                        if (!silent) {
+                            this.showMessage('代理配置已保存', 'success');
+                        }
+                    } catch (e) {
+                        if (!silent) {
+                            this.showMessage('保存代理配置失败', 'error');
+                        }
+                    } finally {
+                        this.proxySaving = false;
+                    }
+                },
+
+                async startBuiltinProxy() {
+                    this.proxyStarting = true;
+                    try {
+                        const res = await api('proxy-start', {
+                            ...this.proxySettings,
+                            enabled: true
+                        });
+                        if (res && res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        if (res && res.settings) {
+                            this.mergeProxySettings(res.settings);
+                        }
+                        await this.loadProxyStatus({ silent: true });
+                        const listenTip = res && res.listenUrl ? `：${res.listenUrl}` : '';
+                        this.showMessage(`代理已启动${listenTip}`, 'success');
+                    } catch (e) {
+                        this.showMessage('启动代理失败', 'error');
+                    } finally {
+                        this.proxyStarting = false;
+                    }
+                },
+
+                async stopBuiltinProxy() {
+                    this.proxyStopping = true;
+                    try {
+                        const res = await api('proxy-stop');
+                        if (res && res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        await this.loadProxyStatus({ silent: true });
+                        this.showMessage('代理已停止', 'success');
+                    } catch (e) {
+                        this.showMessage('停止代理失败', 'error');
+                    } finally {
+                        this.proxyStopping = false;
+                    }
+                },
+
+                async applyBuiltinProxyProvider() {
+                    this.proxyApplying = true;
+                    try {
+                        const saveRes = await api('proxy-save-config', this.proxySettings);
+                        if (saveRes && saveRes.error) {
+                            this.showMessage(saveRes.error, 'error');
+                            return;
+                        }
+                        const res = await api('proxy-apply-provider', { switchToProxy: true });
+                        if (res && res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        await this.loadAll();
+                        this.showMessage('本地代理 provider 已写入并切换', 'success');
+                    } catch (e) {
+                        this.showMessage('应用代理 provider 失败', 'error');
+                    } finally {
+                        this.proxyApplying = false;
                     }
                 },
 
