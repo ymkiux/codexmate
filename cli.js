@@ -53,6 +53,7 @@ const {
     parseMaxMessagesValue,
     resolveMaxMessagesValue
 } = require('./lib/cli-session-utils');
+const { createMcpStdioServer } = require('./lib/mcp-stdio');
 
 const DEFAULT_WEB_PORT = 3737;
 const DEFAULT_WEB_HOST = '127.0.0.1';
@@ -7026,16 +7027,783 @@ async function cmdGemini(args = []) {
     return runProxyCommand('Gemini', ['gemini', 'gemini-cli'], args, 'npm install -g @google/gemini-cli');
 }
 
+function parseMcpOptions(args = []) {
+    const options = {
+        subcommand: 'serve',
+        transport: 'stdio',
+        allowWrite: false,
+        help: false
+    };
+
+    const argv = Array.isArray(args) ? [...args] : [];
+    if (argv.length > 0 && !argv[0].startsWith('-')) {
+        options.subcommand = String(argv.shift() || '').trim().toLowerCase() || 'serve';
+    }
+
+    const envAllowWrite = typeof process.env.CODEXMATE_MCP_ALLOW_WRITE === 'string'
+        && ['1', 'true', 'yes', 'on'].includes(process.env.CODEXMATE_MCP_ALLOW_WRITE.trim().toLowerCase());
+    options.allowWrite = envAllowWrite;
+
+    for (let i = 0; i < argv.length; i++) {
+        const arg = argv[i];
+        if (!arg) continue;
+        if (arg === '--help' || arg === '-h') {
+            options.help = true;
+            continue;
+        }
+        if (arg === '--allow-write' || arg === '--allow-write-tools') {
+            options.allowWrite = true;
+            continue;
+        }
+        if (arg === '--read-only') {
+            options.allowWrite = false;
+            continue;
+        }
+        if (arg.startsWith('--transport=')) {
+            options.transport = arg.slice('--transport='.length).trim().toLowerCase() || options.transport;
+            continue;
+        }
+        if (arg === '--transport') {
+            options.transport = String(argv[i + 1] || '').trim().toLowerCase() || options.transport;
+            i += 1;
+            continue;
+        }
+    }
+
+    return options;
+}
+
+function toMcpToolResult(payload) {
+    const structured = payload === undefined
+        ? {}
+        : (payload && typeof payload === 'object' ? payload : { value: payload });
+    const hasError = !!(structured && typeof structured === 'object' && (
+        (typeof structured.error === 'string' && structured.error.trim())
+        || structured.success === false
+    ));
+    const text = JSON.stringify(structured, null, 2);
+    const result = {
+        content: [{ type: 'text', text }],
+        structuredContent: structured
+    };
+    if (hasError) {
+        result.isError = true;
+    }
+    return result;
+}
+
+function buildMcpStatusPayload() {
+    const statusConfigResult = readConfigOrVirtualDefault();
+    const config = statusConfigResult.config;
+    const serviceTier = typeof config.service_tier === 'string' ? config.service_tier.trim() : '';
+    const modelReasoningEffort = typeof config.model_reasoning_effort === 'string' ? config.model_reasoning_effort.trim() : '';
+    return {
+        provider: config.model_provider || '未设置',
+        model: config.model || '未设置',
+        serviceTier,
+        modelReasoningEffort,
+        configReady: !statusConfigResult.isVirtual,
+        configNotice: statusConfigResult.reason || '',
+        initNotice: consumeInitNotice()
+    };
+}
+
+function buildMcpProviderListPayload() {
+    const listConfigResult = readConfigOrVirtualDefault();
+    const listConfig = listConfigResult.config;
+    const providers = listConfig.model_providers || {};
+    const current = listConfig.model_provider;
+    return {
+        configReady: !listConfigResult.isVirtual,
+        providers: Object.entries(providers).map(([name, p]) => ({
+            name,
+            url: p.base_url || '',
+            key: maskKey(p.preferred_auth_method || ''),
+            hasKey: !!(p.preferred_auth_method && p.preferred_auth_method.trim()),
+            current: name === current,
+            readOnly: isBuiltinProxyProvider(name),
+            nonDeletable: isNonDeletableProvider(name),
+            nonEditable: isNonEditableProvider(name)
+        }))
+    };
+}
+
+function buildMcpClaudeSettingsPayload() {
+    const info = readClaudeSettingsInfo();
+    if (!info || typeof info !== 'object') {
+        return { error: '读取 Claude 配置失败' };
+    }
+    if (info.error) {
+        return info;
+    }
+
+    const apiKey = typeof info.apiKey === 'string' ? info.apiKey : '';
+    const baseUrl = typeof info.baseUrl === 'string' ? info.baseUrl : '';
+    const model = typeof info.model === 'string' ? info.model : '';
+    const maskedApiKey = maskKey(apiKey);
+
+    return {
+        exists: !!info.exists,
+        targetPath: info.targetPath || CLAUDE_SETTINGS_FILE,
+        apiKey: maskedApiKey,
+        apiKeyMasked: maskedApiKey,
+        baseUrl,
+        model,
+        env: {
+            ANTHROPIC_API_KEY: maskedApiKey,
+            ANTHROPIC_BASE_URL: baseUrl,
+            ANTHROPIC_MODEL: model
+        },
+        redacted: true
+    };
+}
+
+function normalizeMcpSource(value) {
+    const source = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (!source) return '';
+    if (source === 'codex' || source === 'claude' || source === 'all') {
+        return source;
+    }
+    return null;
+}
+
+function createMcpTools(options = {}) {
+    const allowWrite = !!options.allowWrite;
+    const tools = [];
+
+    const pushTool = (tool) => {
+        if (!tool || typeof tool !== 'object') return;
+        if (!tool.readOnly && !allowWrite) return;
+        tools.push({
+            name: tool.name,
+            description: tool.description,
+            inputSchema: tool.inputSchema || { type: 'object', properties: {}, additionalProperties: false },
+            annotations: {
+                readOnlyHint: !!tool.readOnly
+            },
+            handler: async (args = {}) => {
+                try {
+                    const payload = await tool.handler(args || {});
+                    return toMcpToolResult(payload);
+                } catch (error) {
+                    return toMcpToolResult({
+                        error: error && error.message ? error.message : String(error || 'Tool execution failed')
+                    });
+                }
+            }
+        });
+    };
+
+    pushTool({
+        name: 'codexmate.status.get',
+        description: 'Get current provider/model status, config readiness and startup notice.',
+        readOnly: true,
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        handler: async () => buildMcpStatusPayload()
+    });
+
+    pushTool({
+        name: 'codexmate.provider.list',
+        description: 'List configured providers with masked key and active flags.',
+        readOnly: true,
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        handler: async () => buildMcpProviderListPayload()
+    });
+
+    pushTool({
+        name: 'codexmate.model.list',
+        description: 'List models from a provider. If provider is omitted, use current provider.',
+        readOnly: true,
+        inputSchema: {
+            type: 'object',
+            properties: {
+                provider: { type: 'string' }
+            },
+            additionalProperties: false
+        },
+        handler: async (args = {}) => {
+            const rawProvider = typeof args.provider === 'string' ? args.provider.trim() : '';
+            let providerName = rawProvider;
+            if (!providerName) {
+                const cfg = readConfigOrVirtualDefault().config || {};
+                providerName = typeof cfg.model_provider === 'string' ? cfg.model_provider.trim() : '';
+            }
+            if (!providerName) {
+                return { error: 'Provider name is required' };
+            }
+            const res = await fetchProviderModels(providerName);
+            if (res.error) {
+                return { error: res.error, models: [], source: 'remote' };
+            }
+            if (res.unlimited) {
+                return { models: [], source: 'remote', provider: res.provider || '', unlimited: true };
+            }
+            return { models: res.models || [], source: 'remote', provider: res.provider || '' };
+        }
+    });
+
+    pushTool({
+        name: 'codexmate.config.template.get',
+        description: 'Get Codex config template with optional provider/model/service tier/reasoning effort.',
+        readOnly: true,
+        inputSchema: {
+            type: 'object',
+            properties: {
+                provider: { type: 'string' },
+                model: { type: 'string' },
+                serviceTier: { type: 'string' },
+                reasoningEffort: { type: 'string' }
+            },
+            additionalProperties: false
+        },
+        handler: async (args = {}) => getConfigTemplate(args || {})
+    });
+
+    pushTool({
+        name: 'codexmate.claude.settings.get',
+        description: 'Read Claude settings.json env values managed by codexmate.',
+        readOnly: true,
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        handler: async () => buildMcpClaudeSettingsPayload()
+    });
+
+    pushTool({
+        name: 'codexmate.openclaw.config.get',
+        description: 'Read OpenClaw config file content and metadata.',
+        readOnly: true,
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        handler: async () => readOpenclawConfigFile()
+    });
+
+    pushTool({
+        name: 'codexmate.session.list',
+        description: 'List sessions from codex/claude/all with filters.',
+        readOnly: true,
+        inputSchema: {
+            type: 'object',
+            properties: {
+                source: { type: 'string' },
+                pathFilter: { type: 'string' },
+                query: { type: 'string' },
+                roleFilter: { type: 'string' },
+                timeRangePreset: { type: 'string' },
+                limit: { type: 'number' },
+                forceRefresh: { type: 'boolean' },
+                queryMode: { type: 'string' },
+                queryScope: { type: 'string' },
+                contentScanLimit: { type: 'number' }
+            },
+            additionalProperties: false
+        },
+        handler: async (args = {}) => {
+            const input = args && typeof args === 'object' ? args : {};
+            const source = normalizeMcpSource(input.source);
+            if (source === null) {
+                return { error: 'Invalid source. Must be codex, claude, or all' };
+            }
+            const normalizedInput = {
+                ...input,
+                source: source || 'all'
+            };
+            return {
+                sessions: listAllSessions(normalizedInput),
+                source: source || 'all'
+            };
+        }
+    });
+
+    pushTool({
+        name: 'codexmate.session.detail',
+        description: 'Read a session detail by source + sessionId/file.',
+        readOnly: true,
+        inputSchema: {
+            type: 'object',
+            properties: {
+                source: { type: 'string' },
+                sessionId: { type: 'string' },
+                file: { type: 'string' },
+                maxMessages: { type: ['string', 'number'] }
+            },
+            additionalProperties: true
+        },
+        handler: async (args = {}) => readSessionDetail(args || {})
+    });
+
+    pushTool({
+        name: 'codexmate.session.export',
+        description: 'Export session as markdown payload.',
+        readOnly: true,
+        inputSchema: {
+            type: 'object',
+            properties: {
+                source: { type: 'string' },
+                sessionId: { type: 'string' },
+                file: { type: 'string' },
+                maxMessages: { type: ['string', 'number'] }
+            },
+            additionalProperties: true
+        },
+        handler: async (args = {}) => exportSessionData(args || {})
+    });
+
+    pushTool({
+        name: 'codexmate.auth.profile.list',
+        description: 'List codex auth profiles.',
+        readOnly: true,
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        handler: async () => ({ profiles: listAuthProfilesInfo() })
+    });
+
+    pushTool({
+        name: 'codexmate.proxy.status',
+        description: 'Get builtin proxy runtime status and persisted config.',
+        readOnly: true,
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        handler: async () => getBuiltinProxyStatus()
+    });
+
+    pushTool({
+        name: 'codexmate.config.template.apply',
+        description: 'Apply Codex TOML template and sync auth/model pointers.',
+        readOnly: false,
+        inputSchema: {
+            type: 'object',
+            properties: {
+                template: { type: 'string' }
+            },
+            required: ['template'],
+            additionalProperties: false
+        },
+        handler: async (args = {}) => applyConfigTemplate(args || {})
+    });
+
+    pushTool({
+        name: 'codexmate.provider.add',
+        description: 'Add provider into config.toml model_providers.',
+        readOnly: false,
+        inputSchema: {
+            type: 'object',
+            properties: {
+                name: { type: 'string' },
+                url: { type: 'string' },
+                key: { type: 'string' }
+            },
+            required: ['name', 'url'],
+            additionalProperties: false
+        },
+        handler: async (args = {}) => addProviderToConfig(args || {})
+    });
+
+    pushTool({
+        name: 'codexmate.provider.update',
+        description: 'Update provider url/key.',
+        readOnly: false,
+        inputSchema: {
+            type: 'object',
+            properties: {
+                name: { type: 'string' },
+                url: { type: 'string' },
+                key: { type: 'string' }
+            },
+            required: ['name'],
+            additionalProperties: false
+        },
+        handler: async (args = {}) => updateProviderInConfig(args || {})
+    });
+
+    pushTool({
+        name: 'codexmate.provider.delete',
+        description: 'Delete provider from config.',
+        readOnly: false,
+        inputSchema: {
+            type: 'object',
+            properties: {
+                name: { type: 'string' }
+            },
+            required: ['name'],
+            additionalProperties: false
+        },
+        handler: async (args = {}) => deleteProviderFromConfig(args || {})
+    });
+
+    pushTool({
+        name: 'codexmate.claude.config.apply',
+        description: 'Apply Claude env config into ~/.claude/settings.json.',
+        readOnly: false,
+        inputSchema: {
+            type: 'object',
+            properties: {
+                apiKey: { type: 'string' },
+                baseUrl: { type: 'string' },
+                model: { type: 'string' }
+            },
+            required: ['apiKey'],
+            additionalProperties: false
+        },
+        handler: async (args = {}) => applyToClaudeSettings(args || {})
+    });
+
+    pushTool({
+        name: 'codexmate.openclaw.config.apply',
+        description: 'Apply OpenClaw config content into ~/.openclaw/openclaw.json.',
+        readOnly: false,
+        inputSchema: {
+            type: 'object',
+            properties: {
+                content: { type: 'string' },
+                lineEnding: { type: 'string' }
+            },
+            required: ['content'],
+            additionalProperties: false
+        },
+        handler: async (args = {}) => applyOpenclawConfig(args || {})
+    });
+
+    pushTool({
+        name: 'codexmate.session.delete',
+        description: 'Delete one session or selected records in a session.',
+        readOnly: false,
+        inputSchema: {
+            type: 'object',
+            properties: {
+                source: { type: 'string' },
+                sessionId: { type: 'string' },
+                file: { type: 'string' },
+                recordLineIndex: { type: 'number' },
+                recordLineIndices: { type: 'array', items: { type: 'number' } }
+            },
+            additionalProperties: true
+        },
+        handler: async (args = {}) => deleteSessionData(args || {})
+    });
+
+    pushTool({
+        name: 'codexmate.auth.profile.switch',
+        description: 'Switch active auth profile by name.',
+        readOnly: false,
+        inputSchema: {
+            type: 'object',
+            properties: {
+                name: { type: 'string' }
+            },
+            required: ['name'],
+            additionalProperties: false
+        },
+        handler: async (args = {}) => {
+            const profileName = typeof args.name === 'string' ? args.name.trim() : '';
+            if (!profileName) return { error: '认证名称不能为空' };
+            try {
+                return switchAuthProfile(profileName, { silent: true });
+            } catch (e) {
+                return { error: e.message || '切换认证失败' };
+            }
+        }
+    });
+
+    pushTool({
+        name: 'codexmate.auth.profile.delete',
+        description: 'Delete an auth profile by name.',
+        readOnly: false,
+        inputSchema: {
+            type: 'object',
+            properties: {
+                name: { type: 'string' }
+            },
+            required: ['name'],
+            additionalProperties: false
+        },
+        handler: async (args = {}) => deleteAuthProfile(typeof args.name === 'string' ? args.name : '')
+    });
+
+    pushTool({
+        name: 'codexmate.proxy.start',
+        description: 'Start builtin proxy runtime with optional overrides.',
+        readOnly: false,
+        inputSchema: {
+            type: 'object',
+            properties: {
+                enabled: { type: 'boolean' },
+                host: { type: 'string' },
+                port: { type: 'number' },
+                provider: { type: 'string' },
+                authSource: { type: 'string' },
+                timeoutMs: { type: 'number' }
+            },
+            additionalProperties: false
+        },
+        handler: async (args = {}) => startBuiltinProxyRuntime(args || {})
+    });
+
+    pushTool({
+        name: 'codexmate.proxy.stop',
+        description: 'Stop builtin proxy runtime.',
+        readOnly: false,
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        handler: async () => stopBuiltinProxyRuntime()
+    });
+
+    pushTool({
+        name: 'codexmate.proxy.provider.apply',
+        description: 'Apply builtin proxy provider into codex config.',
+        readOnly: false,
+        inputSchema: {
+            type: 'object',
+            properties: {
+                switchToProxy: { type: 'boolean' },
+                provider: { type: 'string' }
+            },
+            additionalProperties: true
+        },
+        handler: async (args = {}) => applyBuiltinProxyProvider(args || {})
+    });
+
+    return tools;
+}
+
+function createMcpResources() {
+    return [
+        {
+            uri: 'codexmate://status',
+            name: 'Status',
+            description: 'Current provider/model status snapshot.',
+            mimeType: 'application/json',
+            read: async () => ({
+                contents: [{
+                    uri: 'codexmate://status',
+                    mimeType: 'application/json',
+                    text: JSON.stringify(buildMcpStatusPayload(), null, 2)
+                }]
+            })
+        },
+        {
+            uri: 'codexmate://providers',
+            name: 'Providers',
+            description: 'Configured provider list (masked).',
+            mimeType: 'application/json',
+            read: async () => ({
+                contents: [{
+                    uri: 'codexmate://providers',
+                    mimeType: 'application/json',
+                    text: JSON.stringify(buildMcpProviderListPayload(), null, 2)
+                }]
+            })
+        },
+        {
+            uri: 'codexmate://sessions',
+            name: 'Sessions',
+            description: 'Session listing resource. Query by source/query/pathFilter via URI params.',
+            mimeType: 'application/json',
+            read: async (params = {}) => {
+                const uri = typeof params.uri === 'string' ? params.uri : 'codexmate://sessions';
+                let source = '';
+                let query = '';
+                let pathFilter = '';
+                let roleFilter = '';
+                let timeRangePreset = '';
+                try {
+                    const parsed = new URL(uri);
+                    source = parsed.searchParams.get('source') || '';
+                    query = parsed.searchParams.get('query') || '';
+                    pathFilter = parsed.searchParams.get('pathFilter') || '';
+                    roleFilter = parsed.searchParams.get('roleFilter') || '';
+                    timeRangePreset = parsed.searchParams.get('timeRangePreset') || '';
+                } catch (_) {}
+                const normalizedSource = normalizeMcpSource(source);
+                if (normalizedSource === null) {
+                    return {
+                        contents: [{
+                            uri,
+                            mimeType: 'application/json',
+                            text: JSON.stringify({ error: 'Invalid source. Must be codex, claude, or all' }, null, 2)
+                        }]
+                    };
+                }
+                const payload = {
+                    source: normalizedSource || 'all',
+                    sessions: listAllSessions({
+                        source: normalizedSource || 'all',
+                        query,
+                        pathFilter,
+                        roleFilter,
+                        timeRangePreset
+                    })
+                };
+                return {
+                    contents: [{
+                        uri,
+                        mimeType: 'application/json',
+                        text: JSON.stringify(payload, null, 2)
+                    }]
+                };
+            }
+        }
+    ];
+}
+
+function createMcpPrompts() {
+    return [
+        {
+            name: 'codexmate.diagnose_config',
+            description: 'Generate troubleshooting guidance from current codexmate status/providers.',
+            arguments: [],
+            get: async () => {
+                const status = buildMcpStatusPayload();
+                const providers = buildMcpProviderListPayload();
+                return {
+                    messages: [{
+                        role: 'user',
+                        content: {
+                            type: 'text',
+                            text: [
+                                '请根据以下配置快照进行故障诊断，并给出按优先级排序的修复步骤。',
+                                '要求：先给结论，再给操作清单，最后给风险与回滚建议。',
+                                '',
+                                '[status]',
+                                JSON.stringify(status, null, 2),
+                                '',
+                                '[providers]',
+                                JSON.stringify(providers, null, 2)
+                            ].join('\n')
+                        }
+                    }]
+                };
+            }
+        },
+        {
+            name: 'codexmate.switch_provider_safely',
+            description: 'Guide safe provider switch with pre-check and rollback plan.',
+            arguments: [{
+                name: 'provider',
+                description: 'Target provider name',
+                required: true
+            }],
+            get: async (args = {}) => {
+                const provider = typeof args.provider === 'string' ? args.provider.trim() : '';
+                return {
+                    messages: [{
+                        role: 'user',
+                        content: {
+                            type: 'text',
+                            text: [
+                                `请为 provider "${provider || '(missing)'}" 生成安全切换步骤。`,
+                                '要求：',
+                                '1) 先检查 provider 是否存在与 key 是否可用',
+                                '2) 给出切换后验证项（模型拉取/健康检查）',
+                                '3) 给出失败时回滚流程（回到旧 provider/model）'
+                            ].join('\n')
+                        }
+                    }]
+                };
+            }
+        },
+        {
+            name: 'codexmate.export_session_for_issue',
+            description: 'Prepare issue report template from a selected session export.',
+            arguments: [{
+                name: 'source',
+                description: 'Session source: codex or claude',
+                required: true
+            }, {
+                name: 'sessionId',
+                description: 'Session id',
+                required: true
+            }],
+            get: async (args = {}) => {
+                const source = typeof args.source === 'string' ? args.source.trim() : '';
+                const sessionId = typeof args.sessionId === 'string' ? args.sessionId.trim() : '';
+                return {
+                    messages: [{
+                        role: 'user',
+                        content: {
+                            type: 'text',
+                            text: [
+                                '请根据会话导出内容生成 issue 报告草稿。',
+                                `source: ${source || '(missing)'}`,
+                                `sessionId: ${sessionId || '(missing)'}`,
+                                '',
+                                '报告需包含：问题现象、复现步骤、预期行为、实际行为、可疑配置项。'
+                            ].join('\n')
+                        }
+                    }]
+                };
+            }
+        }
+    ];
+}
+
+async function cmdMcp(args = []) {
+    const options = parseMcpOptions(args);
+    if (options.help) {
+        console.log('\n用法: codexmate mcp [serve] [--transport stdio] [--allow-write|--read-only]');
+        console.log('  默认 transport=stdio，默认 read-only。');
+        console.log('  设置环境变量 CODEXMATE_MCP_ALLOW_WRITE=1 可默认开启写工具。');
+        console.log();
+        return;
+    }
+
+    if (options.subcommand !== 'serve') {
+        throw new Error(`未知 mcp 子命令: ${options.subcommand}`);
+    }
+    if (options.transport !== 'stdio') {
+        throw new Error(`当前仅支持 stdio 传输，收到: ${options.transport}`);
+    }
+
+    const packageVersion = (() => {
+        try {
+            const pkg = require('./package.json');
+            return pkg && pkg.version ? pkg.version : '0.0.0';
+        } catch (_) {
+            return '0.0.0';
+        }
+    })();
+
+    const server = createMcpStdioServer({
+        protocolVersion: '2025-11-25',
+        serverInfo: {
+            name: 'codexmate-mcp',
+            version: packageVersion
+        },
+        tools: createMcpTools({ allowWrite: options.allowWrite }),
+        resources: createMcpResources(),
+        prompts: createMcpPrompts(),
+        logger: (level, message) => {
+            const label = level === 'error' ? 'ERR' : 'INFO';
+            console.error(`[MCP ${label}] ${message}`);
+        }
+    });
+
+    server.start();
+
+    await new Promise((resolve) => {
+        let done = false;
+        const finish = () => {
+            if (done) return;
+            done = true;
+            server.stop();
+            stopBuiltinProxyRuntime().finally(() => resolve());
+        };
+        process.once('SIGINT', finish);
+        process.once('SIGTERM', finish);
+        process.stdin.once('end', finish);
+        process.stdin.once('close', finish);
+    });
+}
+
 // ============================================================================
 // 主程序
 // ============================================================================
 async function main() {
+    const args = process.argv.slice(2);
+    const command = args[0];
+    const isMcpCommand = command === 'mcp';
     const bootstrap = ensureManagedConfigBootstrap();
     if (bootstrap && bootstrap.notice) {
-        console.log(`\n[Init] ${bootstrap.notice}`);
+        // MCP stdio transport requires stdout to be protocol-clean.
+        if (!isMcpCommand) {
+            console.log(`\n[Init] ${bootstrap.notice}`);
+        }
     }
 
-    const args = process.argv.slice(2);
     if (args.length === 0) {
         console.log('\nCodex Mate - Codex 提供商管理工具');
         console.log('\n用法:');
@@ -7056,14 +7824,13 @@ async function main() {
         console.log('  codexmate codex [参数...]  等同于 codex --yolo');
         console.log('  codexmate qwen [参数...]   等同于 qwen --yolo');
         console.log('  codexmate gemini [参数...] 等同于 gemini --yolo');
+        console.log('  codexmate mcp [serve] [--transport stdio] [--allow-write|--read-only]');
         console.log('  codexmate export-session --source <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]');
         console.log('  codexmate zip <路径> [--max:级别]  压缩（系统 zip 优先，其次 zip-lib）');
         console.log('  codexmate unzip <zip文件> [输出目录]  解压（zip-lib）');
         console.log('');
         process.exit(0);
     }
-
-    const command = args[0];
 
     switch (command) {
         case 'status': cmdStatus(); break;
@@ -7099,6 +7866,7 @@ async function main() {
             process.exit(exitCode);
             break;
         }
+        case 'mcp': await cmdMcp(args.slice(1)); break;
         case 'export-session': await cmdExportSession(args.slice(1)); break;
         case 'zip': {
             // 解析 --max:N 参数
@@ -7127,4 +7895,3 @@ main().catch((err) => {
     console.error('错误:', err && err.message ? err.message : err);
     process.exit(1);
 });
-

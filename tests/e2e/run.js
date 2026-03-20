@@ -21,6 +21,7 @@ const testOpenclaw = require('./test-openclaw');
 const testHealthSpeed = require('./test-health-speed');
 const testMessages = require('./test-messages');
 const testAuthProxy = require('./test-auth-proxy');
+const testMcp = require('./test-mcp');
 
 async function main() {
     const realHome = os.homedir();
@@ -108,6 +109,7 @@ async function main() {
         await testHealthSpeed(ctx);
         await testMessages(ctx);
         await testAuthProxy(ctx);
+        await testMcp(ctx);
 
     } finally {
         const waitForExit = new Promise((resolve) => {
