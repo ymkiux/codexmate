@@ -1,0 +1,41 @@
+name: coderabbit-review
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+
+permissions:
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: coderabbit-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  trigger-review:
+    if: ${{ github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request CodeRabbit review
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const shortSha = pr.head.sha.slice(0, 7);
+            const body = [
+              "@coderabbitai review",
+              "",
+              `Auto-triggered on \`${context.payload.action}\` for commit \`${shortSha}\`.`,
+            ].join("\n");
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body,
+            });
