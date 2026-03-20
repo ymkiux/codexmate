@@ -175,7 +175,29 @@ npm link
 | `codexmate add-model <模型名称>` | 添加模型 |
 | `codexmate delete-model <模型名称>` | 删除模型 |
 | `codexmate run` | 启动 Web 界面 |
+| `codexmate mcp [serve] [--transport stdio] [--allow-write\|--read-only]` | 启动 MCP stdio 服务（默认只读） |
 | `codexmate export-session --source <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]` | 导出指定会话为 Markdown |
+
+## MCP（stdio）
+
+- 传输方式：仅支持 `stdio`
+- 默认模式：只读工具集
+- 写入工具开启方式：`--allow-write` 或 `CODEXMATE_MCP_ALLOW_WRITE=1`
+- `codexmate.claude.settings.get` 的敏感字段默认脱敏返回
+
+```bash
+# 只读（推荐给外部 Agent 接入）
+codexmate mcp serve --read-only
+
+# 显式开启写工具
+codexmate mcp serve --allow-write
+```
+
+当前提供的 MCP 能力：
+
+- `tools`：状态/提供商/模型/会话/认证/代理/配置等操作
+- `resources`：status/providers/sessions 快照资源
+- `prompts`：诊断/安全切换/会话导出模板
 
 ## Web 界面
 
