@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "codexmate",
   "version": "0.0.12",
   "description": "Codex/Claude Code 配置与会话管理 CLI + Web 工具",
@@ -28,7 +28,8 @@
     "start": "node cli.js",
     "test": "npm run test:unit && npm run test:e2e",
     "test:unit": "node tests/unit/run.mjs",
-    "test:e2e": "node tests/e2e/run.js"
+    "test:e2e": "node tests/e2e/run.js",
+    "pretest": "node scripts/ensure-test-deps.js"
   },
   "dependencies": {
     "@iarna/toml": "^2.2.5",
