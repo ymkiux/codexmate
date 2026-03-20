@@ -33,7 +33,7 @@ Codex Mate 让 Codex 与 Claude Code 的提供商/模型切换变成“一条命
 - 可视化 Web 操作，降低命令行负担
 - 配置变更可回溯、有备份
 - Codex + Claude Code 统一会话浏览（查看/导出/可用时复制恢复命令）
- - 0.0.9 新增：Claude 会话支持关键词搜索（含 `claude code` / `claude-code` / 数字关键词）
+ - 0.0.10 新增：Claude 会话支持关键词搜索（含 `claude code` / `claude-code` / 数字关键词）
 
 ## 概览
 
@@ -399,7 +399,7 @@ codexmate unzip ./backup.zip D:/restored
 
 ## 发布（GitHub Actions）
 
-创建与 `package.json` 版本一致的标签（例如 `v0.0.8`）。然后在 GitHub Actions 中手动运行 `release` 工作流并输入该标签，系统会创建 GitHub Release，并附带 `npm pack` 生成的 `.tgz` 产物。
+创建与 `package.json` 版本一致的标签（例如 `v0.0.9`）。然后在 GitHub Actions 中手动运行 `release` 工作流并输入该标签，系统会创建 GitHub Release，并附带 `npm pack` 生成的 `.tgz` 产物。
 
 ## 许可证
 

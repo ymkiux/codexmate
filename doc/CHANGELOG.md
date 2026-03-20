@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.13
+
+- Web UI: switch to IDE-style three-column layout with a fixed status inspector panel
+- AGENTS editor: add "Export" action to download current content as `agent-<timestamp>.txt`
+- Release: bump package version to 0.0.13 and sync release docs/examples
+
 ## 0.0.5
 
 - Sessions: enable keyword search for Codex-only view

@@ -33,7 +33,7 @@ One tool to switch Codex/Claude Code providers & models and manage/browse local 
 - Lightweight Web UI instead of heavy clients
 - Unified session browser (view/export/resume when available)
 - Session management: list/filter/export/delete local sessions; keyword search supports Codex and Claude
-- New in 0.0.9: Claude sessions are searchable by keywords (e.g., `claude code`, `claude-code`, numeric tokens)
+- New in 0.0.10: Claude sessions are searchable by keywords (e.g., `claude code`, `claude-code`, numeric tokens)
 
 ## Feature Overview
 
@@ -393,7 +393,7 @@ Note: 7-Zip is optional. If missing, the built-in JS library is used. `--max` on
 
 ## Release (GitHub Actions)
 
-Create a tag that matches `package.json` (for example `v0.0.8`). Then run the `release` workflow in GitHub Actions and input that tag. It will create a GitHub Release and attach the `npm pack` `.tgz` artifact.
+Create a tag that matches `package.json` (for example `v0.0.9`). Then run the `release` workflow in GitHub Actions and input that tag. It will create a GitHub Release and attach the `npm pack` `.tgz` artifact.
 
 ## License
 
