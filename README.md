@@ -169,7 +169,29 @@ npm link
 | `codexmate add-model <model>` | Add a model |
 | `codexmate delete-model <model>` | Delete a model |
 | `codexmate run` | Start the Web UI |
+| `codexmate mcp [serve] [--transport stdio] [--allow-write\|--read-only]` | Start MCP server over stdio (default read-only) |
 | `codexmate export-session --source <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]` | Export a session to Markdown |
+
+## MCP (stdio)
+
+- Transport: `stdio` only
+- Default mode: read-only tool set
+- Write tools: enable by `--allow-write` or `CODEXMATE_MCP_ALLOW_WRITE=1`
+- Sensitive fields in `codexmate.claude.settings.get` are returned as masked values
+
+```bash
+# Read-only (recommended for external agents)
+codexmate mcp serve --read-only
+
+# Enable write tools explicitly
+codexmate mcp serve --allow-write
+```
+
+Provided MCP domains:
+
+- `tools`: status/provider/model/session/auth/proxy and config operations
+- `resources`: status/providers/sessions snapshots
+- `prompts`: built-in diagnose/switch/export templates
 
 ## Web UI
 
