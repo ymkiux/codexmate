@@ -982,6 +982,64 @@
         </div>
 
             </main>
+            <aside class="status-inspector" v-if="!sessionStandalone" aria-label="当前状态检查器">
+                <div class="inspector-head">
+                    <div class="inspector-title">当前状态</div>
+                    <div class="inspector-subtitle">固定可见 · 实时同步</div>
+                </div>
+
+                <section class="inspector-group" aria-label="当前上下文">
+                    <div class="inspector-group-title">当前上下文</div>
+                    <div class="inspector-kv">
+                        <span class="key">主标签</span>
+                        <span class="value">{{ inspectorMainTabLabel }}</span>
+                        <span class="key">配置模式</span>
+                        <span class="value">{{ inspectorConfigModeLabel }}</span>
+                        <span class="key">当前配置</span>
+                        <span class="value">{{ inspectorCurrentConfigLabel }}</span>
+                        <span class="key">当前模型</span>
+                        <span class="value">{{ inspectorCurrentModelLabel }}</span>
+                    </div>
+                </section>
+
+                <section class="inspector-group" aria-label="生效与一致性">
+                    <div class="inspector-group-title">生效与一致性</div>
+                    <div class="inspector-kv">
+                        <span class="key">模板状态</span>
+                        <span class="value">{{ inspectorTemplateStatus }}</span>
+                        <span class="key">运行状态</span>
+                        <span class="value">{{ inspectorBusyStatus }}</span>
+                        <span class="key">最近提示</span>
+                        <span class="value">{{ inspectorMessageSummary }}</span>
+                    </div>
+                </section>
+
+                <section class="inspector-group" aria-label="会话摘要">
+                    <div class="inspector-group-title">会话摘要</div>
+                    <div class="inspector-kv">
+                        <span class="key">当前来源</span>
+                        <span class="value">{{ inspectorSessionSourceLabel }}</span>
+                        <span class="key">路径过滤</span>
+                        <span class="value">{{ inspectorSessionPathLabel }}</span>
+                        <span class="key">检索条件</span>
+                        <span class="value">{{ inspectorSessionQueryLabel }}</span>
+                        <span class="key">结果数量</span>
+                        <span class="value">{{ sessionsList.length }}</span>
+                    </div>
+                </section>
+
+                <section class="inspector-group" aria-label="健康提示">
+                    <div class="inspector-group-title">健康提示</div>
+                    <div class="inspector-kv">
+                        <span class="key">配置读取</span>
+                        <span :class="['value', 'tone-' + inspectorHealthTone]">{{ inspectorHealthStatus }}</span>
+                        <span class="key">模型加载</span>
+                        <span class="value">{{ inspectorModelLoadStatus }}</span>
+                        <span class="key">代理状态</span>
+                        <span class="value">{{ inspectorProxyStatus }}</span>
+                    </div>
+                </section>
+            </aside>
         </div>
 
         <!-- 添加提供商模态框 -->
@@ -1485,12 +1543,20 @@
             <div class="modal modal-wide modal-editor">
                 <div class="modal-header modal-editor-header">
                     <div class="modal-title">{{ agentsModalTitle }}</div>
-                    <button
-                        class="btn-mini btn-modal-copy"
-                        @click="copyAgentsContent"
-                        :disabled="agentsLoading">
-                        复制
-                    </button>
+                    <div class="modal-header-actions">
+                        <button
+                            class="btn-mini btn-modal-copy"
+                            @click="exportAgentsContent"
+                            :disabled="agentsLoading">
+                            导出
+                        </button>
+                        <button
+                            class="btn-mini btn-modal-copy"
+                            @click="copyAgentsContent"
+                            :disabled="agentsLoading">
+                            复制
+                        </button>
+                    </div>
                 </div>
 
                 <div class="modal-editor-body">

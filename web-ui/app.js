@@ -354,6 +354,119 @@
                 installRegistryPreview() {
                     return this.resolveInstallRegistryUrl(this.installRegistryPreset, this.installRegistryCustom);
                 },
+                inspectorMainTabLabel() {
+                    if (this.mainTab === 'config') return '配置中心';
+                    if (this.mainTab === 'sessions') return '会话浏览';
+                    if (this.mainTab === 'settings') return '设置';
+                    return '未知';
+                },
+                inspectorConfigModeLabel() {
+                    if (this.mainTab !== 'config') return '--';
+                    if (this.configMode === 'codex') return 'Codex';
+                    if (this.configMode === 'claude') return 'Claude Code';
+                    if (this.configMode === 'openclaw') return 'OpenClaw';
+                    return '未选择';
+                },
+                inspectorCurrentConfigLabel() {
+                    if (this.mainTab !== 'config') return '--';
+                    if (this.configMode === 'codex') {
+                        const provider = typeof this.currentProvider === 'string' ? this.currentProvider.trim() : '';
+                        return provider || '未选择';
+                    }
+                    if (this.configMode === 'claude') {
+                        const config = typeof this.currentClaudeConfig === 'string' ? this.currentClaudeConfig.trim() : '';
+                        return config || '未选择';
+                    }
+                    const openclaw = typeof this.currentOpenclawConfig === 'string' ? this.currentOpenclawConfig.trim() : '';
+                    return openclaw || '未选择';
+                },
+                inspectorCurrentModelLabel() {
+                    if (this.mainTab !== 'config') return '--';
+                    if (this.configMode === 'codex') {
+                        const model = typeof this.currentModel === 'string' ? this.currentModel.trim() : '';
+                        return model || '未选择';
+                    }
+                    if (this.configMode === 'claude') {
+                        const model = typeof this.currentClaudeModel === 'string' ? this.currentClaudeModel.trim() : '';
+                        return model || '未选择';
+                    }
+                    const model = this.openclawStructured && typeof this.openclawStructured.agentPrimary === 'string'
+                        ? this.openclawStructured.agentPrimary.trim()
+                        : '';
+                    return model || '按配置文件';
+                },
+                inspectorTemplateStatus() {
+                    if (this.mainTab !== 'config') return '--';
+                    if (this.configMode === 'codex') {
+                        if (this.configTemplateApplying || this.codexApplying) {
+                            return '模板应用中';
+                        }
+                        return '模板可编辑（手动确认应用）';
+                    }
+                    if (this.configMode === 'claude') {
+                        return '即时写入 Claude settings';
+                    }
+                    if (this.openclawApplying || this.openclawSaving) {
+                        return 'OpenClaw 保存/应用中';
+                    }
+                    return 'JSON5 可保存并应用';
+                },
+                inspectorBusyStatus() {
+                    const tasks = [];
+                    if (this.loading) tasks.push('初始化');
+                    if (this.sessionsLoading) tasks.push('会话加载');
+                    if (this.codexModelsLoading || this.claudeModelsLoading) tasks.push('模型加载');
+                    if (this.codexApplying || this.configTemplateApplying || this.openclawApplying) tasks.push('配置应用');
+                    if (this.agentsSaving) tasks.push('AGENTS 保存');
+                    if (this.proxySaving || this.proxyApplying || this.proxyStarting || this.proxyStopping) tasks.push('代理更新');
+                    return tasks.length ? tasks.join(' / ') : '空闲';
+                },
+                inspectorMessageSummary() {
+                    const value = typeof this.message === 'string' ? this.message.trim() : '';
+                    return value || '暂无提示';
+                },
+                inspectorSessionSourceLabel() {
+                    if (this.sessionFilterSource === 'codex') return 'Codex';
+                    if (this.sessionFilterSource === 'claude') return 'Claude Code';
+                    return '全部';
+                },
+                inspectorSessionPathLabel() {
+                    const value = typeof this.sessionPathFilter === 'string' ? this.sessionPathFilter.trim() : '';
+                    return value || '全部路径';
+                },
+                inspectorSessionQueryLabel() {
+                    if (!this.isSessionQueryEnabled) return '当前来源不支持';
+                    const value = typeof this.sessionQuery === 'string' ? this.sessionQuery.trim() : '';
+                    return value || '未设置';
+                },
+                inspectorHealthStatus() {
+                    if (this.initError) return '读取失败';
+                    if (this.loading) return '初始化中';
+                    return '正常';
+                },
+                inspectorHealthTone() {
+                    if (this.initError) return 'error';
+                    if (this.loading) return 'warn';
+                    return 'ok';
+                },
+                inspectorModelLoadStatus() {
+                    if (this.codexModelsLoading || this.claudeModelsLoading) {
+                        return '加载中';
+                    }
+                    if (this.modelsSource === 'error' || this.claudeModelsSource === 'error') {
+                        return '加载异常';
+                    }
+                    return '正常';
+                },
+                inspectorProxyStatus() {
+                    if (this.proxySaving || this.proxyApplying || this.proxyStarting || this.proxyStopping) {
+                        return '状态更新中';
+                    }
+                    if (this.proxyRuntime && this.proxyRuntime.running === true) {
+                        return `运行中（${this.proxyRuntimeDisplayProvider}）`;
+                    }
+                    return '未运行';
+                },
                 installTroubleshootingTips() {
                     const platform = this.resolveInstallPlatform();
                     if (platform === 'win32') {
@@ -803,6 +916,24 @@
                         return;
                     }
                     this.showMessage('复制失败', 'error');
+                },
+
+                exportAgentsContent() {
+                    const text = typeof this.agentsContent === 'string' ? this.agentsContent : '';
+                    if (!text) {
+                        this.showMessage('没有可导出内容', 'info');
+                        return;
+                    }
+                    const now = new Date();
+                    const year = String(now.getFullYear());
+                    const month = String(now.getMonth() + 1).padStart(2, '0');
+                    const day = String(now.getDate()).padStart(2, '0');
+                    const hour = String(now.getHours()).padStart(2, '0');
+                    const minute = String(now.getMinutes()).padStart(2, '0');
+                    const second = String(now.getSeconds()).padStart(2, '0');
+                    const fileName = `agent-${year}${month}${day}-${hour}${minute}${second}.txt`;
+                    this.downloadTextFile(fileName, text, 'text/plain;charset=utf-8');
+                    this.showMessage(`已导出 ${fileName}`, 'success');
                 },
 
                 async copyInstallCommand(cmd) {
@@ -1370,10 +1501,10 @@
                     }
                 },
 
-                downloadTextFile(fileName, content) {
+                downloadTextFile(fileName, content, mimeType = 'text/markdown;charset=utf-8') {
                     // 使用 UTF-8 BOM 确保文本编辑器正确识别编码
                     const BOM = '\uFEFF';
-                    const blob = new Blob([BOM + content], { type: 'text/markdown;charset=utf-8' });
+                    const blob = new Blob([BOM + content], { type: mimeType });
                     const url = URL.createObjectURL(blob);
                     const link = document.createElement('a');
                     link.href = url;
