@@ -13,7 +13,12 @@
 <body>
     <div id="app" class="container" v-cloak>
         <button class="fab-install" @click="openInstallModal" aria-label="安装 CLI">
-            安装 CLI
+            <span class="fab-install-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M10 4v8M6.5 8.5 10 12l3.5-3.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M4 14.5h12" stroke-linecap="round"/>
+                </svg>
+            </span>
         </button>
 
         <div class="hero" v-if="!sessionStandalone">
