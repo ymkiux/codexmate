@@ -130,35 +130,105 @@ body {
 .fab-install {
     position: fixed;
     left: 16px;
-    bottom: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
     z-index: 90;
-    padding: 12px 16px;
+    display: inline-grid;
+    place-items: center;
+    width: 50px;
+    height: 50px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
     border-radius: var(--radius-full);
-    border: none;
-    background: linear-gradient(135deg, var(--color-brand) 0%, var(--color-brand-dark) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.04) 100%),
+        linear-gradient(135deg, var(--color-brand) 0%, var(--color-brand-dark) 100%);
     color: #fff;
+    font-size: var(--font-size-secondary);
     font-weight: var(--font-weight-secondary);
-    letter-spacing: 0.02em;
+    letter-spacing: 0.015em;
     box-shadow: var(--shadow-float);
     cursor: pointer;
-    transition: transform var(--transition-fast) var(--ease-spring), box-shadow var(--transition-fast) var(--ease-spring);
+    overflow: hidden;
+    transition:
+        transform var(--transition-fast) var(--ease-spring),
+        box-shadow var(--transition-fast) var(--ease-spring),
+        filter var(--transition-fast) var(--ease-smooth);
+    animation: fabPulse 3.2s ease-in-out infinite;
+}
+
+.fab-install::after {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    border-radius: inherit;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    pointer-events: none;
+}
+
+.fab-install-icon {
+    width: 20px;
+    height: 20px;
+    display: inline-grid;
+    place-items: center;
+    color: #fff;
+    background: transparent;
+    box-shadow: none;
+    flex-shrink: 0;
+}
+
+.fab-install-icon svg {
+    width: 18px;
+    height: 18px;
 }
 
 .fab-install:hover {
     transform: translateY(-1px);
     box-shadow: var(--shadow-raised);
+    filter: saturate(1.04);
 }
 
 .fab-install:active {
     transform: translateY(0);
+    filter: saturate(0.98);
 }
 
 @media (max-width: 640px) {
     .fab-install {
         left: 12px;
-        bottom: 12px;
-        padding: 10px 14px;
+        bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+        width: 44px;
+        height: 44px;
+        padding: 0;
         font-size: var(--font-size-secondary);
+    }
+
+    .fab-install-icon {
+        width: 18px;
+        height: 18px;
+    }
+
+    .fab-install-icon svg {
+        width: 16px;
+        height: 16px;
+    }
+}
+
+@keyframes fabPulse {
+    0%,
+    100% {
+        box-shadow: var(--shadow-float);
+    }
+    50% {
+        box-shadow: 0 14px 30px rgba(31, 26, 23, 0.14);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fab-install {
+        animation: none;
+        transition: none;
     }
 }
 
