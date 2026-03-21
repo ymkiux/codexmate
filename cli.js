@@ -320,17 +320,6 @@ function isRecoverableNestedProviderConfig(value) {
     return hasProviderSignals;
 }
 
-function formatTomlPathSegments(segments) {
-    if (!Array.isArray(segments) || segments.length === 0) return '';
-    return segments.map((segment) => {
-        const value = String(segment || '');
-        if (/^[a-zA-Z0-9_-]+$/.test(value)) {
-            return value;
-        }
-        return `"${escapeTomlBasicString(value)}"`;
-    }).join('.');
-}
-
 function collectNestedProviderConfigs(node, pathSegments, collector) {
     if (!isPlainObject(node)) return;
     const segments = Array.isArray(pathSegments) ? pathSegments : [String(pathSegments || '')];
@@ -341,7 +330,6 @@ function collectNestedProviderConfigs(node, pathSegments, collector) {
     if (isRecoverableNestedProviderConfig(node)) {
         collector.push({
             name: segments.join('.'),
-            rawPath: formatTomlPathSegments(segments),
             provider: node
         });
         return;
@@ -362,20 +350,9 @@ function normalizeLegacyModelProviders(modelProviders) {
     const addRecovered = (entry) => {
         const name = entry && typeof entry.name === 'string' ? entry.name : '';
         const provider = entry ? entry.provider : null;
-        const rawPath = entry && typeof entry.rawPath === 'string' ? entry.rawPath : '';
         if (!name || !isPlainObject(provider)) return;
         if (Object.prototype.hasOwnProperty.call(modelProviders, name)) return;
         if (Object.prototype.hasOwnProperty.call(normalized, name)) return;
-        if (rawPath) {
-            try {
-                Object.defineProperty(provider, '__codexmate_legacy_table_path', {
-                    value: rawPath,
-                    enumerable: false,
-                    configurable: true,
-                    writable: true
-                });
-            } catch (e) {}
-        }
         normalized[name] = provider;
         changed = true;
     };
@@ -414,16 +391,93 @@ function escapeRegex(value) {
     return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function findProviderSectionRanges(content, providerName, rawPath = '') {
+function parseTomlDottedKeyExpression(expression) {
+    const text = String(expression || '');
+    let index = 0;
+    const segments = [];
+    const skipWhitespace = () => {
+        while (index < text.length && /\s/.test(text[index])) index++;
+    };
+
+    while (index < text.length) {
+        skipWhitespace();
+        if (index >= text.length) break;
+
+        const ch = text[index];
+        if (ch === "'") {
+            const end = text.indexOf("'", index + 1);
+            if (end === -1) return null;
+            segments.push(text.slice(index + 1, end));
+            index = end + 1;
+        } else if (ch === '"') {
+            index += 1;
+            let value = '';
+            let closed = false;
+            while (index < text.length) {
+                const cur = text[index];
+                if (cur === '"') {
+                    index += 1;
+                    closed = true;
+                    break;
+                }
+                if (cur !== '\\') {
+                    value += cur;
+                    index += 1;
+                    continue;
+                }
+                if (index + 1 >= text.length) return null;
+                const esc = text[index + 1];
+                if (esc === 'u' || esc === 'U') {
+                    const hexLen = esc === 'u' ? 4 : 8;
+                    const hex = text.slice(index + 2, index + 2 + hexLen);
+                    if (!/^[0-9a-fA-F]+$/.test(hex)) return null;
+                    try {
+                        value += String.fromCodePoint(parseInt(hex, 16));
+                    } catch (e) {
+                        return null;
+                    }
+                    index += 2 + hexLen;
+                    continue;
+                }
+                const unescaped = {
+                    b: '\b',
+                    t: '\t',
+                    n: '\n',
+                    f: '\f',
+                    r: '\r',
+                    '"': '"',
+                    '\\': '\\'
+                }[esc];
+                if (unescaped === undefined) return null;
+                value += unescaped;
+                index += 2;
+            }
+            if (!closed) return null;
+            segments.push(value);
+        } else {
+            const start = index;
+            while (index < text.length && !/\s|\./.test(text[index])) index++;
+            const bare = text.slice(start, index);
+            if (!bare) return null;
+            segments.push(bare);
+        }
+
+        skipWhitespace();
+        if (index >= text.length) break;
+        if (text[index] !== '.') return null;
+        index += 1;
+    }
+
+    return segments.length > 0 ? segments : null;
+}
+
+function findProviderSectionRanges(content, providerName) {
     const text = typeof content === 'string' ? content : '';
     const name = typeof providerName === 'string' ? providerName.trim() : '';
-    const raw = typeof rawPath === 'string' ? rawPath.trim() : '';
     if (!text || !name) return [];
 
     const safeName = escapeRegex(name);
-    const safeRaw = escapeRegex(raw);
     const headerPatterns = [
-        ...(raw ? [{ priority: -1, regex: new RegExp(`^\\s*model_providers\\s*\\.\\s*${safeRaw}\\s*$`) }] : []),
         { priority: 0, regex: new RegExp(`^\\s*model_providers\\s*\\.\\s*"${safeName}"\\s*$`) },
         { priority: 1, regex: new RegExp(`^\\s*model_providers\\s*\\.\\s*'${safeName}'\\s*$`) },
         { priority: 2, regex: new RegExp(`^\\s*model_providers\\s*\\.\\s*${safeName}\\s*$`) }
@@ -437,6 +491,19 @@ function findProviderSectionRanges(content, providerName, rawPath = '') {
         const start = match.index;
         allHeaders.push(start);
         const headerExpr = String(match[1] || '').trim();
+
+        const parsedSegments = parseTomlDottedKeyExpression(headerExpr);
+        if (Array.isArray(parsedSegments) && parsedSegments.length >= 2 && parsedSegments[0] === 'model_providers') {
+            const parsedName = parsedSegments.slice(1).join('.');
+            if (parsedName === name) {
+                const prev = targetPriorityByStart.get(start);
+                if (prev === undefined || -2 < prev) {
+                    targetPriorityByStart.set(start, -2);
+                }
+                continue;
+            }
+        }
+
         for (const pattern of headerPatterns) {
             if (pattern.regex.test(headerExpr)) {
                 const prev = targetPriorityByStart.get(start);
@@ -1991,10 +2058,6 @@ function performProviderDeletion(name, options = {}) {
     const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
     const lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
     const hasBom = content.charCodeAt(0) === 0xFEFF;
-    const providerConfig = config.model_providers[name];
-    const rawSectionPath = providerConfig && typeof providerConfig.__codexmate_legacy_table_path === 'string'
-        ? providerConfig.__codexmate_legacy_table_path
-        : '';
 
     const remainingProviders = Object.keys(config.model_providers || {}).filter(item => item !== name);
     if (remainingProviders.length === 0) {
@@ -2033,7 +2096,7 @@ function performProviderDeletion(name, options = {}) {
     };
 
     let updatedContent = null;
-    const ranges = findProviderSectionRanges(content, name, rawSectionPath);
+    const ranges = findProviderSectionRanges(content, name);
     if (ranges.length > 0) {
         const sorted = ranges.sort((a, b) => b.start - a.start);
         let removedContent = content;
@@ -5298,11 +5361,7 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
     }
 
     const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
-    const providerConfig = config.model_providers[name];
-    const rawSectionPath = providerConfig && typeof providerConfig.__codexmate_legacy_table_path === 'string'
-        ? providerConfig.__codexmate_legacy_table_path
-        : '';
-    const ranges = findProviderSectionRanges(content, name, rawSectionPath);
+    const ranges = findProviderSectionRanges(content, name);
     if (ranges.length === 0) {
         if (!silent) console.error('错误: 无法找到提供商配置块');
         throw new Error('无法找到提供商配置块');
@@ -5311,6 +5370,29 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
     const replaceTomlStringField = (block, fieldName, rawValue) => {
         const safeValue = escapeTomlBasicString(rawValue);
         const escapedFieldName = escapeRegex(fieldName);
+        const tripleStartRegex = new RegExp(`^(\\s*${escapedFieldName}\\s*=\\s*)(\"\"\"|''')`, 'm');
+        const tripleStartMatch = tripleStartRegex.exec(block);
+        if (tripleStartMatch) {
+            const prefixStart = tripleStartMatch.index;
+            const prefixEnd = prefixStart + tripleStartMatch[1].length;
+            const tripleQuote = tripleStartMatch[2];
+            const valueStart = prefixEnd + tripleQuote.length;
+            const valueEnd = block.indexOf(tripleQuote, valueStart);
+            if (valueEnd === -1) {
+                throw new Error(`${fieldName} 使用了未闭合的多行 TOML 字符串，无法安全更新`);
+            }
+            const lineEndIndex = block.indexOf('\n', valueEnd + tripleQuote.length);
+            const tailEnd = lineEndIndex === -1 ? block.length : lineEndIndex;
+            const tail = block.slice(valueEnd + tripleQuote.length, tailEnd);
+            const tailMatch = tail.match(/^(\s+#.*)?\s*$/);
+            if (!tailMatch) {
+                throw new Error(`${fieldName} 多行字符串后的语法不受支持，无法安全更新`);
+            }
+            const commentSuffix = tailMatch[1] || '';
+            const replacementLine = `${block.slice(prefixStart, prefixEnd)}"${safeValue}"${commentSuffix}`;
+            return block.slice(0, prefixStart) + replacementLine + block.slice(tailEnd);
+        }
+
         const withCommentRegex = new RegExp(
             `^(\\s*${escapedFieldName}\\s*=\\s*)(?:"(?:\\\\.|[^"\\\\])*"|'[^'\\n]*')(\\s+#.*)?$`,
             'm'
@@ -5324,10 +5406,10 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
             }
         );
         if (!replaced) {
-            const fallbackRegex = new RegExp(`^(\\s*${escapedFieldName}\\s*=\\s*).*$`, 'm');
+            const fallbackRegex = new RegExp(`^(\\s*${escapedFieldName}\\s*=\\s*)(.*?)(\\s+#.*)?$`, 'm');
             next = next.replace(
                 fallbackRegex,
-                (_, prefix) => `${prefix}"${safeValue}"`
+                (_, prefix, __, suffix = '') => `${prefix}"${safeValue}"${suffix}`
             );
         }
         return next;
