@@ -23,6 +23,7 @@ const testMessages = require('./test-messages');
 const testAuthProxy = require('./test-auth-proxy');
 const testMcp = require('./test-mcp');
 const testWorkflow = require('./test-workflow');
+const testInvalidConfig = require('./test-invalid-config');
 
 async function main() {
     const realHome = os.homedir();
@@ -77,6 +78,7 @@ async function main() {
             console.warn(`E2E skipped: ${ctx.skipE2E}`);
             return;
         }
+        await testInvalidConfig(ctx);
 
         const port = 18000 + Math.floor(Math.random() * 1000);
         debug('start web server');
