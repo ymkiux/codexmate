@@ -2043,7 +2043,7 @@ function readConfigOrVirtualDefault() {
     return {
         config: buildVirtualDefaultConfig(),
         isVirtual: true,
-        reason: `配置文件不存在: ${CONFIG_FILE}`,
+        reason: '未检测到 config.toml',
         errorType: 'missing'
     };
 }
