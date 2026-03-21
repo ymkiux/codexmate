@@ -5265,46 +5265,41 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
         throw new Error('无法找到提供商配置块');
     }
 
+    const replaceTomlStringField = (block, fieldName, rawValue) => {
+        const safeValue = escapeTomlBasicString(rawValue);
+        const escapedFieldName = escapeRegex(fieldName);
+        const withCommentRegex = new RegExp(
+            `^(\\s*${escapedFieldName}\\s*=\\s*)(?:"(?:\\\\.|[^"\\\\])*"|'[^'\\n]*')(\\s+#.*)?$`,
+            'm'
+        );
+        let replaced = false;
+        let next = block.replace(
+            withCommentRegex,
+            (_, prefix, suffix = '') => {
+                replaced = true;
+                return `${prefix}"${safeValue}"${suffix}`;
+            }
+        );
+        if (!replaced) {
+            const fallbackRegex = new RegExp(`^(\\s*${escapedFieldName}\\s*=\\s*).*$`, 'm');
+            next = next.replace(
+                fallbackRegex,
+                (_, prefix) => `${prefix}"${safeValue}"`
+            );
+        }
+        return next;
+    };
+
     let newContent = content;
     const sorted = ranges.sort((a, b) => b.start - a.start);
     for (const range of sorted) {
         const providerBlock = newContent.slice(range.start, range.end);
         let updatedBlock = providerBlock;
         if (baseUrl) {
-            const safeBaseUrl = escapeTomlBasicString(baseUrl);
-            const baseUrlWithCommentRegex = /^(\s*base_url\s*=\s*)(?:"(?:\\.|[^"\\])*"|'[^'\n]*')(\s+#.*)?$/m;
-            let replacedBaseUrl = false;
-            updatedBlock = updatedBlock.replace(
-                baseUrlWithCommentRegex,
-                (_, prefix, suffix = '') => {
-                    replacedBaseUrl = true;
-                    return `${prefix}"${safeBaseUrl}"${suffix}`;
-                }
-            );
-            if (!replacedBaseUrl) {
-                updatedBlock = updatedBlock.replace(
-                    /^(\s*base_url\s*=\s*).*$/m,
-                    (_, prefix) => `${prefix}"${safeBaseUrl}"`
-                );
-            }
+            updatedBlock = replaceTomlStringField(updatedBlock, 'base_url', baseUrl);
         }
         if (apiKey !== undefined) {
-            const safeApiKey = escapeTomlBasicString(apiKey);
-            const apiKeyWithCommentRegex = /^(\s*preferred_auth_method\s*=\s*)(?:"(?:\\.|[^"\\])*"|'[^'\n]*')(\s+#.*)?$/m;
-            let replacedApiKey = false;
-            updatedBlock = updatedBlock.replace(
-                apiKeyWithCommentRegex,
-                (_, prefix, suffix = '') => {
-                    replacedApiKey = true;
-                    return `${prefix}"${safeApiKey}"${suffix}`;
-                }
-            );
-            if (!replacedApiKey) {
-                updatedBlock = updatedBlock.replace(
-                    /^(\s*preferred_auth_method\s*=\s*).*$/m,
-                    (_, prefix) => `${prefix}"${safeApiKey}"`
-                );
-            }
+            updatedBlock = replaceTomlStringField(updatedBlock, 'preferred_auth_method', apiKey);
         }
         newContent = newContent.slice(0, range.start) + updatedBlock + newContent.slice(range.end);
     }
