@@ -540,6 +540,15 @@ module.exports = async function testConfig(ctx) {
             && parsedAfterMultilineUpdate.model_providers.foo.preferred_auth_method === 'sk-triple-updated',
             'update-provider multiline rewrite should keep config.toml parseable and value readable'
         );
+        const cliListAfterMultiline = runSync(node, [cliPath, 'list'], { env: legacyEnv });
+        assert(
+            cliListAfterMultiline.status === 0,
+            `multiline string update should keep config parseable: ${cliListAfterMultiline.stderr || cliListAfterMultiline.stdout}`
+        );
+        assert(
+            cliListAfterMultiline.stdout.includes('foo'),
+            'multiline string update should keep provider readable in a fresh process'
+        );
 
         const nestedMetadataConfig = [
             'model_provider = "foo"',
