@@ -299,6 +299,7 @@ const PROVIDER_CONFIG_KEYS = new Set([
     'stream_max_retries',
     'stream_idle_timeout_ms'
 ]);
+const RECOVERABLE_PROVIDER_SIGNAL_KEYS = [...PROVIDER_CONFIG_KEYS].filter((key) => key !== 'name' && key !== 'base_url');
 
 function looksLikeProviderConfig(value) {
     if (!isPlainObject(value)) return false;
@@ -310,14 +311,7 @@ function isRecoverableNestedProviderConfig(value) {
     const hasBaseUrl = typeof value.base_url === 'string' && value.base_url.trim() !== '';
     if (!hasBaseUrl) return false;
     const hasName = typeof value.name === 'string' && value.name.trim() !== '';
-    const hasProviderSignals = [
-        'wire_api',
-        'requires_openai_auth',
-        'preferred_auth_method',
-        'request_max_retries',
-        'stream_max_retries',
-        'stream_idle_timeout_ms'
-    ].some((key) => Object.prototype.hasOwnProperty.call(value, key));
+    const hasProviderSignals = RECOVERABLE_PROVIDER_SIGNAL_KEYS.some((key) => Object.prototype.hasOwnProperty.call(value, key));
     return hasName || hasProviderSignals;
 }
 
@@ -5455,10 +5449,24 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
         );
         if (!replaced) {
             const fallbackRegex = new RegExp(`^(\\s*${escapedFieldName}\\s*=\\s*)(.*?)(\\s+#.*)?$`, 'm');
+            let fallbackReplaced = false;
             next = next.replace(
                 fallbackRegex,
-                (_, prefix, __, suffix = '') => `${prefix}"${safeValue}"${suffix}`
+                (_, prefix, __, suffix = '') => {
+                    fallbackReplaced = true;
+                    return `${prefix}"${safeValue}"${suffix}`;
+                }
             );
+            if (!fallbackReplaced) {
+                const keyIndentMatch = block.match(/^(\s*)[A-Za-z0-9_.-]+\s*=/m);
+                const indent = keyIndentMatch ? keyIndentMatch[1] : '';
+                const lineEnding = block.includes('\r\n') ? '\r\n' : '\n';
+                const tailMatch = block.match(/(\s*)$/);
+                const tail = tailMatch ? tailMatch[1] : '';
+                const body = block.slice(0, block.length - tail.length);
+                const separator = body.endsWith('\n') || body.endsWith('\r') ? '' : lineEnding;
+                next = `${body}${separator}${indent}${fieldName} = "${safeValue}"${tail}`;
+            }
         }
         return next;
     };

@@ -550,6 +550,47 @@ module.exports = async function testConfig(ctx) {
             'multiline string update should keep provider readable in a fresh process'
         );
 
+        const missingFieldConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.openai]',
+            'name = "openai"',
+            'base_url = "https://api.openai.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = ""',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, missingFieldConfig, 'utf-8');
+        const updateMissingField = await legacyApi('update-provider', {
+            name: 'foo',
+            key: 'sk-added-field'
+        });
+        assert(updateMissingField.success === true, 'update-provider should append missing preferred_auth_method field');
+        const configAfterMissingFieldUpdate = fs.readFileSync(legacyConfigPath, 'utf-8');
+        assert(
+            configAfterMissingFieldUpdate.includes('preferred_auth_method = "sk-added-field"'),
+            'update-provider should append preferred_auth_method when field is missing'
+        );
+        const exportMissingFieldProvider = await legacyApi('export-provider', { name: 'foo' });
+        assert(
+            exportMissingFieldProvider.payload && exportMissingFieldProvider.payload.apiKey === 'sk-added-field',
+            'appended preferred_auth_method should be readable via export-provider'
+        );
+
         const nestedMetadataConfig = [
             'model_provider = "foo"',
             'model = "gpt-5.3-codex"',
