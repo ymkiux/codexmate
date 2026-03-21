@@ -444,12 +444,10 @@ function normalizeLegacyModelProviders(modelProviders, providerHeaderSegmentKeyS
 
         const recovered = [];
         collectNestedProviderConfigs(provider, [name], recovered);
-        if (recovered.length > 0) {
-            delete normalized[name];
-            changed = true;
-            for (const recoveredEntry of recovered) {
-                addRecovered(recoveredEntry);
-            }
+        delete normalized[name];
+        changed = true;
+        for (const recoveredEntry of recovered) {
+            addRecovered(recoveredEntry);
         }
     }
 
@@ -5735,7 +5733,10 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
                 throw new Error(`${fieldName} 使用了未闭合的多行 TOML 字符串，无法安全更新`);
             }
             const lineEndIndex = block.indexOf('\n', valueEnd + closingRunLength);
-            const tailEnd = lineEndIndex === -1 ? block.length : lineEndIndex;
+            let tailEnd = lineEndIndex === -1 ? block.length : lineEndIndex;
+            if (lineEndIndex > 0 && block[lineEndIndex - 1] === '\r') {
+                tailEnd = lineEndIndex - 1;
+            }
             const tail = block.slice(valueEnd + closingRunLength, tailEnd);
             const tailMatch = tail.match(/^(\s+#.*)?\s*$/);
             if (!tailMatch) {

@@ -862,13 +862,25 @@ module.exports = async function testConfig(ctx) {
         ].join('\n');
         fs.writeFileSync(legacyConfigPath, nestedMetadataConfig, 'utf-8');
         const nestedMetadataList = await legacyApi('list');
+        const nestedFoo = nestedMetadataList.providers.find((item) => item && item.name === 'foo');
         assert(
-            nestedMetadataList.providers.some((item) => item && item.name === 'foo'),
+            nestedFoo,
             'nested metadata config should keep foo provider'
+        );
+        assert(
+            nestedFoo.url === 'https://api.example.com/v1',
+            'nested metadata should not override foo provider data'
         );
         assert(
             !nestedMetadataList.providers.some((item) => item && item.name === 'foo.metadata'),
             'nested metadata should not be promoted to provider'
+        );
+        const nestedFooExport = await legacyApi('export-provider', { name: 'foo' });
+        assert(
+            nestedFooExport.payload
+            && nestedFooExport.payload.baseUrl === 'https://api.example.com/v1'
+            && nestedFooExport.payload.apiKey === 'sk-foo',
+            'nested metadata should not change export-provider(foo)'
         );
         const nestedMetadataExport = await legacyApi('export-provider', { name: 'foo.metadata' });
         assert(nestedMetadataExport.error, 'nested metadata should not be exportable as a provider');
@@ -968,6 +980,14 @@ module.exports = async function testConfig(ctx) {
             && parsedAfterDeleteWithMetadataChild.model_providers
             && !parsedAfterDeleteWithMetadataChild.model_providers.foo,
             'delete-provider with metadata child should not leave foo namespace behind'
+        );
+        assert(
+            !/model_provider\s*=\s*["']foo["']/.test(configAfterDeleteWithMetadataChild),
+            'delete-provider with metadata child should not keep top-level model_provider = "foo"'
+        );
+        assert(
+            !parsedAfterDeleteWithMetadataChild.model_provider || parsedAfterDeleteWithMetadataChild.model_provider !== 'foo',
+            'delete-provider with metadata child should keep global provider selection away from removed provider'
         );
 
         const deepNestedRecoverableConfig = [
@@ -1304,6 +1324,14 @@ module.exports = async function testConfig(ctx) {
         && parsedAfterQuotedUpdate.model_providers[e2eApiProviderKey]
         && parsedAfterQuotedUpdate.model_providers[e2eApiProviderKey].preferred_auth_method === quotedApiKey,
         'quoted API key rewrite should keep config.toml parseable and runtime value readable'
+    );
+    assert(
+        parsedAfterQuotedUpdate
+        && parsedAfterQuotedUpdate.model_providers
+        && e2eApiProviderKey
+        && parsedAfterQuotedUpdate.model_providers[e2eApiProviderKey]
+        && parsedAfterQuotedUpdate.model_providers[e2eApiProviderKey].base_url === updatedUrl,
+        'quoted API key update should preserve base_url in config.toml'
     );
     // Expected TOML fragment:
     // preferred_auth_method = "sk-e2e-\\\"quoted\\\"-\\\\\\\\path"
