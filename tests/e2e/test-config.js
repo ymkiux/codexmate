@@ -562,6 +562,9 @@ module.exports = async function testConfig(ctx) {
     assert(exportProviderNew.payload.baseUrl === updatedUrl, 'export-provider(e2e-api) baseUrl mismatch');
     assert(exportProviderNew.payload.apiKey === 'sk-e2e-api-upd', 'export-provider(e2e-api) apiKey mismatch');
 
+    // quotedApiKey is the runtime value used for API update/export round-trip.
+    // configPath/configAfterQuotedUpdate validates the persisted TOML line where
+    // quotes/backslashes are escaped for TOML syntax.
     const quotedApiKey = 'sk-e2e-"quoted"-\\\\path';
     const updateProviderQuoted = await api('update-provider', { name: 'e2e-api', key: quotedApiKey });
     assert(updateProviderQuoted.success === true, 'update-provider should handle quoted API key');
@@ -570,6 +573,8 @@ module.exports = async function testConfig(ctx) {
     assert(exportProviderQuoted.payload.apiKey === quotedApiKey, 'quoted API key should round-trip');
     const configPath = path.join(tmpHome, '.codex', 'config.toml');
     const configAfterQuotedUpdate = fs.readFileSync(configPath, 'utf-8');
+    // Expected TOML fragment:
+    // preferred_auth_method = "sk-e2e-\\\"quoted\\\"-\\\\\\\\path"
     assert(
         configAfterQuotedUpdate.includes('preferred_auth_method = "sk-e2e-\\"quoted\\"-\\\\\\\\path"'),
         'quoted API key should be escaped in config.toml'

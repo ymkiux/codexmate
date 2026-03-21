@@ -322,6 +322,11 @@ function isRecoverableNestedProviderConfig(value) {
 
 function collectNestedProviderConfigs(node, pathPrefix, collector) {
     if (!isPlainObject(node)) return;
+    const segments = String(pathPrefix || '').split('.');
+    const lastSegment = segments.length > 0 ? segments[segments.length - 1] : '';
+    if (lastSegment === 'metadata') {
+        return;
+    }
     if (isRecoverableNestedProviderConfig(node)) {
         collector.push([pathPrefix, node]);
         return;
