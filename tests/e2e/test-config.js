@@ -505,7 +505,7 @@ module.exports = async function testConfig(ctx) {
             'stream_max_retries = 10',
             'stream_idle_timeout_ms = 300000',
             '',
-            '[model_providers.foo."bar.metadata"]',
+            "[ model_providers . foo . 'bar.metadata' ]",
             'base_url = "https://bar-metadata.example.com/v1"',
             'wire_api = "responses"',
             'preferred_auth_method = "sk-bar-metadata"',
@@ -618,10 +618,15 @@ module.exports = async function testConfig(ctx) {
     assert(exportProviderQuoted.payload.apiKey === quotedApiKey, 'quoted API key should round-trip');
     const configPath = path.join(tmpHome, '.codex', 'config.toml');
     const configAfterQuotedUpdate = fs.readFileSync(configPath, 'utf-8');
+    const e2eApiBlockMatch = configAfterQuotedUpdate.match(
+        /(?:^|\n)\s*\[model_providers\.(?:"e2e-api"|'e2e-api'|e2e-api)\][\s\S]*?(?=\n\s*\[|$)/
+    );
+    assert(e2eApiBlockMatch, 'config.toml should contain e2e-api provider block after quoted update');
+    const e2eApiBlock = e2eApiBlockMatch[0];
     // Expected TOML fragment:
     // preferred_auth_method = "sk-e2e-\\\"quoted\\\"-\\\\\\\\path"
     assert(
-        configAfterQuotedUpdate.includes('preferred_auth_method = "sk-e2e-\\"quoted\\"-\\\\\\\\path"'),
+        e2eApiBlock.includes('preferred_auth_method = "sk-e2e-\\"quoted\\"-\\\\\\\\path"'),
         'quoted API key should be escaped in config.toml'
     );
     const cliListAfterQuoted = runSync(node, [cliPath, 'list'], { env });
