@@ -517,6 +517,24 @@ module.exports = async function testConfig(ctx) {
             dottedNestedProviderList.providers.some((item) => item && item.name === 'foo.bar.metadata'),
             'nested provider keys containing dot suffix should not be filtered as metadata'
         );
+        const dottedNestedProviderUpdate = await legacyApi('update-provider', {
+            name: 'foo.bar.metadata',
+            url: 'https://bar-metadata-updated.example.com/v1',
+            key: 'sk-bar-metadata-updated'
+        });
+        assert(
+            dottedNestedProviderUpdate.success === true,
+            'nested provider with dotted segment should support update-provider'
+        );
+        const dottedNestedProviderExport = await legacyApi('export-provider', { name: 'foo.bar.metadata' });
+        assert(
+            dottedNestedProviderExport.payload && dottedNestedProviderExport.payload.baseUrl === 'https://bar-metadata-updated.example.com/v1',
+            'nested provider with dotted segment should update baseUrl'
+        );
+        assert(
+            dottedNestedProviderExport.payload && dottedNestedProviderExport.payload.apiKey === 'sk-bar-metadata-updated',
+            'nested provider with dotted segment should update apiKey'
+        );
 
         const ipv6Config = [
             'model_provider = "foo"',
