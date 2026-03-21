@@ -622,6 +622,46 @@ module.exports = async function testConfig(ctx) {
             'nested metadata should not be promoted to provider'
         );
 
+        const topLevelMetadataNamespaceConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = "sk-foo"',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.metadata.foo]',
+            'base_url = "https://metadata-foo.example.com/v1"',
+            'wire_api = "responses"',
+            'preferred_auth_method = "sk-metadata-foo"',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, topLevelMetadataNamespaceConfig, 'utf-8');
+        const topLevelMetadataList = await legacyApi('list');
+        assert(
+            topLevelMetadataList.providers.some((item) => item && item.name === 'metadata.foo'),
+            'top-level metadata namespace should still recover nested provider'
+        );
+        assert(
+            !topLevelMetadataList.providers.some((item) => item && item.name === 'metadata'),
+            'top-level metadata namespace root should not be exposed as provider'
+        );
+        const topLevelMetadataExport = await legacyApi('export-provider', { name: 'metadata.foo' });
+        assert(
+            topLevelMetadataExport.payload && topLevelMetadataExport.payload.baseUrl === 'https://metadata-foo.example.com/v1',
+            'top-level metadata namespace recovered provider should be exportable'
+        );
+        assert(
+            topLevelMetadataExport.payload && topLevelMetadataExport.payload.apiKey === 'sk-metadata-foo',
+            'top-level metadata namespace recovered provider should keep api key'
+        );
+
         const dottedNestedProviderConfig = [
             'model_provider = "foo"',
             'model = "gpt-5.3-codex"',
