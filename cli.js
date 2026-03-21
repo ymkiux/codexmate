@@ -5436,7 +5436,6 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
                         slashCount++;
                     }
                     if (slashCount % 2 !== 0) {
-                        i = runEnd - 1;
                         continue;
                     }
                 }

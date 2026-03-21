@@ -599,6 +599,54 @@ module.exports = async function testConfig(ctx) {
             'escaped triple-quote multiline rewrite should keep config.toml parseable and value readable'
         );
 
+        const escapedQuoteBeforeClosingConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = """sk-old\\"""" # keep-escaped-close-comment',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.openai]',
+            'name = "openai"',
+            'base_url = "https://api.openai.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = ""',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, escapedQuoteBeforeClosingConfig, 'utf-8');
+        const updateEscapedQuoteBeforeClosing = await legacyApi('update-provider', {
+            name: 'foo',
+            key: 'sk-escaped-close-updated'
+        });
+        assert(
+            updateEscapedQuoteBeforeClosing.success === true,
+            'update-provider should handle escaped quote before multiline closing delimiter'
+        );
+        const configAfterEscapedQuoteBeforeClosingUpdate = fs.readFileSync(legacyConfigPath, 'utf-8');
+        assert(
+            configAfterEscapedQuoteBeforeClosingUpdate.includes('preferred_auth_method = "sk-escaped-close-updated" # keep-escaped-close-comment'),
+            'escaped-quote-before-close multiline update should preserve inline comment'
+        );
+        const parsedAfterEscapedQuoteBeforeClosingUpdate = toml.parse(configAfterEscapedQuoteBeforeClosingUpdate);
+        assert(
+            parsedAfterEscapedQuoteBeforeClosingUpdate
+            && parsedAfterEscapedQuoteBeforeClosingUpdate.model_providers
+            && parsedAfterEscapedQuoteBeforeClosingUpdate.model_providers.foo
+            && parsedAfterEscapedQuoteBeforeClosingUpdate.model_providers.foo.preferred_auth_method === 'sk-escaped-close-updated',
+            'escaped-quote-before-close multiline rewrite should keep config.toml parseable and value readable'
+        );
+
         const multilineLiteralTrailingBackslashConfig = [
             'model_provider = "foo"',
             'model = "gpt-5.3-codex"',
