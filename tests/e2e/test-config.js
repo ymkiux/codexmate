@@ -634,6 +634,14 @@ module.exports = async function testConfig(ctx) {
             configAfterMissingFieldUpdate.includes('preferred_auth_method = "sk-added-field"'),
             'update-provider should append preferred_auth_method when field is missing'
         );
+        const parsedAfterMissingFieldUpdate = toml.parse(configAfterMissingFieldUpdate);
+        assert(
+            parsedAfterMissingFieldUpdate
+            && parsedAfterMissingFieldUpdate.model_providers
+            && parsedAfterMissingFieldUpdate.model_providers.foo
+            && parsedAfterMissingFieldUpdate.model_providers.foo.preferred_auth_method === 'sk-added-field',
+            'missing-field rewrite should keep config.toml parseable and value readable'
+        );
         const exportMissingFieldProvider = await legacyApi('export-provider', { name: 'foo' });
         assert(
             exportMissingFieldProvider.payload && exportMissingFieldProvider.payload.apiKey === 'sk-added-field',
@@ -905,6 +913,20 @@ module.exports = async function testConfig(ctx) {
     );
     assert(e2eApiBlockMatch, 'config.toml should contain e2e-api provider block after quoted update');
     const e2eApiBlock = e2eApiBlockMatch[0];
+    const e2eApiBlockHeaderMatch = e2eApiBlock.match(
+        /\[\s*model_providers\.(?:"([^"]+)"|'([^']+)'|([^\]\s]+))\s*\]/
+    );
+    const e2eApiProviderKey = e2eApiBlockHeaderMatch
+        && (e2eApiBlockHeaderMatch[1] || e2eApiBlockHeaderMatch[2] || e2eApiBlockHeaderMatch[3]);
+    const parsedAfterQuotedUpdate = toml.parse(configAfterQuotedUpdate);
+    assert(
+        parsedAfterQuotedUpdate
+        && parsedAfterQuotedUpdate.model_providers
+        && e2eApiProviderKey
+        && parsedAfterQuotedUpdate.model_providers[e2eApiProviderKey]
+        && parsedAfterQuotedUpdate.model_providers[e2eApiProviderKey].preferred_auth_method === quotedApiKey,
+        'quoted API key rewrite should keep config.toml parseable and runtime value readable'
+    );
     // Expected TOML fragment:
     // preferred_auth_method = "sk-e2e-\\\"quoted\\\"-\\\\\\\\path"
     assert(
