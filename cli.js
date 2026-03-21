@@ -675,6 +675,53 @@ function findProviderSectionRanges(content, providerName, exactSegments = null) 
     return exactMatches.length > 0 ? exactMatches : ranges;
 }
 
+function doesSegmentsStartWith(segments, prefix) {
+    if (!Array.isArray(segments) || !Array.isArray(prefix) || prefix.length === 0 || segments.length < prefix.length) {
+        return false;
+    }
+    for (let i = 0; i < prefix.length; i++) {
+        if (String(segments[i]) !== String(prefix[i])) return false;
+    }
+    return true;
+}
+
+function findProviderDescendantSectionRanges(content, prefixSegments) {
+    const text = typeof content === 'string' ? content : '';
+    const prefix = Array.isArray(prefixSegments) ? prefixSegments.map((item) => String(item)) : [];
+    if (!text || prefix.length === 0) return [];
+
+    const allHeaders = [];
+    const parsedProviderSegmentsByStart = new Map();
+    const multilineStringRanges = collectTomlMultilineStringRanges(text);
+    const sectionLineRegex = /^[ \t]*\[(?!\[)([^\]\n]+)\][ \t]*(?:#.*)?$/gm;
+    let match;
+    while ((match = sectionLineRegex.exec(text)) !== null) {
+        const start = match.index;
+        if (isIndexInRanges(start, multilineStringRanges)) {
+            continue;
+        }
+        allHeaders.push(start);
+        const headerExpr = String(match[1] || '').trim();
+        const parsedSegments = parseTomlDottedKeyExpression(headerExpr);
+        if (!Array.isArray(parsedSegments) || parsedSegments.length < 2 || parsedSegments[0] !== 'model_providers') {
+            continue;
+        }
+        parsedProviderSegmentsByStart.set(start, parsedSegments.slice(1));
+    }
+
+    const ranges = [];
+    for (let i = 0; i < allHeaders.length; i++) {
+        const start = allHeaders[i];
+        const providerSegments = parsedProviderSegmentsByStart.get(start);
+        if (!providerSegments) continue;
+        if (!doesSegmentsStartWith(providerSegments, prefix)) continue;
+        if (providerSegments.length <= prefix.length) continue;
+        const end = i + 1 < allHeaders.length ? allHeaders[i + 1] : text.length;
+        ranges.push({ start, end, priority: 0 });
+    }
+    return ranges;
+}
+
 function normalizeAuthProfileName(value) {
     const raw = typeof value === 'string' ? value.trim() : '';
     if (!raw) return '';
@@ -2243,10 +2290,19 @@ function performProviderDeletion(name, options = {}) {
 
     let updatedContent = null;
     const ranges = findProviderSectionRanges(content, name, providerSegments);
-    if (ranges.length > 0) {
-        const sorted = ranges.sort((a, b) => b.start - a.start);
+    const descendantPrefixSegments = Array.isArray(providerSegments) && providerSegments.length > 0
+        ? providerSegments
+        : String(name || '').split('.').filter((item) => item);
+    const descendantRanges = findProviderDescendantSectionRanges(content, descendantPrefixSegments);
+    const combinedRanges = [...ranges, ...descendantRanges];
+    if (combinedRanges.length > 0) {
+        const sorted = combinedRanges.sort((a, b) => b.start - a.start || b.end - a.end);
+        const seen = new Set();
         let removedContent = content;
         for (const range of sorted) {
+            const rangeKey = `${range.start}:${range.end}`;
+            if (seen.has(rangeKey)) continue;
+            seen.add(rangeKey);
             removedContent = removedContent.slice(0, range.start) + removedContent.slice(range.end);
         }
         updatedContent = removedContent.replace(/\n{3,}/g, lineEnding + lineEnding);
