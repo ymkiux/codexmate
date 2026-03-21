@@ -305,9 +305,25 @@ function looksLikeProviderConfig(value) {
     return Object.keys(value).some((key) => PROVIDER_CONFIG_KEYS.has(key));
 }
 
+function isRecoverableNestedProviderConfig(value) {
+    if (!isPlainObject(value)) return false;
+    const hasBaseUrl = typeof value.base_url === 'string' && value.base_url.trim() !== '';
+    if (!hasBaseUrl) return false;
+    const hasName = typeof value.name === 'string' && value.name.trim() !== '';
+    const hasProviderSignals = [
+        'wire_api',
+        'requires_openai_auth',
+        'preferred_auth_method',
+        'request_max_retries',
+        'stream_max_retries',
+        'stream_idle_timeout_ms'
+    ].some((key) => Object.prototype.hasOwnProperty.call(value, key));
+    return hasName || hasProviderSignals;
+}
+
 function collectNestedProviderConfigs(node, pathPrefix, collector) {
     if (!isPlainObject(node)) return;
-    if (looksLikeProviderConfig(node)) {
+    if (isRecoverableNestedProviderConfig(node)) {
         collector.push([pathPrefix, node]);
         return;
     }
@@ -5255,15 +5271,17 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
         const providerBlock = newContent.slice(range.start, range.end);
         let updatedBlock = providerBlock;
         if (baseUrl) {
+            const safeBaseUrl = escapeTomlBasicString(baseUrl);
             updatedBlock = updatedBlock.replace(
                 /^(base_url\s*=\s*)(["']).*?\2/m,
-                `$1$2${baseUrl}$2`
+                (_, prefix, quote) => `${prefix}${quote}${safeBaseUrl}${quote}`
             );
         }
         if (apiKey !== undefined) {
+            const safeApiKey = escapeTomlBasicString(apiKey);
             updatedBlock = updatedBlock.replace(
                 /^(preferred_auth_method\s*=\s*)(["']).*?\2/m,
-                `$1$2${apiKey}$2`
+                (_, prefix, quote) => `${prefix}${quote}${safeApiKey}${quote}`
             );
         }
         newContent = newContent.slice(0, range.start) + updatedBlock + newContent.slice(range.end);

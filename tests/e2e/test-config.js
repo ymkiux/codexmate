@@ -7,6 +7,7 @@ module.exports = async function testConfig(ctx) {
         env,
         node,
         cliPath,
+        tmpHome,
         mockProviderUrl,
         noModelsUrl,
         htmlModelsUrl,
@@ -417,6 +418,36 @@ module.exports = async function testConfig(ctx) {
         const commentDeleteSections = configAfterCommentDelete.match(providerSectionRegex) || [];
         assert(commentDeleteSections.length === 0, 'comment-marker delete should remove foo.bar section only');
 
+        const nestedMetadataConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = "sk-foo"',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.foo.metadata]',
+            'base_url = "https://metadata.example.com/v1"',
+            'owner = "team-a"',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, nestedMetadataConfig, 'utf-8');
+        const nestedMetadataList = await legacyApi('list');
+        assert(
+            nestedMetadataList.providers.some((item) => item && item.name === 'foo'),
+            'nested metadata config should keep foo provider'
+        );
+        assert(
+            !nestedMetadataList.providers.some((item) => item && item.name === 'foo.metadata'),
+            'nested metadata should not be promoted to provider'
+        );
+
         const ipv6Config = [
             'model_provider = "foo"',
             'model = "gpt-5.3-codex"',
@@ -487,6 +518,19 @@ module.exports = async function testConfig(ctx) {
     assert(exportProviderNew.payload, 'export-provider(e2e-api) missing payload');
     assert(exportProviderNew.payload.baseUrl === updatedUrl, 'export-provider(e2e-api) baseUrl mismatch');
     assert(exportProviderNew.payload.apiKey === 'sk-e2e-api-upd', 'export-provider(e2e-api) apiKey mismatch');
+
+    const quotedApiKey = 'sk-e2e-"quoted"-\\\\path';
+    const updateProviderQuoted = await api('update-provider', { name: 'e2e-api', key: quotedApiKey });
+    assert(updateProviderQuoted.success === true, 'update-provider should handle quoted API key');
+    const exportProviderQuoted = await api('export-provider', { name: 'e2e-api' });
+    assert(exportProviderQuoted.payload, 'export-provider(e2e-api quoted) missing payload');
+    assert(exportProviderQuoted.payload.apiKey === quotedApiKey, 'quoted API key should round-trip');
+    const configPath = path.join(tmpHome, '.codex', 'config.toml');
+    const configAfterQuotedUpdate = fs.readFileSync(configPath, 'utf-8');
+    assert(
+        configAfterQuotedUpdate.includes('preferred_auth_method = "sk-e2e-\\"quoted\\"-\\\\\\\\path"'),
+        'quoted API key should be escaped in config.toml'
+    );
 
     const statusAfterAdd = await api('status');
     assert(statusAfterAdd.provider === 'e2e2', 'add-provider should not change current provider');
