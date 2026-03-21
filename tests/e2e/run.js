@@ -22,6 +22,7 @@ const testHealthSpeed = require('./test-health-speed');
 const testMessages = require('./test-messages');
 const testAuthProxy = require('./test-auth-proxy');
 const testMcp = require('./test-mcp');
+const testWorkflow = require('./test-workflow');
 
 async function main() {
     const realHome = os.homedir();
@@ -110,6 +111,7 @@ async function main() {
         await testMessages(ctx);
         await testAuthProxy(ctx);
         await testMcp(ctx);
+        await testWorkflow(ctx);
 
     } finally {
         const waitForExit = new Promise((resolve) => {
