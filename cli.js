@@ -5272,17 +5272,39 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
         let updatedBlock = providerBlock;
         if (baseUrl) {
             const safeBaseUrl = escapeTomlBasicString(baseUrl);
+            const baseUrlWithCommentRegex = /^(\s*base_url\s*=\s*)(?:"(?:\\.|[^"\\])*"|'[^'\n]*')(\s+#.*)?$/m;
+            let replacedBaseUrl = false;
             updatedBlock = updatedBlock.replace(
-                /^(\s*base_url\s*=\s*).*$/m,
-                (_, prefix) => `${prefix}"${safeBaseUrl}"`
+                baseUrlWithCommentRegex,
+                (_, prefix, suffix = '') => {
+                    replacedBaseUrl = true;
+                    return `${prefix}"${safeBaseUrl}"${suffix}`;
+                }
             );
+            if (!replacedBaseUrl) {
+                updatedBlock = updatedBlock.replace(
+                    /^(\s*base_url\s*=\s*).*$/m,
+                    (_, prefix) => `${prefix}"${safeBaseUrl}"`
+                );
+            }
         }
         if (apiKey !== undefined) {
             const safeApiKey = escapeTomlBasicString(apiKey);
+            const apiKeyWithCommentRegex = /^(\s*preferred_auth_method\s*=\s*)(?:"(?:\\.|[^"\\])*"|'[^'\n]*')(\s+#.*)?$/m;
+            let replacedApiKey = false;
             updatedBlock = updatedBlock.replace(
-                /^(\s*preferred_auth_method\s*=\s*).*$/m,
-                (_, prefix) => `${prefix}"${safeApiKey}"`
+                apiKeyWithCommentRegex,
+                (_, prefix, suffix = '') => {
+                    replacedApiKey = true;
+                    return `${prefix}"${safeApiKey}"${suffix}`;
+                }
             );
+            if (!replacedApiKey) {
+                updatedBlock = updatedBlock.replace(
+                    /^(\s*preferred_auth_method\s*=\s*).*$/m,
+                    (_, prefix) => `${prefix}"${safeApiKey}"`
+                );
+            }
         }
         newContent = newContent.slice(0, range.start) + updatedBlock + newContent.slice(range.end);
     }
