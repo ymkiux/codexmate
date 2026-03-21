@@ -95,6 +95,54 @@ module.exports = async function testMcp(ctx) {
                 name: 'codexmate.claude.settings.get',
                 arguments: {}
             }
+        },
+        {
+            jsonrpc: '2.0',
+            id: 6,
+            method: 'resources/read',
+            params: { uri: 'codexmate://workflows' }
+        },
+        {
+            jsonrpc: '2.0',
+            id: 7,
+            method: 'tools/call',
+            params: {
+                name: 'codexmate.workflow.list',
+                arguments: {}
+            }
+        },
+        {
+            jsonrpc: '2.0',
+            id: 8,
+            method: 'tools/call',
+            params: {
+                name: 'codexmate.workflow.run',
+                arguments: {
+                    id: 'diagnose-config',
+                    input: {}
+                }
+            }
+        },
+        {
+            jsonrpc: '2.0',
+            id: 9,
+            method: 'tools/call',
+            params: {
+                name: 'codexmate.workflow.run',
+                arguments: {
+                    id: 'safe-provider-switch',
+                    input: {
+                        provider: 'e2e',
+                        apply: true
+                    }
+                }
+            }
+        },
+        {
+            jsonrpc: '2.0',
+            id: 10,
+            method: 'resources/read',
+            params: { uri: 'codexmate://workflow-runs?limit=5' }
         }
     ];
     const readOnlyResponses = runMcpExchange(node, cliPath, env, ['--read-only'], readOnlyRequests);
@@ -105,6 +153,11 @@ module.exports = async function testMcp(ctx) {
     assert(readOnlyById.has(3), 'mcp resources/read response missing');
     assert(readOnlyById.has(4), 'mcp session.list response missing');
     assert(readOnlyById.has(5), 'mcp claude.settings.get response missing');
+    assert(readOnlyById.has(6), 'mcp workflows resource response missing');
+    assert(readOnlyById.has(7), 'mcp workflow.list response missing');
+    assert(readOnlyById.has(8), 'mcp workflow.run diagnose-config response missing');
+    assert(readOnlyById.has(9), 'mcp workflow.run write-guard response missing');
+    assert(readOnlyById.has(10), 'mcp workflow-runs resource response missing');
 
     const initResult = readOnlyById.get(1).result || {};
     assert(initResult.protocolVersion === '2025-11-25', 'mcp protocol version mismatch');
@@ -115,9 +168,21 @@ module.exports = async function testMcp(ctx) {
     const toolNames = new Set(tools.map((item) => item && item.name).filter(Boolean));
     assert(toolNames.has('codexmate.status.get'), 'mcp read-only tools missing codexmate.status.get');
     assert(!toolNames.has('codexmate.provider.add'), 'mcp read-only tools should not expose write tool');
+    assert(toolNames.has('codexmate.workflow.list'), 'mcp read-only tools missing codexmate.workflow.list');
+    assert(toolNames.has('codexmate.workflow.get'), 'mcp read-only tools missing codexmate.workflow.get');
+    assert(toolNames.has('codexmate.workflow.validate'), 'mcp read-only tools missing codexmate.workflow.validate');
+    assert(toolNames.has('codexmate.workflow.run'), 'mcp read-only tools missing codexmate.workflow.run');
 
     const sessionResource = readOnlyById.get(3).result || {};
     assert(Array.isArray(sessionResource.contents), 'mcp resources/read should return contents');
+    const workflowResource = readOnlyById.get(6).result || {};
+    assert(Array.isArray(workflowResource.contents), 'mcp workflows resource should return contents');
+    const workflowResourcePayload = JSON.parse((workflowResource.contents[0] || {}).text || '{}');
+    assert(Array.isArray(workflowResourcePayload.workflows), 'mcp workflows resource should contain workflows');
+    assert(
+        workflowResourcePayload.workflows.some((item) => item && item.id === 'diagnose-config'),
+        'mcp workflows resource should include diagnose-config'
+    );
 
     const sessionListPayload = ((readOnlyById.get(4).result || {}).structuredContent) || {};
     assert(sessionListPayload.source === 'codex', 'mcp session.list should normalize source to codex');
@@ -140,6 +205,32 @@ module.exports = async function testMcp(ctx) {
             && !String((claudeSettingsPayload.env || {}).ANTHROPIC_API_KEY).includes('sk-claude'),
         'mcp claude.settings.get env.ANTHROPIC_API_KEY should be masked'
     );
+
+    const workflowListPayload = ((readOnlyById.get(7).result || {}).structuredContent) || {};
+    assert(Array.isArray(workflowListPayload.workflows), 'mcp workflow.list should return workflows array');
+    assert(
+        workflowListPayload.workflows.some((item) => item && item.id === 'safe-provider-switch'),
+        'mcp workflow.list should include safe-provider-switch'
+    );
+
+    const workflowRunPayload = ((readOnlyById.get(8).result || {}).structuredContent) || {};
+    assert(workflowRunPayload.success === true, 'mcp workflow.run diagnose-config should succeed');
+    assert(Array.isArray(workflowRunPayload.steps), 'mcp workflow.run should include steps');
+    assert(workflowRunPayload.steps.length >= 3, 'mcp workflow.run diagnose-config should execute builtin steps');
+
+    const workflowWriteBlockedPayload = ((readOnlyById.get(9).result || {}).structuredContent) || {};
+    assert(workflowWriteBlockedPayload.success === false, 'mcp workflow.run should block write step in read-only mode');
+    assert(
+        typeof workflowWriteBlockedPayload.error === 'string'
+            && workflowWriteBlockedPayload.error.includes('allowWrite'),
+        'mcp workflow.run should include allowWrite guard error in read-only mode'
+    );
+
+    const workflowRunsResource = readOnlyById.get(10).result || {};
+    assert(Array.isArray(workflowRunsResource.contents), 'mcp workflow-runs resource should return contents');
+    const workflowRunsPayload = JSON.parse((workflowRunsResource.contents[0] || {}).text || '{}');
+    assert(Array.isArray(workflowRunsPayload.runs), 'mcp workflow-runs resource should contain runs array');
+    assert(workflowRunsPayload.runs.length > 0, 'mcp workflow-runs resource should include run records');
 
     const writeEnabledRequests = [
         { jsonrpc: '2.0', id: 11, method: 'initialize', params: {} },

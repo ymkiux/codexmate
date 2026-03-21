@@ -11,6 +11,7 @@ await import(pathToFileURL(path.join(__dirname, 'web-ui-logic.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'reset-main.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'session-query.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'mcp-stdio.test.mjs')));
+await import(pathToFileURL(path.join(__dirname, 'workflow-engine.test.mjs')));
 
 let failures = 0;
 for (const { name, fn } of tests) {
