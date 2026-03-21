@@ -328,7 +328,6 @@ function collectNestedProviderConfigs(node, pathSegments, collector) {
             segments: segments.slice(),
             provider: node
         });
-        return;
     }
     for (const [childKey, childValue] of Object.entries(node)) {
         if (!isPlainObject(childValue)) continue;
