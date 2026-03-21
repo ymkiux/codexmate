@@ -892,6 +892,55 @@ module.exports = async function testConfig(ctx) {
         });
         assert(nestedMetadataUpdate.error, 'nested metadata should not be updatable as a provider');
 
+        const deleteWithMetadataChildConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = "sk-foo"',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.foo.metadata]',
+            'base_url = "https://metadata.example.com/v1"',
+            'owner = "team-a"',
+            '',
+            '[model_providers.openai]',
+            'name = "openai"',
+            'base_url = "https://api.openai.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = ""',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, deleteWithMetadataChildConfig, 'utf-8');
+        const deleteWithMetadataChild = await legacyApi('delete-provider', { name: 'foo' });
+        assert(deleteWithMetadataChild.success === true, 'delete-provider should remove providers with metadata children');
+        const configAfterDeleteWithMetadataChild = fs.readFileSync(legacyConfigPath, 'utf-8');
+        assert(
+            !/\[\s*model_providers\.foo\s*\]/.test(configAfterDeleteWithMetadataChild),
+            'delete-provider should remove foo section when metadata child exists'
+        );
+        assert(
+            !/\[\s*model_providers\.foo\.metadata\s*\]/.test(configAfterDeleteWithMetadataChild),
+            'delete-provider should remove foo.metadata descendant section'
+        );
+        const parsedAfterDeleteWithMetadataChild = toml.parse(configAfterDeleteWithMetadataChild);
+        assert(
+            parsedAfterDeleteWithMetadataChild
+            && parsedAfterDeleteWithMetadataChild.model_providers
+            && !parsedAfterDeleteWithMetadataChild.model_providers.foo,
+            'delete-provider with metadata child should not leave foo namespace behind'
+        );
+
         const deepNestedRecoverableConfig = [
             'model_provider = "foo"',
             'model = "gpt-5.3-codex"',
