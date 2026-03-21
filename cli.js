@@ -330,6 +330,7 @@ function collectNestedProviderConfigs(node, pathSegments, collector) {
     if (isRecoverableNestedProviderConfig(node)) {
         collector.push({
             name: segments.join('.'),
+            segments: segments.slice(),
             provider: node
         });
         return;
@@ -349,10 +350,21 @@ function normalizeLegacyModelProviders(modelProviders) {
     const normalized = {};
     const addRecovered = (entry) => {
         const name = entry && typeof entry.name === 'string' ? entry.name : '';
+        const segments = entry && Array.isArray(entry.segments) ? entry.segments.slice() : null;
         const provider = entry ? entry.provider : null;
         if (!name || !isPlainObject(provider)) return;
         if (Object.prototype.hasOwnProperty.call(modelProviders, name)) return;
         if (Object.prototype.hasOwnProperty.call(normalized, name)) return;
+        if (Array.isArray(segments) && segments.length > 0) {
+            try {
+                Object.defineProperty(provider, '__codexmate_legacy_segments', {
+                    value: segments,
+                    enumerable: false,
+                    configurable: true,
+                    writable: true
+                });
+            } catch (e) {}
+        }
         normalized[name] = provider;
         changed = true;
     };
@@ -389,6 +401,14 @@ function normalizeLegacyModelProviders(modelProviders) {
 
 function escapeRegex(value) {
     return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function areStringArraysEqual(a, b) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+        if (String(a[i]) !== String(b[i])) return false;
+    }
+    return true;
 }
 
 function parseTomlDottedKeyExpression(expression) {
@@ -471,9 +491,10 @@ function parseTomlDottedKeyExpression(expression) {
     return segments.length > 0 ? segments : null;
 }
 
-function findProviderSectionRanges(content, providerName) {
+function findProviderSectionRanges(content, providerName, exactSegments = null) {
     const text = typeof content === 'string' ? content : '';
     const name = typeof providerName === 'string' ? providerName.trim() : '';
+    const targetSegments = Array.isArray(exactSegments) ? exactSegments.map((item) => String(item)) : null;
     if (!text || !name) return [];
 
     const safeName = escapeRegex(name);
@@ -494,13 +515,23 @@ function findProviderSectionRanges(content, providerName) {
 
         const parsedSegments = parseTomlDottedKeyExpression(headerExpr);
         if (Array.isArray(parsedSegments) && parsedSegments.length >= 2 && parsedSegments[0] === 'model_providers') {
-            const parsedName = parsedSegments.slice(1).join('.');
-            if (parsedName === name) {
+            const providerSegments = parsedSegments.slice(1);
+            if (targetSegments && targetSegments.length > 0 && areStringArraysEqual(providerSegments, targetSegments)) {
                 const prev = targetPriorityByStart.get(start);
-                if (prev === undefined || -2 < prev) {
-                    targetPriorityByStart.set(start, -2);
+                if (prev === undefined || -3 < prev) {
+                    targetPriorityByStart.set(start, -3);
                 }
                 continue;
+            }
+            if (!targetSegments || targetSegments.length === 0) {
+                const parsedName = providerSegments.join('.');
+                if (parsedName === name) {
+                    const prev = targetPriorityByStart.get(start);
+                    if (prev === undefined || -2 < prev) {
+                        targetPriorityByStart.set(start, -2);
+                    }
+                    continue;
+                }
             }
         }
 
@@ -2058,6 +2089,10 @@ function performProviderDeletion(name, options = {}) {
     const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
     const lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
     const hasBom = content.charCodeAt(0) === 0xFEFF;
+    const providerConfig = config.model_providers[name];
+    const providerSegments = providerConfig && Array.isArray(providerConfig.__codexmate_legacy_segments)
+        ? providerConfig.__codexmate_legacy_segments
+        : null;
 
     const remainingProviders = Object.keys(config.model_providers || {}).filter(item => item !== name);
     if (remainingProviders.length === 0) {
@@ -2096,7 +2131,7 @@ function performProviderDeletion(name, options = {}) {
     };
 
     let updatedContent = null;
-    const ranges = findProviderSectionRanges(content, name);
+    const ranges = findProviderSectionRanges(content, name, providerSegments);
     if (ranges.length > 0) {
         const sorted = ranges.sort((a, b) => b.start - a.start);
         let removedContent = content;
@@ -5361,7 +5396,11 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
     }
 
     const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
-    const ranges = findProviderSectionRanges(content, name);
+    const providerConfig = config.model_providers[name];
+    const providerSegments = providerConfig && Array.isArray(providerConfig.__codexmate_legacy_segments)
+        ? providerConfig.__codexmate_legacy_segments
+        : null;
+    const ranges = findProviderSectionRanges(content, name, providerSegments);
     if (ranges.length === 0) {
         if (!silent) console.error('错误: 无法找到提供商配置块');
         throw new Error('无法找到提供商配置块');

@@ -460,6 +460,48 @@ module.exports = async function testConfig(ctx) {
             'update-provider should preserve preferred_auth_method inline comment'
         );
 
+        const multilineStringConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = """sk-old',
+            'line-2""" # keep-triple-comment',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.openai]',
+            'name = "openai"',
+            'base_url = "https://api.openai.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = ""',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, multilineStringConfig, 'utf-8');
+        const updateMultilineString = await legacyApi('update-provider', {
+            name: 'foo',
+            key: 'sk-triple-updated'
+        });
+        assert(updateMultilineString.success === true, 'update-provider should handle multiline TOML string values');
+        const configAfterMultilineUpdate = fs.readFileSync(legacyConfigPath, 'utf-8');
+        assert(
+            configAfterMultilineUpdate.includes('preferred_auth_method = "sk-triple-updated" # keep-triple-comment'),
+            'update-provider should safely replace multiline TOML string and preserve comment'
+        );
+        assert(
+            !configAfterMultilineUpdate.includes('line-2"""'),
+            'update-provider should remove previous multiline TOML string tail'
+        );
+
         const nestedMetadataConfig = [
             'model_provider = "foo"',
             'model = "gpt-5.3-codex"',
@@ -534,6 +576,69 @@ module.exports = async function testConfig(ctx) {
         assert(
             dottedNestedProviderExport.payload && dottedNestedProviderExport.payload.apiKey === 'sk-bar-metadata-updated',
             'nested provider with dotted segment should update apiKey'
+        );
+
+        const ambiguousNestedProviderConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = "sk-foo"',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            "[ model_providers . foo . 'bar.baz' ]",
+            'base_url = "https://primary.example.com/v1"',
+            'wire_api = "responses"',
+            'preferred_auth_method = "sk-primary"',
+            '',
+            '[model_providers."foo.bar".baz]',
+            'base_url = "https://alt.example.com/v1"',
+            'wire_api = "responses"',
+            'preferred_auth_method = "sk-alt"',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, ambiguousNestedProviderConfig, 'utf-8');
+        const ambiguousList = await legacyApi('list');
+        assert(
+            ambiguousList.providers.some((item) => item && item.name === 'foo.bar.baz'),
+            'ambiguous nested provider config should expose flattened provider name'
+        );
+        const ambiguousUpdate = await legacyApi('update-provider', {
+            name: 'foo.bar.baz',
+            url: 'https://primary-updated.example.com/v1',
+            key: 'sk-primary-updated'
+        });
+        assert(ambiguousUpdate.success === true, 'ambiguous nested provider update should succeed');
+        const configAfterAmbiguousUpdate = fs.readFileSync(legacyConfigPath, 'utf-8');
+        const primaryBlockMatch = configAfterAmbiguousUpdate.match(
+            /(?:^|\n)\s*\[\s*model_providers\s*\.\s*foo\s*\.\s*'bar\.baz'\s*\][\s\S]*?(?=\n\s*\[|$)/
+        );
+        assert(primaryBlockMatch, 'primary nested provider block should exist after ambiguous update');
+        assert(
+            primaryBlockMatch[0].includes('base_url = "https://primary-updated.example.com/v1"'),
+            'ambiguous update should target primary nested provider block url'
+        );
+        assert(
+            primaryBlockMatch[0].includes('preferred_auth_method = "sk-primary-updated"'),
+            'ambiguous update should target primary nested provider block key'
+        );
+        const alternateBlockMatch = configAfterAmbiguousUpdate.match(
+            /(?:^|\n)\s*\[\s*model_providers\s*\.\s*"foo\.bar"\s*\.\s*baz\s*\][\s\S]*?(?=\n\s*\[|$)/
+        );
+        assert(alternateBlockMatch, 'alternate nested provider block should exist after ambiguous update');
+        assert(
+            alternateBlockMatch[0].includes('base_url = "https://alt.example.com/v1"'),
+            'ambiguous update should not rewrite alternate nested provider block url'
+        );
+        assert(
+            alternateBlockMatch[0].includes('preferred_auth_method = "sk-alt"'),
+            'ambiguous update should not rewrite alternate nested provider block key'
         );
 
         const ipv6Config = [
