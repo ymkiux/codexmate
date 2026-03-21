@@ -550,6 +550,55 @@ module.exports = async function testConfig(ctx) {
             'multiline string update should keep provider readable in a fresh process'
         );
 
+        const escapedTripleQuoteConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = """sk-old\\"""marker',
+            'line-2""" # keep-escaped-triple-comment',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.openai]',
+            'name = "openai"',
+            'base_url = "https://api.openai.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = ""',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, escapedTripleQuoteConfig, 'utf-8');
+        const updateEscapedTripleQuote = await legacyApi('update-provider', {
+            name: 'foo',
+            key: 'sk-escaped-triple-updated'
+        });
+        assert(
+            updateEscapedTripleQuote.success === true,
+            'update-provider should support multiline strings containing escaped triple quotes'
+        );
+        const configAfterEscapedTripleUpdate = fs.readFileSync(legacyConfigPath, 'utf-8');
+        assert(
+            configAfterEscapedTripleUpdate.includes('preferred_auth_method = "sk-escaped-triple-updated" # keep-escaped-triple-comment'),
+            'escaped triple-quote multiline update should preserve inline comment'
+        );
+        const parsedAfterEscapedTripleUpdate = toml.parse(configAfterEscapedTripleUpdate);
+        assert(
+            parsedAfterEscapedTripleUpdate
+            && parsedAfterEscapedTripleUpdate.model_providers
+            && parsedAfterEscapedTripleUpdate.model_providers.foo
+            && parsedAfterEscapedTripleUpdate.model_providers.foo.preferred_auth_method === 'sk-escaped-triple-updated',
+            'escaped triple-quote multiline rewrite should keep config.toml parseable and value readable'
+        );
+
         const missingFieldConfig = [
             'model_provider = "foo"',
             'model = "gpt-5.3-codex"',
