@@ -1833,10 +1833,13 @@ async function buildConfigHealthReport(params = {}) {
     const config = status.config || {};
 
     if (status.isVirtual) {
+        const parseFailed = status.errorType === 'parse';
         issues.push({
-            code: 'config-missing',
-            message: status.reason || '未检测到 config.toml',
-            suggestion: '在模板编辑器中确认应用配置，生成可用的 config.toml'
+            code: parseFailed ? 'config-parse-failed' : 'config-missing',
+            message: status.reason || (parseFailed ? 'config.toml 解析失败' : '未检测到 config.toml'),
+            suggestion: parseFailed
+                ? '修复 config.toml 语法错误后重试'
+                : '在模板编辑器中确认应用配置，生成可用的 config.toml'
         });
     }
 
@@ -2024,13 +2027,15 @@ function readConfigOrVirtualDefault() {
             return {
                 config: readConfig(),
                 isVirtual: false,
-                reason: ''
+                reason: '',
+                errorType: ''
             };
         } catch (e) {
             return {
                 config: buildVirtualDefaultConfig(),
                 isVirtual: true,
-                reason: e.message || '配置文件无效，已回退到默认模板'
+                reason: e.message || '配置文件解析失败',
+                errorType: 'parse'
             };
         }
     }
@@ -2038,8 +2043,25 @@ function readConfigOrVirtualDefault() {
     return {
         config: buildVirtualDefaultConfig(),
         isVirtual: true,
-        reason: `配置文件不存在: ${CONFIG_FILE}`
+        reason: `配置文件不存在: ${CONFIG_FILE}`,
+        errorType: 'missing'
     };
+}
+
+function hasConfigParseError(result) {
+    return !!(result && result.isVirtual && result.errorType === 'parse');
+}
+
+function printConfigParseErrorAndMarkExit(result) {
+    const detail = result && typeof result.reason === 'string' && result.reason.trim()
+        ? result.reason.trim()
+        : '配置文件解析失败';
+    console.error('\n错误: 配置文件解析失败');
+    console.error(`  详情: ${detail}`);
+    console.error(`  路径: ${CONFIG_FILE}`);
+    console.error('  建议: 修复 config.toml 语法后重试');
+    console.error();
+    process.exitCode = 1;
 }
 
 function normalizeTopLevelConfigWithTemplate(template, selectedProvider, selectedModel) {
@@ -5418,7 +5440,12 @@ async function cmdSetup() {
 
 // 显示当前状态
 function cmdStatus() {
-    const { config, isVirtual } = readConfigOrVirtualDefault();
+    const configResult = readConfigOrVirtualDefault();
+    if (hasConfigParseError(configResult)) {
+        printConfigParseErrorAndMarkExit(configResult);
+        return;
+    }
+    const { config, isVirtual } = configResult;
     const current = config.model_provider || '未设置';
     const currentModel = config.model || '未设置';
 
@@ -5434,7 +5461,12 @@ function cmdStatus() {
 
 // 列出所有提供商
 function cmdList() {
-    const { config, isVirtual } = readConfigOrVirtualDefault();
+    const configResult = readConfigOrVirtualDefault();
+    if (hasConfigParseError(configResult)) {
+        printConfigParseErrorAndMarkExit(configResult);
+        return;
+    }
+    const { config, isVirtual } = configResult;
     const providers = config.model_providers || {};
     const current = config.model_provider;
 
@@ -6867,6 +6899,7 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                                 serviceTier,
                                 modelReasoningEffort,
                                 configReady: !statusConfigResult.isVirtual,
+                                configErrorType: statusConfigResult.errorType || '',
                                 configNotice: statusConfigResult.reason || '',
                                 initNotice: consumeInitNotice()
                             };
@@ -6881,6 +6914,8 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             const current = listConfig.model_provider;
                             result = {
                                 configReady: !listConfigResult.isVirtual,
+                                configErrorType: listConfigResult.errorType || '',
+                                configNotice: listConfigResult.reason || '',
                                 providers: Object.entries(providers).map(([name, p]) => ({
                                     name,
                                     url: p.base_url || '',
@@ -8053,6 +8088,7 @@ function buildMcpStatusPayload() {
         serviceTier,
         modelReasoningEffort,
         configReady: !statusConfigResult.isVirtual,
+        configErrorType: statusConfigResult.errorType || '',
         configNotice: statusConfigResult.reason || '',
         initNotice: consumeInitNotice()
     };
@@ -8065,6 +8101,8 @@ function buildMcpProviderListPayload() {
     const current = listConfig.model_provider;
     return {
         configReady: !listConfigResult.isVirtual,
+        configErrorType: listConfigResult.errorType || '',
+        configNotice: listConfigResult.reason || '',
         providers: Object.entries(providers).map(([name, p]) => ({
             name,
             url: p.base_url || '',
