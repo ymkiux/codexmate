@@ -320,20 +320,20 @@ function isRecoverableNestedProviderConfig(value) {
     return hasProviderSignals;
 }
 
-function collectNestedProviderConfigs(node, pathPrefix, collector) {
+function collectNestedProviderConfigs(node, pathSegments, collector) {
     if (!isPlainObject(node)) return;
-    const segments = String(pathPrefix || '').split('.');
+    const segments = Array.isArray(pathSegments) ? pathSegments : [String(pathSegments || '')];
     const lastSegment = segments.length > 0 ? segments[segments.length - 1] : '';
     if (lastSegment === 'metadata') {
         return;
     }
     if (isRecoverableNestedProviderConfig(node)) {
-        collector.push([pathPrefix, node]);
+        collector.push([segments.join('.'), node]);
         return;
     }
     for (const [childKey, childValue] of Object.entries(node)) {
         if (!isPlainObject(childValue)) continue;
-        collectNestedProviderConfigs(childValue, `${pathPrefix}.${childKey}`, collector);
+        collectNestedProviderConfigs(childValue, [...segments, childKey], collector);
     }
 }
 
@@ -360,7 +360,7 @@ function normalizeLegacyModelProviders(modelProviders) {
             for (const [childKey, childValue] of Object.entries(provider)) {
                 if (!isPlainObject(childValue)) continue;
                 const recovered = [];
-                collectNestedProviderConfigs(childValue, `${name}.${childKey}`, recovered);
+                collectNestedProviderConfigs(childValue, [name, childKey], recovered);
                 for (const [recoveredName, recoveredProvider] of recovered) {
                     addRecovered(recoveredName, recoveredProvider);
                 }
@@ -369,7 +369,7 @@ function normalizeLegacyModelProviders(modelProviders) {
         }
 
         const recovered = [];
-        collectNestedProviderConfigs(provider, name, recovered);
+        collectNestedProviderConfigs(provider, [name], recovered);
         if (recovered.length > 0) {
             delete normalized[name];
             changed = true;

@@ -491,6 +491,33 @@ module.exports = async function testConfig(ctx) {
             'nested metadata should not be promoted to provider'
         );
 
+        const dottedNestedProviderConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = "sk-foo"',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.foo."bar.metadata"]',
+            'base_url = "https://bar-metadata.example.com/v1"',
+            'wire_api = "responses"',
+            'preferred_auth_method = "sk-bar-metadata"',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, dottedNestedProviderConfig, 'utf-8');
+        const dottedNestedProviderList = await legacyApi('list');
+        assert(
+            dottedNestedProviderList.providers.some((item) => item && item.name === 'foo.bar.metadata'),
+            'nested provider keys containing dot suffix should not be filtered as metadata'
+        );
+
         const ipv6Config = [
             'model_provider = "foo"',
             'model = "gpt-5.3-codex"',
