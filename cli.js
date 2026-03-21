@@ -5416,13 +5416,35 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
             const prefixEnd = prefixStart + tripleStartMatch[1].length;
             const tripleQuote = tripleStartMatch[2];
             const valueStart = prefixEnd + tripleQuote.length;
-            const quoteRunRegex = tripleQuote[0] === '"' ? /"{3,}/ : /'{3,}/;
-            const quoteRunMatch = quoteRunRegex.exec(block.slice(valueStart));
-            if (!quoteRunMatch) {
+            const quoteChar = tripleQuote[0];
+            let valueEnd = -1;
+            let closingRunLength = 0;
+            for (let i = valueStart; i < block.length; i++) {
+                if (block[i] !== quoteChar) continue;
+                let runEnd = i + 1;
+                while (runEnd < block.length && block[runEnd] === quoteChar) {
+                    runEnd++;
+                }
+                const runLength = runEnd - i;
+                if (runLength < tripleQuote.length) {
+                    i = runEnd - 1;
+                    continue;
+                }
+                let slashCount = 0;
+                for (let j = i - 1; j >= valueStart && block[j] === '\\'; j--) {
+                    slashCount++;
+                }
+                if (slashCount % 2 !== 0) {
+                    i = runEnd - 1;
+                    continue;
+                }
+                valueEnd = i;
+                closingRunLength = runLength;
+                break;
+            }
+            if (valueEnd === -1) {
                 throw new Error(`${fieldName} 使用了未闭合的多行 TOML 字符串，无法安全更新`);
             }
-            const valueEnd = valueStart + quoteRunMatch.index;
-            const closingRunLength = quoteRunMatch[0].length;
             const lineEndIndex = block.indexOf('\n', valueEnd + closingRunLength);
             const tailEnd = lineEndIndex === -1 ? block.length : lineEndIndex;
             const tail = block.slice(valueEnd + closingRunLength, tailEnd);
