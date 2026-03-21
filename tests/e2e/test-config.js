@@ -1,4 +1,5 @@
 const { spawn } = require('child_process');
+const toml = require('@iarna/toml');
 const { assert, runSync, fs, path, os, waitForServer, postJson } = require('./helpers');
 
 module.exports = async function testConfig(ctx) {
@@ -371,12 +372,32 @@ module.exports = async function testConfig(ctx) {
         const configAfterDualUpdate = fs.readFileSync(legacyConfigPath, 'utf-8');
         assert(configAfterDualUpdate.includes('https://api.example.com/v1'), 'dual-definition update should keep legacy section url');
         assert(!configAfterDualUpdate.includes('https://quoted.example.com/v1'), 'dual-definition update should sync quoted section url');
+        const quotedFooBarBlock = configAfterDualUpdate.match(
+            /(?:^|\n)\s*\[model_providers\."foo\.bar"\][\s\S]*?(?=\n\s*\[|$)/
+        )?.[0];
+        assert(quotedFooBarBlock, 'dual-definition update should keep the quoted foo.bar section');
+        assert(
+            quotedFooBarBlock.includes('base_url = "https://updated.example.com/v1"'),
+            'dual-definition update should rewrite the quoted foo.bar url'
+        );
+        assert(
+            quotedFooBarBlock.includes('preferred_auth_method = "sk-updated"'),
+            'dual-definition update should rewrite the quoted foo.bar key'
+        );
 
         const legacyDeleteDual = await legacyApi('delete-provider', { name: 'foo.bar' });
         assert(legacyDeleteDual.success === true, 'dual-definition delete-provider should succeed');
         const configAfterDualDelete = fs.readFileSync(legacyConfigPath, 'utf-8');
         const remainingDualSections = configAfterDualDelete.match(providerSectionRegex) || [];
         assert(remainingDualSections.length === 1, 'dual-definition delete-provider should remove the exact matched foo.bar section');
+        const remainingLegacyBlock = configAfterDualDelete.match(
+            /(?:^|\n)\s*\[model_providers\.foo\.bar\][\s\S]*?(?=\n\s*\[|$)/
+        )?.[0];
+        assert(remainingLegacyBlock, 'dual-definition first delete should leave the legacy foo.bar block');
+        assert(
+            !/(?:^|\n)\s*\[model_providers\."foo\.bar"\]/.test(configAfterDualDelete),
+            'dual-definition first delete should remove the quoted foo.bar block'
+        );
         const legacyListAfterDualDelete = await legacyApi('list');
         assert(
             legacyListAfterDualDelete.providers.some((item) => item && item.name === 'foo.bar'),
@@ -510,6 +531,14 @@ module.exports = async function testConfig(ctx) {
         assert(
             !configAfterMultilineUpdate.includes('line-2"""'),
             'update-provider should remove previous multiline TOML string tail'
+        );
+        const parsedAfterMultilineUpdate = toml.parse(configAfterMultilineUpdate);
+        assert(
+            parsedAfterMultilineUpdate
+            && parsedAfterMultilineUpdate.model_providers
+            && parsedAfterMultilineUpdate.model_providers.foo
+            && parsedAfterMultilineUpdate.model_providers.foo.preferred_auth_method === 'sk-triple-updated',
+            'update-provider multiline rewrite should keep config.toml parseable and value readable'
         );
 
         const nestedMetadataConfig = [
