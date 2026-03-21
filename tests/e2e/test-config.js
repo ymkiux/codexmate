@@ -531,6 +531,15 @@ module.exports = async function testConfig(ctx) {
         configAfterQuotedUpdate.includes('preferred_auth_method = "sk-e2e-\\"quoted\\"-\\\\\\\\path"'),
         'quoted API key should be escaped in config.toml'
     );
+    const cliListAfterQuoted = runSync(node, [cliPath, 'list'], { env });
+    assert(
+        cliListAfterQuoted.status === 0,
+        `quoted API key should keep config parseable: ${cliListAfterQuoted.stderr || cliListAfterQuoted.stdout}`
+    );
+    assert(
+        cliListAfterQuoted.stdout.includes('e2e-api'),
+        'quoted API key should keep provider readable in fresh process'
+    );
 
     const statusAfterAdd = await api('status');
     assert(statusAfterAdd.provider === 'e2e2', 'add-provider should not change current provider');

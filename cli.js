@@ -5273,15 +5273,15 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
         if (baseUrl) {
             const safeBaseUrl = escapeTomlBasicString(baseUrl);
             updatedBlock = updatedBlock.replace(
-                /^(base_url\s*=\s*)(["']).*?\2/m,
-                (_, prefix, quote) => `${prefix}${quote}${safeBaseUrl}${quote}`
+                /^(\s*base_url\s*=\s*).*$/m,
+                (_, prefix) => `${prefix}"${safeBaseUrl}"`
             );
         }
         if (apiKey !== undefined) {
             const safeApiKey = escapeTomlBasicString(apiKey);
             updatedBlock = updatedBlock.replace(
-                /^(preferred_auth_method\s*=\s*)(["']).*?\2/m,
-                (_, prefix, quote) => `${prefix}${quote}${safeApiKey}${quote}`
+                /^(\s*preferred_auth_method\s*=\s*).*$/m,
+                (_, prefix) => `${prefix}"${safeApiKey}"`
             );
         }
         newContent = newContent.slice(0, range.start) + updatedBlock + newContent.slice(range.end);
