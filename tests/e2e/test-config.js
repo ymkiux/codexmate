@@ -369,18 +369,28 @@ module.exports = async function testConfig(ctx) {
         });
         assert(legacyUpdateDual.success === true, 'dual-definition update-provider should succeed');
         const configAfterDualUpdate = fs.readFileSync(legacyConfigPath, 'utf-8');
-        assert(!configAfterDualUpdate.includes('https://api.example.com/v1'), 'dual-definition update should sync legacy section url');
+        assert(configAfterDualUpdate.includes('https://api.example.com/v1'), 'dual-definition update should keep legacy section url');
         assert(!configAfterDualUpdate.includes('https://quoted.example.com/v1'), 'dual-definition update should sync quoted section url');
 
         const legacyDeleteDual = await legacyApi('delete-provider', { name: 'foo.bar' });
         assert(legacyDeleteDual.success === true, 'dual-definition delete-provider should succeed');
         const configAfterDualDelete = fs.readFileSync(legacyConfigPath, 'utf-8');
         const remainingDualSections = configAfterDualDelete.match(providerSectionRegex) || [];
-        assert(remainingDualSections.length === 0, 'dual-definition delete-provider should remove all foo.bar sections');
+        assert(remainingDualSections.length === 1, 'dual-definition delete-provider should remove the exact matched foo.bar section');
         const legacyListAfterDualDelete = await legacyApi('list');
         assert(
-            !legacyListAfterDualDelete.providers.some((item) => item && item.name === 'foo.bar'),
-            'dual-definition delete-provider should remove foo.bar from provider list'
+            legacyListAfterDualDelete.providers.some((item) => item && item.name === 'foo.bar'),
+            'dual-definition delete-provider should keep remaining foo.bar section available'
+        );
+        const legacyDeleteDualRemaining = await legacyApi('delete-provider', { name: 'foo.bar' });
+        assert(legacyDeleteDualRemaining.success === true, 'dual-definition second delete-provider should remove remaining section');
+        const configAfterDualDeleteAll = fs.readFileSync(legacyConfigPath, 'utf-8');
+        const finalDualSections = configAfterDualDeleteAll.match(providerSectionRegex) || [];
+        assert(finalDualSections.length === 0, 'dual-definition second delete-provider should remove all foo.bar sections');
+        const legacyListAfterDualDeleteAll = await legacyApi('list');
+        assert(
+            !legacyListAfterDualDeleteAll.providers.some((item) => item && item.name === 'foo.bar'),
+            'dual-definition second delete-provider should remove foo.bar from provider list'
         );
 
         const commentMarkerConfig = [
@@ -605,10 +615,8 @@ module.exports = async function testConfig(ctx) {
         ].join('\n');
         fs.writeFileSync(legacyConfigPath, ambiguousNestedProviderConfig, 'utf-8');
         const ambiguousList = await legacyApi('list');
-        assert(
-            ambiguousList.providers.some((item) => item && item.name === 'foo.bar.baz'),
-            'ambiguous nested provider config should expose flattened provider name'
-        );
+        const ambiguousMatches = ambiguousList.providers.filter((item) => item && item.name === 'foo.bar.baz');
+        assert(ambiguousMatches.length === 1, 'ambiguous nested provider config should expose exactly one flattened provider entry');
         const ambiguousUpdate = await legacyApi('update-provider', {
             name: 'foo.bar.baz',
             url: 'https://primary-updated.example.com/v1',
@@ -721,6 +729,7 @@ module.exports = async function testConfig(ctx) {
     const exportProviderQuoted = await api('export-provider', { name: 'e2e-api' });
     assert(exportProviderQuoted.payload, 'export-provider(e2e-api quoted) missing payload');
     assert(exportProviderQuoted.payload.apiKey === quotedApiKey, 'quoted API key should round-trip');
+    assert(exportProviderQuoted.payload.baseUrl === updatedUrl, 'quoted API key update should not change provider baseUrl');
     const configPath = path.join(tmpHome, '.codex', 'config.toml');
     const configAfterQuotedUpdate = fs.readFileSync(configPath, 'utf-8');
     const e2eApiBlockMatch = configAfterQuotedUpdate.match(
