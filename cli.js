@@ -320,6 +320,17 @@ function isRecoverableNestedProviderConfig(value) {
     return hasProviderSignals;
 }
 
+function formatTomlPathSegments(segments) {
+    if (!Array.isArray(segments) || segments.length === 0) return '';
+    return segments.map((segment) => {
+        const value = String(segment || '');
+        if (/^[a-zA-Z0-9_-]+$/.test(value)) {
+            return value;
+        }
+        return `"${escapeTomlBasicString(value)}"`;
+    }).join('.');
+}
+
 function collectNestedProviderConfigs(node, pathSegments, collector) {
     if (!isPlainObject(node)) return;
     const segments = Array.isArray(pathSegments) ? pathSegments : [String(pathSegments || '')];
@@ -328,7 +339,11 @@ function collectNestedProviderConfigs(node, pathSegments, collector) {
         return;
     }
     if (isRecoverableNestedProviderConfig(node)) {
-        collector.push([segments.join('.'), node]);
+        collector.push({
+            name: segments.join('.'),
+            rawPath: formatTomlPathSegments(segments),
+            provider: node
+        });
         return;
     }
     for (const [childKey, childValue] of Object.entries(node)) {
@@ -344,10 +359,23 @@ function normalizeLegacyModelProviders(modelProviders) {
 
     let changed = false;
     const normalized = {};
-    const addRecovered = (name, provider) => {
+    const addRecovered = (entry) => {
+        const name = entry && typeof entry.name === 'string' ? entry.name : '';
+        const provider = entry ? entry.provider : null;
+        const rawPath = entry && typeof entry.rawPath === 'string' ? entry.rawPath : '';
         if (!name || !isPlainObject(provider)) return;
         if (Object.prototype.hasOwnProperty.call(modelProviders, name)) return;
         if (Object.prototype.hasOwnProperty.call(normalized, name)) return;
+        if (rawPath) {
+            try {
+                Object.defineProperty(provider, '__codexmate_legacy_table_path', {
+                    value: rawPath,
+                    enumerable: false,
+                    configurable: true,
+                    writable: true
+                });
+            } catch (e) {}
+        }
         normalized[name] = provider;
         changed = true;
     };
@@ -361,8 +389,8 @@ function normalizeLegacyModelProviders(modelProviders) {
                 if (!isPlainObject(childValue)) continue;
                 const recovered = [];
                 collectNestedProviderConfigs(childValue, [name, childKey], recovered);
-                for (const [recoveredName, recoveredProvider] of recovered) {
-                    addRecovered(recoveredName, recoveredProvider);
+                for (const recoveredEntry of recovered) {
+                    addRecovered(recoveredEntry);
                 }
             }
             continue;
@@ -373,8 +401,8 @@ function normalizeLegacyModelProviders(modelProviders) {
         if (recovered.length > 0) {
             delete normalized[name];
             changed = true;
-            for (const [recoveredName, recoveredProvider] of recovered) {
-                addRecovered(recoveredName, recoveredProvider);
+            for (const recoveredEntry of recovered) {
+                addRecovered(recoveredEntry);
             }
         }
     }
@@ -386,13 +414,16 @@ function escapeRegex(value) {
     return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function findProviderSectionRanges(content, providerName) {
+function findProviderSectionRanges(content, providerName, rawPath = '') {
     const text = typeof content === 'string' ? content : '';
     const name = typeof providerName === 'string' ? providerName.trim() : '';
+    const raw = typeof rawPath === 'string' ? rawPath.trim() : '';
     if (!text || !name) return [];
 
     const safeName = escapeRegex(name);
+    const safeRaw = escapeRegex(raw);
     const headerPatterns = [
+        ...(raw ? [{ priority: -1, regex: new RegExp(`^\\s*model_providers\\s*\\.\\s*${safeRaw}\\s*$`) }] : []),
         { priority: 0, regex: new RegExp(`^\\s*model_providers\\s*\\.\\s*"${safeName}"\\s*$`) },
         { priority: 1, regex: new RegExp(`^\\s*model_providers\\s*\\.\\s*'${safeName}'\\s*$`) },
         { priority: 2, regex: new RegExp(`^\\s*model_providers\\s*\\.\\s*${safeName}\\s*$`) }
@@ -1960,6 +1991,10 @@ function performProviderDeletion(name, options = {}) {
     const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
     const lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
     const hasBom = content.charCodeAt(0) === 0xFEFF;
+    const providerConfig = config.model_providers[name];
+    const rawSectionPath = providerConfig && typeof providerConfig.__codexmate_legacy_table_path === 'string'
+        ? providerConfig.__codexmate_legacy_table_path
+        : '';
 
     const remainingProviders = Object.keys(config.model_providers || {}).filter(item => item !== name);
     if (remainingProviders.length === 0) {
@@ -1998,7 +2033,7 @@ function performProviderDeletion(name, options = {}) {
     };
 
     let updatedContent = null;
-    const ranges = findProviderSectionRanges(content, name);
+    const ranges = findProviderSectionRanges(content, name, rawSectionPath);
     if (ranges.length > 0) {
         const sorted = ranges.sort((a, b) => b.start - a.start);
         let removedContent = content;
@@ -5263,7 +5298,11 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
     }
 
     const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
-    const ranges = findProviderSectionRanges(content, name);
+    const providerConfig = config.model_providers[name];
+    const rawSectionPath = providerConfig && typeof providerConfig.__codexmate_legacy_table_path === 'string'
+        ? providerConfig.__codexmate_legacy_table_path
+        : '';
+    const ranges = findProviderSectionRanges(content, name, rawSectionPath);
     if (ranges.length === 0) {
         if (!silent) console.error('错误: 无法找到提供商配置块');
         throw new Error('无法找到提供商配置块');
