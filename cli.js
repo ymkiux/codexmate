@@ -231,7 +231,8 @@ function readConfig() {
         const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
         const parsed = toml.parse(content);
         if (isPlainObject(parsed) && isPlainObject(parsed.model_providers)) {
-            parsed.model_providers = normalizeLegacyModelProviders(parsed.model_providers);
+            const providerHeaderSegmentKeySet = collectModelProviderHeaderSegmentKeySet(content);
+            parsed.model_providers = normalizeLegacyModelProviders(parsed.model_providers, providerHeaderSegmentKeySet);
         }
         return parsed;
     } catch (e) {
@@ -299,35 +300,127 @@ const PROVIDER_CONFIG_KEYS = new Set([
     'stream_max_retries',
     'stream_idle_timeout_ms'
 ]);
+const RECOVERABLE_PROVIDER_SIGNAL_KEYS = [...PROVIDER_CONFIG_KEYS].filter((key) => key !== 'name' && key !== 'base_url');
 
 function looksLikeProviderConfig(value) {
     if (!isPlainObject(value)) return false;
     return Object.keys(value).some((key) => PROVIDER_CONFIG_KEYS.has(key));
 }
 
-function collectNestedProviderConfigs(node, pathPrefix, collector) {
+function isRecoverableNestedProviderConfig(value) {
+    if (!isPlainObject(value)) return false;
+    const hasBaseUrl = typeof value.base_url === 'string' && value.base_url.trim() !== '';
+    if (!hasBaseUrl) return false;
+    const hasName = typeof value.name === 'string' && value.name.trim() !== '';
+    const hasProviderSignals = RECOVERABLE_PROVIDER_SIGNAL_KEYS.some((key) => Object.prototype.hasOwnProperty.call(value, key));
+    return hasName || hasProviderSignals;
+}
+
+function collectNestedProviderConfigs(node, pathSegments, collector) {
     if (!isPlainObject(node)) return;
-    if (looksLikeProviderConfig(node)) {
-        collector.push([pathPrefix, node]);
+    const segments = Array.isArray(pathSegments) ? pathSegments : [String(pathSegments || '')];
+    const lastSegment = segments.length > 0 ? segments[segments.length - 1] : '';
+    if (segments.length > 1 && lastSegment === 'metadata') {
         return;
+    }
+    if (isRecoverableNestedProviderConfig(node)) {
+        collector.push({
+            name: segments.join('.'),
+            segments: segments.slice(),
+            provider: node
+        });
     }
     for (const [childKey, childValue] of Object.entries(node)) {
         if (!isPlainObject(childValue)) continue;
-        collectNestedProviderConfigs(childValue, `${pathPrefix}.${childKey}`, collector);
+        collectNestedProviderConfigs(childValue, [...segments, childKey], collector);
     }
 }
 
-function normalizeLegacyModelProviders(modelProviders) {
+function normalizeLegacySegments(segments) {
+    if (!Array.isArray(segments) || segments.length === 0) return null;
+    return segments.map((item) => String(item));
+}
+
+function buildLegacySegmentsKey(segments) {
+    const normalized = normalizeLegacySegments(segments);
+    return normalized ? JSON.stringify(normalized) : '';
+}
+
+function appendLegacySegmentsVariant(provider, segments) {
+    if (!isPlainObject(provider)) return;
+    const normalized = normalizeLegacySegments(segments);
+    if (!normalized) return;
+
+    const variants = [];
+    const seen = new Set();
+    const pushVariant = (candidate) => {
+        const key = buildLegacySegmentsKey(candidate);
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        variants.push(normalizeLegacySegments(candidate));
+    };
+
+    if (Array.isArray(provider.__codexmate_legacy_segments)) {
+        pushVariant(provider.__codexmate_legacy_segments);
+    }
+    if (Array.isArray(provider.__codexmate_legacy_segment_variants)) {
+        for (const candidate of provider.__codexmate_legacy_segment_variants) {
+            pushVariant(candidate);
+        }
+    }
+    pushVariant(normalized);
+
+    try {
+        if (!Array.isArray(provider.__codexmate_legacy_segments)) {
+            Object.defineProperty(provider, '__codexmate_legacy_segments', {
+                value: normalized,
+                enumerable: false,
+                configurable: true,
+                writable: true
+            });
+        }
+        Object.defineProperty(provider, '__codexmate_legacy_segment_variants', {
+            value: variants,
+            enumerable: false,
+            configurable: true,
+            writable: true
+        });
+    } catch (e) {}
+}
+
+function setLegacySegmentsMetadata(provider, segments) {
+    appendLegacySegmentsVariant(provider, segments);
+}
+
+function normalizeLegacyModelProviders(modelProviders, providerHeaderSegmentKeySet = null) {
     if (!isPlainObject(modelProviders)) {
         return modelProviders;
     }
 
     let changed = false;
     const normalized = {};
-    const addRecovered = (name, provider) => {
+    const addRecovered = (entry) => {
+        const name = entry && typeof entry.name === 'string' ? entry.name : '';
+        const segments = entry && Array.isArray(entry.segments) ? entry.segments.slice() : null;
+        const provider = entry ? entry.provider : null;
         if (!name || !isPlainObject(provider)) return;
+        const segmentKey = buildLegacySegmentsKey(segments);
+        if (providerHeaderSegmentKeySet instanceof Set && segmentKey && !providerHeaderSegmentKeySet.has(segmentKey)) {
+            return;
+        }
+        const existing = Object.prototype.hasOwnProperty.call(normalized, name)
+            ? normalized[name]
+            : (Object.prototype.hasOwnProperty.call(modelProviders, name) ? modelProviders[name] : null);
+        if (isPlainObject(existing)) {
+            if (!Array.isArray(existing.__codexmate_legacy_segments)) {
+                setLegacySegmentsMetadata(existing, [name]);
+            }
+            appendLegacySegmentsVariant(existing, segments);
+            return;
+        }
         if (Object.prototype.hasOwnProperty.call(modelProviders, name)) return;
         if (Object.prototype.hasOwnProperty.call(normalized, name)) return;
+        setLegacySegmentsMetadata(provider, segments);
         normalized[name] = provider;
         changed = true;
     };
@@ -337,25 +430,24 @@ function normalizeLegacyModelProviders(modelProviders) {
         if (!isPlainObject(provider)) continue;
 
         if (looksLikeProviderConfig(provider)) {
+            setLegacySegmentsMetadata(provider, [name]);
             for (const [childKey, childValue] of Object.entries(provider)) {
                 if (!isPlainObject(childValue)) continue;
                 const recovered = [];
-                collectNestedProviderConfigs(childValue, `${name}.${childKey}`, recovered);
-                for (const [recoveredName, recoveredProvider] of recovered) {
-                    addRecovered(recoveredName, recoveredProvider);
+                collectNestedProviderConfigs(childValue, [name, childKey], recovered);
+                for (const recoveredEntry of recovered) {
+                    addRecovered(recoveredEntry);
                 }
             }
             continue;
         }
 
         const recovered = [];
-        collectNestedProviderConfigs(provider, name, recovered);
-        if (recovered.length > 0) {
-            delete normalized[name];
-            changed = true;
-            for (const [recoveredName, recoveredProvider] of recovered) {
-                addRecovered(recoveredName, recoveredProvider);
-            }
+        collectNestedProviderConfigs(provider, [name], recovered);
+        delete normalized[name];
+        changed = true;
+        for (const recoveredEntry of recovered) {
+            addRecovered(recoveredEntry);
         }
     }
 
@@ -366,9 +458,206 @@ function escapeRegex(value) {
     return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function findProviderSectionRanges(content, providerName) {
+function areStringArraysEqual(a, b) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+        if (String(a[i]) !== String(b[i])) return false;
+    }
+    return true;
+}
+
+function parseTomlDottedKeyExpression(expression) {
+    const text = String(expression || '');
+    let index = 0;
+    const segments = [];
+    const skipWhitespace = () => {
+        while (index < text.length && /\s/.test(text[index])) index++;
+    };
+
+    while (index < text.length) {
+        skipWhitespace();
+        if (index >= text.length) break;
+
+        const ch = text[index];
+        if (ch === "'") {
+            const end = text.indexOf("'", index + 1);
+            if (end === -1) return null;
+            segments.push(text.slice(index + 1, end));
+            index = end + 1;
+        } else if (ch === '"') {
+            index += 1;
+            let value = '';
+            let closed = false;
+            while (index < text.length) {
+                const cur = text[index];
+                if (cur === '"') {
+                    index += 1;
+                    closed = true;
+                    break;
+                }
+                if (cur !== '\\') {
+                    value += cur;
+                    index += 1;
+                    continue;
+                }
+                if (index + 1 >= text.length) return null;
+                const esc = text[index + 1];
+                if (esc === 'u' || esc === 'U') {
+                    const hexLen = esc === 'u' ? 4 : 8;
+                    const hex = text.slice(index + 2, index + 2 + hexLen);
+                    if (!/^[0-9a-fA-F]+$/.test(hex)) return null;
+                    try {
+                        value += String.fromCodePoint(parseInt(hex, 16));
+                    } catch (e) {
+                        return null;
+                    }
+                    index += 2 + hexLen;
+                    continue;
+                }
+                const unescaped = {
+                    b: '\b',
+                    t: '\t',
+                    n: '\n',
+                    f: '\f',
+                    r: '\r',
+                    '"': '"',
+                    '\\': '\\'
+                }[esc];
+                if (unescaped === undefined) return null;
+                value += unescaped;
+                index += 2;
+            }
+            if (!closed) return null;
+            segments.push(value);
+        } else {
+            const start = index;
+            while (index < text.length && !/\s|\./.test(text[index])) index++;
+            const bare = text.slice(start, index);
+            if (!bare) return null;
+            segments.push(bare);
+        }
+
+        skipWhitespace();
+        if (index >= text.length) break;
+        if (text[index] !== '.') return null;
+        index += 1;
+    }
+
+    return segments.length > 0 ? segments : null;
+}
+
+function collectTomlMultilineStringRanges(text) {
+    const source = typeof text === 'string' ? text : '';
+    const ranges = [];
+    let i = 0;
+    let inMultilineBasic = false;
+    let inMultilineLiteral = false;
+    let rangeStart = -1;
+
+    while (i < source.length) {
+        if (inMultilineBasic) {
+            if (source.slice(i, i + 3) === '"""') {
+                let slashCount = 0;
+                for (let j = i - 1; j >= 0 && source[j] === '\\'; j--) {
+                    slashCount++;
+                }
+                if (slashCount % 2 === 0) {
+                    let runEnd = i + 3;
+                    while (runEnd < source.length && source[runEnd] === '"') runEnd++;
+                    ranges.push({ start: rangeStart, end: runEnd });
+                    inMultilineBasic = false;
+                    rangeStart = -1;
+                    i = runEnd;
+                    continue;
+                }
+            }
+            i++;
+            continue;
+        }
+
+        if (inMultilineLiteral) {
+            if (source.slice(i, i + 3) === "'''") {
+                let runEnd = i + 3;
+                while (runEnd < source.length && source[runEnd] === '\'') runEnd++;
+                ranges.push({ start: rangeStart, end: runEnd });
+                inMultilineLiteral = false;
+                rangeStart = -1;
+                i = runEnd;
+                continue;
+            }
+            i++;
+            continue;
+        }
+
+        const ch = source[i];
+        if (ch === '#') {
+            while (i < source.length && source[i] !== '\n') i++;
+            continue;
+        }
+
+        if (source.slice(i, i + 3) === '"""') {
+            inMultilineBasic = true;
+            rangeStart = i;
+            i += 3;
+            continue;
+        }
+
+        if (source.slice(i, i + 3) === "'''") {
+            inMultilineLiteral = true;
+            rangeStart = i;
+            i += 3;
+            continue;
+        }
+
+        if (ch === '"') {
+            i++;
+            while (i < source.length) {
+                if (source[i] === '\\') {
+                    i += 2;
+                    continue;
+                }
+                if (source[i] === '"' || source[i] === '\n') {
+                    i++;
+                    break;
+                }
+                i++;
+            }
+            continue;
+        }
+
+        if (ch === '\'') {
+            i++;
+            while (i < source.length) {
+                if (source[i] === '\'' || source[i] === '\n') {
+                    i++;
+                    break;
+                }
+                i++;
+            }
+            continue;
+        }
+
+        i++;
+    }
+
+    if (rangeStart >= 0) {
+        ranges.push({ start: rangeStart, end: source.length });
+    }
+    return ranges;
+}
+
+function isIndexInRanges(index, ranges) {
+    for (const range of ranges) {
+        if (index < range.start) return false;
+        if (index >= range.start && index < range.end) return true;
+    }
+    return false;
+}
+
+function findProviderSectionRanges(content, providerName, exactSegments = null) {
     const text = typeof content === 'string' ? content : '';
     const name = typeof providerName === 'string' ? providerName.trim() : '';
+    const targetSegments = Array.isArray(exactSegments) ? exactSegments.map((item) => String(item)) : null;
     if (!text || !name) return [];
 
     const safeName = escapeRegex(name);
@@ -380,12 +669,39 @@ function findProviderSectionRanges(content, providerName) {
 
     const allHeaders = [];
     const targetPriorityByStart = new Map();
+    const multilineStringRanges = collectTomlMultilineStringRanges(text);
     const sectionLineRegex = /^[ \t]*\[(?!\[)([^\]\n]+)\][ \t]*(?:#.*)?$/gm;
     let match;
     while ((match = sectionLineRegex.exec(text)) !== null) {
         const start = match.index;
+        if (isIndexInRanges(start, multilineStringRanges)) {
+            continue;
+        }
         allHeaders.push(start);
         const headerExpr = String(match[1] || '').trim();
+
+        const parsedSegments = parseTomlDottedKeyExpression(headerExpr);
+        if (Array.isArray(parsedSegments) && parsedSegments.length >= 2 && parsedSegments[0] === 'model_providers') {
+            const providerSegments = parsedSegments.slice(1);
+            if (targetSegments && targetSegments.length > 0 && areStringArraysEqual(providerSegments, targetSegments)) {
+                const prev = targetPriorityByStart.get(start);
+                if (prev === undefined || -3 < prev) {
+                    targetPriorityByStart.set(start, -3);
+                }
+                continue;
+            }
+            if (!targetSegments || targetSegments.length === 0) {
+                const parsedName = providerSegments.join('.');
+                if (parsedName === name) {
+                    const prev = targetPriorityByStart.get(start);
+                    if (prev === undefined || -2 < prev) {
+                        targetPriorityByStart.set(start, -2);
+                    }
+                    continue;
+                }
+            }
+        }
+
         for (const pattern of headerPatterns) {
             if (pattern.regex.test(headerExpr)) {
                 const prev = targetPriorityByStart.get(start);
@@ -412,7 +728,79 @@ function findProviderSectionRanges(content, providerName) {
             priority: targetPriorityByStart.get(start)
         });
     }
+    const exactMatches = ranges.filter((range) => range.priority === -3);
+    return exactMatches.length > 0 ? exactMatches : ranges;
+}
+
+function doesSegmentsStartWith(segments, prefix) {
+    if (!Array.isArray(segments) || !Array.isArray(prefix) || prefix.length === 0 || segments.length < prefix.length) {
+        return false;
+    }
+    for (let i = 0; i < prefix.length; i++) {
+        if (String(segments[i]) !== String(prefix[i])) return false;
+    }
+    return true;
+}
+
+function findProviderDescendantSectionRanges(content, prefixSegments) {
+    const text = typeof content === 'string' ? content : '';
+    const prefix = Array.isArray(prefixSegments) ? prefixSegments.map((item) => String(item)) : [];
+    if (!text || prefix.length === 0) return [];
+
+    const allHeaders = [];
+    const parsedProviderSegmentsByStart = new Map();
+    const multilineStringRanges = collectTomlMultilineStringRanges(text);
+    const sectionLineRegex = /^[ \t]*\[(?!\[)([^\]\n]+)\][ \t]*(?:#.*)?$/gm;
+    let match;
+    while ((match = sectionLineRegex.exec(text)) !== null) {
+        const start = match.index;
+        if (isIndexInRanges(start, multilineStringRanges)) {
+            continue;
+        }
+        allHeaders.push(start);
+        const headerExpr = String(match[1] || '').trim();
+        const parsedSegments = parseTomlDottedKeyExpression(headerExpr);
+        if (!Array.isArray(parsedSegments) || parsedSegments.length < 2 || parsedSegments[0] !== 'model_providers') {
+            continue;
+        }
+        parsedProviderSegmentsByStart.set(start, parsedSegments.slice(1));
+    }
+
+    const ranges = [];
+    for (let i = 0; i < allHeaders.length; i++) {
+        const start = allHeaders[i];
+        const providerSegments = parsedProviderSegmentsByStart.get(start);
+        if (!providerSegments) continue;
+        if (!doesSegmentsStartWith(providerSegments, prefix)) continue;
+        if (providerSegments.length <= prefix.length) continue;
+        const end = i + 1 < allHeaders.length ? allHeaders[i + 1] : text.length;
+        ranges.push({ start, end, priority: 0 });
+    }
     return ranges;
+}
+
+function collectModelProviderHeaderSegmentKeySet(content) {
+    const text = typeof content === 'string' ? content : '';
+    const keys = new Set();
+    if (!text) return keys;
+
+    const multilineStringRanges = collectTomlMultilineStringRanges(text);
+    const sectionLineRegex = /^[ \t]*\[(?!\[)([^\]\n]+)\][ \t]*(?:#.*)?$/gm;
+    let match;
+    while ((match = sectionLineRegex.exec(text)) !== null) {
+        const start = match.index;
+        if (isIndexInRanges(start, multilineStringRanges)) {
+            continue;
+        }
+        const headerExpr = String(match[1] || '').trim();
+        const parsedSegments = parseTomlDottedKeyExpression(headerExpr);
+        if (!Array.isArray(parsedSegments) || parsedSegments.length < 2 || parsedSegments[0] !== 'model_providers') {
+            continue;
+        }
+        const key = buildLegacySegmentsKey(parsedSegments.slice(1));
+        if (key) keys.add(key);
+    }
+    return keys;
 }
 
 function normalizeAuthProfileName(value) {
@@ -1828,8 +2216,9 @@ function addProviderToConfig(params = {}) {
         return { error: `config.toml 解析失败: ${e.message}` };
     }
 
+    const providerHeaderSegmentKeySet = collectModelProviderHeaderSegmentKeySet(content);
     const normalizedProviders = isPlainObject(parsed.model_providers)
-        ? normalizeLegacyModelProviders(parsed.model_providers)
+        ? normalizeLegacyModelProviders(parsed.model_providers, providerHeaderSegmentKeySet)
         : {};
     if (normalizedProviders && normalizedProviders[name]) {
         return { error: '提供商已存在' };
@@ -1940,6 +2329,36 @@ function performProviderDeletion(name, options = {}) {
     const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
     const lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
     const hasBom = content.charCodeAt(0) === 0xFEFF;
+    const providerConfig = config.model_providers[name];
+    const providerSegments = providerConfig && Array.isArray(providerConfig.__codexmate_legacy_segments)
+        ? providerConfig.__codexmate_legacy_segments
+        : null;
+    const providerSegmentVariants = (() => {
+        const variants = [];
+        const seen = new Set();
+        const pushVariant = (segments) => {
+            const normalized = normalizeLegacySegments(segments);
+            const key = buildLegacySegmentsKey(normalized);
+            if (!key || seen.has(key)) return;
+            seen.add(key);
+            variants.push(normalized);
+        };
+        if (providerConfig && Array.isArray(providerConfig.__codexmate_legacy_segments)) {
+            pushVariant(providerConfig.__codexmate_legacy_segments);
+        }
+        if (providerConfig && Array.isArray(providerConfig.__codexmate_legacy_segment_variants)) {
+            for (const segments of providerConfig.__codexmate_legacy_segment_variants) {
+                pushVariant(segments);
+            }
+        }
+        if (providerSegments) {
+            pushVariant(providerSegments);
+        }
+        if (variants.length === 0) {
+            pushVariant(String(name || '').split('.').filter((item) => item));
+        }
+        return variants;
+    })();
 
     const remainingProviders = Object.keys(config.model_providers || {}).filter(item => item !== name);
     if (remainingProviders.length === 0) {
@@ -1978,11 +2397,22 @@ function performProviderDeletion(name, options = {}) {
     };
 
     let updatedContent = null;
-    const ranges = findProviderSectionRanges(content, name);
-    if (ranges.length > 0) {
-        const sorted = ranges.sort((a, b) => b.start - a.start);
+    const combinedRanges = [];
+    for (const segments of providerSegmentVariants) {
+        combinedRanges.push(...findProviderSectionRanges(content, name, segments));
+        combinedRanges.push(...findProviderDescendantSectionRanges(content, segments));
+    }
+    if (combinedRanges.length === 0) {
+        combinedRanges.push(...findProviderSectionRanges(content, name, providerSegments));
+    }
+    if (combinedRanges.length > 0) {
+        const sorted = combinedRanges.sort((a, b) => b.start - a.start || b.end - a.end);
+        const seen = new Set();
         let removedContent = content;
         for (const range of sorted) {
+            const rangeKey = `${range.start}:${range.end}`;
+            if (seen.has(rangeKey)) continue;
+            seen.add(rangeKey);
             removedContent = removedContent.slice(0, range.start) + removedContent.slice(range.end);
         }
         updatedContent = removedContent.replace(/\n{3,}/g, lineEnding + lineEnding);
@@ -5243,11 +5673,134 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
     }
 
     const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
-    const ranges = findProviderSectionRanges(content, name);
+    const providerConfig = config.model_providers[name];
+    const providerSegments = providerConfig && Array.isArray(providerConfig.__codexmate_legacy_segments)
+        ? providerConfig.__codexmate_legacy_segments
+        : null;
+    const ranges = findProviderSectionRanges(content, name, providerSegments);
     if (ranges.length === 0) {
         if (!silent) console.error('错误: 无法找到提供商配置块');
         throw new Error('无法找到提供商配置块');
     }
+
+    const replaceTomlStringField = (block, fieldName, rawValue) => {
+        const safeValue = escapeTomlBasicString(rawValue);
+        const escapedFieldName = escapeRegex(fieldName);
+        const multilineRanges = collectTomlMultilineStringRanges(block);
+        const tripleStartRegex = new RegExp(`^(\\s*${escapedFieldName}\\s*=\\s*)(\"\"\"|''')`, 'mg');
+        let tripleStartMatch = null;
+        let tripleCandidate;
+        while ((tripleCandidate = tripleStartRegex.exec(block)) !== null) {
+            if (isIndexInRanges(tripleCandidate.index, multilineRanges)) {
+                continue;
+            }
+            tripleStartMatch = tripleCandidate;
+            break;
+        }
+        if (tripleStartMatch) {
+            const prefixStart = tripleStartMatch.index;
+            const prefixEnd = prefixStart + tripleStartMatch[1].length;
+            const tripleQuote = tripleStartMatch[2];
+            const valueStart = prefixEnd + tripleQuote.length;
+            const quoteChar = tripleQuote[0];
+            let valueEnd = -1;
+            let closingRunLength = 0;
+            for (let i = valueStart; i < block.length; i++) {
+                if (block[i] !== quoteChar) continue;
+                let runEnd = i + 1;
+                while (runEnd < block.length && block[runEnd] === quoteChar) {
+                    runEnd++;
+                }
+                const runLength = runEnd - i;
+                if (runLength < tripleQuote.length) {
+                    i = runEnd - 1;
+                    continue;
+                }
+                if (tripleQuote === '"""') {
+                    let slashCount = 0;
+                    for (let j = i - 1; j >= valueStart && block[j] === '\\'; j--) {
+                        slashCount++;
+                    }
+                    if (slashCount % 2 !== 0) {
+                        continue;
+                    }
+                }
+                valueEnd = i;
+                closingRunLength = runLength;
+                break;
+            }
+            if (valueEnd === -1) {
+                throw new Error(`${fieldName} 使用了未闭合的多行 TOML 字符串，无法安全更新`);
+            }
+            const lineEndIndex = block.indexOf('\n', valueEnd + closingRunLength);
+            let tailEnd = lineEndIndex === -1 ? block.length : lineEndIndex;
+            if (lineEndIndex > 0 && block[lineEndIndex - 1] === '\r') {
+                tailEnd = lineEndIndex - 1;
+            }
+            const tail = block.slice(valueEnd + closingRunLength, tailEnd);
+            const tailMatch = tail.match(/^(\s+#.*)?\s*$/);
+            if (!tailMatch) {
+                throw new Error(`${fieldName} 多行字符串后的语法不受支持，无法安全更新`);
+            }
+            const commentSuffix = tailMatch[1] || '';
+            const replacementLine = `${block.slice(prefixStart, prefixEnd)}"${safeValue}"${commentSuffix}`;
+            return block.slice(0, prefixStart) + replacementLine + block.slice(tailEnd);
+        }
+
+        const withCommentRegex = new RegExp(
+            `^(\\s*${escapedFieldName}\\s*=\\s*)(?:"(?:\\\\.|[^"\\\\])*"|'[^'\\n]*')(\\s+#.*)?$`,
+            'mg'
+        );
+        let replaced = false;
+        let next = block.replace(
+            withCommentRegex,
+            (full, prefix, suffix = '', offset) => {
+                if (replaced || isIndexInRanges(offset, multilineRanges)) {
+                    return full;
+                }
+                replaced = true;
+                return `${prefix}"${safeValue}"${suffix}`;
+            }
+        );
+        if (!replaced) {
+            const fallbackRegex = new RegExp(`^(\\s*${escapedFieldName}\\s*=\\s*)(.*?)(\\s+#.*)?$`, 'mg');
+            let fallbackReplaced = false;
+            const multilineRangesForNext = collectTomlMultilineStringRanges(next);
+            let fallbackMatch;
+            let fallbackCandidate;
+            while ((fallbackCandidate = fallbackRegex.exec(next)) !== null) {
+                if (isIndexInRanges(fallbackCandidate.index, multilineRangesForNext)) {
+                    continue;
+                }
+                fallbackMatch = fallbackCandidate;
+                break;
+            }
+            if (fallbackMatch) {
+                const existingValue = String(fallbackMatch[2] || '').trim();
+                const looksLikeMultilineArray = existingValue.startsWith('[') && !existingValue.endsWith(']');
+                const looksLikeMultilineInlineTable = existingValue.startsWith('{') && !existingValue.endsWith('}');
+                if (looksLikeMultilineArray || looksLikeMultilineInlineTable) {
+                    throw new Error(`${fieldName} 当前值是多行 TOML 结构，无法安全更新`);
+                }
+                const prefix = fallbackMatch[1];
+                const suffix = fallbackMatch[3] || '';
+                const replacement = `${prefix}"${safeValue}"${suffix}`;
+                next = `${next.slice(0, fallbackMatch.index)}${replacement}${next.slice(fallbackMatch.index + fallbackMatch[0].length)}`;
+                fallbackReplaced = true;
+            }
+            if (!fallbackReplaced) {
+                const keyIndentMatch = block.match(/^(\s*)[A-Za-z0-9_.-]+\s*=/m);
+                const indent = keyIndentMatch ? keyIndentMatch[1] : '';
+                const lineEnding = block.includes('\r\n') ? '\r\n' : '\n';
+                const tailMatch = block.match(/(\s*)$/);
+                const tail = tailMatch ? tailMatch[1] : '';
+                const body = block.slice(0, block.length - tail.length);
+                const separator = body.endsWith('\n') || body.endsWith('\r') ? '' : lineEnding;
+                next = `${body}${separator}${indent}${fieldName} = "${safeValue}"${tail}`;
+            }
+        }
+        return next;
+    };
 
     let newContent = content;
     const sorted = ranges.sort((a, b) => b.start - a.start);
@@ -5255,21 +5808,21 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
         const providerBlock = newContent.slice(range.start, range.end);
         let updatedBlock = providerBlock;
         if (baseUrl) {
-            updatedBlock = updatedBlock.replace(
-                /^(base_url\s*=\s*)(["']).*?\2/m,
-                `$1$2${baseUrl}$2`
-            );
+            updatedBlock = replaceTomlStringField(updatedBlock, 'base_url', baseUrl);
         }
         if (apiKey !== undefined) {
-            updatedBlock = updatedBlock.replace(
-                /^(preferred_auth_method\s*=\s*)(["']).*?\2/m,
-                `$1$2${apiKey}$2`
-            );
+            updatedBlock = replaceTomlStringField(updatedBlock, 'preferred_auth_method', apiKey);
         }
         newContent = newContent.slice(0, range.start) + updatedBlock + newContent.slice(range.end);
     }
 
-    writeConfig(newContent.trim());
+    const finalContent = newContent.trim();
+    try {
+        toml.parse(finalContent);
+    } catch (e) {
+        throw new Error(`更新后的 config.toml 无效: ${e.message}`);
+    }
+    writeConfig(finalContent);
 
     // 如果更新了 API Key 且该提供商是当前激活的，同步更新 auth.json
     const currentProvider = config.model_provider;

@@ -1,4 +1,5 @@
 const { spawn } = require('child_process');
+const toml = require('@iarna/toml');
 const { assert, runSync, fs, path, os, waitForServer, postJson } = require('./helpers');
 
 module.exports = async function testConfig(ctx) {
@@ -7,6 +8,7 @@ module.exports = async function testConfig(ctx) {
         env,
         node,
         cliPath,
+        tmpHome,
         mockProviderUrl,
         noModelsUrl,
         htmlModelsUrl,
@@ -368,18 +370,35 @@ module.exports = async function testConfig(ctx) {
         });
         assert(legacyUpdateDual.success === true, 'dual-definition update-provider should succeed');
         const configAfterDualUpdate = fs.readFileSync(legacyConfigPath, 'utf-8');
-        assert(!configAfterDualUpdate.includes('https://api.example.com/v1'), 'dual-definition update should sync legacy section url');
+        assert(configAfterDualUpdate.includes('https://api.example.com/v1'), 'dual-definition update should keep legacy section url');
         assert(!configAfterDualUpdate.includes('https://quoted.example.com/v1'), 'dual-definition update should sync quoted section url');
+        const quotedFooBarBlock = configAfterDualUpdate.match(
+            /(?:^|\n)\s*\[model_providers\."foo\.bar"\][\s\S]*?(?=\n\s*\[|$)/
+        )?.[0];
+        assert(quotedFooBarBlock, 'dual-definition update should keep the quoted foo.bar section');
+        assert(
+            quotedFooBarBlock.includes('base_url = "https://updated.example.com/v1"'),
+            'dual-definition update should rewrite the quoted foo.bar url'
+        );
+        assert(
+            quotedFooBarBlock.includes('preferred_auth_method = "sk-updated"'),
+            'dual-definition update should rewrite the quoted foo.bar key'
+        );
 
         const legacyDeleteDual = await legacyApi('delete-provider', { name: 'foo.bar' });
         assert(legacyDeleteDual.success === true, 'dual-definition delete-provider should succeed');
         const configAfterDualDelete = fs.readFileSync(legacyConfigPath, 'utf-8');
         const remainingDualSections = configAfterDualDelete.match(providerSectionRegex) || [];
-        assert(remainingDualSections.length === 0, 'dual-definition delete-provider should remove all foo.bar sections');
+        assert(remainingDualSections.length === 0, 'dual-definition delete-provider should remove all foo.bar section variants');
         const legacyListAfterDualDelete = await legacyApi('list');
         assert(
             !legacyListAfterDualDelete.providers.some((item) => item && item.name === 'foo.bar'),
-            'dual-definition delete-provider should remove foo.bar from provider list'
+            'dual-definition delete-provider should not leave shadowed foo.bar providers reappearing'
+        );
+        const legacyListAfterDualDeleteAll = await legacyApi('list');
+        assert(
+            !legacyListAfterDualDeleteAll.providers.some((item) => item && item.name === 'foo.bar'),
+            'dual-definition second delete-provider should remove foo.bar from provider list'
         );
 
         const commentMarkerConfig = [
@@ -416,6 +435,793 @@ module.exports = async function testConfig(ctx) {
         assert(configAfterCommentDelete.includes('[model_providers.openai]'), 'comment-marker delete should keep openai section');
         const commentDeleteSections = configAfterCommentDelete.match(providerSectionRegex) || [];
         assert(commentDeleteSections.length === 0, 'comment-marker delete should remove foo.bar section only');
+
+        const inlineCommentConfig = [
+            'model_provider = "foo.bar"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers."foo.bar"]',
+            'name = "foo.bar"',
+            'base_url = "https://api.example.com/v1" # keep-base-comment',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = "sk-old" # keep-key-comment',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.openai]',
+            'name = "openai"',
+            'base_url = "https://api.openai.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = ""',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, inlineCommentConfig, 'utf-8');
+        const updateWithInlineComment = await legacyApi('update-provider', {
+            name: 'foo.bar',
+            url: 'https://updated-inline.example.com/v1',
+            key: 'sk-inline-new'
+        });
+        assert(updateWithInlineComment.success === true, 'update-provider should keep inline comments');
+        const configAfterInlineCommentUpdate = fs.readFileSync(legacyConfigPath, 'utf-8');
+        assert(
+            configAfterInlineCommentUpdate.includes('base_url = "https://updated-inline.example.com/v1" # keep-base-comment'),
+            'update-provider should preserve base_url inline comment'
+        );
+        assert(
+            configAfterInlineCommentUpdate.includes('preferred_auth_method = "sk-inline-new" # keep-key-comment'),
+            'update-provider should preserve preferred_auth_method inline comment'
+        );
+        const parsedAfterInlineCommentUpdate = toml.parse(configAfterInlineCommentUpdate);
+        assert(
+            parsedAfterInlineCommentUpdate
+            && parsedAfterInlineCommentUpdate.model_providers
+            && parsedAfterInlineCommentUpdate.model_providers['foo.bar']
+            && parsedAfterInlineCommentUpdate.model_providers['foo.bar'].preferred_auth_method === 'sk-inline-new',
+            'inline comment update should keep config.toml parseable and value readable'
+        );
+
+        const multilineStringConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = """sk-old',
+            'line-2""" # keep-triple-comment',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.openai]',
+            'name = "openai"',
+            'base_url = "https://api.openai.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = ""',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, multilineStringConfig, 'utf-8');
+        const updateMultilineString = await legacyApi('update-provider', {
+            name: 'foo',
+            key: 'sk-triple-updated'
+        });
+        assert(updateMultilineString.success === true, 'update-provider should handle multiline TOML string values');
+        const configAfterMultilineUpdate = fs.readFileSync(legacyConfigPath, 'utf-8');
+        assert(
+            configAfterMultilineUpdate.includes('preferred_auth_method = "sk-triple-updated" # keep-triple-comment'),
+            'update-provider should safely replace multiline TOML string and preserve comment'
+        );
+        assert(
+            !configAfterMultilineUpdate.includes('line-2"""'),
+            'update-provider should remove previous multiline TOML string tail'
+        );
+        const parsedAfterMultilineUpdate = toml.parse(configAfterMultilineUpdate);
+        assert(
+            parsedAfterMultilineUpdate
+            && parsedAfterMultilineUpdate.model_providers
+            && parsedAfterMultilineUpdate.model_providers.foo
+            && parsedAfterMultilineUpdate.model_providers.foo.preferred_auth_method === 'sk-triple-updated',
+            'update-provider multiline rewrite should keep config.toml parseable and value readable'
+        );
+        const cliListAfterMultiline = runSync(node, [cliPath, 'list'], { env: legacyEnv });
+        assert(
+            cliListAfterMultiline.status === 0,
+            `multiline string update should keep config parseable: ${cliListAfterMultiline.stderr || cliListAfterMultiline.stdout}`
+        );
+        assert(
+            cliListAfterMultiline.stdout.includes('foo'),
+            'multiline string update should keep provider readable in a fresh process'
+        );
+
+        const multilineWithHeaderLikeLineConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = """sk-old',
+            '[model_providers.fake]',
+            'line-2""" # keep-fake-header-comment',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.openai]',
+            'name = "openai"',
+            'base_url = "https://api.openai.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = ""',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, multilineWithHeaderLikeLineConfig, 'utf-8');
+        const updateMultilineWithHeaderLikeLine = await legacyApi('update-provider', {
+            name: 'foo',
+            key: 'sk-multiline-header-updated'
+        });
+        assert(
+            updateMultilineWithHeaderLikeLine.success === true,
+            'update-provider should ignore header-like lines inside multiline strings when finding section ranges'
+        );
+        const configAfterMultilineWithHeaderLikeLineUpdate = fs.readFileSync(legacyConfigPath, 'utf-8');
+        assert(
+            configAfterMultilineWithHeaderLikeLineUpdate.includes('preferred_auth_method = "sk-multiline-header-updated" # keep-fake-header-comment'),
+            'multiline rewrite with header-like content should preserve inline comment'
+        );
+        const parsedAfterMultilineWithHeaderLikeLineUpdate = toml.parse(configAfterMultilineWithHeaderLikeLineUpdate);
+        assert(
+            parsedAfterMultilineWithHeaderLikeLineUpdate
+            && parsedAfterMultilineWithHeaderLikeLineUpdate.model_providers
+            && parsedAfterMultilineWithHeaderLikeLineUpdate.model_providers.foo
+            && parsedAfterMultilineWithHeaderLikeLineUpdate.model_providers.foo.preferred_auth_method === 'sk-multiline-header-updated',
+            'header-like lines inside multiline strings should not break update-provider parsing'
+        );
+
+        const escapedTripleQuoteConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = """sk-old\\"""marker',
+            'line-2""" # keep-escaped-triple-comment',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.openai]',
+            'name = "openai"',
+            'base_url = "https://api.openai.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = ""',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, escapedTripleQuoteConfig, 'utf-8');
+        const updateEscapedTripleQuote = await legacyApi('update-provider', {
+            name: 'foo',
+            key: 'sk-escaped-triple-updated'
+        });
+        assert(
+            updateEscapedTripleQuote.success === true,
+            'update-provider should support multiline strings containing escaped triple quotes'
+        );
+        const configAfterEscapedTripleUpdate = fs.readFileSync(legacyConfigPath, 'utf-8');
+        assert(
+            configAfterEscapedTripleUpdate.includes('preferred_auth_method = "sk-escaped-triple-updated" # keep-escaped-triple-comment'),
+            'escaped triple-quote multiline update should preserve inline comment'
+        );
+        const parsedAfterEscapedTripleUpdate = toml.parse(configAfterEscapedTripleUpdate);
+        assert(
+            parsedAfterEscapedTripleUpdate
+            && parsedAfterEscapedTripleUpdate.model_providers
+            && parsedAfterEscapedTripleUpdate.model_providers.foo
+            && parsedAfterEscapedTripleUpdate.model_providers.foo.preferred_auth_method === 'sk-escaped-triple-updated',
+            'escaped triple-quote multiline rewrite should keep config.toml parseable and value readable'
+        );
+
+        const escapedQuoteBeforeClosingConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = """sk-old\\"""" # keep-escaped-close-comment',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.openai]',
+            'name = "openai"',
+            'base_url = "https://api.openai.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = ""',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, escapedQuoteBeforeClosingConfig, 'utf-8');
+        const updateEscapedQuoteBeforeClosing = await legacyApi('update-provider', {
+            name: 'foo',
+            key: 'sk-escaped-close-updated'
+        });
+        assert(
+            updateEscapedQuoteBeforeClosing.success === true,
+            'update-provider should handle escaped quote before multiline closing delimiter'
+        );
+        const configAfterEscapedQuoteBeforeClosingUpdate = fs.readFileSync(legacyConfigPath, 'utf-8');
+        assert(
+            configAfterEscapedQuoteBeforeClosingUpdate.includes('preferred_auth_method = "sk-escaped-close-updated" # keep-escaped-close-comment'),
+            'escaped-quote-before-close multiline update should preserve inline comment'
+        );
+        const parsedAfterEscapedQuoteBeforeClosingUpdate = toml.parse(configAfterEscapedQuoteBeforeClosingUpdate);
+        assert(
+            parsedAfterEscapedQuoteBeforeClosingUpdate
+            && parsedAfterEscapedQuoteBeforeClosingUpdate.model_providers
+            && parsedAfterEscapedQuoteBeforeClosingUpdate.model_providers.foo
+            && parsedAfterEscapedQuoteBeforeClosingUpdate.model_providers.foo.preferred_auth_method === 'sk-escaped-close-updated',
+            'escaped-quote-before-close multiline rewrite should keep config.toml parseable and value readable'
+        );
+
+        const multilineLiteralTrailingBackslashConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            "preferred_auth_method = '''sk-old\\''' # keep-literal-triple-comment",
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.openai]',
+            'name = "openai"',
+            'base_url = "https://api.openai.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = ""',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, multilineLiteralTrailingBackslashConfig, 'utf-8');
+        const updateMultilineLiteralTrailingBackslash = await legacyApi('update-provider', {
+            name: 'foo',
+            key: 'sk-literal-triple-updated'
+        });
+        assert(
+            updateMultilineLiteralTrailingBackslash.success === true,
+            'update-provider should handle multiline literal strings with trailing backslashes'
+        );
+        const configAfterMultilineLiteralTrailingBackslashUpdate = fs.readFileSync(legacyConfigPath, 'utf-8');
+        assert(
+            configAfterMultilineLiteralTrailingBackslashUpdate.includes('preferred_auth_method = "sk-literal-triple-updated" # keep-literal-triple-comment'),
+            'multiline literal rewrite should preserve inline comment'
+        );
+        const parsedAfterMultilineLiteralTrailingBackslashUpdate = toml.parse(configAfterMultilineLiteralTrailingBackslashUpdate);
+        assert(
+            parsedAfterMultilineLiteralTrailingBackslashUpdate
+            && parsedAfterMultilineLiteralTrailingBackslashUpdate.model_providers
+            && parsedAfterMultilineLiteralTrailingBackslashUpdate.model_providers.foo
+            && parsedAfterMultilineLiteralTrailingBackslashUpdate.model_providers.foo.preferred_auth_method === 'sk-literal-triple-updated',
+            'multiline literal rewrite should keep config.toml parseable and value readable'
+        );
+
+        const missingFieldConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.openai]',
+            'name = "openai"',
+            'base_url = "https://api.openai.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = ""',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, missingFieldConfig, 'utf-8');
+        const updateMissingField = await legacyApi('update-provider', {
+            name: 'foo',
+            key: 'sk-added-field'
+        });
+        assert(updateMissingField.success === true, 'update-provider should append missing preferred_auth_method field');
+        const configAfterMissingFieldUpdate = fs.readFileSync(legacyConfigPath, 'utf-8');
+        assert(
+            configAfterMissingFieldUpdate.includes('preferred_auth_method = "sk-added-field"'),
+            'update-provider should append preferred_auth_method when field is missing'
+        );
+        const parsedAfterMissingFieldUpdate = toml.parse(configAfterMissingFieldUpdate);
+        assert(
+            parsedAfterMissingFieldUpdate
+            && parsedAfterMissingFieldUpdate.model_providers
+            && parsedAfterMissingFieldUpdate.model_providers.foo
+            && parsedAfterMissingFieldUpdate.model_providers.foo.preferred_auth_method === 'sk-added-field',
+            'missing-field rewrite should keep config.toml parseable and value readable'
+        );
+        const exportMissingFieldProvider = await legacyApi('export-provider', { name: 'foo' });
+        assert(
+            exportMissingFieldProvider.payload && exportMissingFieldProvider.payload.apiKey === 'sk-added-field',
+            'appended preferred_auth_method should be readable via export-provider'
+        );
+
+        const multilineStructuredFieldConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = [',
+            '  "sk-old",',
+            '  "sk-old-2"',
+            ']',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.openai]',
+            'name = "openai"',
+            'base_url = "https://api.openai.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = ""',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, multilineStructuredFieldConfig, 'utf-8');
+        const updateMultilineStructuredField = await legacyApi('update-provider', {
+            name: 'foo',
+            key: 'sk-should-not-write'
+        });
+        assert(
+            updateMultilineStructuredField.error,
+            'update-provider should reject multiline structured field values instead of partially rewriting them'
+        );
+        const configAfterMultilineStructuredFieldUpdate = fs.readFileSync(legacyConfigPath, 'utf-8');
+        assert(
+            configAfterMultilineStructuredFieldUpdate === multilineStructuredFieldConfig,
+            'failed multiline structured-field update should not mutate config.toml'
+        );
+        const parsedAfterMultilineStructuredFieldUpdate = toml.parse(configAfterMultilineStructuredFieldUpdate);
+        assert(
+            parsedAfterMultilineStructuredFieldUpdate
+            && parsedAfterMultilineStructuredFieldUpdate.model_providers
+            && parsedAfterMultilineStructuredFieldUpdate.model_providers.foo
+            && Array.isArray(parsedAfterMultilineStructuredFieldUpdate.model_providers.foo.preferred_auth_method),
+            'rejected multiline structured-field update should leave parseable original value'
+        );
+
+        const nestedMetadataConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = "sk-foo"',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.foo.metadata]',
+            'name = "metadata"',
+            'base_url = "https://metadata.example.com/v1"',
+            'owner = "team-a"',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, nestedMetadataConfig, 'utf-8');
+        const nestedMetadataList = await legacyApi('list');
+        const nestedFoo = nestedMetadataList.providers.find((item) => item && item.name === 'foo');
+        assert(
+            nestedFoo,
+            'nested metadata config should keep foo provider'
+        );
+        assert(
+            nestedFoo.url === 'https://api.example.com/v1',
+            'nested metadata should not override foo provider data'
+        );
+        assert(
+            !nestedMetadataList.providers.some((item) => item && item.name === 'foo.metadata'),
+            'nested metadata should not be promoted to provider'
+        );
+        const nestedFooExport = await legacyApi('export-provider', { name: 'foo' });
+        assert(
+            nestedFooExport.payload
+            && nestedFooExport.payload.baseUrl === 'https://api.example.com/v1'
+            && nestedFooExport.payload.apiKey === 'sk-foo',
+            'nested metadata should not change export-provider(foo)'
+        );
+        const nestedMetadataExport = await legacyApi('export-provider', { name: 'foo.metadata' });
+        assert(nestedMetadataExport.error, 'nested metadata should not be exportable as a provider');
+        const nestedMetadataUpdate = await legacyApi('update-provider', {
+            name: 'foo.metadata',
+            url: 'https://should-not-write.example.com/v1',
+            key: 'sk-should-not-write'
+        });
+        assert(nestedMetadataUpdate.error, 'nested metadata should not be updatable as a provider');
+
+        const inlineTableNestedConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = "sk-foo"',
+            'shadow = { name = "shadow", base_url = "https://inline-shadow.example.com/v1", wire_api = "responses", preferred_auth_method = "sk-shadow" }',
+            '',
+            '[model_providers.openai]',
+            'name = "openai"',
+            'base_url = "https://api.openai.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = ""',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, inlineTableNestedConfig, 'utf-8');
+        const inlineTableNestedList = await legacyApi('list');
+        assert(
+            inlineTableNestedList.providers.some((item) => item && item.name === 'foo'),
+            'inline table config should keep foo provider'
+        );
+        assert(
+            !inlineTableNestedList.providers.some((item) => item && item.name === 'foo.shadow'),
+            'inline table values should not be promoted to synthetic nested providers'
+        );
+        const inlineTableNestedExport = await legacyApi('export-provider', { name: 'foo.shadow' });
+        assert(inlineTableNestedExport.error, 'inline table synthetic provider should not be exportable');
+        const inlineTableNestedUpdate = await legacyApi('update-provider', {
+            name: 'foo.shadow',
+            url: 'https://should-not-write-inline-shadow.example.com/v1',
+            key: 'sk-should-not-write-inline-shadow'
+        });
+        assert(inlineTableNestedUpdate.error, 'inline table synthetic provider should not be updatable');
+
+        const deleteWithMetadataChildConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = "sk-foo"',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.foo.metadata]',
+            'base_url = "https://metadata.example.com/v1"',
+            'owner = "team-a"',
+            '',
+            '[model_providers.openai]',
+            'name = "openai"',
+            'base_url = "https://api.openai.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = ""',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, deleteWithMetadataChildConfig, 'utf-8');
+        const deleteWithMetadataChild = await legacyApi('delete-provider', { name: 'foo' });
+        assert(deleteWithMetadataChild.success === true, 'delete-provider should remove providers with metadata children');
+        const configAfterDeleteWithMetadataChild = fs.readFileSync(legacyConfigPath, 'utf-8');
+        assert(
+            !/\[\s*model_providers\.foo\s*\]/.test(configAfterDeleteWithMetadataChild),
+            'delete-provider should remove foo section when metadata child exists'
+        );
+        assert(
+            !/\[\s*model_providers\.foo\.metadata\s*\]/.test(configAfterDeleteWithMetadataChild),
+            'delete-provider should remove foo.metadata descendant section'
+        );
+        const parsedAfterDeleteWithMetadataChild = toml.parse(configAfterDeleteWithMetadataChild);
+        assert(
+            parsedAfterDeleteWithMetadataChild
+            && parsedAfterDeleteWithMetadataChild.model_providers
+            && !parsedAfterDeleteWithMetadataChild.model_providers.foo,
+            'delete-provider with metadata child should not leave foo namespace behind'
+        );
+        assert(
+            !/model_provider\s*=\s*["']foo["']/.test(configAfterDeleteWithMetadataChild),
+            'delete-provider with metadata child should not keep top-level model_provider = "foo"'
+        );
+        assert(
+            !parsedAfterDeleteWithMetadataChild.model_provider || parsedAfterDeleteWithMetadataChild.model_provider !== 'foo',
+            'delete-provider with metadata child should keep global provider selection away from removed provider'
+        );
+
+        const deepNestedRecoverableConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = "sk-foo"',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.foo.bar]',
+            'name = "foo.bar"',
+            'base_url = "https://bar.example.com/v1"',
+            'wire_api = "responses"',
+            'preferred_auth_method = "sk-bar"',
+            '',
+            '[model_providers.foo.bar.baz]',
+            'name = "foo.bar.baz"',
+            'base_url = "https://baz.example.com/v1"',
+            'wire_api = "responses"',
+            'preferred_auth_method = "sk-baz"',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, deepNestedRecoverableConfig, 'utf-8');
+        const deepNestedRecoverableList = await legacyApi('list');
+        assert(
+            deepNestedRecoverableList.providers.some((item) => item && item.name === 'foo.bar'),
+            'recoverable nested provider should keep first-level nested provider'
+        );
+        assert(
+            deepNestedRecoverableList.providers.some((item) => item && item.name === 'foo.bar.baz'),
+            'recoverable nested provider should keep deeper nested provider'
+        );
+        const deepNestedRecoverableUpdate = await legacyApi('update-provider', {
+            name: 'foo.bar.baz',
+            url: 'https://baz-updated.example.com/v1',
+            key: 'sk-baz-updated'
+        });
+        assert(
+            deepNestedRecoverableUpdate.success === true,
+            'deeper nested recoverable provider should support update-provider'
+        );
+        const deepNestedRecoverableExport = await legacyApi('export-provider', { name: 'foo.bar.baz' });
+        assert(
+            deepNestedRecoverableExport.payload && deepNestedRecoverableExport.payload.baseUrl === 'https://baz-updated.example.com/v1',
+            'deeper nested recoverable provider should update baseUrl'
+        );
+        assert(
+            deepNestedRecoverableExport.payload && deepNestedRecoverableExport.payload.apiKey === 'sk-baz-updated',
+            'deeper nested recoverable provider should update apiKey'
+        );
+
+        const topLevelMetadataNamespaceConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = "sk-foo"',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.metadata.foo]',
+            'base_url = "https://metadata-foo.example.com/v1"',
+            'wire_api = "responses"',
+            'preferred_auth_method = "sk-metadata-foo"',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, topLevelMetadataNamespaceConfig, 'utf-8');
+        const topLevelMetadataList = await legacyApi('list');
+        assert(
+            topLevelMetadataList.providers.some((item) => item && item.name === 'metadata.foo'),
+            'top-level metadata namespace should still recover nested provider'
+        );
+        assert(
+            !topLevelMetadataList.providers.some((item) => item && item.name === 'metadata'),
+            'top-level metadata namespace root should not be exposed as provider'
+        );
+        const topLevelMetadataExport = await legacyApi('export-provider', { name: 'metadata.foo' });
+        assert(
+            topLevelMetadataExport.payload && topLevelMetadataExport.payload.baseUrl === 'https://metadata-foo.example.com/v1',
+            'top-level metadata namespace recovered provider should be exportable'
+        );
+        assert(
+            topLevelMetadataExport.payload && topLevelMetadataExport.payload.apiKey === 'sk-metadata-foo',
+            'top-level metadata namespace recovered provider should keep api key'
+        );
+
+        const dottedNestedProviderConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = "sk-foo"',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            "[ model_providers . foo . 'bar.metadata' ]",
+            'base_url = "https://bar-metadata.example.com/v1"',
+            'wire_api = "responses"',
+            'preferred_auth_method = "sk-bar-metadata"',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, dottedNestedProviderConfig, 'utf-8');
+        const dottedNestedProviderList = await legacyApi('list');
+        assert(
+            dottedNestedProviderList.providers.some((item) => item && item.name === 'foo.bar.metadata'),
+            'nested provider keys containing dot suffix should not be filtered as metadata'
+        );
+        const dottedNestedProviderUpdate = await legacyApi('update-provider', {
+            name: 'foo.bar.metadata',
+            url: 'https://bar-metadata-updated.example.com/v1',
+            key: 'sk-bar-metadata-updated'
+        });
+        assert(
+            dottedNestedProviderUpdate.success === true,
+            'nested provider with dotted segment should support update-provider'
+        );
+        const dottedNestedProviderExport = await legacyApi('export-provider', { name: 'foo.bar.metadata' });
+        assert(
+            dottedNestedProviderExport.payload && dottedNestedProviderExport.payload.baseUrl === 'https://bar-metadata-updated.example.com/v1',
+            'nested provider with dotted segment should update baseUrl'
+        );
+        assert(
+            dottedNestedProviderExport.payload && dottedNestedProviderExport.payload.apiKey === 'sk-bar-metadata-updated',
+            'nested provider with dotted segment should update apiKey'
+        );
+
+        const ambiguousNestedProviderConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = "sk-foo"',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            "[ model_providers . foo . 'bar.baz' ]",
+            'base_url = "https://primary.example.com/v1"',
+            'wire_api = "responses"',
+            'preferred_auth_method = "sk-primary"',
+            '',
+            '[model_providers."foo.bar".baz]',
+            'base_url = "https://alt.example.com/v1"',
+            'wire_api = "responses"',
+            'preferred_auth_method = "sk-alt"',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, ambiguousNestedProviderConfig, 'utf-8');
+        const ambiguousList = await legacyApi('list');
+        const ambiguousMatches = ambiguousList.providers.filter((item) => item && item.name === 'foo.bar.baz');
+        assert(ambiguousMatches.length === 1, 'ambiguous nested provider config should expose exactly one flattened provider entry');
+        const ambiguousUpdate = await legacyApi('update-provider', {
+            name: 'foo.bar.baz',
+            url: 'https://primary-updated.example.com/v1',
+            key: 'sk-primary-updated'
+        });
+        assert(ambiguousUpdate.success === true, 'ambiguous nested provider update should succeed');
+        const ambiguousListAfterUpdate = await legacyApi('list');
+        const ambiguousItemAfterUpdate = ambiguousListAfterUpdate.providers.find((item) => item && item.name === 'foo.bar.baz');
+        assert(
+            ambiguousItemAfterUpdate && ambiguousItemAfterUpdate.url === 'https://primary-updated.example.com/v1',
+            'ambiguous nested provider list should resolve to the same primary block that update-provider rewrites'
+        );
+        const ambiguousExportAfterUpdate = await legacyApi('export-provider', { name: 'foo.bar.baz' });
+        assert(
+            ambiguousExportAfterUpdate.payload && ambiguousExportAfterUpdate.payload.baseUrl === 'https://primary-updated.example.com/v1',
+            'ambiguous export-provider should resolve to the same primary block that update-provider rewrites'
+        );
+        assert(
+            ambiguousExportAfterUpdate.payload && ambiguousExportAfterUpdate.payload.apiKey === 'sk-primary-updated',
+            'ambiguous export-provider should return the updated key from the primary block'
+        );
+        const configAfterAmbiguousUpdate = fs.readFileSync(legacyConfigPath, 'utf-8');
+        const primaryBlockMatch = configAfterAmbiguousUpdate.match(
+            /(?:^|\n)\s*\[\s*model_providers\s*\.\s*foo\s*\.\s*'bar\.baz'\s*\][\s\S]*?(?=\n\s*\[|$)/
+        );
+        assert(primaryBlockMatch, 'primary nested provider block should exist after ambiguous update');
+        assert(
+            primaryBlockMatch[0].includes('base_url = "https://primary-updated.example.com/v1"'),
+            'ambiguous update should target primary nested provider block url'
+        );
+        assert(
+            primaryBlockMatch[0].includes('preferred_auth_method = "sk-primary-updated"'),
+            'ambiguous update should target primary nested provider block key'
+        );
+        const alternateBlockMatch = configAfterAmbiguousUpdate.match(
+            /(?:^|\n)\s*\[\s*model_providers\s*\.\s*"foo\.bar"\s*\.\s*baz\s*\][\s\S]*?(?=\n\s*\[|$)/
+        );
+        assert(alternateBlockMatch, 'alternate nested provider block should exist after ambiguous update');
+        assert(
+            alternateBlockMatch[0].includes('base_url = "https://alt.example.com/v1"'),
+            'ambiguous update should not rewrite alternate nested provider block url'
+        );
+        assert(
+            alternateBlockMatch[0].includes('preferred_auth_method = "sk-alt"'),
+            'ambiguous update should not rewrite alternate nested provider block key'
+        );
+        const ambiguousDelete = await legacyApi('delete-provider', { name: 'foo.bar.baz' });
+        assert(ambiguousDelete.success === true, 'ambiguous nested provider delete should succeed');
+        const configAfterAmbiguousDelete = fs.readFileSync(legacyConfigPath, 'utf-8');
+        assert(
+            !/(?:^|\n)\s*\[\s*model_providers\s*\.\s*foo\s*\.\s*'bar\.baz'\s*\]/.test(configAfterAmbiguousDelete),
+            'ambiguous delete should remove primary nested provider block'
+        );
+        assert(
+            !/(?:^|\n)\s*\[\s*model_providers\s*\.\s*"foo\.bar"\s*\.\s*baz\s*\]/.test(configAfterAmbiguousDelete),
+            'ambiguous delete should remove alternate nested provider block to avoid reappearing providers'
+        );
+        const ambiguousListAfterDelete = await legacyApi('list');
+        assert(
+            !ambiguousListAfterDelete.providers.some((item) => item && item.name === 'foo.bar.baz'),
+            'ambiguous delete should not leave recoverable duplicate provider entries'
+        );
 
         const ipv6Config = [
             'model_provider = "foo"',
@@ -487,6 +1293,61 @@ module.exports = async function testConfig(ctx) {
     assert(exportProviderNew.payload, 'export-provider(e2e-api) missing payload');
     assert(exportProviderNew.payload.baseUrl === updatedUrl, 'export-provider(e2e-api) baseUrl mismatch');
     assert(exportProviderNew.payload.apiKey === 'sk-e2e-api-upd', 'export-provider(e2e-api) apiKey mismatch');
+
+    // quotedApiKey is the runtime value used for API update/export round-trip.
+    // configPath/configAfterQuotedUpdate validates the persisted TOML line where
+    // quotes/backslashes are escaped for TOML syntax.
+    const quotedApiKey = 'sk-e2e-"quoted"-\\\\path';
+    const updateProviderQuoted = await api('update-provider', { name: 'e2e-api', key: quotedApiKey });
+    assert(updateProviderQuoted.success === true, 'update-provider should handle quoted API key');
+    const exportProviderQuoted = await api('export-provider', { name: 'e2e-api' });
+    assert(exportProviderQuoted.payload, 'export-provider(e2e-api quoted) missing payload');
+    assert(exportProviderQuoted.payload.apiKey === quotedApiKey, 'quoted API key should round-trip');
+    assert(exportProviderQuoted.payload.baseUrl === updatedUrl, 'quoted API key update should not change provider baseUrl');
+    const configPath = path.join(tmpHome, '.codex', 'config.toml');
+    const configAfterQuotedUpdate = fs.readFileSync(configPath, 'utf-8');
+    const e2eApiBlockMatch = configAfterQuotedUpdate.match(
+        /(?:^|\n)\s*\[model_providers\.(?:"e2e-api"|'e2e-api'|e2e-api)\][\s\S]*?(?=\n\s*\[|$)/
+    );
+    assert(e2eApiBlockMatch, 'config.toml should contain e2e-api provider block after quoted update');
+    const e2eApiBlock = e2eApiBlockMatch[0];
+    const e2eApiBlockHeaderMatch = e2eApiBlock.match(
+        /\[\s*model_providers\.(?:"([^"]+)"|'([^']+)'|([^\]\s]+))\s*\]/
+    );
+    const e2eApiProviderKey = e2eApiBlockHeaderMatch
+        && (e2eApiBlockHeaderMatch[1] || e2eApiBlockHeaderMatch[2] || e2eApiBlockHeaderMatch[3]);
+    const parsedAfterQuotedUpdate = toml.parse(configAfterQuotedUpdate);
+    assert(
+        parsedAfterQuotedUpdate
+        && parsedAfterQuotedUpdate.model_providers
+        && e2eApiProviderKey
+        && parsedAfterQuotedUpdate.model_providers[e2eApiProviderKey]
+        && parsedAfterQuotedUpdate.model_providers[e2eApiProviderKey].preferred_auth_method === quotedApiKey,
+        'quoted API key rewrite should keep config.toml parseable and runtime value readable'
+    );
+    assert(
+        parsedAfterQuotedUpdate
+        && parsedAfterQuotedUpdate.model_providers
+        && e2eApiProviderKey
+        && parsedAfterQuotedUpdate.model_providers[e2eApiProviderKey]
+        && parsedAfterQuotedUpdate.model_providers[e2eApiProviderKey].base_url === updatedUrl,
+        'quoted API key update should preserve base_url in config.toml'
+    );
+    // Expected TOML fragment:
+    // preferred_auth_method = "sk-e2e-\\\"quoted\\\"-\\\\\\\\path"
+    assert(
+        e2eApiBlock.includes('preferred_auth_method = "sk-e2e-\\"quoted\\"-\\\\\\\\path"'),
+        'quoted API key should be escaped in config.toml'
+    );
+    const cliListAfterQuoted = runSync(node, [cliPath, 'list'], { env });
+    assert(
+        cliListAfterQuoted.status === 0,
+        `quoted API key should keep config parseable: ${cliListAfterQuoted.stderr || cliListAfterQuoted.stdout}`
+    );
+    assert(
+        cliListAfterQuoted.stdout.includes('e2e-api'),
+        'quoted API key should keep provider readable in fresh process'
+    );
 
     const statusAfterAdd = await api('status');
     assert(statusAfterAdd.provider === 'e2e2', 'add-provider should not change current provider');
