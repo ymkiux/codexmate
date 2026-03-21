@@ -418,6 +418,48 @@ module.exports = async function testConfig(ctx) {
         const commentDeleteSections = configAfterCommentDelete.match(providerSectionRegex) || [];
         assert(commentDeleteSections.length === 0, 'comment-marker delete should remove foo.bar section only');
 
+        const inlineCommentConfig = [
+            'model_provider = "foo.bar"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers."foo.bar"]',
+            'name = "foo.bar"',
+            'base_url = "https://api.example.com/v1" # keep-base-comment',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = "sk-old" # keep-key-comment',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.openai]',
+            'name = "openai"',
+            'base_url = "https://api.openai.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = ""',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, inlineCommentConfig, 'utf-8');
+        const updateWithInlineComment = await legacyApi('update-provider', {
+            name: 'foo.bar',
+            url: 'https://updated-inline.example.com/v1',
+            key: 'sk-inline-new'
+        });
+        assert(updateWithInlineComment.success === true, 'update-provider should keep inline comments');
+        const configAfterInlineCommentUpdate = fs.readFileSync(legacyConfigPath, 'utf-8');
+        assert(
+            configAfterInlineCommentUpdate.includes('base_url = "https://updated-inline.example.com/v1" # keep-base-comment'),
+            'update-provider should preserve base_url inline comment'
+        );
+        assert(
+            configAfterInlineCommentUpdate.includes('preferred_auth_method = "sk-inline-new" # keep-key-comment'),
+            'update-provider should preserve preferred_auth_method inline comment'
+        );
+
         const nestedMetadataConfig = [
             'model_provider = "foo"',
             'model = "gpt-5.3-codex"',
