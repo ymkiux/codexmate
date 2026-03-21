@@ -231,7 +231,8 @@ function readConfig() {
         const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
         const parsed = toml.parse(content);
         if (isPlainObject(parsed) && isPlainObject(parsed.model_providers)) {
-            parsed.model_providers = normalizeLegacyModelProviders(parsed.model_providers);
+            const providerHeaderSegmentKeySet = collectModelProviderHeaderSegmentKeySet(content);
+            parsed.model_providers = normalizeLegacyModelProviders(parsed.model_providers, providerHeaderSegmentKeySet);
         }
         return parsed;
     } catch (e) {
@@ -335,11 +336,51 @@ function collectNestedProviderConfigs(node, pathSegments, collector) {
     }
 }
 
-function setLegacySegmentsMetadata(provider, segments) {
-    if (!isPlainObject(provider) || !Array.isArray(segments) || segments.length === 0) return;
+function normalizeLegacySegments(segments) {
+    if (!Array.isArray(segments) || segments.length === 0) return null;
+    return segments.map((item) => String(item));
+}
+
+function buildLegacySegmentsKey(segments) {
+    const normalized = normalizeLegacySegments(segments);
+    return normalized ? JSON.stringify(normalized) : '';
+}
+
+function appendLegacySegmentsVariant(provider, segments) {
+    if (!isPlainObject(provider)) return;
+    const normalized = normalizeLegacySegments(segments);
+    if (!normalized) return;
+
+    const variants = [];
+    const seen = new Set();
+    const pushVariant = (candidate) => {
+        const key = buildLegacySegmentsKey(candidate);
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        variants.push(normalizeLegacySegments(candidate));
+    };
+
+    if (Array.isArray(provider.__codexmate_legacy_segments)) {
+        pushVariant(provider.__codexmate_legacy_segments);
+    }
+    if (Array.isArray(provider.__codexmate_legacy_segment_variants)) {
+        for (const candidate of provider.__codexmate_legacy_segment_variants) {
+            pushVariant(candidate);
+        }
+    }
+    pushVariant(normalized);
+
     try {
-        Object.defineProperty(provider, '__codexmate_legacy_segments', {
-            value: segments.map((item) => String(item)),
+        if (!Array.isArray(provider.__codexmate_legacy_segments)) {
+            Object.defineProperty(provider, '__codexmate_legacy_segments', {
+                value: normalized,
+                enumerable: false,
+                configurable: true,
+                writable: true
+            });
+        }
+        Object.defineProperty(provider, '__codexmate_legacy_segment_variants', {
+            value: variants,
             enumerable: false,
             configurable: true,
             writable: true
@@ -347,7 +388,11 @@ function setLegacySegmentsMetadata(provider, segments) {
     } catch (e) {}
 }
 
-function normalizeLegacyModelProviders(modelProviders) {
+function setLegacySegmentsMetadata(provider, segments) {
+    appendLegacySegmentsVariant(provider, segments);
+}
+
+function normalizeLegacyModelProviders(modelProviders, providerHeaderSegmentKeySet = null) {
     if (!isPlainObject(modelProviders)) {
         return modelProviders;
     }
@@ -359,6 +404,20 @@ function normalizeLegacyModelProviders(modelProviders) {
         const segments = entry && Array.isArray(entry.segments) ? entry.segments.slice() : null;
         const provider = entry ? entry.provider : null;
         if (!name || !isPlainObject(provider)) return;
+        const segmentKey = buildLegacySegmentsKey(segments);
+        if (providerHeaderSegmentKeySet instanceof Set && segmentKey && !providerHeaderSegmentKeySet.has(segmentKey)) {
+            return;
+        }
+        const existing = Object.prototype.hasOwnProperty.call(normalized, name)
+            ? normalized[name]
+            : (Object.prototype.hasOwnProperty.call(modelProviders, name) ? modelProviders[name] : null);
+        if (isPlainObject(existing)) {
+            if (!Array.isArray(existing.__codexmate_legacy_segments)) {
+                setLegacySegmentsMetadata(existing, [name]);
+            }
+            appendLegacySegmentsVariant(existing, segments);
+            return;
+        }
         if (Object.prototype.hasOwnProperty.call(modelProviders, name)) return;
         if (Object.prototype.hasOwnProperty.call(normalized, name)) return;
         setLegacySegmentsMetadata(provider, segments);
@@ -720,6 +779,30 @@ function findProviderDescendantSectionRanges(content, prefixSegments) {
         ranges.push({ start, end, priority: 0 });
     }
     return ranges;
+}
+
+function collectModelProviderHeaderSegmentKeySet(content) {
+    const text = typeof content === 'string' ? content : '';
+    const keys = new Set();
+    if (!text) return keys;
+
+    const multilineStringRanges = collectTomlMultilineStringRanges(text);
+    const sectionLineRegex = /^[ \t]*\[(?!\[)([^\]\n]+)\][ \t]*(?:#.*)?$/gm;
+    let match;
+    while ((match = sectionLineRegex.exec(text)) !== null) {
+        const start = match.index;
+        if (isIndexInRanges(start, multilineStringRanges)) {
+            continue;
+        }
+        const headerExpr = String(match[1] || '').trim();
+        const parsedSegments = parseTomlDottedKeyExpression(headerExpr);
+        if (!Array.isArray(parsedSegments) || parsedSegments.length < 2 || parsedSegments[0] !== 'model_providers') {
+            continue;
+        }
+        const key = buildLegacySegmentsKey(parsedSegments.slice(1));
+        if (key) keys.add(key);
+    }
+    return keys;
 }
 
 function normalizeAuthProfileName(value) {
@@ -2135,8 +2218,9 @@ function addProviderToConfig(params = {}) {
         return { error: `config.toml 解析失败: ${e.message}` };
     }
 
+    const providerHeaderSegmentKeySet = collectModelProviderHeaderSegmentKeySet(content);
     const normalizedProviders = isPlainObject(parsed.model_providers)
-        ? normalizeLegacyModelProviders(parsed.model_providers)
+        ? normalizeLegacyModelProviders(parsed.model_providers, providerHeaderSegmentKeySet)
         : {};
     if (normalizedProviders && normalizedProviders[name]) {
         return { error: '提供商已存在' };
@@ -2251,6 +2335,32 @@ function performProviderDeletion(name, options = {}) {
     const providerSegments = providerConfig && Array.isArray(providerConfig.__codexmate_legacy_segments)
         ? providerConfig.__codexmate_legacy_segments
         : null;
+    const providerSegmentVariants = (() => {
+        const variants = [];
+        const seen = new Set();
+        const pushVariant = (segments) => {
+            const normalized = normalizeLegacySegments(segments);
+            const key = buildLegacySegmentsKey(normalized);
+            if (!key || seen.has(key)) return;
+            seen.add(key);
+            variants.push(normalized);
+        };
+        if (providerConfig && Array.isArray(providerConfig.__codexmate_legacy_segments)) {
+            pushVariant(providerConfig.__codexmate_legacy_segments);
+        }
+        if (providerConfig && Array.isArray(providerConfig.__codexmate_legacy_segment_variants)) {
+            for (const segments of providerConfig.__codexmate_legacy_segment_variants) {
+                pushVariant(segments);
+            }
+        }
+        if (providerSegments) {
+            pushVariant(providerSegments);
+        }
+        if (variants.length === 0) {
+            pushVariant(String(name || '').split('.').filter((item) => item));
+        }
+        return variants;
+    })();
 
     const remainingProviders = Object.keys(config.model_providers || {}).filter(item => item !== name);
     if (remainingProviders.length === 0) {
@@ -2289,12 +2399,14 @@ function performProviderDeletion(name, options = {}) {
     };
 
     let updatedContent = null;
-    const ranges = findProviderSectionRanges(content, name, providerSegments);
-    const descendantPrefixSegments = Array.isArray(providerSegments) && providerSegments.length > 0
-        ? providerSegments
-        : String(name || '').split('.').filter((item) => item);
-    const descendantRanges = findProviderDescendantSectionRanges(content, descendantPrefixSegments);
-    const combinedRanges = [...ranges, ...descendantRanges];
+    const combinedRanges = [];
+    for (const segments of providerSegmentVariants) {
+        combinedRanges.push(...findProviderSectionRanges(content, name, segments));
+        combinedRanges.push(...findProviderDescendantSectionRanges(content, segments));
+    }
+    if (combinedRanges.length === 0) {
+        combinedRanges.push(...findProviderSectionRanges(content, name, providerSegments));
+    }
     if (combinedRanges.length > 0) {
         const sorted = combinedRanges.sort((a, b) => b.start - a.start || b.end - a.end);
         const seen = new Set();
@@ -5703,7 +5815,13 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
         newContent = newContent.slice(0, range.start) + updatedBlock + newContent.slice(range.end);
     }
 
-    writeConfig(newContent.trim());
+    const finalContent = newContent.trim();
+    try {
+        toml.parse(finalContent);
+    } catch (e) {
+        throw new Error(`更新后的 config.toml 无效: ${e.message}`);
+    }
+    writeConfig(finalContent);
 
     // 如果更新了 API Key 且该提供商是当前激活的，同步更新 auth.json
     const currentProvider = config.model_provider;
