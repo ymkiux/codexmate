@@ -550,6 +550,56 @@ module.exports = async function testConfig(ctx) {
             'multiline string update should keep provider readable in a fresh process'
         );
 
+        const multilineWithHeaderLikeLineConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = """sk-old',
+            '[model_providers.fake]',
+            'line-2""" # keep-fake-header-comment',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.openai]',
+            'name = "openai"',
+            'base_url = "https://api.openai.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = ""',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, multilineWithHeaderLikeLineConfig, 'utf-8');
+        const updateMultilineWithHeaderLikeLine = await legacyApi('update-provider', {
+            name: 'foo',
+            key: 'sk-multiline-header-updated'
+        });
+        assert(
+            updateMultilineWithHeaderLikeLine.success === true,
+            'update-provider should ignore header-like lines inside multiline strings when finding section ranges'
+        );
+        const configAfterMultilineWithHeaderLikeLineUpdate = fs.readFileSync(legacyConfigPath, 'utf-8');
+        assert(
+            configAfterMultilineWithHeaderLikeLineUpdate.includes('preferred_auth_method = "sk-multiline-header-updated" # keep-fake-header-comment'),
+            'multiline rewrite with header-like content should preserve inline comment'
+        );
+        const parsedAfterMultilineWithHeaderLikeLineUpdate = toml.parse(configAfterMultilineWithHeaderLikeLineUpdate);
+        assert(
+            parsedAfterMultilineWithHeaderLikeLineUpdate
+            && parsedAfterMultilineWithHeaderLikeLineUpdate.model_providers
+            && parsedAfterMultilineWithHeaderLikeLineUpdate.model_providers.foo
+            && parsedAfterMultilineWithHeaderLikeLineUpdate.model_providers.foo.preferred_auth_method === 'sk-multiline-header-updated',
+            'header-like lines inside multiline strings should not break update-provider parsing'
+        );
+
         const escapedTripleQuoteConfig = [
             'model_provider = "foo"',
             'model = "gpt-5.3-codex"',
@@ -895,6 +945,21 @@ module.exports = async function testConfig(ctx) {
             key: 'sk-primary-updated'
         });
         assert(ambiguousUpdate.success === true, 'ambiguous nested provider update should succeed');
+        const ambiguousListAfterUpdate = await legacyApi('list');
+        const ambiguousItemAfterUpdate = ambiguousListAfterUpdate.providers.find((item) => item && item.name === 'foo.bar.baz');
+        assert(
+            ambiguousItemAfterUpdate && ambiguousItemAfterUpdate.url === 'https://primary-updated.example.com/v1',
+            'ambiguous nested provider list should resolve to the same primary block that update-provider rewrites'
+        );
+        const ambiguousExportAfterUpdate = await legacyApi('export-provider', { name: 'foo.bar.baz' });
+        assert(
+            ambiguousExportAfterUpdate.payload && ambiguousExportAfterUpdate.payload.baseUrl === 'https://primary-updated.example.com/v1',
+            'ambiguous export-provider should resolve to the same primary block that update-provider rewrites'
+        );
+        assert(
+            ambiguousExportAfterUpdate.payload && ambiguousExportAfterUpdate.payload.apiKey === 'sk-primary-updated',
+            'ambiguous export-provider should return the updated key from the primary block'
+        );
         const configAfterAmbiguousUpdate = fs.readFileSync(legacyConfigPath, 'utf-8');
         const primaryBlockMatch = configAfterAmbiguousUpdate.match(
             /(?:^|\n)\s*\[\s*model_providers\s*\.\s*foo\s*\.\s*'bar\.baz'\s*\][\s\S]*?(?=\n\s*\[|$)/

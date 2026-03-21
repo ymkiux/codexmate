@@ -490,6 +490,114 @@ function parseTomlDottedKeyExpression(expression) {
     return segments.length > 0 ? segments : null;
 }
 
+function collectTomlMultilineStringRanges(text) {
+    const source = typeof text === 'string' ? text : '';
+    const ranges = [];
+    let i = 0;
+    let inMultilineBasic = false;
+    let inMultilineLiteral = false;
+    let rangeStart = -1;
+
+    while (i < source.length) {
+        if (inMultilineBasic) {
+            if (source.slice(i, i + 3) === '"""') {
+                let slashCount = 0;
+                for (let j = i - 1; j >= 0 && source[j] === '\\'; j--) {
+                    slashCount++;
+                }
+                if (slashCount % 2 === 0) {
+                    let runEnd = i + 3;
+                    while (runEnd < source.length && source[runEnd] === '"') runEnd++;
+                    ranges.push({ start: rangeStart, end: runEnd });
+                    inMultilineBasic = false;
+                    rangeStart = -1;
+                    i = runEnd;
+                    continue;
+                }
+            }
+            i++;
+            continue;
+        }
+
+        if (inMultilineLiteral) {
+            if (source.slice(i, i + 3) === "'''") {
+                let runEnd = i + 3;
+                while (runEnd < source.length && source[runEnd] === '\'') runEnd++;
+                ranges.push({ start: rangeStart, end: runEnd });
+                inMultilineLiteral = false;
+                rangeStart = -1;
+                i = runEnd;
+                continue;
+            }
+            i++;
+            continue;
+        }
+
+        const ch = source[i];
+        if (ch === '#') {
+            while (i < source.length && source[i] !== '\n') i++;
+            continue;
+        }
+
+        if (source.slice(i, i + 3) === '"""') {
+            inMultilineBasic = true;
+            rangeStart = i;
+            i += 3;
+            continue;
+        }
+
+        if (source.slice(i, i + 3) === "'''") {
+            inMultilineLiteral = true;
+            rangeStart = i;
+            i += 3;
+            continue;
+        }
+
+        if (ch === '"') {
+            i++;
+            while (i < source.length) {
+                if (source[i] === '\\') {
+                    i += 2;
+                    continue;
+                }
+                if (source[i] === '"' || source[i] === '\n') {
+                    i++;
+                    break;
+                }
+                i++;
+            }
+            continue;
+        }
+
+        if (ch === '\'') {
+            i++;
+            while (i < source.length) {
+                if (source[i] === '\'' || source[i] === '\n') {
+                    i++;
+                    break;
+                }
+                i++;
+            }
+            continue;
+        }
+
+        i++;
+    }
+
+    if (rangeStart >= 0) {
+        ranges.push({ start: rangeStart, end: source.length });
+    }
+    return ranges;
+}
+
+function isIndexInRanges(index, ranges) {
+    for (const range of ranges) {
+        if (index < range.start) return false;
+        if (index >= range.start && index < range.end) return true;
+    }
+    return false;
+}
+
 function findProviderSectionRanges(content, providerName, exactSegments = null) {
     const text = typeof content === 'string' ? content : '';
     const name = typeof providerName === 'string' ? providerName.trim() : '';
@@ -505,10 +613,14 @@ function findProviderSectionRanges(content, providerName, exactSegments = null) 
 
     const allHeaders = [];
     const targetPriorityByStart = new Map();
+    const multilineStringRanges = collectTomlMultilineStringRanges(text);
     const sectionLineRegex = /^[ \t]*\[(?!\[)([^\]\n]+)\][ \t]*(?:#.*)?$/gm;
     let match;
     while ((match = sectionLineRegex.exec(text)) !== null) {
         const start = match.index;
+        if (isIndexInRanges(start, multilineStringRanges)) {
+            continue;
+        }
         allHeaders.push(start);
         const headerExpr = String(match[1] || '').trim();
 
