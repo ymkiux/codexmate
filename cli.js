@@ -341,6 +341,18 @@ function collectNestedProviderConfigs(node, pathSegments, collector) {
     }
 }
 
+function setLegacySegmentsMetadata(provider, segments) {
+    if (!isPlainObject(provider) || !Array.isArray(segments) || segments.length === 0) return;
+    try {
+        Object.defineProperty(provider, '__codexmate_legacy_segments', {
+            value: segments.map((item) => String(item)),
+            enumerable: false,
+            configurable: true,
+            writable: true
+        });
+    } catch (e) {}
+}
+
 function normalizeLegacyModelProviders(modelProviders) {
     if (!isPlainObject(modelProviders)) {
         return modelProviders;
@@ -355,16 +367,7 @@ function normalizeLegacyModelProviders(modelProviders) {
         if (!name || !isPlainObject(provider)) return;
         if (Object.prototype.hasOwnProperty.call(modelProviders, name)) return;
         if (Object.prototype.hasOwnProperty.call(normalized, name)) return;
-        if (Array.isArray(segments) && segments.length > 0) {
-            try {
-                Object.defineProperty(provider, '__codexmate_legacy_segments', {
-                    value: segments,
-                    enumerable: false,
-                    configurable: true,
-                    writable: true
-                });
-            } catch (e) {}
-        }
+        setLegacySegmentsMetadata(provider, segments);
         normalized[name] = provider;
         changed = true;
     };
@@ -374,6 +377,7 @@ function normalizeLegacyModelProviders(modelProviders) {
         if (!isPlainObject(provider)) continue;
 
         if (looksLikeProviderConfig(provider)) {
+            setLegacySegmentsMetadata(provider, [name]);
             for (const [childKey, childValue] of Object.entries(provider)) {
                 if (!isPlainObject(childValue)) continue;
                 const recovered = [];
