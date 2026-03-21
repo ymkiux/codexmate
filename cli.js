@@ -565,7 +565,8 @@ function findProviderSectionRanges(content, providerName, exactSegments = null) 
             priority: targetPriorityByStart.get(start)
         });
     }
-    return ranges;
+    const exactMatches = ranges.filter((range) => range.priority === -3);
+    return exactMatches.length > 0 ? exactMatches : ranges;
 }
 
 function normalizeAuthProfileName(value) {
@@ -5420,13 +5421,16 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
             const prefixEnd = prefixStart + tripleStartMatch[1].length;
             const tripleQuote = tripleStartMatch[2];
             const valueStart = prefixEnd + tripleQuote.length;
-            const valueEnd = block.indexOf(tripleQuote, valueStart);
-            if (valueEnd === -1) {
+            const quoteRunRegex = tripleQuote[0] === '"' ? /"{3,}/ : /'{3,}/;
+            const quoteRunMatch = quoteRunRegex.exec(block.slice(valueStart));
+            if (!quoteRunMatch) {
                 throw new Error(`${fieldName} 使用了未闭合的多行 TOML 字符串，无法安全更新`);
             }
-            const lineEndIndex = block.indexOf('\n', valueEnd + tripleQuote.length);
+            const valueEnd = valueStart + quoteRunMatch.index;
+            const closingRunLength = quoteRunMatch[0].length;
+            const lineEndIndex = block.indexOf('\n', valueEnd + closingRunLength);
             const tailEnd = lineEndIndex === -1 ? block.length : lineEndIndex;
-            const tail = block.slice(valueEnd + tripleQuote.length, tailEnd);
+            const tail = block.slice(valueEnd + closingRunLength, tailEnd);
             const tailMatch = tail.match(/^(\s+#.*)?\s*$/);
             if (!tailMatch) {
                 throw new Error(`${fieldName} 多行字符串后的语法不受支持，无法安全更新`);
