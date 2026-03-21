@@ -389,25 +389,12 @@ module.exports = async function testConfig(ctx) {
         assert(legacyDeleteDual.success === true, 'dual-definition delete-provider should succeed');
         const configAfterDualDelete = fs.readFileSync(legacyConfigPath, 'utf-8');
         const remainingDualSections = configAfterDualDelete.match(providerSectionRegex) || [];
-        assert(remainingDualSections.length === 1, 'dual-definition delete-provider should remove the exact matched foo.bar section');
-        const remainingLegacyBlock = configAfterDualDelete.match(
-            /(?:^|\n)\s*\[model_providers\.foo\.bar\][\s\S]*?(?=\n\s*\[|$)/
-        )?.[0];
-        assert(remainingLegacyBlock, 'dual-definition first delete should leave the legacy foo.bar block');
-        assert(
-            !/(?:^|\n)\s*\[model_providers\."foo\.bar"\]/.test(configAfterDualDelete),
-            'dual-definition first delete should remove the quoted foo.bar block'
-        );
+        assert(remainingDualSections.length === 0, 'dual-definition delete-provider should remove all foo.bar section variants');
         const legacyListAfterDualDelete = await legacyApi('list');
         assert(
-            legacyListAfterDualDelete.providers.some((item) => item && item.name === 'foo.bar'),
-            'dual-definition delete-provider should keep remaining foo.bar section available'
+            !legacyListAfterDualDelete.providers.some((item) => item && item.name === 'foo.bar'),
+            'dual-definition delete-provider should not leave shadowed foo.bar providers reappearing'
         );
-        const legacyDeleteDualRemaining = await legacyApi('delete-provider', { name: 'foo.bar' });
-        assert(legacyDeleteDualRemaining.success === true, 'dual-definition second delete-provider should remove remaining section');
-        const configAfterDualDeleteAll = fs.readFileSync(legacyConfigPath, 'utf-8');
-        const finalDualSections = configAfterDualDeleteAll.match(providerSectionRegex) || [];
-        assert(finalDualSections.length === 0, 'dual-definition second delete-provider should remove all foo.bar sections');
         const legacyListAfterDualDeleteAll = await legacyApi('list');
         assert(
             !legacyListAfterDualDeleteAll.providers.some((item) => item && item.name === 'foo.bar'),
@@ -892,6 +879,48 @@ module.exports = async function testConfig(ctx) {
         });
         assert(nestedMetadataUpdate.error, 'nested metadata should not be updatable as a provider');
 
+        const inlineTableNestedConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = "sk-foo"',
+            'shadow = { name = "shadow", base_url = "https://inline-shadow.example.com/v1", wire_api = "responses", preferred_auth_method = "sk-shadow" }',
+            '',
+            '[model_providers.openai]',
+            'name = "openai"',
+            'base_url = "https://api.openai.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = ""',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, inlineTableNestedConfig, 'utf-8');
+        const inlineTableNestedList = await legacyApi('list');
+        assert(
+            inlineTableNestedList.providers.some((item) => item && item.name === 'foo'),
+            'inline table config should keep foo provider'
+        );
+        assert(
+            !inlineTableNestedList.providers.some((item) => item && item.name === 'foo.shadow'),
+            'inline table values should not be promoted to synthetic nested providers'
+        );
+        const inlineTableNestedExport = await legacyApi('export-provider', { name: 'foo.shadow' });
+        assert(inlineTableNestedExport.error, 'inline table synthetic provider should not be exportable');
+        const inlineTableNestedUpdate = await legacyApi('update-provider', {
+            name: 'foo.shadow',
+            url: 'https://should-not-write-inline-shadow.example.com/v1',
+            key: 'sk-should-not-write-inline-shadow'
+        });
+        assert(inlineTableNestedUpdate.error, 'inline table synthetic provider should not be updatable');
+
         const deleteWithMetadataChildConfig = [
             'model_provider = "foo"',
             'model = "gpt-5.3-codex"',
@@ -1156,6 +1185,22 @@ module.exports = async function testConfig(ctx) {
         assert(
             alternateBlockMatch[0].includes('preferred_auth_method = "sk-alt"'),
             'ambiguous update should not rewrite alternate nested provider block key'
+        );
+        const ambiguousDelete = await legacyApi('delete-provider', { name: 'foo.bar.baz' });
+        assert(ambiguousDelete.success === true, 'ambiguous nested provider delete should succeed');
+        const configAfterAmbiguousDelete = fs.readFileSync(legacyConfigPath, 'utf-8');
+        assert(
+            !/(?:^|\n)\s*\[\s*model_providers\s*\.\s*foo\s*\.\s*'bar\.baz'\s*\]/.test(configAfterAmbiguousDelete),
+            'ambiguous delete should remove primary nested provider block'
+        );
+        assert(
+            !/(?:^|\n)\s*\[\s*model_providers\s*\.\s*"foo\.bar"\s*\.\s*baz\s*\]/.test(configAfterAmbiguousDelete),
+            'ambiguous delete should remove alternate nested provider block to avoid reappearing providers'
+        );
+        const ambiguousListAfterDelete = await legacyApi('list');
+        assert(
+            !ambiguousListAfterDelete.providers.some((item) => item && item.name === 'foo.bar.baz'),
+            'ambiguous delete should not leave recoverable duplicate provider entries'
         );
 
         const ipv6Config = [
