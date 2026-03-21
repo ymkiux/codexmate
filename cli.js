@@ -5584,13 +5584,20 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
         if (!replaced) {
             const fallbackRegex = new RegExp(`^(\\s*${escapedFieldName}\\s*=\\s*)(.*?)(\\s+#.*)?$`, 'm');
             let fallbackReplaced = false;
-            next = next.replace(
-                fallbackRegex,
-                (_, prefix, __, suffix = '') => {
-                    fallbackReplaced = true;
-                    return `${prefix}"${safeValue}"${suffix}`;
+            const fallbackMatch = fallbackRegex.exec(next);
+            if (fallbackMatch) {
+                const existingValue = String(fallbackMatch[2] || '').trim();
+                const looksLikeMultilineArray = existingValue.startsWith('[') && !existingValue.endsWith(']');
+                const looksLikeMultilineInlineTable = existingValue.startsWith('{') && !existingValue.endsWith('}');
+                if (looksLikeMultilineArray || looksLikeMultilineInlineTable) {
+                    throw new Error(`${fieldName} 当前值是多行 TOML 结构，无法安全更新`);
                 }
-            );
+                const prefix = fallbackMatch[1];
+                const suffix = fallbackMatch[3] || '';
+                const replacement = `${prefix}"${safeValue}"${suffix}`;
+                next = `${next.slice(0, fallbackMatch.index)}${replacement}${next.slice(fallbackMatch.index + fallbackMatch[0].length)}`;
+                fallbackReplaced = true;
+            }
             if (!fallbackReplaced) {
                 const keyIndentMatch = block.match(/^(\s*)[A-Za-z0-9_.-]+\s*=/m);
                 const indent = keyIndentMatch ? keyIndentMatch[1] : '';

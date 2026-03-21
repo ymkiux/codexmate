@@ -794,6 +794,57 @@ module.exports = async function testConfig(ctx) {
             'appended preferred_auth_method should be readable via export-provider'
         );
 
+        const multilineStructuredFieldConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = [',
+            '  "sk-old",',
+            '  "sk-old-2"',
+            ']',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.openai]',
+            'name = "openai"',
+            'base_url = "https://api.openai.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = ""',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, multilineStructuredFieldConfig, 'utf-8');
+        const updateMultilineStructuredField = await legacyApi('update-provider', {
+            name: 'foo',
+            key: 'sk-should-not-write'
+        });
+        assert(
+            updateMultilineStructuredField.error,
+            'update-provider should reject multiline structured field values instead of partially rewriting them'
+        );
+        const configAfterMultilineStructuredFieldUpdate = fs.readFileSync(legacyConfigPath, 'utf-8');
+        assert(
+            configAfterMultilineStructuredFieldUpdate === multilineStructuredFieldConfig,
+            'failed multiline structured-field update should not mutate config.toml'
+        );
+        const parsedAfterMultilineStructuredFieldUpdate = toml.parse(configAfterMultilineStructuredFieldUpdate);
+        assert(
+            parsedAfterMultilineStructuredFieldUpdate
+            && parsedAfterMultilineStructuredFieldUpdate.model_providers
+            && parsedAfterMultilineStructuredFieldUpdate.model_providers.foo
+            && Array.isArray(parsedAfterMultilineStructuredFieldUpdate.model_providers.foo.preferred_auth_method),
+            'rejected multiline structured-field update should leave parseable original value'
+        );
+
         const nestedMetadataConfig = [
             'model_provider = "foo"',
             'model = "gpt-5.3-codex"',
