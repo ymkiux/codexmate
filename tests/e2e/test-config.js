@@ -475,6 +475,7 @@ module.exports = async function testConfig(ctx) {
             'stream_idle_timeout_ms = 300000',
             '',
             '[model_providers.foo.metadata]',
+            'name = "metadata"',
             'base_url = "https://metadata.example.com/v1"',
             'owner = "team-a"',
             ''

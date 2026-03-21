@@ -309,7 +309,6 @@ function isRecoverableNestedProviderConfig(value) {
     if (!isPlainObject(value)) return false;
     const hasBaseUrl = typeof value.base_url === 'string' && value.base_url.trim() !== '';
     if (!hasBaseUrl) return false;
-    const hasName = typeof value.name === 'string' && value.name.trim() !== '';
     const hasProviderSignals = [
         'wire_api',
         'requires_openai_auth',
@@ -318,7 +317,7 @@ function isRecoverableNestedProviderConfig(value) {
         'stream_max_retries',
         'stream_idle_timeout_ms'
     ].some((key) => Object.prototype.hasOwnProperty.call(value, key));
-    return hasName || hasProviderSignals;
+    return hasProviderSignals;
 }
 
 function collectNestedProviderConfigs(node, pathPrefix, collector) {
