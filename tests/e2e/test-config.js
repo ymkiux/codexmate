@@ -825,6 +825,62 @@ module.exports = async function testConfig(ctx) {
             'nested metadata should not be promoted to provider'
         );
 
+        const deepNestedRecoverableConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = "sk-foo"',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.foo.bar]',
+            'name = "foo.bar"',
+            'base_url = "https://bar.example.com/v1"',
+            'wire_api = "responses"',
+            'preferred_auth_method = "sk-bar"',
+            '',
+            '[model_providers.foo.bar.baz]',
+            'name = "foo.bar.baz"',
+            'base_url = "https://baz.example.com/v1"',
+            'wire_api = "responses"',
+            'preferred_auth_method = "sk-baz"',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, deepNestedRecoverableConfig, 'utf-8');
+        const deepNestedRecoverableList = await legacyApi('list');
+        assert(
+            deepNestedRecoverableList.providers.some((item) => item && item.name === 'foo.bar'),
+            'recoverable nested provider should keep first-level nested provider'
+        );
+        assert(
+            deepNestedRecoverableList.providers.some((item) => item && item.name === 'foo.bar.baz'),
+            'recoverable nested provider should keep deeper nested provider'
+        );
+        const deepNestedRecoverableUpdate = await legacyApi('update-provider', {
+            name: 'foo.bar.baz',
+            url: 'https://baz-updated.example.com/v1',
+            key: 'sk-baz-updated'
+        });
+        assert(
+            deepNestedRecoverableUpdate.success === true,
+            'deeper nested recoverable provider should support update-provider'
+        );
+        const deepNestedRecoverableExport = await legacyApi('export-provider', { name: 'foo.bar.baz' });
+        assert(
+            deepNestedRecoverableExport.payload && deepNestedRecoverableExport.payload.baseUrl === 'https://baz-updated.example.com/v1',
+            'deeper nested recoverable provider should update baseUrl'
+        );
+        assert(
+            deepNestedRecoverableExport.payload && deepNestedRecoverableExport.payload.apiKey === 'sk-baz-updated',
+            'deeper nested recoverable provider should update apiKey'
+        );
+
         const topLevelMetadataNamespaceConfig = [
             'model_provider = "foo"',
             'model = "gpt-5.3-codex"',
