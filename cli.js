@@ -54,6 +54,10 @@ const {
     resolveMaxMessagesValue
 } = require('./lib/cli-session-utils');
 const { createMcpStdioServer } = require('./lib/mcp-stdio');
+const {
+    validateWorkflowDefinition,
+    executeWorkflowDefinition
+} = require('./lib/workflow-engine');
 
 const DEFAULT_WEB_PORT = 3737;
 const DEFAULT_WEB_HOST = '127.0.0.1';
@@ -78,6 +82,8 @@ const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 const CLAUDE_SETTINGS_FILE = path.join(CLAUDE_DIR, 'settings.json');
 const CLAUDE_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
 const RECENT_CONFIGS_FILE = path.join(CONFIG_DIR, 'recent-configs.json');
+const WORKFLOW_DEFINITIONS_FILE = path.join(CONFIG_DIR, 'codexmate-workflows.json');
+const WORKFLOW_RUNS_FILE = path.join(CONFIG_DIR, 'codexmate-workflow-runs.jsonl');
 const DEFAULT_CLAUDE_MODEL = 'glm-4.7';
 const CODEX_BACKUP_NAME = 'codex-config';
 
@@ -6433,6 +6439,58 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                         case 'proxy-apply-provider':
                             result = applyBuiltinProxyProvider(params || {});
                             break;
+                        case 'workflow-list':
+                            result = listWorkflowDefinitions();
+                            break;
+                        case 'workflow-get':
+                            {
+                                const id = params && typeof params.id === 'string' ? params.id.trim() : '';
+                                if (!id) {
+                                    result = { error: 'workflow id is required' };
+                                } else {
+                                    result = getWorkflowDefinitionById(id);
+                                }
+                            }
+                            break;
+                        case 'workflow-validate':
+                            {
+                                const id = params && typeof params.id === 'string' ? params.id.trim() : '';
+                                if (!id) {
+                                    result = { ok: false, error: 'workflow id is required' };
+                                    break;
+                                }
+                                const input = params && params.input && typeof params.input === 'object' && !Array.isArray(params.input)
+                                    ? params.input
+                                    : {};
+                                result = validateWorkflowById(id, input);
+                            }
+                            break;
+                        case 'workflow-run':
+                            {
+                                const id = params && typeof params.id === 'string' ? params.id.trim() : '';
+                                if (!id) {
+                                    result = { error: 'workflow id is required' };
+                                    break;
+                                }
+                                const input = params && params.input && typeof params.input === 'object' && !Array.isArray(params.input)
+                                    ? params.input
+                                    : {};
+                                result = await runWorkflowById(id, input, {
+                                    allowWrite: !!(params && params.allowWrite),
+                                    dryRun: !!(params && params.dryRun)
+                                });
+                            }
+                            break;
+                        case 'workflow-runs':
+                            {
+                                const rawLimit = params && Number.isFinite(params.limit) ? params.limit : parseInt(params && params.limit, 10);
+                                const limit = Number.isFinite(rawLimit) ? Math.max(1, Math.floor(rawLimit)) : 20;
+                                result = {
+                                    runs: listWorkflowRunRecords(limit),
+                                    limit
+                                };
+                            }
+                            break;
                         default:
                             result = { error: '未知操作' };
                     }
@@ -6951,6 +7009,222 @@ async function cmdProxy(args = []) {
     throw new Error(`未知 proxy 子命令: ${subcommand}`);
 }
 
+function parseWorkflowInputArg(rawInput) {
+    const raw = typeof rawInput === 'string' ? rawInput.trim() : '';
+    if (!raw) {
+        return {};
+    }
+    let content = raw;
+    if (raw.startsWith('@')) {
+        const filePath = path.resolve(raw.slice(1));
+        if (!fs.existsSync(filePath)) {
+            throw new Error(`工作流输入文件不存在: ${filePath}`);
+        }
+        content = fs.readFileSync(filePath, 'utf-8');
+    }
+    let parsed;
+    try {
+        parsed = JSON.parse(content);
+    } catch (e) {
+        throw new Error(`工作流输入 JSON 解析失败: ${e.message}`);
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error('工作流输入必须是 JSON 对象');
+    }
+    return parsed;
+}
+
+function printWorkflowHelp() {
+    console.log('\n用法: codexmate workflow <list|get|validate|run|runs> [参数]');
+    console.log('  codexmate workflow list');
+    console.log('  codexmate workflow get diagnose-config');
+    console.log('  codexmate workflow validate safe-provider-switch --input \'{"provider":"e2e"}\'');
+    console.log('  codexmate workflow run diagnose-config --input \'{}\'');
+    console.log('  codexmate workflow run safe-provider-switch --input \'{"provider":"e2e","apply":true}\' --allow-write');
+    console.log('  codexmate workflow runs --limit 20');
+    console.log('参数:');
+    console.log('  --input <JSON|@file>  传入工作流输入');
+    console.log('  --allow-write         允许执行写入步骤');
+    console.log('  --dry-run             跳过写入步骤，仅预演');
+    console.log('  --limit <N>           读取最近执行记录数量（runs）');
+    console.log('  --json                以 JSON 输出');
+    console.log();
+}
+
+function parseWorkflowCliOptions(args = []) {
+    const options = {
+        inputRaw: '',
+        allowWrite: false,
+        dryRun: false,
+        limit: 20,
+        json: false
+    };
+    const rest = [];
+    for (let i = 0; i < args.length; i += 1) {
+        const arg = args[i];
+        if (arg === '--allow-write') {
+            options.allowWrite = true;
+            continue;
+        }
+        if (arg === '--dry-run') {
+            options.dryRun = true;
+            continue;
+        }
+        if (arg === '--json') {
+            options.json = true;
+            continue;
+        }
+        if (arg === '--input') {
+            options.inputRaw = args[i + 1] || '';
+            i += 1;
+            continue;
+        }
+        if (arg.startsWith('--input=')) {
+            options.inputRaw = arg.slice('--input='.length);
+            continue;
+        }
+        if (arg === '--limit') {
+            const raw = args[i + 1];
+            i += 1;
+            const value = parseInt(raw, 10);
+            if (Number.isFinite(value)) {
+                options.limit = value;
+            }
+            continue;
+        }
+        if (arg.startsWith('--limit=')) {
+            const value = parseInt(arg.slice('--limit='.length), 10);
+            if (Number.isFinite(value)) {
+                options.limit = value;
+            }
+            continue;
+        }
+        rest.push(arg);
+    }
+    return { options, rest };
+}
+
+async function cmdWorkflow(args = []) {
+    const argv = Array.isArray(args) ? args : [];
+    if (argv.length === 0 || argv.includes('--help') || argv.includes('-h')) {
+        printWorkflowHelp();
+        return;
+    }
+    const subcommand = String(argv[0] || '').trim().toLowerCase();
+    const parsed = parseWorkflowCliOptions(argv.slice(1));
+    const options = parsed.options;
+    const rest = parsed.rest;
+
+    if (subcommand === 'list') {
+        const result = listWorkflowDefinitions();
+        if (options.json) {
+            console.log(JSON.stringify(result, null, 2));
+            return;
+        }
+        const workflows = Array.isArray(result.workflows) ? result.workflows : [];
+        console.log('\n可用工作流:');
+        for (const item of workflows) {
+            const mode = item.readOnly ? 'read-only' : 'read-write';
+            console.log(`  - ${item.id} (${mode}, steps=${item.stepCount})`);
+            if (item.description) {
+                console.log(`    ${item.description}`);
+            }
+        }
+        if (Array.isArray(result.warnings) && result.warnings.length > 0) {
+            console.log('\n警告:');
+            result.warnings.forEach((msg) => console.log(`  - ${msg}`));
+        }
+        console.log();
+        return;
+    }
+
+    if (subcommand === 'runs') {
+        const limit = Number.isFinite(options.limit) ? Math.max(1, Math.floor(options.limit)) : 20;
+        const runs = listWorkflowRunRecords(limit);
+        if (options.json) {
+            console.log(JSON.stringify({ runs, limit }, null, 2));
+            return;
+        }
+        console.log(`\n最近执行记录（${runs.length}/${limit}）:`);
+        for (const item of runs) {
+            const status = item && item.success ? 'OK' : 'FAIL';
+            console.log(`  - [${status}] ${item.workflowId || '(unknown)'} runId=${item.runId || ''} duration=${item.durationMs || 0}ms`);
+            if (item && item.error) {
+                console.log(`    error: ${item.error}`);
+            }
+        }
+        console.log();
+        return;
+    }
+
+    const workflowId = typeof rest[0] === 'string' ? rest[0].trim() : '';
+    if (!workflowId) {
+        throw new Error('workflow id is required');
+    }
+    const input = parseWorkflowInputArg(options.inputRaw);
+
+    if (subcommand === 'get') {
+        const result = getWorkflowDefinitionById(workflowId);
+        if (result.error) {
+            throw new Error(result.error);
+        }
+        console.log(JSON.stringify(result, null, 2));
+        return;
+    }
+
+    if (subcommand === 'validate') {
+        const result = validateWorkflowById(workflowId, input);
+        if (!result.ok) {
+            throw new Error(result.error || 'workflow validate failed');
+        }
+        if (options.json) {
+            console.log(JSON.stringify(result, null, 2));
+        } else {
+            console.log(`✓ 工作流校验通过: ${workflowId}`);
+            if (Array.isArray(result.warnings) && result.warnings.length > 0) {
+                result.warnings.forEach((msg) => console.log(`  - ${msg}`));
+            }
+            console.log();
+        }
+        return;
+    }
+
+    if (subcommand === 'run') {
+        const result = await runWorkflowById(workflowId, input, {
+            allowWrite: options.allowWrite,
+            dryRun: options.dryRun
+        });
+        if (options.json) {
+            console.log(JSON.stringify(result, null, 2));
+        } else {
+            if (result.error) {
+                console.error(`✗ 工作流执行失败: ${result.error}`);
+            } else {
+                console.log(`✓ 工作流执行完成: ${workflowId} (${result.durationMs || 0}ms)`);
+            }
+            const steps = Array.isArray(result.steps) ? result.steps : [];
+            for (const step of steps) {
+                const status = step.status || 'unknown';
+                const label = step.id || step.tool || '(step)';
+                console.log(`  - ${label}: ${status} (${step.durationMs || 0}ms)`);
+                if (step.error) {
+                    console.log(`    error: ${step.error}`);
+                }
+            }
+            if (result.runId) {
+                console.log(`  runId: ${result.runId}`);
+            }
+            console.log();
+        }
+        if (result.error) {
+            throw new Error(result.error);
+        }
+        return;
+    }
+
+    throw new Error(`未知 workflow 子命令: ${subcommand}`);
+}
+
 async function runProxyCommand(displayName, binNames, args = [], installTip = '') {
     const extraArgs = Array.isArray(args) ? args.filter(arg => arg !== undefined) : [];
     const hasYolo = extraArgs.includes('--yolo');
@@ -7167,6 +7441,541 @@ function normalizeMcpSource(value) {
     return null;
 }
 
+const BUILTIN_WORKFLOW_DEFINITIONS = Object.freeze({
+    'diagnose-config': {
+        id: 'diagnose-config',
+        name: 'Diagnose Config',
+        description: 'Collect status/providers/proxy snapshots for troubleshooting.',
+        readOnly: true,
+        inputSchema: {
+            type: 'object',
+            properties: {},
+            additionalProperties: false
+        },
+        steps: [
+            { id: 'status', tool: 'codexmate.status.get', arguments: {} },
+            { id: 'providers', tool: 'codexmate.provider.list', arguments: {} },
+            { id: 'proxy', tool: 'codexmate.proxy.status', arguments: {} }
+        ]
+    },
+    'safe-provider-switch': {
+        id: 'safe-provider-switch',
+        name: 'Safe Provider Switch',
+        description: 'Build template for a provider switch and optionally apply it.',
+        readOnly: false,
+        inputSchema: {
+            type: 'object',
+            properties: {
+                provider: { type: 'string' },
+                model: { type: 'string' },
+                serviceTier: { type: 'string' },
+                reasoningEffort: { type: 'string' },
+                apply: { type: 'boolean' }
+            },
+            required: ['provider'],
+            additionalProperties: false
+        },
+        steps: [
+            { id: 'providers', tool: 'codexmate.provider.list', arguments: {} },
+            {
+                id: 'template',
+                tool: 'codexmate.config.template.get',
+                arguments: {
+                    provider: '{{input.provider}}',
+                    model: '{{input.model}}',
+                    serviceTier: '{{input.serviceTier}}',
+                    reasoningEffort: '{{input.reasoningEffort}}'
+                }
+            },
+            {
+                id: 'apply',
+                tool: 'codexmate.config.template.apply',
+                when: { path: 'input.apply', equals: true },
+                arguments: {
+                    template: '{{steps.template.output.template}}'
+                }
+            },
+            {
+                id: 'statusAfter',
+                tool: 'codexmate.status.get',
+                when: { path: 'input.apply', equals: true },
+                arguments: {}
+            }
+        ]
+    },
+    'session-issue-pack': {
+        id: 'session-issue-pack',
+        name: 'Session Issue Pack',
+        description: 'Collect session detail and markdown export for issue reports.',
+        readOnly: true,
+        inputSchema: {
+            type: 'object',
+            properties: {
+                source: { type: 'string' },
+                sessionId: { type: 'string' },
+                file: { type: 'string' },
+                maxMessages: { type: ['string', 'number'] }
+            },
+            additionalProperties: true
+        },
+        steps: [
+            {
+                id: 'detail',
+                tool: 'codexmate.session.detail',
+                arguments: {
+                    source: '{{input.source}}',
+                    sessionId: '{{input.sessionId}}',
+                    file: '{{input.file}}',
+                    maxMessages: '{{input.maxMessages}}'
+                }
+            },
+            {
+                id: 'export',
+                tool: 'codexmate.session.export',
+                arguments: {
+                    source: '{{input.source}}',
+                    sessionId: '{{input.sessionId}}',
+                    file: '{{input.file}}',
+                    maxMessages: '{{input.maxMessages}}'
+                }
+            }
+        ]
+    }
+});
+
+function cloneJson(value, fallback) {
+    try {
+        return JSON.parse(JSON.stringify(value));
+    } catch (_) {
+        return fallback;
+    }
+}
+
+function normalizeWorkflowId(value) {
+    const raw = typeof value === 'string' ? value.trim() : '';
+    if (!raw) return '';
+    if (!/^[a-zA-Z0-9._-]+$/.test(raw)) {
+        return '';
+    }
+    return raw.toLowerCase();
+}
+
+function normalizeWorkflowDefinition(raw, idHint = '', source = 'custom') {
+    const safe = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : null;
+    if (!safe) {
+        return { ok: false, error: 'workflow must be an object' };
+    }
+    const id = normalizeWorkflowId(safe.id || idHint);
+    if (!id) {
+        return { ok: false, error: 'workflow id is invalid' };
+    }
+    const name = typeof safe.name === 'string' && safe.name.trim()
+        ? safe.name.trim()
+        : id;
+    const description = typeof safe.description === 'string' ? safe.description.trim() : '';
+    const inputSchema = safe.inputSchema && typeof safe.inputSchema === 'object'
+        ? cloneJson(safe.inputSchema, { type: 'object', properties: {}, additionalProperties: true })
+        : { type: 'object', properties: {}, additionalProperties: true };
+    const stepsRaw = Array.isArray(safe.steps) ? safe.steps : [];
+    if (stepsRaw.length === 0) {
+        return { ok: false, error: 'workflow steps cannot be empty' };
+    }
+
+    const steps = [];
+    for (let i = 0; i < stepsRaw.length; i += 1) {
+        const item = stepsRaw[i];
+        if (!item || typeof item !== 'object' || Array.isArray(item)) {
+            return { ok: false, error: `workflow step #${i + 1} must be an object` };
+        }
+        const stepIdRaw = typeof item.id === 'string' && item.id.trim()
+            ? item.id.trim()
+            : `step${i + 1}`;
+        const stepId = normalizeWorkflowId(stepIdRaw);
+        if (!stepId) {
+            return { ok: false, error: `workflow step id invalid at #${i + 1}` };
+        }
+        const toolName = typeof item.tool === 'string' ? item.tool.trim() : '';
+        if (!toolName) {
+            return { ok: false, error: `workflow step "${stepId}" missing tool` };
+        }
+        const args = item.arguments && typeof item.arguments === 'object' && !Array.isArray(item.arguments)
+            ? cloneJson(item.arguments, {})
+            : {};
+        const when = item.when && typeof item.when === 'object' && !Array.isArray(item.when)
+            ? cloneJson(item.when, {})
+            : null;
+        steps.push({
+            id: stepId,
+            name: typeof item.name === 'string' ? item.name.trim() : '',
+            tool: toolName,
+            arguments: args,
+            when,
+            continueOnError: item.continueOnError === true,
+            write: item.write === true
+        });
+    }
+
+    return {
+        ok: true,
+        data: {
+            id,
+            name,
+            description,
+            source,
+            readOnly: safe.readOnly !== false,
+            inputSchema,
+            steps
+        }
+    };
+}
+
+function loadBuiltinWorkflowDefinitions() {
+    const items = [];
+    for (const [id, raw] of Object.entries(BUILTIN_WORKFLOW_DEFINITIONS)) {
+        const normalized = normalizeWorkflowDefinition(raw, id, 'builtin');
+        if (!normalized.ok) {
+            continue;
+        }
+        items.push(normalized.data);
+    }
+    return items;
+}
+
+function loadCustomWorkflowDefinitions() {
+    const parsed = readJsonObjectFromFile(WORKFLOW_DEFINITIONS_FILE, {});
+    if (!parsed.ok || !parsed.exists) {
+        return {
+            items: [],
+            warnings: parsed.ok ? [] : [parsed.error || 'workflow file parse failed']
+        };
+    }
+    const data = parsed.data && typeof parsed.data === 'object' ? parsed.data : {};
+    let list = [];
+    if (Array.isArray(data.workflows)) {
+        list = data.workflows;
+    } else if (data.workflows && typeof data.workflows === 'object') {
+        list = Object.entries(data.workflows).map(([id, item]) => ({ ...(item || {}), id }));
+    } else {
+        list = Object.entries(data).map(([id, item]) => ({ ...(item || {}), id }));
+    }
+
+    const items = [];
+    const warnings = [];
+    for (const item of list) {
+        const normalized = normalizeWorkflowDefinition(item, item && item.id ? item.id : '', 'custom');
+        if (!normalized.ok) {
+            warnings.push(normalized.error || 'invalid custom workflow');
+            continue;
+        }
+        items.push(normalized.data);
+    }
+    return { items, warnings };
+}
+
+function buildWorkflowRegistry() {
+    const registry = new Map();
+    const warnings = [];
+    const builtin = loadBuiltinWorkflowDefinitions();
+    for (const item of builtin) {
+        registry.set(item.id, item);
+    }
+    const custom = loadCustomWorkflowDefinitions();
+    for (const item of custom.items) {
+        if (registry.has(item.id)) {
+            warnings.push(`custom workflow id duplicated with builtin and ignored: ${item.id}`);
+            continue;
+        }
+        registry.set(item.id, item);
+    }
+    warnings.push(...custom.warnings);
+    return { registry, warnings };
+}
+
+function listWorkflowDefinitions() {
+    const { registry, warnings } = buildWorkflowRegistry();
+    const workflows = Array.from(registry.values())
+        .sort((a, b) => a.id.localeCompare(b.id))
+        .map((item) => ({
+            id: item.id,
+            name: item.name,
+            description: item.description,
+            source: item.source,
+            readOnly: item.readOnly !== false,
+            stepCount: Array.isArray(item.steps) ? item.steps.length : 0
+        }));
+    return {
+        workflows,
+        warnings
+    };
+}
+
+function getWorkflowDefinitionById(rawId) {
+    const id = normalizeWorkflowId(rawId);
+    if (!id) {
+        return { error: 'workflow id is required' };
+    }
+    const { registry, warnings } = buildWorkflowRegistry();
+    const workflow = registry.get(id);
+    if (!workflow) {
+        return { error: `workflow not found: ${id}` };
+    }
+    return {
+        workflow: cloneJson(workflow, {}),
+        warnings
+    };
+}
+
+function createWorkflowToolCatalog() {
+    return {
+        'codexmate.status.get': {
+            readOnly: true,
+            handler: async () => buildMcpStatusPayload()
+        },
+        'codexmate.provider.list': {
+            readOnly: true,
+            handler: async () => buildMcpProviderListPayload()
+        },
+        'codexmate.proxy.status': {
+            readOnly: true,
+            handler: async () => getBuiltinProxyStatus()
+        },
+        'codexmate.session.list': {
+            readOnly: true,
+            handler: async (args = {}) => {
+                const source = normalizeMcpSource(args.source);
+                if (source === null) {
+                    return { error: 'Invalid source. Must be codex, claude, or all' };
+                }
+                return {
+                    source: source || 'all',
+                    sessions: listAllSessions({
+                        ...args,
+                        source: source || 'all'
+                    })
+                };
+            }
+        },
+        'codexmate.session.detail': {
+            readOnly: true,
+            handler: async (args = {}) => readSessionDetail(args || {})
+        },
+        'codexmate.session.export': {
+            readOnly: true,
+            handler: async (args = {}) => exportSessionData(args || {})
+        },
+        'codexmate.config.template.get': {
+            readOnly: true,
+            handler: async (args = {}) => getConfigTemplate(args || {})
+        },
+        'codexmate.config.template.apply': {
+            readOnly: false,
+            handler: async (args = {}) => applyConfigTemplate(args || {})
+        }
+    };
+}
+
+function getWorkflowKnownToolsSet() {
+    return new Set(Object.keys(createWorkflowToolCatalog()));
+}
+
+function resolveWorkflowDefinitionWithToolMeta(workflow) {
+    const catalog = createWorkflowToolCatalog();
+    const safe = cloneJson(workflow, {});
+    safe.steps = (Array.isArray(safe.steps) ? safe.steps : []).map((step) => {
+        const tool = catalog[step.tool];
+        return {
+            ...step,
+            write: step.write === true || !!(tool && tool.readOnly === false)
+        };
+    });
+    return safe;
+}
+
+function validateWorkflowInputBySchema(inputSchema, input) {
+    const schema = inputSchema && typeof inputSchema === 'object' ? inputSchema : {};
+    if (schema.type && schema.type !== 'object') {
+        return { ok: false, error: `unsupported input schema type: ${schema.type}` };
+    }
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+        return { ok: false, error: 'workflow input must be an object' };
+    }
+    const required = Array.isArray(schema.required) ? schema.required : [];
+    for (const key of required) {
+        if (!Object.prototype.hasOwnProperty.call(input, key)) {
+            return { ok: false, error: `missing required input field: ${key}` };
+        }
+    }
+    const properties = schema.properties && typeof schema.properties === 'object' ? schema.properties : {};
+    for (const [key, expected] of Object.entries(properties)) {
+        if (!Object.prototype.hasOwnProperty.call(input, key)) continue;
+        const value = input[key];
+        if (!expected || typeof expected !== 'object') continue;
+        const type = expected.type;
+        if (!type) continue;
+        const typeList = Array.isArray(type) ? type : [type];
+        const actualType = value === null ? 'null' : (Array.isArray(value) ? 'array' : typeof value);
+        const matched = typeList.some((candidate) => {
+            if (candidate === 'number') return typeof value === 'number' && Number.isFinite(value);
+            if (candidate === 'integer') return Number.isInteger(value);
+            if (candidate === 'array') return Array.isArray(value);
+            if (candidate === 'object') return value && typeof value === 'object' && !Array.isArray(value);
+            if (candidate === 'null') return value === null;
+            return actualType === candidate;
+        });
+        if (!matched) {
+            return { ok: false, error: `input field "${key}" type mismatch` };
+        }
+    }
+    return { ok: true };
+}
+
+function appendWorkflowRunRecord(record) {
+    ensureDir(path.dirname(WORKFLOW_RUNS_FILE));
+    const content = `${JSON.stringify(record)}\n`;
+    fs.appendFileSync(WORKFLOW_RUNS_FILE, content, { encoding: 'utf-8', mode: 0o600 });
+}
+
+function listWorkflowRunRecords(limit = 20) {
+    const max = Number.isFinite(limit) ? Math.max(1, Math.floor(limit)) : 20;
+    if (!fs.existsSync(WORKFLOW_RUNS_FILE)) {
+        return [];
+    }
+    let content = '';
+    try {
+        content = fs.readFileSync(WORKFLOW_RUNS_FILE, 'utf-8');
+    } catch (_) {
+        return [];
+    }
+    const rows = content
+        .split(/\r?\n/g)
+        .map((line) => line.trim())
+        .filter(Boolean);
+    const parsed = [];
+    for (let i = rows.length - 1; i >= 0; i -= 1) {
+        try {
+            const item = JSON.parse(rows[i]);
+            parsed.push(item);
+            if (parsed.length >= max) {
+                break;
+            }
+        } catch (_) {}
+    }
+    return parsed;
+}
+
+function validateWorkflowById(workflowId, input = {}) {
+    const definitionResult = getWorkflowDefinitionById(workflowId);
+    if (definitionResult.error) {
+        return { ok: false, error: definitionResult.error };
+    }
+    const workflow = resolveWorkflowDefinitionWithToolMeta(definitionResult.workflow);
+    const knownTools = getWorkflowKnownToolsSet();
+    const validation = validateWorkflowDefinition(workflow, { knownTools });
+    if (!validation.ok) {
+        return {
+            ok: false,
+            error: validation.error || 'workflow validation failed',
+            issues: validation.issues || []
+        };
+    }
+    const schemaValidation = validateWorkflowInputBySchema(workflow.inputSchema, input || {});
+    if (!schemaValidation.ok) {
+        return { ok: false, error: schemaValidation.error || 'workflow input validation failed' };
+    }
+    return {
+        ok: true,
+        workflow: {
+            id: workflow.id,
+            name: workflow.name,
+            readOnly: workflow.readOnly !== false,
+            stepCount: Array.isArray(workflow.steps) ? workflow.steps.length : 0
+        },
+        warnings: definitionResult.warnings || []
+    };
+}
+
+async function runWorkflowById(workflowId, input = {}, options = {}) {
+    const definitionResult = getWorkflowDefinitionById(workflowId);
+    if (definitionResult.error) {
+        return { error: definitionResult.error };
+    }
+    const workflow = resolveWorkflowDefinitionWithToolMeta(definitionResult.workflow);
+    const knownTools = getWorkflowKnownToolsSet();
+    const validation = validateWorkflowDefinition(workflow, { knownTools });
+    if (!validation.ok) {
+        return {
+            error: validation.error || 'workflow validation failed',
+            issues: validation.issues || []
+        };
+    }
+    const schemaValidation = validateWorkflowInputBySchema(workflow.inputSchema, input || {});
+    if (!schemaValidation.ok) {
+        return { error: schemaValidation.error || 'workflow input validation failed' };
+    }
+
+    const catalog = createWorkflowToolCatalog();
+    const allowWrite = options.allowWrite === true;
+    const dryRun = options.dryRun === true;
+    const runId = `wf-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+    const startedAt = toIsoTime(Date.now());
+
+    const execution = await executeWorkflowDefinition(workflow, input || {}, {
+        allowWrite,
+        dryRun,
+        invokeTool: async (toolName, args = {}) => {
+            const tool = catalog[toolName];
+            if (!tool) {
+                return { error: `workflow tool not supported: ${toolName}` };
+            }
+            if (!tool.readOnly && !allowWrite) {
+                return { error: `workflow requires write permission for tool: ${toolName}` };
+            }
+            return tool.handler(args || {});
+        }
+    });
+
+    const endedAt = toIsoTime(Date.now());
+    const record = {
+        runId,
+        workflowId: workflow.id,
+        workflowName: workflow.name,
+        success: execution.success === true,
+        error: execution.error || '',
+        allowWrite,
+        dryRun,
+        startedAt,
+        endedAt,
+        durationMs: execution.durationMs || 0,
+        steps: Array.isArray(execution.steps) ? execution.steps.map((step) => ({
+            id: step.id,
+            tool: step.tool,
+            status: step.status,
+            durationMs: step.durationMs || 0,
+            error: step.error || ''
+        })) : [],
+        input: cloneJson(input || {}, {})
+    };
+    try {
+        appendWorkflowRunRecord(record);
+    } catch (_) {}
+
+    return {
+        success: execution.success === true,
+        runId,
+        workflowId: workflow.id,
+        workflowName: workflow.name,
+        allowWrite,
+        dryRun,
+        startedAt: execution.startedAt || startedAt,
+        endedAt: execution.endedAt || endedAt,
+        durationMs: execution.durationMs || 0,
+        steps: execution.steps || [],
+        output: execution.output || null,
+        warnings: definitionResult.warnings || [],
+        ...(execution.error ? { error: execution.error } : {})
+    };
+}
+
 function createMcpTools(options = {}) {
     const allowWrite = !!options.allowWrite;
     const tools = [];
@@ -7360,6 +8169,89 @@ function createMcpTools(options = {}) {
         readOnly: true,
         inputSchema: { type: 'object', properties: {}, additionalProperties: false },
         handler: async () => getBuiltinProxyStatus()
+    });
+
+    pushTool({
+        name: 'codexmate.workflow.list',
+        description: 'List available workflows (builtin + custom).',
+        readOnly: true,
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        handler: async () => listWorkflowDefinitions()
+    });
+
+    pushTool({
+        name: 'codexmate.workflow.get',
+        description: 'Get one workflow definition by id.',
+        readOnly: true,
+        inputSchema: {
+            type: 'object',
+            properties: {
+                id: { type: 'string' }
+            },
+            required: ['id'],
+            additionalProperties: false
+        },
+        handler: async (args = {}) => {
+            const id = typeof args.id === 'string' ? args.id.trim() : '';
+            if (!id) {
+                return { error: 'workflow id is required' };
+            }
+            return getWorkflowDefinitionById(id);
+        }
+    });
+
+    pushTool({
+        name: 'codexmate.workflow.validate',
+        description: 'Validate workflow definition and input payload.',
+        readOnly: true,
+        inputSchema: {
+            type: 'object',
+            properties: {
+                id: { type: 'string' },
+                input: { type: 'object' }
+            },
+            required: ['id'],
+            additionalProperties: false
+        },
+        handler: async (args = {}) => {
+            const id = typeof args.id === 'string' ? args.id.trim() : '';
+            if (!id) {
+                return { ok: false, error: 'workflow id is required' };
+            }
+            const input = args.input && typeof args.input === 'object' && !Array.isArray(args.input)
+                ? args.input
+                : {};
+            return validateWorkflowById(id, input);
+        }
+    });
+
+    pushTool({
+        name: 'codexmate.workflow.run',
+        description: 'Run workflow by id. Write steps require allow-write mode.',
+        readOnly: true,
+        inputSchema: {
+            type: 'object',
+            properties: {
+                id: { type: 'string' },
+                input: { type: 'object' },
+                dryRun: { type: 'boolean' }
+            },
+            required: ['id'],
+            additionalProperties: false
+        },
+        handler: async (args = {}) => {
+            const id = typeof args.id === 'string' ? args.id.trim() : '';
+            if (!id) {
+                return { error: 'workflow id is required' };
+            }
+            const input = args.input && typeof args.input === 'object' && !Array.isArray(args.input)
+                ? args.input
+                : {};
+            return runWorkflowById(id, input, {
+                allowWrite,
+                dryRun: args.dryRun === true
+            });
+        }
     });
 
     pushTool({
@@ -7636,6 +8528,50 @@ function createMcpResources() {
                     }]
                 };
             }
+        },
+        {
+            uri: 'codexmate://workflows',
+            name: 'Workflows',
+            description: 'Workflow list resource (builtin + custom).',
+            mimeType: 'application/json',
+            read: async () => ({
+                contents: [{
+                    uri: 'codexmate://workflows',
+                    mimeType: 'application/json',
+                    text: JSON.stringify(listWorkflowDefinitions(), null, 2)
+                }]
+            })
+        },
+        {
+            uri: 'codexmate://workflow-runs',
+            name: 'WorkflowRuns',
+            description: 'Recent workflow execution records. Supports ?limit=<N>.',
+            mimeType: 'application/json',
+            read: async (params = {}) => {
+                const uri = typeof params.uri === 'string' ? params.uri : 'codexmate://workflow-runs';
+                let limit = 20;
+                try {
+                    const parsed = new URL(uri);
+                    const rawLimit = parsed.searchParams.get('limit');
+                    if (rawLimit) {
+                        const parsedLimit = parseInt(rawLimit, 10);
+                        if (Number.isFinite(parsedLimit)) {
+                            limit = parsedLimit;
+                        }
+                    }
+                } catch (_) {}
+                const payload = {
+                    runs: listWorkflowRunRecords(limit),
+                    limit: Number.isFinite(limit) ? Math.max(1, Math.floor(limit)) : 20
+                };
+                return {
+                    contents: [{
+                        uri,
+                        mimeType: 'application/json',
+                        text: JSON.stringify(payload, null, 2)
+                    }]
+                };
+            }
         }
     ];
 }
@@ -7820,6 +8756,7 @@ async function main() {
         console.log('  codexmate delete-model <模型> 删除模型');
         console.log('  codexmate auth <list|import|switch|delete|status>  认证文件管理');
         console.log('  codexmate proxy <status|set|apply|enable|start|stop>  内建代理');
+        console.log('  codexmate workflow <list|get|validate|run|runs>  MCP 工作流中心');
         console.log('  codexmate run [--host <HOST>]    启动 Web 界面');
         console.log('  codexmate codex [参数...]  等同于 codex --yolo');
         console.log('  codexmate qwen [参数...]   等同于 qwen --yolo');
@@ -7846,6 +8783,7 @@ async function main() {
         case 'delete-model': cmdDeleteModel(args[1]); break;
         case 'auth': cmdAuth(args.slice(1)); break;
         case 'proxy': await cmdProxy(args.slice(1)); break;
+        case 'workflow': await cmdWorkflow(args.slice(1)); break;
         case 'run': cmdStart(parseStartOptions(args.slice(1))); break;
         case 'start':
             console.error('错误: 命令已更名为 "run"，请使用: codexmate run');
