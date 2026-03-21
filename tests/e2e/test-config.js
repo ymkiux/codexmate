@@ -1,8 +1,12 @@
-const { assert } = require('./helpers');
+const { spawn } = require('child_process');
+const { assert, runSync, fs, path, os, waitForServer, postJson } = require('./helpers');
 
 module.exports = async function testConfig(ctx) {
     const {
         api,
+        env,
+        node,
+        cliPath,
         mockProviderUrl,
         noModelsUrl,
         htmlModelsUrl,
@@ -246,6 +250,228 @@ module.exports = async function testConfig(ctx) {
 
     const addProviderLocal = await api('add-provider', { name: 'LOCAL', url: mockProviderUrl });
     assert(addProviderLocal.error, 'add-provider should reject reserved local name');
+
+    const addProviderInvalidName = await api('add-provider', { name: 'bad name', url: mockProviderUrl });
+    assert(addProviderInvalidName.error, 'add-provider should reject invalid provider name');
+    const apiListAfterInvalidName = await api('list');
+    assert(
+        !apiListAfterInvalidName.providers.some((item) => item && item.name === 'bad name'),
+        'add-provider invalid name should not pollute provider list'
+    );
+    const apiStatusAfterInvalidName = await api('status');
+    assert(apiStatusAfterInvalidName.provider, 'status should remain readable after invalid add-provider');
+
+    const dottedProviderName = 'e2e.dot';
+    const cliAddDotted = runSync(node, [cliPath, 'add', dottedProviderName, mockProviderUrl, 'sk-e2e-dot'], { env });
+    assert(cliAddDotted.status === 0, `cli add dotted provider failed: ${cliAddDotted.stderr || cliAddDotted.stdout}`);
+    const cliListAfterDotAdd = runSync(node, [cliPath, 'list'], { env });
+    assert(cliListAfterDotAdd.status === 0, 'cli list failed after adding dotted provider');
+    assert(cliListAfterDotAdd.stdout.includes(dottedProviderName), 'dotted provider should be listed with original name');
+    const dottedUpdatedUrl = `${mockProviderUrl}/dot-v2`;
+    const updateDottedProvider = await api('update-provider', { name: dottedProviderName, url: dottedUpdatedUrl, key: 'sk-e2e-dot-upd' });
+    assert(updateDottedProvider.success === true, 'update-provider should support dotted provider name');
+    const apiListAfterDottedUpdate = await api('list');
+    const dottedUpdatedItem = apiListAfterDottedUpdate.providers.find((item) => item.name === dottedProviderName);
+    assert(dottedUpdatedItem && dottedUpdatedItem.url === dottedUpdatedUrl, 'dotted provider update should change url');
+    const cliSwitchDotted = runSync(node, [cliPath, 'switch', dottedProviderName], { env });
+    assert(cliSwitchDotted.status === 0, `cli switch dotted provider failed: ${cliSwitchDotted.stderr || cliSwitchDotted.stdout}`);
+    const cliSwitchBack = runSync(node, [cliPath, 'switch', 'e2e2'], { env });
+    assert(cliSwitchBack.status === 0, `cli switch back failed: ${cliSwitchBack.stderr || cliSwitchBack.stdout}`);
+    const deleteDottedProvider = await api('delete-provider', { name: dottedProviderName });
+    assert(deleteDottedProvider.success === true, 'delete-provider should remove dotted provider');
+
+    const legacyHome = fs.mkdtempSync(path.join(os.tmpdir(), 'codexmate-legacy-dot-'));
+    const legacyEnv = {
+        ...env,
+        HOME: legacyHome,
+        USERPROFILE: legacyHome,
+        CODEXMATE_FORCE_RESET_EXISTING_CONFIG: '0'
+    };
+    const legacyCodexDir = path.join(legacyHome, '.codex');
+    fs.mkdirSync(legacyCodexDir, { recursive: true });
+    const legacyConfig = [
+        'model_provider = "openai"',
+        'model = "gpt-5.3-codex"',
+        '',
+        '[model_providers.openai]',
+        'name = "openai"',
+        'base_url = "https://api.openai.com/v1"',
+        'wire_api = "responses"',
+        'requires_openai_auth = false',
+        'preferred_auth_method = ""',
+        'request_max_retries = 4',
+        'stream_max_retries = 10',
+        'stream_idle_timeout_ms = 300000',
+        '',
+        '[model_providers.foo.bar]',
+        'name = "foo.bar"',
+        'base_url = "https://api.example.com/v1"',
+        'wire_api = "responses"',
+        'requires_openai_auth = false',
+        'preferred_auth_method = "sk-legacy"',
+        'request_max_retries = 4',
+        'stream_max_retries = 10',
+        'stream_idle_timeout_ms = 300000',
+        ''
+    ].join('\n');
+    fs.writeFileSync(path.join(legacyCodexDir, 'config.toml'), legacyConfig, 'utf-8');
+
+    const legacyList = runSync(node, [cliPath, 'list'], { env: legacyEnv });
+    assert(legacyList.status === 0, `legacy list failed: ${legacyList.stderr || legacyList.stdout}`);
+    assert(legacyList.stdout.includes('foo.bar'), 'legacy dotted provider should be recovered in list');
+    const legacySwitch = runSync(node, [cliPath, 'switch', 'foo.bar'], { env: legacyEnv });
+    assert(legacySwitch.status === 0, `legacy dotted provider switch failed: ${legacySwitch.stderr || legacySwitch.stdout}`);
+
+    const legacyPort = 29000 + Math.floor(Math.random() * 1000);
+    const legacyConfigPath = path.join(legacyCodexDir, 'config.toml');
+    let legacyServer = null;
+    try {
+        legacyServer = spawn(node, [cliPath, 'run'], {
+            env: { ...legacyEnv, CODEXMATE_PORT: String(legacyPort) },
+            stdio: ['ignore', 'pipe', 'pipe']
+        });
+        legacyServer.stdout.on('data', () => {});
+        legacyServer.stderr.on('data', () => {});
+        await waitForServer(legacyPort);
+
+        const legacyApi = (action, params) => postJson(legacyPort, { action, params }, 2000);
+        const legacyAddDup = await legacyApi('add-provider', {
+            name: 'foo.bar',
+            url: 'https://dup.example.com/v1',
+            key: 'sk-dup'
+        });
+        assert(legacyAddDup.error, 'legacy duplicate add-provider should be rejected');
+        const legacyConfigAfterDup = fs.readFileSync(legacyConfigPath, 'utf-8');
+        const providerSectionRegex = /^[ \t]*\[\s*model_providers\s*\.\s*(?:"foo\.bar"|'foo\.bar'|foo\.bar)\s*\][ \t]*(?:#.*)?$/gm;
+        const legacyDupSections = legacyConfigAfterDup.match(providerSectionRegex) || [];
+        assert(legacyDupSections.length === 1, 'legacy duplicate add-provider should not create extra foo.bar sections');
+
+        const dualSection = [
+            '',
+            '[model_providers."foo.bar"]',
+            'name = "foo.bar"',
+            'base_url = "https://quoted.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = "sk-quoted"',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            ''
+        ].join('\n');
+        fs.appendFileSync(legacyConfigPath, dualSection, 'utf-8');
+
+        const legacyUpdateDual = await legacyApi('update-provider', {
+            name: 'foo.bar',
+            url: 'https://updated.example.com/v1',
+            key: 'sk-updated'
+        });
+        assert(legacyUpdateDual.success === true, 'dual-definition update-provider should succeed');
+        const configAfterDualUpdate = fs.readFileSync(legacyConfigPath, 'utf-8');
+        assert(!configAfterDualUpdate.includes('https://api.example.com/v1'), 'dual-definition update should sync legacy section url');
+        assert(!configAfterDualUpdate.includes('https://quoted.example.com/v1'), 'dual-definition update should sync quoted section url');
+
+        const legacyDeleteDual = await legacyApi('delete-provider', { name: 'foo.bar' });
+        assert(legacyDeleteDual.success === true, 'dual-definition delete-provider should succeed');
+        const configAfterDualDelete = fs.readFileSync(legacyConfigPath, 'utf-8');
+        const remainingDualSections = configAfterDualDelete.match(providerSectionRegex) || [];
+        assert(remainingDualSections.length === 0, 'dual-definition delete-provider should remove all foo.bar sections');
+        const legacyListAfterDualDelete = await legacyApi('list');
+        assert(
+            !legacyListAfterDualDelete.providers.some((item) => item && item.name === 'foo.bar'),
+            'dual-definition delete-provider should remove foo.bar from provider list'
+        );
+
+        const commentMarkerConfig = [
+            '# [model_providers."foo.bar"] comment marker only',
+            'model_provider = "openai"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.openai]',
+            'name = "openai"',
+            'base_url = "https://api.openai.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = ""',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers."foo.bar"]',
+            'name = "foo.bar"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = "sk-comment"',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, commentMarkerConfig, 'utf-8');
+        const deleteWithCommentMarker = await legacyApi('delete-provider', { name: 'foo.bar' });
+        assert(deleteWithCommentMarker.success === true, 'delete-provider should ignore comment markers');
+        const configAfterCommentDelete = fs.readFileSync(legacyConfigPath, 'utf-8');
+        assert(configAfterCommentDelete.includes('model_provider = "openai"'), 'comment-marker delete should keep model_provider line');
+        assert(configAfterCommentDelete.includes('[model_providers.openai]'), 'comment-marker delete should keep openai section');
+        const commentDeleteSections = configAfterCommentDelete.match(providerSectionRegex) || [];
+        assert(commentDeleteSections.length === 0, 'comment-marker delete should remove foo.bar section only');
+
+        const ipv6Config = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://[2001:db8::1]/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = "sk-ipv6"',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.openai]',
+            'name = "openai"',
+            'base_url = "https://api.openai.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = ""',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, ipv6Config, 'utf-8');
+        const ipv6Update = await legacyApi('update-provider', {
+            name: 'foo',
+            url: 'https://api2.example.com/v1',
+            key: 'sk-ipv6-updated'
+        });
+        assert(ipv6Update.success === true, 'ipv6 update-provider should succeed');
+        const configAfterIpv6Update = fs.readFileSync(legacyConfigPath, 'utf-8');
+        assert(configAfterIpv6Update.includes('base_url = "https://api2.example.com/v1"'), 'ipv6 update should update provider url');
+        assert(!configAfterIpv6Update.includes('[2001:db8::1]/v1"'), 'ipv6 update should not corrupt provider block');
+        const ipv6Delete = await legacyApi('delete-provider', { name: 'foo' });
+        assert(ipv6Delete.success === true, 'ipv6 delete-provider should succeed');
+        const configAfterIpv6Delete = fs.readFileSync(legacyConfigPath, 'utf-8');
+        assert(configAfterIpv6Delete.includes('model_provider = "openai"'), 'ipv6 delete should keep fallback model_provider');
+        assert(configAfterIpv6Delete.includes('[model_providers.openai]'), 'ipv6 delete should keep openai section');
+        assert(!configAfterIpv6Delete.includes('[2001:db8::1]/v1"'), 'ipv6 delete should not leave corrupted leftovers');
+    } finally {
+        if (legacyServer) {
+            const waitExit = new Promise((resolve) => {
+                legacyServer.once('exit', () => resolve());
+                if (legacyServer.exitCode !== null || legacyServer.signalCode) {
+                    resolve();
+                }
+            });
+            try {
+                legacyServer.kill('SIGINT');
+            } catch (e) {}
+            await waitExit;
+        }
+    }
 
     // ========== Update Provider Tests ==========
     const updatedUrl = `${mockProviderUrl}/v2`;

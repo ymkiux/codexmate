@@ -21,6 +21,8 @@ const {
     detectLineEnding,
     normalizeLineEnding,
     isValidProviderName,
+    escapeTomlBasicString,
+    buildModelProviderTableHeader,
     buildModelsCandidates,
     isValidHttpUrl,
     normalizeBaseUrl,
@@ -227,7 +229,11 @@ function readConfig() {
     }
     try {
         const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
-        return toml.parse(content);
+        const parsed = toml.parse(content);
+        if (isPlainObject(parsed) && isPlainObject(parsed.model_providers)) {
+            parsed.model_providers = normalizeLegacyModelProviders(parsed.model_providers);
+        }
+        return parsed;
     } catch (e) {
         throw new Error(`配置文件解析失败: ${e.message}`);
     }
@@ -281,6 +287,132 @@ function updateAuthJson(apiKey) {
 
 function isPlainObject(value) {
     return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+const PROVIDER_CONFIG_KEYS = new Set([
+    'name',
+    'base_url',
+    'wire_api',
+    'requires_openai_auth',
+    'preferred_auth_method',
+    'request_max_retries',
+    'stream_max_retries',
+    'stream_idle_timeout_ms'
+]);
+
+function looksLikeProviderConfig(value) {
+    if (!isPlainObject(value)) return false;
+    return Object.keys(value).some((key) => PROVIDER_CONFIG_KEYS.has(key));
+}
+
+function collectNestedProviderConfigs(node, pathPrefix, collector) {
+    if (!isPlainObject(node)) return;
+    if (looksLikeProviderConfig(node)) {
+        collector.push([pathPrefix, node]);
+        return;
+    }
+    for (const [childKey, childValue] of Object.entries(node)) {
+        if (!isPlainObject(childValue)) continue;
+        collectNestedProviderConfigs(childValue, `${pathPrefix}.${childKey}`, collector);
+    }
+}
+
+function normalizeLegacyModelProviders(modelProviders) {
+    if (!isPlainObject(modelProviders)) {
+        return modelProviders;
+    }
+
+    let changed = false;
+    const normalized = {};
+    const addRecovered = (name, provider) => {
+        if (!name || !isPlainObject(provider)) return;
+        if (Object.prototype.hasOwnProperty.call(modelProviders, name)) return;
+        if (Object.prototype.hasOwnProperty.call(normalized, name)) return;
+        normalized[name] = provider;
+        changed = true;
+    };
+
+    for (const [name, provider] of Object.entries(modelProviders)) {
+        normalized[name] = provider;
+        if (!isPlainObject(provider)) continue;
+
+        if (looksLikeProviderConfig(provider)) {
+            for (const [childKey, childValue] of Object.entries(provider)) {
+                if (!isPlainObject(childValue)) continue;
+                const recovered = [];
+                collectNestedProviderConfigs(childValue, `${name}.${childKey}`, recovered);
+                for (const [recoveredName, recoveredProvider] of recovered) {
+                    addRecovered(recoveredName, recoveredProvider);
+                }
+            }
+            continue;
+        }
+
+        const recovered = [];
+        collectNestedProviderConfigs(provider, name, recovered);
+        if (recovered.length > 0) {
+            delete normalized[name];
+            changed = true;
+            for (const [recoveredName, recoveredProvider] of recovered) {
+                addRecovered(recoveredName, recoveredProvider);
+            }
+        }
+    }
+
+    return changed ? normalized : modelProviders;
+}
+
+function escapeRegex(value) {
+    return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function findProviderSectionRanges(content, providerName) {
+    const text = typeof content === 'string' ? content : '';
+    const name = typeof providerName === 'string' ? providerName.trim() : '';
+    if (!text || !name) return [];
+
+    const safeName = escapeRegex(name);
+    const headerPatterns = [
+        { priority: 0, regex: new RegExp(`^\\s*model_providers\\s*\\.\\s*"${safeName}"\\s*$`) },
+        { priority: 1, regex: new RegExp(`^\\s*model_providers\\s*\\.\\s*'${safeName}'\\s*$`) },
+        { priority: 2, regex: new RegExp(`^\\s*model_providers\\s*\\.\\s*${safeName}\\s*$`) }
+    ];
+
+    const allHeaders = [];
+    const targetPriorityByStart = new Map();
+    const sectionLineRegex = /^[ \t]*\[(?!\[)([^\]\n]+)\][ \t]*(?:#.*)?$/gm;
+    let match;
+    while ((match = sectionLineRegex.exec(text)) !== null) {
+        const start = match.index;
+        allHeaders.push(start);
+        const headerExpr = String(match[1] || '').trim();
+        for (const pattern of headerPatterns) {
+            if (pattern.regex.test(headerExpr)) {
+                const prev = targetPriorityByStart.get(start);
+                if (prev === undefined || pattern.priority < prev) {
+                    targetPriorityByStart.set(start, pattern.priority);
+                }
+                break;
+            }
+        }
+    }
+
+    if (targetPriorityByStart.size === 0) {
+        return [];
+    }
+
+    const ranges = [];
+    for (let i = 0; i < allHeaders.length; i++) {
+        const start = allHeaders[i];
+        if (!targetPriorityByStart.has(start)) continue;
+        const end = i + 1 < allHeaders.length ? allHeaders[i + 1] : text.length;
+        ranges.push({
+            start,
+            end,
+            priority: targetPriorityByStart.get(start)
+        });
+    }
+    return ranges;
 }
 
 function normalizeAuthProfileName(value) {
@@ -1662,6 +1794,9 @@ function addProviderToConfig(params = {}) {
 
     if (!name) return { error: '名称不能为空' };
     if (!url) return { error: 'URL 不能为空' };
+    if (!isValidProviderName(name)) {
+        return { error: '名称仅支持字母/数字/._-' };
+    }
     if (isReservedProviderNameForCreation(name)) {
         return { error: 'local provider 为系统保留名称，不可新增' };
     }
@@ -1693,24 +1828,19 @@ function addProviderToConfig(params = {}) {
         return { error: `config.toml 解析失败: ${e.message}` };
     }
 
-    if (!parsed.model_providers || typeof parsed.model_providers !== 'object') {
-        parsed.model_providers = {};
-    }
-
-    if (parsed.model_providers[name]) {
+    const normalizedProviders = isPlainObject(parsed.model_providers)
+        ? normalizeLegacyModelProviders(parsed.model_providers)
+        : {};
+    if (normalizedProviders && normalizedProviders[name]) {
         return { error: '提供商已存在' };
     }
 
-    const escapeTomlString = (value) => String(value || '')
-        .replace(/\\/g, '\\\\')
-        .replace(/"/g, '\\"');
-
     const lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
-    const safeName = escapeTomlString(name);
-    const safeUrl = escapeTomlString(url);
-    const safeKey = escapeTomlString(key);
+    const safeName = escapeTomlBasicString(name);
+    const safeUrl = escapeTomlBasicString(url);
+    const safeKey = escapeTomlBasicString(key);
     const block = [
-        `[model_providers.${safeName}]`,
+        buildModelProviderTableHeader(name),
         `name = "${safeName}"`,
         `base_url = "${safeUrl}"`,
         `wire_api = "responses"`,
@@ -1810,8 +1940,6 @@ function performProviderDeletion(name, options = {}) {
     const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
     const lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
     const hasBom = content.charCodeAt(0) === 0xFEFF;
-    const safeName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const sectionRegex = new RegExp(`\\[\\s*model_providers\\s*\\.\\s*(?:"${safeName}"|'${safeName}'|${safeName})\\s*\\]`);
 
     const remainingProviders = Object.keys(config.model_providers || {}).filter(item => item !== name);
     if (remainingProviders.length === 0) {
@@ -1850,17 +1978,14 @@ function performProviderDeletion(name, options = {}) {
     };
 
     let updatedContent = null;
-    const match = content.match(sectionRegex);
-    if (match) {
-        const startIdx = match.index;
-        const rest = content.slice(startIdx + match[0].length);
-        const nextIdx = rest.indexOf('[');
-        const endIdx = nextIdx === -1 ? content.length : (startIdx + match[0].length + nextIdx);
-
-        const removedContent = (content.slice(0, startIdx) + content.slice(endIdx))
-            .replace(/\n{3,}/g, lineEnding + lineEnding);
-
-        updatedContent = removedContent;
+    const ranges = findProviderSectionRanges(content, name);
+    if (ranges.length > 0) {
+        const sorted = ranges.sort((a, b) => b.start - a.start);
+        let removedContent = content;
+        for (const range of sorted) {
+            removedContent = removedContent.slice(0, range.start) + removedContent.slice(range.end);
+        }
+        updatedContent = removedContent.replace(/\n{3,}/g, lineEnding + lineEnding);
     }
 
     if (updatedContent) {
@@ -5034,6 +5159,10 @@ function cmdAdd(name, baseUrl, apiKey, silent = false) {
         }
         throw new Error('名称和URL必填');
     }
+    if (!isValidProviderName(providerName)) {
+        if (!silent) console.error('错误: 名称仅支持字母/数字/._-');
+        throw new Error('名称仅支持字母/数字/._-');
+    }
     if (isReservedProviderNameForCreation(providerName)) {
         if (!silent) console.error('错误: local provider 为系统保留名称，不可新增');
         throw new Error('local provider 为系统保留名称，不可新增');
@@ -5045,13 +5174,16 @@ function cmdAdd(name, baseUrl, apiKey, silent = false) {
         throw new Error('提供商已存在');
     }
 
+    const safeName = escapeTomlBasicString(providerName);
+    const safeBaseUrl = escapeTomlBasicString(providerBaseUrl);
+    const safeApiKey = escapeTomlBasicString(apiKey || '');
     const newBlock = `
-[model_providers.${providerName}]
-name = "${providerName}"
-base_url = "${providerBaseUrl}"
+${buildModelProviderTableHeader(providerName)}
+name = "${safeName}"
+base_url = "${safeBaseUrl}"
 wire_api = "responses"
 requires_openai_auth = false
-preferred_auth_method = "${apiKey || ''}"
+preferred_auth_method = "${safeApiKey}"
 request_max_retries = 4
 stream_max_retries = 10
 stream_idle_timeout_ms = 300000
@@ -5111,41 +5243,32 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
     }
 
     const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
-    const safeName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const sectionRegex = new RegExp(`\\[\\s*model_providers\\s*\\.\\s*${safeName}\\s*\\]`);
-    const match = content.match(sectionRegex);
-    if (!match) {
+    const ranges = findProviderSectionRanges(content, name);
+    if (ranges.length === 0) {
         if (!silent) console.error('错误: 无法找到提供商配置块');
         throw new Error('无法找到提供商配置块');
     }
 
-    const startIdx = match.index;
-    const rest = content.slice(startIdx + match[0].length);
-    const nextIdx = rest.indexOf('[');
-    const endIdx = nextIdx === -1 ? content.length : (startIdx + match[0].length + nextIdx);
-
-    // 提取该提供商的配置块
-    const providerBlock = content.slice(startIdx, endIdx);
-
-    // 替换 base_url
-    let updatedBlock = providerBlock;
-    if (baseUrl) {
-        updatedBlock = updatedBlock.replace(
-            /^(base_url\s*=\s*)(["']).*?\2/m,
-            `$1$2${baseUrl}$2`
-        );
+    let newContent = content;
+    const sorted = ranges.sort((a, b) => b.start - a.start);
+    for (const range of sorted) {
+        const providerBlock = newContent.slice(range.start, range.end);
+        let updatedBlock = providerBlock;
+        if (baseUrl) {
+            updatedBlock = updatedBlock.replace(
+                /^(base_url\s*=\s*)(["']).*?\2/m,
+                `$1$2${baseUrl}$2`
+            );
+        }
+        if (apiKey !== undefined) {
+            updatedBlock = updatedBlock.replace(
+                /^(preferred_auth_method\s*=\s*)(["']).*?\2/m,
+                `$1$2${apiKey}$2`
+            );
+        }
+        newContent = newContent.slice(0, range.start) + updatedBlock + newContent.slice(range.end);
     }
 
-    // 替换 preferred_auth_method (API Key)
-    if (apiKey !== undefined) {
-        updatedBlock = updatedBlock.replace(
-            /^(preferred_auth_method\s*=\s*)(["']).*?\2/m,
-            `$1$2${apiKey}$2`
-        );
-    }
-
-    // 组合新的内容
-    const newContent = content.slice(0, startIdx) + updatedBlock + content.slice(endIdx);
     writeConfig(newContent.trim());
 
     // 如果更新了 API Key 且该提供商是当前激活的，同步更新 auth.json
