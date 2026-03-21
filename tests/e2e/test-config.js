@@ -490,6 +490,14 @@ module.exports = async function testConfig(ctx) {
             configAfterInlineCommentUpdate.includes('preferred_auth_method = "sk-inline-new" # keep-key-comment'),
             'update-provider should preserve preferred_auth_method inline comment'
         );
+        const parsedAfterInlineCommentUpdate = toml.parse(configAfterInlineCommentUpdate);
+        assert(
+            parsedAfterInlineCommentUpdate
+            && parsedAfterInlineCommentUpdate.model_providers
+            && parsedAfterInlineCommentUpdate.model_providers['foo.bar']
+            && parsedAfterInlineCommentUpdate.model_providers['foo.bar'].preferred_auth_method === 'sk-inline-new',
+            'inline comment update should keep config.toml parseable and value readable'
+        );
 
         const multilineStringConfig = [
             'model_provider = "foo"',
@@ -875,6 +883,14 @@ module.exports = async function testConfig(ctx) {
             !nestedMetadataList.providers.some((item) => item && item.name === 'foo.metadata'),
             'nested metadata should not be promoted to provider'
         );
+        const nestedMetadataExport = await legacyApi('export-provider', { name: 'foo.metadata' });
+        assert(nestedMetadataExport.error, 'nested metadata should not be exportable as a provider');
+        const nestedMetadataUpdate = await legacyApi('update-provider', {
+            name: 'foo.metadata',
+            url: 'https://should-not-write.example.com/v1',
+            key: 'sk-should-not-write'
+        });
+        assert(nestedMetadataUpdate.error, 'nested metadata should not be updatable as a provider');
 
         const deepNestedRecoverableConfig = [
             'model_provider = "foo"',

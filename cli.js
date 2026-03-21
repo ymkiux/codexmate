@@ -5520,8 +5520,17 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
     const replaceTomlStringField = (block, fieldName, rawValue) => {
         const safeValue = escapeTomlBasicString(rawValue);
         const escapedFieldName = escapeRegex(fieldName);
-        const tripleStartRegex = new RegExp(`^(\\s*${escapedFieldName}\\s*=\\s*)(\"\"\"|''')`, 'm');
-        const tripleStartMatch = tripleStartRegex.exec(block);
+        const multilineRanges = collectTomlMultilineStringRanges(block);
+        const tripleStartRegex = new RegExp(`^(\\s*${escapedFieldName}\\s*=\\s*)(\"\"\"|''')`, 'mg');
+        let tripleStartMatch = null;
+        let tripleCandidate;
+        while ((tripleCandidate = tripleStartRegex.exec(block)) !== null) {
+            if (isIndexInRanges(tripleCandidate.index, multilineRanges)) {
+                continue;
+            }
+            tripleStartMatch = tripleCandidate;
+            break;
+        }
         if (tripleStartMatch) {
             const prefixStart = tripleStartMatch.index;
             const prefixEnd = prefixStart + tripleStartMatch[1].length;
@@ -5571,20 +5580,32 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
 
         const withCommentRegex = new RegExp(
             `^(\\s*${escapedFieldName}\\s*=\\s*)(?:"(?:\\\\.|[^"\\\\])*"|'[^'\\n]*')(\\s+#.*)?$`,
-            'm'
+            'mg'
         );
         let replaced = false;
         let next = block.replace(
             withCommentRegex,
-            (_, prefix, suffix = '') => {
+            (full, prefix, suffix = '', offset) => {
+                if (replaced || isIndexInRanges(offset, multilineRanges)) {
+                    return full;
+                }
                 replaced = true;
                 return `${prefix}"${safeValue}"${suffix}`;
             }
         );
         if (!replaced) {
-            const fallbackRegex = new RegExp(`^(\\s*${escapedFieldName}\\s*=\\s*)(.*?)(\\s+#.*)?$`, 'm');
+            const fallbackRegex = new RegExp(`^(\\s*${escapedFieldName}\\s*=\\s*)(.*?)(\\s+#.*)?$`, 'mg');
             let fallbackReplaced = false;
-            const fallbackMatch = fallbackRegex.exec(next);
+            const multilineRangesForNext = collectTomlMultilineStringRanges(next);
+            let fallbackMatch;
+            let fallbackCandidate;
+            while ((fallbackCandidate = fallbackRegex.exec(next)) !== null) {
+                if (isIndexInRanges(fallbackCandidate.index, multilineRangesForNext)) {
+                    continue;
+                }
+                fallbackMatch = fallbackCandidate;
+                break;
+            }
             if (fallbackMatch) {
                 const existingValue = String(fallbackMatch[2] || '').trim();
                 const looksLikeMultilineArray = existingValue.startsWith('[') && !existingValue.endsWith(']');
