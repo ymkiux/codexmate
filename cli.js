@@ -5430,13 +5430,15 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
                     i = runEnd - 1;
                     continue;
                 }
-                let slashCount = 0;
-                for (let j = i - 1; j >= valueStart && block[j] === '\\'; j--) {
-                    slashCount++;
-                }
-                if (slashCount % 2 !== 0) {
-                    i = runEnd - 1;
-                    continue;
+                if (tripleQuote === '"""') {
+                    let slashCount = 0;
+                    for (let j = i - 1; j >= valueStart && block[j] === '\\'; j--) {
+                        slashCount++;
+                    }
+                    if (slashCount % 2 !== 0) {
+                        i = runEnd - 1;
+                        continue;
+                    }
                 }
                 valueEnd = i;
                 closingRunLength = runLength;

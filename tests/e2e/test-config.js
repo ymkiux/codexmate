@@ -599,6 +599,54 @@ module.exports = async function testConfig(ctx) {
             'escaped triple-quote multiline rewrite should keep config.toml parseable and value readable'
         );
 
+        const multilineLiteralTrailingBackslashConfig = [
+            'model_provider = "foo"',
+            'model = "gpt-5.3-codex"',
+            '',
+            '[model_providers.foo]',
+            'name = "foo"',
+            'base_url = "https://api.example.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            "preferred_auth_method = '''sk-old\\''' # keep-literal-triple-comment",
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            '',
+            '[model_providers.openai]',
+            'name = "openai"',
+            'base_url = "https://api.openai.com/v1"',
+            'wire_api = "responses"',
+            'requires_openai_auth = false',
+            'preferred_auth_method = ""',
+            'request_max_retries = 4',
+            'stream_max_retries = 10',
+            'stream_idle_timeout_ms = 300000',
+            ''
+        ].join('\n');
+        fs.writeFileSync(legacyConfigPath, multilineLiteralTrailingBackslashConfig, 'utf-8');
+        const updateMultilineLiteralTrailingBackslash = await legacyApi('update-provider', {
+            name: 'foo',
+            key: 'sk-literal-triple-updated'
+        });
+        assert(
+            updateMultilineLiteralTrailingBackslash.success === true,
+            'update-provider should handle multiline literal strings with trailing backslashes'
+        );
+        const configAfterMultilineLiteralTrailingBackslashUpdate = fs.readFileSync(legacyConfigPath, 'utf-8');
+        assert(
+            configAfterMultilineLiteralTrailingBackslashUpdate.includes('preferred_auth_method = "sk-literal-triple-updated" # keep-literal-triple-comment'),
+            'multiline literal rewrite should preserve inline comment'
+        );
+        const parsedAfterMultilineLiteralTrailingBackslashUpdate = toml.parse(configAfterMultilineLiteralTrailingBackslashUpdate);
+        assert(
+            parsedAfterMultilineLiteralTrailingBackslashUpdate
+            && parsedAfterMultilineLiteralTrailingBackslashUpdate.model_providers
+            && parsedAfterMultilineLiteralTrailingBackslashUpdate.model_providers.foo
+            && parsedAfterMultilineLiteralTrailingBackslashUpdate.model_providers.foo.preferred_auth_method === 'sk-literal-triple-updated',
+            'multiline literal rewrite should keep config.toml parseable and value readable'
+        );
+
         const missingFieldConfig = [
             'model_provider = "foo"',
             'model = "gpt-5.3-codex"',
