@@ -26,11 +26,10 @@ jobs:
         with:
           script: |
             const pr = context.payload.pull_request;
-            const shortSha = pr.head.sha.slice(0, 7);
             const body = [
               "@coderabbitai review",
               "",
-              `Auto-triggered on \`${context.payload.action}\` for commit \`${shortSha}\`.`,
+              "If I directly merge them, will it cause regression anomalies? Note that this includes whether it will introduce bugs in the debugger. Please perform a comprehensive check.",
             ].join("\n");
 
             await github.rest.issues.createComment({
