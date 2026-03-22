@@ -8,9 +8,14 @@ const lockfile = path.join(root, 'package-lock.json');
 const packageJson = path.join(root, 'package.json');
 const nodeModules = path.join(root, 'node_modules');
 
+function stripUtf8Bom(text) {
+  return typeof text === 'string' && text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+}
+
 function hasRequiredDeps() {
   try {
-    const pkg = JSON.parse(fs.readFileSync(packageJson, 'utf8'));
+    const raw = fs.readFileSync(packageJson, 'utf8');
+    const pkg = JSON.parse(stripUtf8Bom(raw));
     const deps = Object.keys(pkg.dependencies || {});
     if (!deps.length) return true;
     return deps.every((name) => {
