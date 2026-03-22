@@ -223,21 +223,50 @@ function ensureConfigDir() {
     }
 }
 
+function createConfigLoadError(type, message, detail) {
+    const err = new Error(detail || message);
+    err.configErrorType = type || 'read';
+    err.configPublicReason = message || '读取 config.toml 失败';
+    err.configDetail = detail || message || '';
+    return err;
+}
+
 function readConfig() {
     if (!fs.existsSync(CONFIG_FILE)) {
-        throw new Error(`配置文件不存在: ${CONFIG_FILE}`);
+        throw createConfigLoadError(
+            'missing',
+            '未检测到 config.toml',
+            `配置文件不存在: ${CONFIG_FILE}`
+        );
     }
+
+    let content = '';
     try {
-        const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
-        const parsed = toml.parse(content);
-        if (isPlainObject(parsed) && isPlainObject(parsed.model_providers)) {
-            const providerHeaderSegmentKeySet = collectModelProviderHeaderSegmentKeySet(content);
-            parsed.model_providers = normalizeLegacyModelProviders(parsed.model_providers, providerHeaderSegmentKeySet);
-        }
-        return parsed;
+        content = fs.readFileSync(CONFIG_FILE, 'utf-8');
     } catch (e) {
-        throw new Error(`配置文件解析失败: ${e.message}`);
+        throw createConfigLoadError(
+            'read',
+            '读取 config.toml 失败',
+            `读取配置文件失败: ${e && e.message ? e.message : e}`
+        );
     }
+
+    let parsed;
+    try {
+        parsed = toml.parse(content);
+    } catch (e) {
+        throw createConfigLoadError(
+            'parse',
+            'config.toml 解析失败',
+            `配置文件解析失败: ${e && e.message ? e.message : e}`
+        );
+    }
+
+    if (isPlainObject(parsed) && isPlainObject(parsed.model_providers)) {
+        const providerHeaderSegmentKeySet = collectModelProviderHeaderSegmentKeySet(content);
+        parsed.model_providers = normalizeLegacyModelProviders(parsed.model_providers, providerHeaderSegmentKeySet);
+    }
+    return parsed;
 }
 
 function writeConfig(content) {
@@ -1834,14 +1863,17 @@ async function buildConfigHealthReport(params = {}) {
 
     if (status.isVirtual) {
         const parseFailed = status.errorType === 'parse';
+        const readFailed = status.errorType === 'read';
         issues.push({
-            code: parseFailed ? 'config-parse-failed' : 'config-missing',
-            message: status.reason || (parseFailed ? 'config.toml 解析失败' : '未检测到 config.toml'),
+            code: parseFailed ? 'config-parse-failed' : (readFailed ? 'config-read-failed' : 'config-missing'),
+            message: status.reason || (parseFailed
+                ? 'config.toml 解析失败'
+                : (readFailed ? '读取 config.toml 失败' : '未检测到 config.toml')),
             suggestion: parseFailed
                 ? '修复 config.toml 语法错误后重试'
-                : '在模板编辑器中确认应用配置，生成可用的 config.toml'
+                : (readFailed ? '检查文件权限后重试' : '在模板编辑器中确认应用配置，生成可用的 config.toml')
         });
-        if (parseFailed) {
+        if (parseFailed || readFailed) {
             return {
                 ok: false,
                 issues,
@@ -2039,14 +2071,25 @@ function readConfigOrVirtualDefault() {
                 config: readConfig(),
                 isVirtual: false,
                 reason: '',
+                detail: '',
                 errorType: ''
             };
         } catch (e) {
+            const errorType = typeof e.configErrorType === 'string' && e.configErrorType.trim()
+                ? e.configErrorType.trim()
+                : 'read';
+            const publicReason = typeof e.configPublicReason === 'string' && e.configPublicReason.trim()
+                ? e.configPublicReason.trim()
+                : (errorType === 'parse' ? 'config.toml 解析失败' : '读取 config.toml 失败');
+            const detail = typeof e.configDetail === 'string' && e.configDetail.trim()
+                ? e.configDetail.trim()
+                : (e && e.message ? e.message : publicReason);
             return {
-                config: {},
+                config: errorType === 'missing' ? buildVirtualDefaultConfig() : {},
                 isVirtual: true,
-                reason: e.message || '配置文件解析失败',
-                errorType: 'parse'
+                reason: publicReason,
+                detail,
+                errorType
             };
         }
     }
@@ -2055,22 +2098,26 @@ function readConfigOrVirtualDefault() {
         config: buildVirtualDefaultConfig(),
         isVirtual: true,
         reason: '未检测到 config.toml',
+        detail: `配置文件不存在: ${CONFIG_FILE}`,
         errorType: 'missing'
     };
 }
 
-function hasConfigParseError(result) {
-    return !!(result && result.isVirtual && result.errorType === 'parse');
+function hasConfigLoadError(result) {
+    return !!(result
+        && result.isVirtual
+        && (result.errorType === 'parse' || result.errorType === 'read'));
 }
 
-function printConfigParseErrorAndMarkExit(result) {
-    const detail = result && typeof result.reason === 'string' && result.reason.trim()
-        ? result.reason.trim()
-        : '配置文件解析失败';
-    console.error('\n错误: 配置文件解析失败');
+function printConfigLoadErrorAndMarkExit(result) {
+    const isReadError = result && result.errorType === 'read';
+    const detail = result && typeof result.detail === 'string' && result.detail.trim()
+        ? result.detail.trim()
+        : (isReadError ? '读取配置文件失败' : '配置文件解析失败');
+    console.error(`\n错误: ${isReadError ? '读取 config.toml 失败' : '配置文件解析失败'}`);
     console.error(`  详情: ${detail}`);
     console.error(`  路径: ${CONFIG_FILE}`);
-    console.error('  建议: 修复 config.toml 语法后重试');
+    console.error(`  建议: ${isReadError ? '检查文件权限后重试' : '修复 config.toml 语法后重试'}`);
     console.error();
     process.exitCode = 1;
 }
@@ -5452,8 +5499,8 @@ async function cmdSetup() {
 // 显示当前状态
 function cmdStatus() {
     const configResult = readConfigOrVirtualDefault();
-    if (hasConfigParseError(configResult)) {
-        printConfigParseErrorAndMarkExit(configResult);
+    if (hasConfigLoadError(configResult)) {
+        printConfigLoadErrorAndMarkExit(configResult);
         return;
     }
     const { config, isVirtual } = configResult;
@@ -5473,8 +5520,8 @@ function cmdStatus() {
 // 列出所有提供商
 function cmdList() {
     const configResult = readConfigOrVirtualDefault();
-    if (hasConfigParseError(configResult)) {
-        printConfigParseErrorAndMarkExit(configResult);
+    if (hasConfigLoadError(configResult)) {
+        printConfigLoadErrorAndMarkExit(configResult);
         return;
     }
     const { config, isVirtual } = configResult;
