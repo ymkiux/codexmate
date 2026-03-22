@@ -1841,6 +1841,17 @@ async function buildConfigHealthReport(params = {}) {
                 ? '修复 config.toml 语法错误后重试'
                 : '在模板编辑器中确认应用配置，生成可用的 config.toml'
         });
+        if (parseFailed) {
+            return {
+                ok: false,
+                issues,
+                summary: {
+                    currentProvider: '',
+                    currentModel: ''
+                },
+                remote: null
+            };
+        }
     }
 
     const providerName = typeof config.model_provider === 'string' ? config.model_provider.trim() : '';
@@ -2032,7 +2043,7 @@ function readConfigOrVirtualDefault() {
             };
         } catch (e) {
             return {
-                config: buildVirtualDefaultConfig(),
+                config: {},
                 isVirtual: true,
                 reason: e.message || '配置文件解析失败',
                 errorType: 'parse'
