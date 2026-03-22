@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "codexmate",
   "version": "0.0.13",
   "description": "Codex/Claude Code 配置与会话管理 CLI + Web 工具",
@@ -26,6 +26,9 @@
   "scripts": {
     "dev": "node cli.js run",
     "start": "node cli.js",
+    "docs:dev": "node ./node_modules/vitepress/dist/node/cli.js dev site",
+    "docs:build": "node ./node_modules/vitepress/dist/node/cli.js build site",
+    "docs:preview": "node ./node_modules/vitepress/dist/node/cli.js preview site",
     "test": "npm run test:unit && npm run test:e2e",
     "test:unit": "node tests/unit/run.mjs",
     "test:e2e": "node tests/e2e/run.js",
@@ -52,5 +55,8 @@
     "cli"
   ],
   "author": "ymkiux",
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "vitepress": "^1.6.4"
+  }
 }
