@@ -141,6 +141,7 @@
                     sessionPreviewScrollEl: null,
                     sessionPreviewContainerEl: null,
                     sessionPreviewHeaderEl: null,
+                    sessionPreviewHeaderResizeObserver: null,
                     sessionStandalone: false,
                     sessionStandaloneError: '',
                     sessionStandaloneText: '',
@@ -325,6 +326,7 @@
             },
             beforeUnmount() {
                 this.cancelSessionTimelineSync();
+                this.disconnectSessionPreviewHeaderResizeObserver();
                 window.removeEventListener('resize', this.onWindowResize);
                 this.sessionPreviewScrollEl = null;
                 this.sessionPreviewContainerEl = null;
@@ -1380,8 +1382,23 @@
                     this.sessionPreviewContainerEl = el || null;
                     this.updateSessionTimelineOffset();
                 },
+                disconnectSessionPreviewHeaderResizeObserver() {
+                    if (!this.sessionPreviewHeaderResizeObserver) return;
+                    this.sessionPreviewHeaderResizeObserver.disconnect();
+                    this.sessionPreviewHeaderResizeObserver = null;
+                },
+                observeSessionPreviewHeaderResize() {
+                    this.disconnectSessionPreviewHeaderResizeObserver();
+                    if (!this.sessionPreviewHeaderEl || typeof ResizeObserver !== 'function') return;
+                    this.sessionPreviewHeaderResizeObserver = new ResizeObserver(() => {
+                        this.updateSessionTimelineOffset();
+                    });
+                    this.sessionPreviewHeaderResizeObserver.observe(this.sessionPreviewHeaderEl);
+                },
                 setSessionPreviewHeaderRef(el) {
+                    this.disconnectSessionPreviewHeaderResizeObserver();
                     this.sessionPreviewHeaderEl = el || null;
+                    this.observeSessionPreviewHeaderResize();
                     this.updateSessionTimelineOffset();
                 },
                 setSessionPreviewScrollRef(el) {
@@ -1400,7 +1417,7 @@
                         || (this.sessionPreviewScrollEl ? this.sessionPreviewScrollEl.querySelector('.session-preview-header') : null)
                         || container.querySelector('.session-preview-header');
                     const headerHeight = header ? Math.ceil(header.getBoundingClientRect().height) : 0;
-                    const offset = Math.max(72, headerHeight + 12);
+                    const offset = headerHeight > 0 ? (headerHeight + 12) : 72;
                     container.style.setProperty('--session-preview-header-offset', `${offset}px`);
                 },
                 bindSessionMessageRef(messageKey, el) {

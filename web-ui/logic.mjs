@@ -253,9 +253,17 @@ export function buildSessionTimelineNodes(messages = [], options = {}) {
     }
 
     const nodes = [];
-    const groupSize = Math.ceil(total / maxMarkers);
-    for (let start = 0; start < total; start += groupSize) {
-        const end = Math.min(total - 1, start + groupSize - 1);
+    const bucketWidth = total / maxMarkers;
+    for (let bucket = 0; bucket < maxMarkers; bucket += 1) {
+        let start = Math.floor(bucket * bucketWidth);
+        if (nodes.length && start <= nodes[nodes.length - 1].endIndex) {
+            start = nodes[nodes.length - 1].endIndex + 1;
+        }
+        if (start >= total) {
+            break;
+        }
+        let end = Math.floor((bucket + 1) * bucketWidth) - 1;
+        end = Math.max(start, Math.min(total - 1, end));
         const targetIndex = Math.min(total - 1, start + Math.floor((end - start) / 2));
         const targetMessage = list[targetIndex] || null;
         const key = String(getKey(targetMessage, targetIndex) || `msg-${targetIndex}`);

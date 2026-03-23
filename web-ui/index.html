@@ -964,7 +964,7 @@
                                             :class="['session-msg', msg.normalizedRole === 'user' ? 'user' : (msg.normalizedRole === 'system' ? 'system' : 'assistant')]">
                                             <div class="session-msg-header">
                                                 <div class="session-msg-meta">
-                                                    <span class="session-msg-role">{{ msg.roleLabel || 'Assistant' }}</span>
+                                                    <span class="session-msg-role">{{ msg.roleLabel || (msg.normalizedRole === 'user' ? 'User' : (msg.normalizedRole === 'system' ? 'System' : 'Assistant')) }}</span>
                                                     <span class="session-msg-time">{{ msg.timestamp || '' }}</span>
                                                 </div>
                                             </div>
