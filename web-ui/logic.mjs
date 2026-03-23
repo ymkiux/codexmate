@@ -185,6 +185,23 @@ function normalizeSessionRole(role) {
     return 'assistant';
 }
 
+function toRoleMeta(role) {
+    if (role === 'user') {
+        return { role: 'user', roleLabel: 'User', roleShort: 'U' };
+    }
+    if (role === 'assistant') {
+        return { role: 'assistant', roleLabel: 'Assistant', roleShort: 'A' };
+    }
+    if (role === 'system') {
+        return { role: 'system', roleLabel: 'System', roleShort: 'S' };
+    }
+    return { role: 'mixed', roleLabel: 'Mixed', roleShort: 'M' };
+}
+
+function clampTimelinePercent(percent) {
+    return Math.max(6, Math.min(94, percent));
+}
+
 export function formatSessionTimelineTimestamp(timestamp) {
     const value = typeof timestamp === 'string' ? timestamp.trim() : '';
     if (!value) return '';
@@ -205,29 +222,74 @@ export function buildSessionTimelineNodes(messages = [], options = {}) {
         ? options.getKey
         : ((_message, index) => `msg-${index}`);
     const total = list.length;
+    const rawMaxMarkers = Number(options.maxMarkers);
+    const maxMarkers = Number.isFinite(rawMaxMarkers)
+        ? Math.max(1, Math.min(80, Math.floor(rawMaxMarkers)))
+        : 30;
 
-    return list.map((message, index) => {
+    const buildSingleNode = (message, index) => {
         const role = normalizeSessionRole(message && message.role);
-        const roleLabel = role === 'user'
-            ? 'User'
-            : (role === 'assistant' ? 'Assistant' : 'System');
-        const roleShort = role === 'user' ? 'U' : (role === 'assistant' ? 'A' : 'S');
+        const roleMeta = toRoleMeta(role);
         const key = String(getKey(message, index) || `msg-${index}`);
         const displayTime = formatSessionTimelineTimestamp(message && message.timestamp ? message.timestamp : '');
         const title = displayTime
-            ? `#${index + 1} · ${roleLabel} · ${displayTime}`
-            : `#${index + 1} · ${roleLabel}`;
+            ? `#${index + 1} · ${roleMeta.roleLabel} · ${displayTime}`
+            : `#${index + 1} · ${roleMeta.roleLabel}`;
         const percent = total <= 1 ? 0 : (index / (total - 1)) * 100;
-        const safePercent = Math.max(6, Math.min(94, percent));
         return {
             key,
-            role,
-            roleLabel,
-            roleShort,
+            role: roleMeta.role,
+            roleLabel: roleMeta.roleLabel,
+            roleShort: roleMeta.roleShort,
             displayTime,
             title,
             percent,
-            safePercent
+            safePercent: clampTimelinePercent(percent)
         };
-    });
+    };
+
+    if (total <= maxMarkers) {
+        return list.map((message, index) => buildSingleNode(message, index));
+    }
+
+    const nodes = [];
+    const groupSize = Math.ceil(total / maxMarkers);
+    for (let start = 0; start < total; start += groupSize) {
+        const end = Math.min(total - 1, start + groupSize - 1);
+        const targetIndex = Math.min(total - 1, start + Math.floor((end - start) / 2));
+        const targetMessage = list[targetIndex] || null;
+        const key = String(getKey(targetMessage, targetIndex) || `msg-${targetIndex}`);
+        const percent = total <= 1 ? 0 : (targetIndex / (total - 1)) * 100;
+        const messagesInGroup = end - start + 1;
+        const roleSet = new Set();
+        for (let i = start; i <= end; i += 1) {
+            roleSet.add(normalizeSessionRole(list[i] && list[i].role));
+        }
+        const roleValue = roleSet.size === 1 ? Array.from(roleSet)[0] : 'mixed';
+        const roleMeta = toRoleMeta(roleValue);
+        const firstTime = formatSessionTimelineTimestamp(list[start] && list[start].timestamp ? list[start].timestamp : '');
+        const lastTime = formatSessionTimelineTimestamp(list[end] && list[end].timestamp ? list[end].timestamp : '');
+        let displayTime = '';
+        if (firstTime && lastTime) {
+            displayTime = firstTime === lastTime ? firstTime : `${firstTime} ~ ${lastTime}`;
+        } else {
+            displayTime = firstTime || lastTime;
+        }
+        const titleBase = `#${start + 1}-${end + 1} · ${messagesInGroup} msgs · ${roleMeta.roleLabel}`;
+        const title = displayTime ? `${titleBase} · ${displayTime}` : titleBase;
+        nodes.push({
+            key,
+            role: roleMeta.role,
+            roleLabel: roleMeta.roleLabel,
+            roleShort: roleMeta.roleShort,
+            displayTime,
+            title,
+            percent,
+            safePercent: clampTimelinePercent(percent),
+            startIndex: start,
+            endIndex: end,
+            messageCount: messagesInGroup
+        });
+    }
+    return nodes;
 }

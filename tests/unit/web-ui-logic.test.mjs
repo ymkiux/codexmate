@@ -258,3 +258,32 @@ test('buildSessionTimelineNodes builds per-message node metadata', () => {
     assert.strictEqual(nodes[2].percent, 100);
     assert.strictEqual(nodes[2].safePercent, 94);
 });
+
+test('buildSessionTimelineNodes groups dense messages to avoid overlapping markers', () => {
+    const messages = Array.from({ length: 90 }, (_, idx) => ({
+        role: idx % 3 === 0 ? 'user' : (idx % 3 === 1 ? 'assistant' : 'system'),
+        timestamp: `2026-03-23T09:${String(idx % 60).padStart(2, '0')}:00Z`
+    }));
+
+    const nodes = buildSessionTimelineNodes(messages, {
+        maxMarkers: 30,
+        getKey(_message, idx) {
+            return `msg-${idx}`;
+        }
+    });
+
+    assert.strictEqual(nodes.length, 30);
+    assert.strictEqual(nodes[0].key, 'msg-1');
+    assert.strictEqual(nodes[0].role, 'mixed');
+    assert.strictEqual(nodes[0].messageCount, 3);
+    assert.strictEqual(nodes[0].startIndex, 0);
+    assert.strictEqual(nodes[0].endIndex, 2);
+
+    const last = nodes[nodes.length - 1];
+    assert.strictEqual(last.key, 'msg-88');
+    assert.strictEqual(last.messageCount, 3);
+    assert.strictEqual(last.startIndex, 87);
+    assert.strictEqual(last.endIndex, 89);
+
+    assert.ok(nodes.every(node => node.safePercent >= 6 && node.safePercent <= 94));
+});

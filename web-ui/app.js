@@ -138,6 +138,8 @@
                     sessionTimelineRafId: 0,
                     sessionMessageRefMap: Object.create(null),
                     sessionPreviewScrollEl: null,
+                    sessionPreviewContainerEl: null,
+                    sessionPreviewHeaderEl: null,
                     sessionStandalone: false,
                     sessionStandaloneError: '',
                     sessionStandaloneText: '',
@@ -284,6 +286,7 @@
                     this.sessionResumeWithYolo = true;
                 }
                 this.restoreSessionFilterCache();
+                window.addEventListener('resize', this.onWindowResize);
                 const savedConfigs = localStorage.getItem('claudeConfigs');
                 if (savedConfigs) {
                     try {
@@ -321,7 +324,10 @@
             },
             beforeUnmount() {
                 this.cancelSessionTimelineSync();
+                window.removeEventListener('resize', this.onWindowResize);
                 this.sessionPreviewScrollEl = null;
+                this.sessionPreviewContainerEl = null;
+                this.sessionPreviewHeaderEl = null;
                 this.sessionMessageRefMap = Object.create(null);
             },
 
@@ -1368,11 +1374,30 @@
                     this.persistSessionFilterCache();
                     await this.onSessionSourceChange();
                 },
+                setSessionPreviewContainerRef(el) {
+                    this.sessionPreviewContainerEl = el || null;
+                    this.updateSessionTimelineOffset();
+                },
+                setSessionPreviewHeaderRef(el) {
+                    this.sessionPreviewHeaderEl = el || null;
+                    this.updateSessionTimelineOffset();
+                },
                 setSessionPreviewScrollRef(el) {
                     this.sessionPreviewScrollEl = el || null;
                     if (this.sessionPreviewScrollEl) {
                         this.scheduleSessionTimelineSync();
                     }
+                    this.updateSessionTimelineOffset();
+                },
+                updateSessionTimelineOffset() {
+                    const container = this.sessionPreviewContainerEl || this.$refs.sessionPreviewContainer;
+                    if (!container || !container.style) return;
+                    const header = this.sessionPreviewHeaderEl
+                        || (this.sessionPreviewScrollEl ? this.sessionPreviewScrollEl.querySelector('.session-preview-header') : null)
+                        || container.querySelector('.session-preview-header');
+                    const headerHeight = header ? Math.ceil(header.getBoundingClientRect().height) : 0;
+                    const offset = Math.max(72, headerHeight + 12);
+                    container.style.setProperty('--session-preview-header-offset', `${offset}px`);
                 },
                 bindSessionMessageRef(messageKey, el) {
                     if (!messageKey) return;
@@ -1401,6 +1426,10 @@
                     this.syncSessionTimelineActiveFromScroll();
                 },
                 onSessionPreviewScroll() {
+                    this.scheduleSessionTimelineSync();
+                },
+                onWindowResize() {
+                    this.updateSessionTimelineOffset();
                     this.scheduleSessionTimelineSync();
                 },
                 syncSessionTimelineActiveFromScroll() {
@@ -1648,6 +1677,7 @@
                             this.syncActiveSessionMessageCount(res.totalMessages);
                         }
                         this.$nextTick(() => {
+                            this.updateSessionTimelineOffset();
                             this.scheduleSessionTimelineSync();
                         });
                     } catch (e) {

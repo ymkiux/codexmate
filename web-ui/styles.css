@@ -2012,6 +2012,7 @@ body::after {
     flex-direction: column;
     overflow: hidden;
     position: relative;
+    --session-preview-header-offset: 96px;
     transform: translateX(4px);
     transition: transform var(--transition-normal) var(--ease-spring-soft), box-shadow var(--transition-normal) var(--ease-spring-soft);
 }
@@ -2126,7 +2127,7 @@ body::after {
 
 .session-timeline {
     position: absolute;
-    top: 86px;
+    top: var(--session-preview-header-offset);
     right: 8px;
     bottom: 12px;
     width: 56px;
