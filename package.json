@@ -1,6 +1,6 @@
-{
+﻿{
   "name": "codexmate",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "description": "Codex/Claude Code 配置与会话管理 CLI + Web 工具",
   "main": "cli.js",
   "bin": {
@@ -14,7 +14,7 @@
     "res/",
     "doc/",
     "README.md",
-    "README.zh-CN.md",
+    "README.en.md",
     "LICENSE"
   ],
   "exports": {
@@ -60,3 +60,4 @@
     "vitepress": "^1.6.4"
   }
 }
+
