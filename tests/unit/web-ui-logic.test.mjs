@@ -288,6 +288,27 @@ test('buildSessionTimelineNodes groups dense messages to avoid overlapping marke
     assert.ok(nodes.every(node => node.safePercent >= 6 && node.safePercent <= 94));
 });
 
+test('buildSessionTimelineNodes keeps near-max marker density when total is just above cap', () => {
+    const messages = Array.from({ length: 31 }, (_, idx) => ({
+        role: idx % 2 === 0 ? 'user' : 'assistant',
+        timestamp: `2026-03-23T09:${String(idx % 60).padStart(2, '0')}:00Z`
+    }));
+    const nodes = buildSessionTimelineNodes(messages, {
+        maxMarkers: 30,
+        getKey(_message, idx) {
+            return `msg-${idx}`;
+        }
+    });
+
+    assert.strictEqual(nodes.length, 30);
+    assert.strictEqual(nodes[0].startIndex, 0);
+    assert.strictEqual(nodes[0].endIndex, 0);
+    const last = nodes[nodes.length - 1];
+    assert.strictEqual(last.startIndex, 29);
+    assert.strictEqual(last.endIndex, 30);
+    assert.strictEqual(last.messageCount, 2);
+});
+
 test('buildSessionTimelineNodes clamps maxMarkers into 1..80 and falls back on non-numeric values', () => {
     const messages = Array.from({ length: 800 }, (_, idx) => ({
         role: idx % 2 === 0 ? 'user' : 'assistant',
