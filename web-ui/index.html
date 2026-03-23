@@ -900,7 +900,7 @@
 
                     <div :class="['session-preview', { active: !!activeSession }]">
                         <template v-if="activeSession">
-                            <div class="session-preview-scroll">
+                            <div class="session-preview-scroll" :ref="setSessionPreviewScrollRef" @scroll="onSessionPreviewScroll">
                                 <div class="session-preview-header">
                                     <div>
                                         <div class="session-preview-title">{{ activeSession.title || activeSession.sessionId }}</div>
@@ -952,23 +952,43 @@
                                 </div>
 
                                 <div v-else class="session-preview-body">
-                                    <div v-if="activeSessionDetailClipped" class="session-item-sub session-item-wrap">
-                                        仅展示最近 {{ activeSessionMessages.length }} 条消息。
-                                    </div>
-                                    <div
-                                        v-for="(msg, idx) in activeSessionMessages"
-                                        :key="getRecordRenderKey(msg, idx)"
-                                        :class="['session-msg', msg.role === 'user' ? 'user' : (msg.role === 'system' ? 'system' : 'assistant')]">
-                                        <div class="session-msg-header">
-                                            <div class="session-msg-meta">
-                                                <span class="session-msg-role">{{ msg.role === 'user' ? 'User' : (msg.role === 'system' ? 'System' : 'Assistant') }}</span>
-                                                <span class="session-msg-time">{{ msg.timestamp || '' }}</span>
-                                            </div>
+                                    <div class="session-preview-messages">
+                                        <div v-if="activeSessionDetailClipped" class="session-item-sub session-item-wrap">
+                                            仅展示最近 {{ activeSessionMessages.length }} 条消息。
                                         </div>
-                                        <div class="session-msg-content">{{ msg.text || '' }}</div>
+                                        <div
+                                            v-for="(msg, idx) in activeSessionMessages"
+                                            :key="getRecordRenderKey(msg, idx)"
+                                            :data-message-key="getRecordRenderKey(msg, idx)"
+                                            :ref="(el) => bindSessionMessageRef(getRecordRenderKey(msg, idx), el)"
+                                            :class="['session-msg', msg.role === 'user' ? 'user' : (msg.role === 'system' ? 'system' : 'assistant')]">
+                                            <div class="session-msg-header">
+                                                <div class="session-msg-meta">
+                                                    <span class="session-msg-role">{{ msg.role === 'user' ? 'User' : (msg.role === 'system' ? 'System' : 'Assistant') }}</span>
+                                                    <span class="session-msg-time">{{ msg.timestamp || '' }}</span>
+                                                </div>
+                                            </div>
+                                            <div class="session-msg-content">{{ msg.text || '' }}</div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
+                            <aside v-if="sessionTimelineNodes.length" class="session-timeline" aria-label="会话时间轴">
+                                <div class="session-timeline-track"></div>
+                                <button
+                                    v-for="node in sessionTimelineNodes"
+                                    :key="'timeline-' + node.key"
+                                    type="button"
+                                    :class="['session-timeline-node', { active: sessionTimelineActiveKey === node.key }]"
+                                    :style="{ top: `${node.safePercent}%` }"
+                                    :title="node.title"
+                                    @click="jumpToSessionTimelineNode(node.key)">
+                                    <span class="sr-only">{{ node.title }}</span>
+                                </button>
+                                <div class="session-timeline-current" v-if="sessionTimelineActiveTitle">
+                                    {{ sessionTimelineActiveTitle }}
+                                </div>
+                            </aside>
                         </template>
 
                     <div v-else class="session-preview-empty">

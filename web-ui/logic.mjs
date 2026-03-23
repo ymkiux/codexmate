@@ -128,8 +128,29 @@ export function buildSpeedTestIssue(name, result) {
 
 // Session filtering helpers
 export function isSessionQueryEnabled(source) {
-    const normalized = (source || '').toLowerCase();
+    const normalized = normalizeSessionSource(source, '');
     return normalized === 'codex' || normalized === 'claude' || normalized === 'all';
+}
+
+export function normalizeSessionSource(source, fallback = 'all') {
+    const normalized = typeof source === 'string'
+        ? source.trim().toLowerCase()
+        : '';
+    if (normalized === 'codex' || normalized === 'claude' || normalized === 'all') {
+        return normalized;
+    }
+    return fallback;
+}
+
+export function normalizeSessionPathFilter(pathFilter) {
+    return typeof pathFilter === 'string' ? pathFilter.trim() : '';
+}
+
+export function buildSessionFilterCacheState(source, pathFilter) {
+    return {
+        source: normalizeSessionSource(source, 'all'),
+        pathFilter: normalizeSessionPathFilter(pathFilter)
+    };
 }
 
 export function buildSessionListParams(options = {}) {
@@ -154,4 +175,59 @@ export function buildSessionListParams(options = {}) {
         limit,
         forceRefresh: true
     };
+}
+
+function normalizeSessionRole(role) {
+    const value = typeof role === 'string' ? role.trim().toLowerCase() : '';
+    if (value === 'user' || value === 'assistant' || value === 'system') {
+        return value;
+    }
+    return 'assistant';
+}
+
+export function formatSessionTimelineTimestamp(timestamp) {
+    const value = typeof timestamp === 'string' ? timestamp.trim() : '';
+    if (!value) return '';
+
+    // 优先按 ISO/常见时间串抽取，避免本地时区格式差异导致的展示抖动。
+    const matched = value.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})(?::(\d{2}))?/);
+    if (matched) {
+        const second = matched[6] || '00';
+        return `${matched[2]}-${matched[3]} ${matched[4]}:${matched[5]}:${second}`;
+    }
+
+    return value;
+}
+
+export function buildSessionTimelineNodes(messages = [], options = {}) {
+    const list = Array.isArray(messages) ? messages : [];
+    const getKey = typeof options.getKey === 'function'
+        ? options.getKey
+        : ((_message, index) => `msg-${index}`);
+    const total = list.length;
+
+    return list.map((message, index) => {
+        const role = normalizeSessionRole(message && message.role);
+        const roleLabel = role === 'user'
+            ? 'User'
+            : (role === 'assistant' ? 'Assistant' : 'System');
+        const roleShort = role === 'user' ? 'U' : (role === 'assistant' ? 'A' : 'S');
+        const key = String(getKey(message, index) || `msg-${index}`);
+        const displayTime = formatSessionTimelineTimestamp(message && message.timestamp ? message.timestamp : '');
+        const title = displayTime
+            ? `#${index + 1} · ${roleLabel} · ${displayTime}`
+            : `#${index + 1} · ${roleLabel}`;
+        const percent = total <= 1 ? 0 : (index / (total - 1)) * 100;
+        const safePercent = Math.max(6, Math.min(94, percent));
+        return {
+            key,
+            role,
+            roleLabel,
+            roleShort,
+            displayTime,
+            title,
+            percent,
+            safePercent
+        };
+    });
 }

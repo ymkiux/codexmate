@@ -2011,6 +2011,7 @@ body::after {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    position: relative;
     transform: translateX(4px);
     transition: transform var(--transition-normal) var(--ease-spring-soft), box-shadow var(--transition-normal) var(--ease-spring-soft);
 }
@@ -2025,6 +2026,7 @@ body::after {
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
+    padding-right: 68px;
     display: flex;
     flex-direction: column;
     scrollbar-width: thin;
@@ -2113,6 +2115,81 @@ body::after {
     display: flex;
     flex-direction: column;
     gap: 10px;
+}
+
+.session-preview-messages {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.session-timeline {
+    position: absolute;
+    top: 86px;
+    right: 8px;
+    bottom: 12px;
+    width: 56px;
+    height: auto;
+    border-radius: 12px;
+    border: 1px solid rgba(208, 196, 182, 0.5);
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.92) 0%, rgba(252, 246, 239, 0.94) 100%);
+    box-shadow: 0 4px 12px rgba(31, 26, 23, 0.06);
+    padding: 6px 4px 28px;
+    z-index: 3;
+}
+
+.session-timeline-track {
+    position: absolute;
+    left: 50%;
+    top: 10px;
+    bottom: 32px;
+    width: 2px;
+    transform: translateX(-50%);
+    background: linear-gradient(to bottom, rgba(166, 149, 130, 0.3) 0%, rgba(166, 149, 130, 0.65) 100%);
+    border-radius: 999px;
+}
+
+.session-timeline-node {
+    position: absolute;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 1px solid rgba(139, 118, 104, 0.7);
+    background: rgba(255, 255, 255, 0.94);
+    transform: translate(-50%, -50%);
+    cursor: pointer;
+    padding: 0;
+    transition: transform var(--transition-fast) var(--ease-spring), background-color var(--transition-fast) var(--ease-spring), border-color var(--transition-fast) var(--ease-spring), box-shadow var(--transition-fast) var(--ease-spring);
+}
+
+.session-timeline-node:hover {
+    transform: translate(-50%, -50%) scale(1.2);
+    border-color: rgba(201, 94, 75, 0.85);
+    background: rgba(255, 255, 255, 1);
+    box-shadow: 0 0 0 3px rgba(201, 94, 75, 0.15);
+}
+
+.session-timeline-node.active {
+    transform: translate(-50%, -50%) scale(1.2);
+    border-color: rgba(201, 94, 75, 0.95);
+    background: rgba(201, 94, 75, 0.95);
+    box-shadow: 0 0 0 3px rgba(201, 94, 75, 0.2);
+}
+
+.session-timeline-current {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    bottom: 4px;
+    font-size: 10px;
+    line-height: 1.2;
+    color: var(--color-text-tertiary);
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .session-msg {
@@ -2240,6 +2317,14 @@ body::after {
         position: relative;
         transform: none;
         box-shadow: var(--shadow-card);
+    }
+
+    .session-preview-scroll {
+        padding-right: 0;
+    }
+
+    .session-timeline {
+        display: none;
     }
 
     .session-preview-header {
