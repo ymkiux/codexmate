@@ -4,11 +4,11 @@
 
 <img src="res/logo.png" alt="Codex Mate logo" width="110">
 
-[![Build](https://img.shields.io/github/actions/workflow/status/ymkiux/codexmate/release.yml?label=build)](https://github.com/ymkiux/codexmate/actions/workflows/release.yml)
+[![Build](https://img.shields.io/github/actions/workflow/status/SakuraByteCore/codexmate/release.yml?label=build)](https://github.com/SakuraByteCore/codexmate/actions/workflows/release.yml)
 [![Version](https://img.shields.io/npm/v/codexmate?label=version&registry_uri=https%3A%2F%2Fregistry.npmjs.org)](https://www.npmjs.com/package/codexmate)
 [![Downloads](https://img.shields.io/npm/dt/codexmate?label=downloads)](https://www.npmjs.com/package/codexmate)
-[![Status](https://img.shields.io/badge/status-alpha-orange)](https://github.com/ymkiux/codexmate)
-[![Maintain](https://img.shields.io/github/commit-activity/m/ymkiux/codexmate?label=maintain%2Fmonth)](https://github.com/ymkiux/codexmate/commits)
+[![Status](https://img.shields.io/badge/status-alpha-orange)](https://github.com/SakuraByteCore/codexmate)
+[![Maintain](https://img.shields.io/github/commit-activity/m/SakuraByteCore/codexmate?label=maintain%2Fmonth)](https://github.com/SakuraByteCore/codexmate/commits)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D14.0.0-green.svg)](https://nodejs.org)
 
@@ -31,7 +31,7 @@ Codex Mate helps you switch Codex/Claude Code providers and models in seconds, a
 Requirements: `Node.js >= 14`, `Git`
 
 ```bash
-git clone https://github.com/ymkiux/codexmate.git && cd codexmate && npm install && npm link && codexmate run
+git clone https://github.com/SakuraByteCore/codexmate.git && cd codexmate && npm install && npm link && codexmate run
 ```
 
 Open `http://localhost:3737` in your browser.
@@ -125,7 +125,7 @@ codexmate export-session --source codex --session-id <ID>
 ### From Source (Recommended, One Line)
 
 ```bash
-git clone https://github.com/ymkiux/codexmate.git && cd codexmate && npm install && npm link
+git clone https://github.com/SakuraByteCore/codexmate.git && cd codexmate && npm install && npm link
 ```
 
 Then verify:
@@ -151,7 +151,7 @@ npm install -g codexmate
 Package name on npm: `codexmate`. If you want the latest repo version each time, install from GitHub:
 
 ```bash
-npm install -g ymkiux/codexmate
+npm install -g github:SakuraByteCore/codexmate
 ```
 
 ### Requirements
