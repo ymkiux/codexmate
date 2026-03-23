@@ -15,7 +15,12 @@ const {
     formatLatency,
     buildSpeedTestIssue,
     isSessionQueryEnabled,
-    buildSessionListParams
+    normalizeSessionSource,
+    normalizeSessionPathFilter,
+    buildSessionFilterCacheState,
+    buildSessionListParams,
+    formatSessionTimelineTimestamp,
+    buildSessionTimelineNodes
 } = logic;
 
 test('normalizeClaudeValue trims strings and ignores non-string', () => {
@@ -126,6 +131,36 @@ test('isSessionQueryEnabled supports codex/claude/all', () => {
     assert.strictEqual(isSessionQueryEnabled(''), false);
 });
 
+test('normalizeSessionSource returns safe source value for session filters', () => {
+    assert.strictEqual(normalizeSessionSource('codex'), 'codex');
+    assert.strictEqual(normalizeSessionSource('CLAUDE'), 'claude');
+    assert.strictEqual(normalizeSessionSource('all'), 'all');
+    assert.strictEqual(normalizeSessionSource('unknown'), 'all');
+    assert.strictEqual(normalizeSessionSource(''), 'all');
+    assert.strictEqual(normalizeSessionSource(null), 'all');
+});
+
+test('normalizeSessionPathFilter trims path and handles non-string', () => {
+    assert.strictEqual(normalizeSessionPathFilter('  D:/repo  '), 'D:/repo');
+    assert.strictEqual(normalizeSessionPathFilter(''), '');
+    assert.strictEqual(normalizeSessionPathFilter(null), '');
+    assert.strictEqual(normalizeSessionPathFilter(undefined), '');
+});
+
+test('buildSessionFilterCacheState normalizes source/path for local cache', () => {
+    const cached = buildSessionFilterCacheState('CLAUDE', '  D:/project/11/8  ');
+    assert.deepStrictEqual(cached, {
+        source: 'claude',
+        pathFilter: 'D:/project/11/8'
+    });
+
+    const fallback = buildSessionFilterCacheState('invalid-source', null);
+    assert.deepStrictEqual(fallback, {
+        source: 'all',
+        pathFilter: ''
+    });
+});
+
 test('buildSessionListParams keeps claude code lexicon query when enabled', () => {
     const paramsClaude = buildSessionListParams({
         source: 'claude',
@@ -183,4 +218,133 @@ test('buildSessionListParams clears query for unsupported sources', () => {
     assert.strictEqual(params.forceRefresh, true);
     assert.strictEqual(params.queryScope, 'content');
     assert.strictEqual(params.contentScanLimit, 50);
+});
+
+test('formatSessionTimelineTimestamp normalizes ISO-like strings for timeline labels', () => {
+    assert.strictEqual(formatSessionTimelineTimestamp('2026-03-23T09:10:11.000Z'), '03-23 09:10:11');
+    assert.strictEqual(formatSessionTimelineTimestamp('2026-03-23 19:20:00'), '03-23 19:20:00');
+    assert.strictEqual(formatSessionTimelineTimestamp('not-a-time'), 'not-a-time');
+    assert.strictEqual(formatSessionTimelineTimestamp(''), '');
+});
+
+test('buildSessionTimelineNodes builds per-message node metadata', () => {
+    const nodes = buildSessionTimelineNodes([
+        { role: 'user', timestamp: '2026-03-23T09:00:00Z' },
+        { role: 'assistant', timestamp: '2026-03-23T09:01:00Z' },
+        { role: 'system', timestamp: '' }
+    ], {
+        getKey(message, idx) {
+            return `${message.role}-${idx}`;
+        }
+    });
+
+    assert.strictEqual(nodes.length, 3);
+    assert.strictEqual(nodes[0].key, 'user-0');
+    assert.strictEqual(nodes[0].role, 'user');
+    assert.strictEqual(nodes[0].roleShort, 'U');
+    assert.strictEqual(nodes[0].displayTime, '03-23 09:00:00');
+    assert.strictEqual(nodes[0].title, '#1 · User · 03-23 09:00:00');
+    assert.strictEqual(nodes[0].percent, 0);
+    assert.strictEqual(nodes[0].safePercent, 6);
+
+    assert.strictEqual(nodes[1].key, 'assistant-1');
+    assert.strictEqual(nodes[1].roleShort, 'A');
+    assert.strictEqual(nodes[1].percent, 50);
+    assert.strictEqual(nodes[1].safePercent, 50);
+
+    assert.strictEqual(nodes[2].key, 'system-2');
+    assert.strictEqual(nodes[2].roleShort, 'S');
+    assert.strictEqual(nodes[2].title, '#3 · System');
+    assert.strictEqual(nodes[2].percent, 100);
+    assert.strictEqual(nodes[2].safePercent, 94);
+});
+
+test('buildSessionTimelineNodes groups dense messages to avoid overlapping markers', () => {
+    const messages = Array.from({ length: 90 }, (_, idx) => ({
+        role: idx % 3 === 0 ? 'user' : (idx % 3 === 1 ? 'assistant' : 'system'),
+        timestamp: `2026-03-23T09:${String(idx % 60).padStart(2, '0')}:00Z`
+    }));
+
+    const nodes = buildSessionTimelineNodes(messages, {
+        maxMarkers: 30,
+        getKey(_message, idx) {
+            return `msg-${idx}`;
+        }
+    });
+
+    assert.strictEqual(nodes.length, 30);
+    assert.strictEqual(nodes[0].key, 'msg-1');
+    assert.strictEqual(nodes[0].role, 'mixed');
+    assert.strictEqual(nodes[0].messageCount, 3);
+    assert.strictEqual(nodes[0].startIndex, 0);
+    assert.strictEqual(nodes[0].endIndex, 2);
+
+    const last = nodes[nodes.length - 1];
+    assert.strictEqual(last.key, 'msg-88');
+    assert.strictEqual(last.messageCount, 3);
+    assert.strictEqual(last.startIndex, 87);
+    assert.strictEqual(last.endIndex, 89);
+
+    assert.ok(nodes.every(node => node.safePercent >= 6 && node.safePercent <= 94));
+});
+
+test('buildSessionTimelineNodes keeps near-max marker density when total is just above cap', () => {
+    const messages = Array.from({ length: 31 }, (_, idx) => ({
+        role: idx % 2 === 0 ? 'user' : 'assistant',
+        timestamp: `2026-03-23T09:${String(idx % 60).padStart(2, '0')}:00Z`
+    }));
+    const nodes = buildSessionTimelineNodes(messages, {
+        maxMarkers: 30,
+        getKey(_message, idx) {
+            return `msg-${idx}`;
+        }
+    });
+
+    assert.strictEqual(nodes.length, 30);
+    assert.strictEqual(nodes[0].startIndex, 0);
+    assert.strictEqual(nodes[0].endIndex, 0);
+    const last = nodes[nodes.length - 1];
+    assert.strictEqual(last.startIndex, 29);
+    assert.strictEqual(last.endIndex, 30);
+    assert.strictEqual(last.messageCount, 2);
+});
+
+test('buildSessionTimelineNodes clamps maxMarkers into 1..80 and falls back on non-numeric values', () => {
+    const messages = Array.from({ length: 800 }, (_, idx) => ({
+        role: idx % 2 === 0 ? 'user' : 'assistant',
+        timestamp: `2026-03-23T09:${String(idx % 60).padStart(2, '0')}:00Z`
+    }));
+
+    const scenarios = [
+        { maxMarkers: 0, expectedLength: 1 },
+        { maxMarkers: -5, expectedLength: 1 },
+        { maxMarkers: 'not-a-number', expectedLength: 30 },
+        { maxMarkers: 10.7, expectedLength: 10 },
+        { maxMarkers: 999, expectedLength: 80 }
+    ];
+
+    for (const scenario of scenarios) {
+        const nodes = buildSessionTimelineNodes(messages, {
+            maxMarkers: scenario.maxMarkers,
+            getKey(_message, idx) {
+                return `msg-${idx}`;
+            }
+        });
+
+        assert.strictEqual(nodes.length, scenario.expectedLength);
+        assert.ok(nodes.length >= 1);
+        assert.ok(nodes[0].key.startsWith('msg-'));
+        assert.ok(Number.isInteger(nodes[0].startIndex) && nodes[0].startIndex >= 0);
+        assert.ok(Number.isInteger(nodes[0].endIndex) && nodes[0].endIndex >= nodes[0].startIndex);
+        assert.ok(Number.isInteger(nodes[0].messageCount) && nodes[0].messageCount > 0);
+        assert.ok(nodes[0].safePercent >= 6 && nodes[0].safePercent <= 94);
+
+        const last = nodes[nodes.length - 1];
+        assert.ok(last.key.startsWith('msg-'));
+        assert.ok(Number.isInteger(last.startIndex) && last.startIndex >= 0);
+        assert.ok(Number.isInteger(last.endIndex) && last.endIndex >= last.startIndex);
+        assert.ok(Number.isInteger(last.messageCount) && last.messageCount > 0);
+        assert.strictEqual(last.endIndex, messages.length - 1);
+        assert.ok(last.safePercent >= 6 && last.safePercent <= 94);
+    }
 });
