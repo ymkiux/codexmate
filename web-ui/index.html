@@ -390,8 +390,8 @@
                     <div class="selector-header">
                         <span class="selector-title">Skills 管理</span>
                     </div>
-                    <div class="config-template-hint skills-hint-line">管理 <code>~/.codex/skills</code> 自定义 skills，支持多选删除。</div>
-                    <button class="btn-tool" @click="openSkillsManager" :disabled="loading || !!initError || skillsLoading || skillsDeleting">
+                    <div class="config-template-hint skills-hint-line">管理 <code>~/.codex/skills</code> 自定义 skills，支持检索筛选、多选删除与跨应用导入。</div>
+                    <button class="btn-tool" @click="openSkillsManager" :disabled="loading || !!initError || skillsLoading || skillsDeleting || skillsScanningImports || skillsImporting">
                         {{ skillsLoading ? '加载中...' : '打开 Skills 管理' }}
                     </button>
                 </div>
@@ -1672,8 +1672,11 @@
                 <div class="modal-header skills-modal-header">
                     <div class="modal-title">Skills 管理</div>
                     <div class="modal-header-actions skills-modal-actions">
-                        <button class="btn-mini" @click="refreshSkillsList({ silent: false })" :disabled="skillsLoading || skillsDeleting">
+                        <button class="btn-mini" @click="refreshSkillsList({ silent: false })" :disabled="skillsLoading || skillsDeleting || skillsScanningImports || skillsImporting">
                             {{ skillsLoading ? '刷新中...' : '刷新' }}
+                        </button>
+                        <button class="btn-mini" @click="scanImportableSkills" :disabled="skillsLoading || skillsDeleting || skillsScanningImports || skillsImporting">
+                            {{ skillsScanningImports ? '扫描中...' : '扫描可导入' }}
                         </button>
                     </div>
                 </div>
@@ -1683,36 +1686,87 @@
                     <div class="skills-root-box">{{ skillsRootPath || '~/.codex/skills' }}</div>
                 </div>
 
+                <div class="skills-filter-row">
+                    <input
+                        class="form-input"
+                        type="text"
+                        v-model.trim="skillsKeyword"
+                        placeholder="按目录名/显示名/描述检索">
+                    <select class="form-select skills-status-select" v-model="skillsStatusFilter">
+                        <option value="all">全部状态</option>
+                        <option value="with-skill-file">仅含 SKILL.md</option>
+                        <option value="missing-skill-file">仅缺少 SKILL.md</option>
+                    </select>
+                </div>
+
                 <div class="skill-toolbar">
                     <label class="skill-select-all">
                         <input type="checkbox" :checked="skillsAllSelected" @change="toggleAllSkillsSelection" :disabled="skillsLoading || skillsDeleting || skillsSelectableNames.length === 0">
                         <span>{{ skillsAllSelected ? '取消全选' : '全选' }}</span>
                     </label>
-                    <span class="skill-toolbar-count">已选 {{ skillsSelectedCount }} / {{ skillsSelectableNames.length }}</span>
+                    <span class="skill-toolbar-count">已选 {{ skillsSelectedCount }}（当前筛选 {{ skillsVisibleSelectedCount }} / {{ skillsSelectableNames.length }}，总计 {{ skillsList.length }}）</span>
                 </div>
 
                 <div v-if="skillsList.length === 0" class="skills-empty-state">暂无可管理的 skill。</div>
+                <div v-else-if="filteredSkillsList.length === 0" class="skills-empty-state">当前筛选条件下没有匹配的 skill。</div>
                 <div v-else class="skill-list">
                     <label
                         class="skill-item"
                         :class="{ selected: skillsSelectedNames.includes(skill.name) }"
-                        v-for="skill in skillsList"
+                        v-for="skill in filteredSkillsList"
                         :key="'skill-' + skill.name">
                         <input type="checkbox" v-model="skillsSelectedNames" :value="skill.name" :disabled="skillsDeleting">
                         <div class="skill-item-main">
-                            <div class="skill-item-title">{{ skill.name }}</div>
+                            <div class="skill-item-title">{{ skill.displayName || skill.name }}</div>
+                            <div v-if="skill.description" class="skill-item-description">{{ skill.description }}</div>
                             <div class="skill-item-meta">
                                 <span>{{ skill.path }}</span>
                                 <span :class="['pill', skill.hasSkillFile ? 'configured' : 'empty']">
                                     {{ skill.hasSkillFile ? '含 SKILL.md' : '缺少 SKILL.md' }}
                                 </span>
+                                <span class="pill source">{{ skill.sourceType === 'symlink' ? '符号链接' : '目录' }}</span>
                             </div>
                         </div>
                     </label>
                 </div>
 
+                <div class="skills-import-block">
+                    <div class="skills-import-title">跨应用导入（对齐 cc-switch 能力）</div>
+                    <div class="skill-toolbar">
+                        <label class="skill-select-all">
+                            <input type="checkbox" :checked="skillsImportAllSelected" @change="toggleAllSkillsImportSelection" :disabled="skillsScanningImports || skillsImporting || skillsImportSelectableKeys.length === 0">
+                            <span>{{ skillsImportAllSelected ? '取消全选' : '全选' }}</span>
+                        </label>
+                        <span class="skill-toolbar-count">已选 {{ skillsImportSelectedCount }} / {{ skillsImportSelectableKeys.length }}</span>
+                    </div>
+                    <div v-if="skillsImportList.length === 0" class="skills-empty-state skills-import-empty">暂无可导入 skill，点击“扫描可导入”。</div>
+                    <div v-else class="skill-list skills-import-list">
+                        <label
+                            class="skill-item"
+                            :class="{ selected: skillsImportSelectedKeys.includes(buildSkillImportKey(skill)) }"
+                            v-for="skill in skillsImportList"
+                            :key="'import-skill-' + buildSkillImportKey(skill)">
+                            <input type="checkbox" v-model="skillsImportSelectedKeys" :value="buildSkillImportKey(skill)" :disabled="skillsImporting">
+                            <div class="skill-item-main">
+                                <div class="skill-item-title">{{ skill.displayName || skill.name }}</div>
+                                <div v-if="skill.description" class="skill-item-description">{{ skill.description }}</div>
+                                <div class="skill-item-meta">
+                                    <span>{{ skill.sourcePath }}</span>
+                                    <span class="pill source">{{ skill.sourceLabel }}</span>
+                                    <span :class="['pill', skill.hasSkillFile ? 'configured' : 'empty']">
+                                        {{ skill.hasSkillFile ? '含 SKILL.md' : '缺少 SKILL.md' }}
+                                    </span>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
                 <div class="btn-group">
                     <button class="btn btn-cancel" @click="closeSkillsModal" :disabled="skillsDeleting">关闭</button>
+                    <button class="btn btn-confirm" @click="importSelectedSkills" :disabled="skillsImporting || skillsImportSelectedCount === 0">
+                        {{ skillsImporting ? '导入中...' : '导入选中' }}
+                    </button>
                     <button class="btn btn-confirm btn-danger" @click="deleteSelectedSkills" :disabled="skillsDeleting || skillsSelectedCount === 0">
                         {{ skillsDeleting ? '删除中...' : '删除选中' }}
                     </button>

@@ -105,6 +105,12 @@
                     skillsSelectedNames: [],
                     skillsLoading: false,
                     skillsDeleting: false,
+                    skillsKeyword: '',
+                    skillsStatusFilter: 'all',
+                    skillsImportList: [],
+                    skillsImportSelectedKeys: [],
+                    skillsScanningImports: false,
+                    skillsImporting: false,
                     sessionsList: [],
                     sessionsLoading: false,
                     sessionFilterSource: 'all',
@@ -394,21 +400,62 @@
                 installRegistryPreview() {
                     return this.resolveInstallRegistryUrl(this.installRegistryPreset, this.installRegistryCustom);
                 },
-                skillsSelectableNames() {
+                filteredSkillsList() {
                     const list = Array.isArray(this.skillsList) ? this.skillsList : [];
+                    const keyword = typeof this.skillsKeyword === 'string' ? this.skillsKeyword.trim().toLowerCase() : '';
+                    const status = typeof this.skillsStatusFilter === 'string' ? this.skillsStatusFilter : 'all';
+                    return list.filter((item) => {
+                        const safe = item && typeof item === 'object' ? item : {};
+                        const hasSkillFile = !!safe.hasSkillFile;
+                        if (status === 'with-skill-file' && !hasSkillFile) return false;
+                        if (status === 'missing-skill-file' && hasSkillFile) return false;
+                        if (!keyword) return true;
+                        const fields = [
+                            safe.name,
+                            safe.displayName,
+                            safe.description,
+                            safe.path
+                        ];
+                        return fields.some((value) => typeof value === 'string' && value.toLowerCase().includes(keyword));
+                    });
+                },
+                skillsSelectableNames() {
+                    const list = Array.isArray(this.filteredSkillsList) ? this.filteredSkillsList : [];
                     return list
                         .map((item) => (item && typeof item.name === 'string' ? item.name.trim() : ''))
                         .filter(Boolean);
                 },
                 skillsSelectedCount() {
                     const selected = Array.isArray(this.skillsSelectedNames) ? this.skillsSelectedNames : [];
-                    return selected.length;
+                    return Array.from(new Set(selected.map((item) => String(item || '').trim()).filter(Boolean))).length;
+                },
+                skillsVisibleSelectedCount() {
+                    const selectable = this.skillsSelectableNames;
+                    const selectedSet = new Set(Array.isArray(this.skillsSelectedNames) ? this.skillsSelectedNames : []);
+                    return selectable.filter((name) => selectedSet.has(name)).length;
                 },
                 skillsAllSelected() {
                     const selectable = this.skillsSelectableNames;
                     if (!selectable.length) return false;
                     const selectedSet = new Set(Array.isArray(this.skillsSelectedNames) ? this.skillsSelectedNames : []);
                     return selectable.every((name) => selectedSet.has(name));
+                },
+                skillsImportSelectableKeys() {
+                    const list = Array.isArray(this.skillsImportList) ? this.skillsImportList : [];
+                    return list
+                        .map((item) => this.buildSkillImportKey(item))
+                        .filter(Boolean);
+                },
+                skillsImportSelectedCount() {
+                    const selectable = this.skillsImportSelectableKeys;
+                    const selectedSet = new Set(Array.isArray(this.skillsImportSelectedKeys) ? this.skillsImportSelectedKeys : []);
+                    return selectable.filter((key) => selectedSet.has(key)).length;
+                },
+                skillsImportAllSelected() {
+                    const selectable = this.skillsImportSelectableKeys;
+                    if (!selectable.length) return false;
+                    const selectedSet = new Set(Array.isArray(this.skillsImportSelectedKeys) ? this.skillsImportSelectedKeys : []);
+                    return selectable.every((key) => selectedSet.has(key));
                 },
                 inspectorMainTabLabel() {
                     if (this.mainTab === 'config') return '配置中心';
@@ -474,7 +521,7 @@
                     if (this.codexModelsLoading || this.claudeModelsLoading) tasks.push('模型加载');
                     if (this.codexApplying || this.configTemplateApplying || this.openclawApplying) tasks.push('配置应用');
                     if (this.agentsSaving) tasks.push('AGENTS 保存');
-                    if (this.skillsLoading || this.skillsDeleting) tasks.push('Skills 管理');
+                    if (this.skillsLoading || this.skillsDeleting || this.skillsScanningImports || this.skillsImporting) tasks.push('Skills 管理');
                     if (this.proxySaving || this.proxyApplying || this.proxyStarting || this.proxyStopping) tasks.push('代理更新');
                     return tasks.length ? tasks.join(' / ') : '空闲';
                 },
@@ -2014,6 +2061,10 @@
 
                 async openSkillsManager() {
                     this.skillsSelectedNames = [];
+                    this.skillsKeyword = '';
+                    this.skillsStatusFilter = 'all';
+                    this.skillsImportList = [];
+                    this.skillsImportSelectedKeys = [];
                     this.showSkillsModal = true;
                     await this.refreshSkillsList({ silent: false });
                 },
@@ -2021,6 +2072,7 @@
                 closeSkillsModal() {
                     this.showSkillsModal = false;
                     this.skillsSelectedNames = [];
+                    this.skillsImportSelectedKeys = [];
                 },
 
                 async refreshSkillsList(options = {}) {
@@ -2033,7 +2085,9 @@
                         }
                         this.skillsRootPath = res.root || '';
                         this.skillsList = Array.isArray(res.items) ? res.items : [];
-                        const currentNames = new Set(this.skillsSelectableNames);
+                        const currentNames = new Set((Array.isArray(this.skillsList) ? this.skillsList : [])
+                            .map((item) => (item && typeof item.name === 'string' ? item.name.trim() : ''))
+                            .filter(Boolean));
                         this.skillsSelectedNames = (Array.isArray(this.skillsSelectedNames) ? this.skillsSelectedNames : [])
                             .filter((name) => currentNames.has(name));
                         if (!options.silent) {
@@ -2050,11 +2104,98 @@
                 },
 
                 toggleAllSkillsSelection() {
+                    const selectable = this.skillsSelectableNames;
                     if (this.skillsAllSelected) {
-                        this.skillsSelectedNames = [];
+                        const selectedSet = new Set(Array.isArray(this.skillsSelectedNames) ? this.skillsSelectedNames : []);
+                        selectable.forEach((name) => selectedSet.delete(name));
+                        this.skillsSelectedNames = Array.from(selectedSet);
                         return;
                     }
-                    this.skillsSelectedNames = [...this.skillsSelectableNames];
+                    const selectedSet = new Set(Array.isArray(this.skillsSelectedNames) ? this.skillsSelectedNames : []);
+                    selectable.forEach((name) => selectedSet.add(name));
+                    this.skillsSelectedNames = Array.from(selectedSet);
+                },
+
+                buildSkillImportKey(item) {
+                    const safe = item && typeof item === 'object' ? item : {};
+                    const sourceApp = typeof safe.sourceApp === 'string' ? safe.sourceApp.trim().toLowerCase() : '';
+                    const name = typeof safe.name === 'string' ? safe.name.trim() : '';
+                    if (!sourceApp || !name) return '';
+                    return `${sourceApp}:${name}`;
+                },
+
+                toggleAllSkillsImportSelection() {
+                    const selectable = this.skillsImportSelectableKeys;
+                    if (this.skillsImportAllSelected) {
+                        this.skillsImportSelectedKeys = [];
+                        return;
+                    }
+                    this.skillsImportSelectedKeys = [...selectable];
+                },
+
+                async scanImportableSkills() {
+                    if (this.skillsScanningImports || this.skillsImporting) return;
+                    this.skillsScanningImports = true;
+                    try {
+                        const res = await api('scan-unmanaged-codex-skills');
+                        if (res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        this.skillsImportList = Array.isArray(res.items) ? res.items : [];
+                        const availableKeys = new Set(this.skillsImportSelectableKeys);
+                        this.skillsImportSelectedKeys = (Array.isArray(this.skillsImportSelectedKeys) ? this.skillsImportSelectedKeys : [])
+                            .filter((key) => availableKeys.has(key));
+                        if (this.skillsImportList.length === 0) {
+                            this.showMessage('未扫描到可导入 skill', 'info');
+                        } else {
+                            this.showMessage(`扫描到 ${this.skillsImportList.length} 个可导入 skill`, 'success');
+                        }
+                    } catch (e) {
+                        this.showMessage('扫描可导入 skill 失败', 'error');
+                    } finally {
+                        this.skillsScanningImports = false;
+                    }
+                },
+
+                async importSelectedSkills() {
+                    if (this.skillsImporting) return;
+                    const selectedSet = new Set(Array.isArray(this.skillsImportSelectedKeys) ? this.skillsImportSelectedKeys : []);
+                    const selectedItems = (Array.isArray(this.skillsImportList) ? this.skillsImportList : [])
+                        .filter((item) => selectedSet.has(this.buildSkillImportKey(item)))
+                        .map((item) => ({
+                            name: item.name,
+                            sourceApp: item.sourceApp
+                        }));
+                    if (!selectedItems.length) {
+                        this.showMessage('请先选择要导入的 skill', 'error');
+                        return;
+                    }
+
+                    this.skillsImporting = true;
+                    try {
+                        const res = await api('import-codex-skills', { items: selectedItems });
+                        if (res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        const importedCount = Array.isArray(res.imported) ? res.imported.length : 0;
+                        const failedCount = Array.isArray(res.failed) ? res.failed.length : 0;
+                        if (failedCount > 0 && importedCount > 0) {
+                            this.showMessage(`已导入 ${importedCount} 个，失败 ${failedCount} 个`, 'error');
+                        } else if (failedCount > 0) {
+                            const first = res.failed[0] && res.failed[0].error ? res.failed[0].error : '导入失败';
+                            this.showMessage(first, 'error');
+                        } else {
+                            this.showMessage(`已导入 ${importedCount} 个 skill`, 'success');
+                        }
+                        await this.refreshSkillsList({ silent: true });
+                        await this.scanImportableSkills();
+                    } catch (e) {
+                        this.showMessage('导入 skill 失败', 'error');
+                    } finally {
+                        this.skillsImporting = false;
+                    }
                 },
 
                 async deleteSelectedSkills() {
