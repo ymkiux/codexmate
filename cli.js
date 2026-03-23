@@ -106,6 +106,7 @@ const SESSION_SCAN_FACTOR = 4;
 const SESSION_SCAN_MIN_FILES = 800;
 const MAX_SESSION_PATH_LIST_SIZE = 2000;
 const AGENTS_FILE_NAME = 'AGENTS.md';
+const CODEX_SKILLS_DIR = path.join(CONFIG_DIR, 'skills');
 const MODELS_CACHE_TTL_MS = 60 * 1000;
 const MODELS_NEGATIVE_CACHE_TTL_MS = 5 * 1000;
 const MODELS_CACHE_MAX_ENTRIES = 50;
@@ -1343,6 +1344,138 @@ function validateAgentsBaseDir(filePath) {
         return { error: `目标目录不存在: ${dirPath}` };
     }
     return { ok: true, dirPath };
+}
+
+function normalizeCodexSkillName(name) {
+    const value = typeof name === 'string' ? name.trim() : '';
+    if (!value) {
+        return { error: '技能名称不能为空' };
+    }
+    if (value.includes('\0')) {
+        return { error: '技能名称非法' };
+    }
+    if (value === '.' || value === '..') {
+        return { error: '技能名称非法' };
+    }
+    if (value.includes('/') || value.includes('\\')) {
+        return { error: '技能名称非法' };
+    }
+    if (path.basename(value) !== value) {
+        return { error: '技能名称非法' };
+    }
+    if (value.startsWith('.')) {
+        return { error: '系统技能不可删除' };
+    }
+    return { name: value };
+}
+
+function isSkillDirectoryEntry(entryName) {
+    const targetPath = path.join(CODEX_SKILLS_DIR, entryName);
+    try {
+        const stat = fs.statSync(targetPath);
+        return stat.isDirectory();
+    } catch (e) {
+        return false;
+    }
+}
+
+function listCodexSkills() {
+    if (!fs.existsSync(CODEX_SKILLS_DIR)) {
+        return {
+            root: CODEX_SKILLS_DIR,
+            exists: false,
+            items: []
+        };
+    }
+    try {
+        const entries = fs.readdirSync(CODEX_SKILLS_DIR, { withFileTypes: true });
+        const items = entries
+            .map((entry) => {
+                const name = entry && entry.name ? entry.name : '';
+                if (!name || name.startsWith('.')) return null;
+                if (!entry.isDirectory()) {
+                    if (!entry.isSymbolicLink() || !isSkillDirectoryEntry(name)) {
+                        return null;
+                    }
+                }
+                const skillPath = path.join(CODEX_SKILLS_DIR, name);
+                return {
+                    name,
+                    path: skillPath,
+                    hasSkillFile: fs.existsSync(path.join(skillPath, 'SKILL.md'))
+                };
+            })
+            .filter(Boolean)
+            .sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'));
+        return {
+            root: CODEX_SKILLS_DIR,
+            exists: true,
+            items
+        };
+    } catch (e) {
+        return { error: `读取 skills 目录失败: ${e.message}` };
+    }
+}
+
+function removeDirectoryRecursive(targetPath) {
+    if (typeof fs.rmSync === 'function') {
+        fs.rmSync(targetPath, { recursive: true, force: false });
+        return;
+    }
+    fs.rmdirSync(targetPath, { recursive: true });
+}
+
+function deleteCodexSkills(params = {}) {
+    const rawList = Array.isArray(params.names) ? params.names : [];
+    const uniqueNames = Array.from(new Set(rawList
+        .map((item) => (typeof item === 'string' ? item.trim() : ''))
+        .filter(Boolean)));
+    if (!uniqueNames.length) {
+        return { error: '请先选择要删除的 skill' };
+    }
+
+    const deleted = [];
+    const failed = [];
+    for (const rawName of uniqueNames) {
+        const normalized = normalizeCodexSkillName(rawName);
+        if (normalized.error) {
+            failed.push({ name: rawName, error: normalized.error });
+            continue;
+        }
+
+        const skillPath = path.join(CODEX_SKILLS_DIR, normalized.name);
+        const relativePath = path.relative(CODEX_SKILLS_DIR, skillPath);
+        if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+            failed.push({ name: normalized.name, error: '技能路径非法' });
+            continue;
+        }
+        if (!fs.existsSync(skillPath)) {
+            failed.push({ name: normalized.name, error: 'skill 不存在' });
+            continue;
+        }
+
+        try {
+            const stat = fs.lstatSync(skillPath);
+            if (!stat.isDirectory() && !stat.isSymbolicLink()) {
+                failed.push({ name: normalized.name, error: '仅支持删除技能目录' });
+                continue;
+            }
+            removeDirectoryRecursive(skillPath);
+            deleted.push(normalized.name);
+        } catch (e) {
+            failed.push({
+                name: normalized.name,
+                error: e && e.message ? e.message : '删除失败'
+            });
+        }
+    }
+
+    return {
+        success: failed.length === 0,
+        deleted,
+        failed,
+        root: CODEX_SKILLS_DIR
+    };
 }
 
 function readAgentsFile(params = {}) {
@@ -7047,6 +7180,12 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             break;
                         case 'apply-agents-file':
                             result = applyAgentsFile(params || {});
+                            break;
+                        case 'list-codex-skills':
+                            result = listCodexSkills();
+                            break;
+                        case 'delete-codex-skills':
+                            result = deleteCodexSkills(params || {});
                             break;
                         case 'get-openclaw-config':
                             result = readOpenclawConfigFile();
