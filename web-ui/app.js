@@ -425,6 +425,19 @@
                         .map((item) => (item && typeof item.name === 'string' ? item.name.trim() : ''))
                         .filter(Boolean);
                 },
+                skillsConfiguredCount() {
+                    const list = Array.isArray(this.skillsList) ? this.skillsList : [];
+                    return list.filter((item) => !!(item && item.hasSkillFile)).length;
+                },
+                skillsMissingSkillFileCount() {
+                    const list = Array.isArray(this.skillsList) ? this.skillsList : [];
+                    return list.filter((item) => !(item && item.hasSkillFile)).length;
+                },
+                skillsFilterDirty() {
+                    const keyword = typeof this.skillsKeyword === 'string' ? this.skillsKeyword.trim() : '';
+                    const status = typeof this.skillsStatusFilter === 'string' ? this.skillsStatusFilter : 'all';
+                    return keyword.length > 0 || status !== 'all';
+                },
                 skillsSelectedCount() {
                     const selected = Array.isArray(this.skillsSelectedNames) ? this.skillsSelectedNames : [];
                     return Array.from(new Set(selected.map((item) => String(item || '').trim()).filter(Boolean))).length;
@@ -456,6 +469,14 @@
                     if (!selectable.length) return false;
                     const selectedSet = new Set(Array.isArray(this.skillsImportSelectedKeys) ? this.skillsImportSelectedKeys : []);
                     return selectable.every((key) => selectedSet.has(key));
+                },
+                skillsImportConfiguredCount() {
+                    const list = Array.isArray(this.skillsImportList) ? this.skillsImportList : [];
+                    return list.filter((item) => !!(item && item.hasSkillFile)).length;
+                },
+                skillsImportMissingSkillFileCount() {
+                    const list = Array.isArray(this.skillsImportList) ? this.skillsImportList : [];
+                    return list.filter((item) => !(item && item.hasSkillFile)).length;
                 },
                 inspectorMainTabLabel() {
                     if (this.mainTab === 'config') return '配置中心';
@@ -2101,6 +2122,11 @@
                     } finally {
                         this.skillsLoading = false;
                     }
+                },
+
+                resetSkillsFilters() {
+                    this.skillsKeyword = '';
+                    this.skillsStatusFilter = 'all';
                 },
 
                 toggleAllSkillsSelection() {
