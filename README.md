@@ -40,6 +40,7 @@ One tool to switch Codex/Claude Code providers & models and manage/browse local 
 | Module | Problem | Key Capabilities |
 | --- | --- | --- |
 | Codex Config | Switching providers/models is painful | Provider/model switching, model management, CLI + Web entry points, template-confirmed writes |
+| Skills Manager | Local custom skills are hard to inspect and clean up | Skills modal with overview counters, keyword/status filters, bulk delete, and cross-app import scan |
 | Claude Code Config | Multiple profiles and inconsistent write paths | Profile management, default write to `~/.claude/settings.json` |
 | OpenClaw Config | OpenClaw configs are scattered | JSON5 profiles, apply to `~/.openclaw/openclaw.json`, AGENTS workspace management |
 | Session Browser | Local sessions are hard to track | List/filter sessions, keyword search (Codex + Claude), export to Markdown, copy resume command (when available), delete and batch cleanup |
@@ -207,8 +208,16 @@ codexmate run
 - Quickly switch provider and model
 - Manage available model list
 - Edit `~/.codex/AGENTS.md` instruction file (same level as `config.toml`)
+- Open the Skills Manager modal for `~/.codex/skills` (overview counters, keyword/status filters, multi-select delete, cross-app import scan)
 - Add/delete custom providers
 - Supports Codex config management on Linux/Windows
+
+### Skills Manager Modal
+
+- Shows overview counters (`total`, `with SKILL.md`, `missing SKILL.md`, `importable`) for quick audit
+- Supports keyword search by folder name/display name/description and status filter by `SKILL.md` presence
+- Supports multi-select and bulk deletion for local skills
+- Supports scanning unmanaged skills from other apps and importing selected items in batch
 
 ### Claude Code Config Mode (Windows / macOS / Linux)
 

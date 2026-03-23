@@ -46,6 +46,7 @@ Codex Mate 让 Codex 与 Claude Code 的提供商/模型切换变成“一条命
 | 模块 | 解决的问题 | 关键能力 |
 | --- | --- | --- |
 | Codex 配置 | 多提供商/多模型切换麻烦 | 提供商/模型切换、模型管理、CLI + Web 双入口、模板确认写入 |
+| Skills 管理 | 本地自定义 skills 分散且难排查 | Skills 弹窗统计概览、关键词/状态筛选、多选删除、跨应用扫描导入 |
 | Claude Code 配置 | 多方案共存、写入路径不统一 | 多配置方案管理、默认写入 `~/.claude/settings.json` |
 | OpenClaw 配置 | OpenClaw 配置分散 | JSON5 多配置管理、应用到 `~/.openclaw/openclaw.json`、Workspace 指令文件管理 |
 | 会话浏览 | 本地会话难以追踪 | 会话列表/筛选、关键词搜索（支持 Codex/Claude）、Markdown 导出、可用时复制恢复命令、删除与批量清理 |
@@ -213,8 +214,16 @@ codexmate run
 - 快速切换提供商与模型
 - 管理可用模型列表
 - 编辑 `~/.codex/AGENTS.md` 指令文件（与 `config.toml` 同级）
+- 打开 `~/.codex/skills` 的 Skills 管理弹窗（统计概览、关键词/状态筛选、多选删除、跨应用扫描导入）
 - 添加/删除自定义提供商
 - 支持 Linux / Windows 环境下的 Codex 配置管理
+
+### Skills 管理弹窗
+
+- 提供 `总数 / 含 SKILL.md / 缺少 SKILL.md / 可导入` 四项统计，便于快速盘点
+- 支持按目录名、显示名、描述关键词检索，并支持 `SKILL.md` 状态筛选
+- 支持本地 skills 多选后批量删除
+- 支持扫描其他应用中未托管 skill，并勾选后批量导入
 
 ### Claude Code 配置模式（Windows / macOS / Linux）
 
