@@ -26,12 +26,12 @@
 
 Codex Mate 让 Codex 与 Claude Code 的提供商/模型切换变成“一条命令或一次点击”，并在同一 Web 页面浏览、导出两者的本地会话记录。
 
-## 60 秒上手（免安装）
+## 60 秒上手（源码一行安装）
 
-环境要求：`Node.js >= 14`
+环境要求：`Node.js >= 14`、`Git`
 
 ```bash
-npx codexmate@latest run
+git clone https://github.com/ymkiux/codexmate.git && cd codexmate && npm install && npm link && codexmate run
 ```
 
 浏览器打开 `http://localhost:3737`。
@@ -39,8 +39,14 @@ npx codexmate@latest run
 首次使用建议再执行：
 
 ```bash
-npx codexmate@latest setup
-npx codexmate@latest status
+codexmate setup
+codexmate status
+```
+
+如果你只想临时试用，可直接用：
+
+```bash
+npx codexmate@latest run
 ```
 
 ## 三条高频路径
@@ -116,37 +122,36 @@ codexmate export-session --source codex --session-id <ID>
 
 ## 安装
 
-### 全局安装（推荐）
+### 从源码安装（推荐，一行命令）
 
 ```bash
-npm install -g codexmate
+git clone https://github.com/ymkiux/codexmate.git && cd codexmate && npm install && npm link
 ```
 
-npm 包名：`codexmate`。
-
-若希望每次执行都能更新到最新特效功能，可使用 GitHub 源安装（重复执行即可更新）：
+安装完成后建议先验证：
 
 ```bash
-npm install -g ymkiux/codexmate
+codexmate status
+codexmate run
 ```
 
 ### 使用 npx（免安装）
 
 ```bash
 npx codexmate@latest status
-```
-
-```bash
 npx codexmate@latest run
 ```
 
-### 从源码安装
+### 全局安装（npm）
 
 ```bash
-git clone https://github.com/ymkiux/codexmate.git
-cd codexmate
-npm install
-npm link
+npm install -g codexmate
+```
+
+npm 包名：`codexmate`。若希望每次执行都更新到仓库最新版本，可使用：
+
+```bash
+npm install -g ymkiux/codexmate
 ```
 
 ### 环境要求

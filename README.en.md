@@ -26,12 +26,12 @@
 
 Codex Mate helps you switch Codex/Claude Code providers and models in seconds, and manage local sessions in one place.
 
-## 60-Second Quick Start (No Install)
+## 60-Second Quick Start (One-Line Source Install)
 
-Requirements: `Node.js >= 14`
+Requirements: `Node.js >= 14`, `Git`
 
 ```bash
-npx codexmate@latest run
+git clone https://github.com/ymkiux/codexmate.git && cd codexmate && npm install && npm link && codexmate run
 ```
 
 Open `http://localhost:3737` in your browser.
@@ -39,8 +39,14 @@ Open `http://localhost:3737` in your browser.
 If this is your first time, run:
 
 ```bash
-npx codexmate@latest setup
-npx codexmate@latest status
+codexmate setup
+codexmate status
+```
+
+If you only want a temporary trial, run:
+
+```bash
+npx codexmate@latest run
 ```
 
 ## Choose a Common Workflow
@@ -116,37 +122,36 @@ codexmate export-session --source codex --session-id <ID>
 
 ## Install
 
-### Global (Recommended)
+### From Source (Recommended, One Line)
 
 ```bash
-npm install -g codexmate
+git clone https://github.com/ymkiux/codexmate.git && cd codexmate && npm install && npm link
 ```
 
-Package name on npm: `codexmate`.
-
-Want to update to the latest effects features each time? Install from GitHub (re-run to update):
+Then verify:
 
 ```bash
-npm install -g ymkiux/codexmate
+codexmate status
+codexmate run
 ```
 
 ### Run with npx (No Install)
 
 ```bash
 npx codexmate@latest status
-```
-
-```bash
 npx codexmate@latest run
 ```
 
-### From Source
+### Global (npm)
 
 ```bash
-git clone https://github.com/ymkiux/codexmate.git
-cd codexmate
-npm install
-npm link
+npm install -g codexmate
+```
+
+Package name on npm: `codexmate`. If you want the latest repo version each time, install from GitHub:
+
+```bash
+npm install -g ymkiux/codexmate
 ```
 
 ### Requirements
