@@ -11,7 +11,8 @@
     normalizeSessionSource,
     normalizeSessionPathFilter,
     buildSessionFilterCacheState,
-    buildSessionTimelineNodes
+    buildSessionTimelineNodes,
+    normalizeSessionMessageRole
 } from './logic.mjs';
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -853,6 +854,7 @@
                     this.activeSessionMessages = [];
                     this.activeSessionDetailError = '';
                     this.activeSessionDetailClipped = false;
+                    this.cancelSessionTimelineSync();
                     this.sessionTimelineActiveKey = '';
                     this.sessionMessageRefMap = Object.create(null);
                     this.sessionStandaloneError = '';
@@ -1386,6 +1388,8 @@
                     this.sessionPreviewScrollEl = el || null;
                     if (this.sessionPreviewScrollEl) {
                         this.scheduleSessionTimelineSync();
+                    } else {
+                        this.cancelSessionTimelineSync();
                     }
                     this.updateSessionTimelineOffset();
                 },
@@ -1443,14 +1447,16 @@
                         this.sessionTimelineActiveKey = nodes[0].key;
                         return;
                     }
+                    const scrollRect = scrollEl.getBoundingClientRect();
                     const headerEl = scrollEl.querySelector('.session-preview-header');
-                    const headerHeight = headerEl ? headerEl.offsetHeight : 0;
-                    const anchorTop = scrollEl.scrollTop + headerHeight + 8;
+                    const headerHeight = headerEl ? headerEl.getBoundingClientRect().height : 0;
+                    const anchorLine = scrollRect.top + headerHeight + 8;
                     let activeKey = nodes[0].key;
                     for (const node of nodes) {
                         const messageEl = this.sessionMessageRefMap[node.key];
                         if (!messageEl) continue;
-                        if (messageEl.offsetTop <= anchorTop) {
+                        const messageRect = messageEl.getBoundingClientRect();
+                        if (messageRect.top <= anchorLine) {
                             activeKey = node.key;
                             continue;
                         }
@@ -1466,15 +1472,41 @@
                     if (!messageEl) return;
                     const headerEl = scrollEl.querySelector('.session-preview-header');
                     const stickyOffset = headerEl ? (headerEl.offsetHeight + 8) : 8;
+                    const scrollRect = scrollEl.getBoundingClientRect();
+                    const messageRect = messageEl.getBoundingClientRect();
+                    const targetScrollTop = scrollEl.scrollTop + (messageRect.top - scrollRect.top) - stickyOffset;
                     this.sessionTimelineActiveKey = messageKey;
                     if (typeof scrollEl.scrollTo === 'function') {
                         scrollEl.scrollTo({
-                            top: Math.max(0, messageEl.offsetTop - stickyOffset),
+                            top: Math.max(0, targetScrollTop),
                             behavior: 'smooth'
                         });
                     } else {
                         messageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     }
+                },
+
+                normalizeSessionMessage(message) {
+                    const fallback = {
+                        role: 'assistant',
+                        normalizedRole: 'assistant',
+                        roleLabel: 'Assistant',
+                        text: typeof message === 'string' ? message : '',
+                        timestamp: ''
+                    };
+                    const safeMessage = message && typeof message === 'object' ? message : fallback;
+                    const normalizedRole = normalizeSessionMessageRole(
+                        safeMessage.normalizedRole || safeMessage.role
+                    );
+                    const roleLabel = normalizedRole === 'user'
+                        ? 'User'
+                        : (normalizedRole === 'system' ? 'System' : 'Assistant');
+                    return {
+                        ...safeMessage,
+                        role: normalizedRole,
+                        normalizedRole,
+                        roleLabel
+                    };
                 },
 
                 getRecordKey(message) {
@@ -1524,6 +1556,7 @@
                             this.activeSession = null;
                             this.activeSessionMessages = [];
                             this.activeSessionDetailClipped = false;
+                            this.cancelSessionTimelineSync();
                             this.sessionTimelineActiveKey = '';
                             this.sessionMessageRefMap = Object.create(null);
                         } else {
@@ -1537,12 +1570,19 @@
                                 this.activeSession = null;
                                 this.activeSessionMessages = [];
                                 this.activeSessionDetailClipped = false;
+                                this.cancelSessionTimelineSync();
                                 this.sessionTimelineActiveKey = '';
                                 this.sessionMessageRefMap = Object.create(null);
                             } else {
                                 const oldKey = this.activeSession ? this.getSessionExportKey(this.activeSession) : '';
                                 const matched = this.sessionsList.find(item => this.getSessionExportKey(item) === oldKey);
                                 this.activeSession = matched || this.sessionsList[0];
+                                this.activeSessionMessages = [];
+                                this.activeSessionDetailError = '';
+                                this.activeSessionDetailClipped = false;
+                                this.cancelSessionTimelineSync();
+                                this.sessionTimelineActiveKey = '';
+                                this.sessionMessageRefMap = Object.create(null);
                                 await this.loadActiveSessionDetail();
                             }
                             void this.loadSessionPathOptions({ source: this.sessionFilterSource });
@@ -1552,6 +1592,7 @@
                         this.activeSession = null;
                         this.activeSessionMessages = [];
                         this.activeSessionDetailClipped = false;
+                        this.cancelSessionTimelineSync();
                         this.sessionTimelineActiveKey = '';
                         this.sessionMessageRefMap = Object.create(null);
                         this.showMessage('加载会话失败', 'error');
@@ -1567,6 +1608,7 @@
                     this.activeSessionMessages = [];
                     this.activeSessionDetailError = '';
                     this.activeSessionDetailClipped = false;
+                    this.cancelSessionTimelineSync();
                     this.sessionTimelineActiveKey = '';
                     this.sessionMessageRefMap = Object.create(null);
                     await this.loadActiveSessionDetail();
@@ -1622,6 +1664,7 @@
                         this.activeSessionMessages = [];
                         this.activeSessionDetailError = '';
                         this.activeSessionDetailClipped = false;
+                        this.cancelSessionTimelineSync();
                         this.sessionTimelineActiveKey = '';
                         this.sessionMessageRefMap = Object.create(null);
                         return;
@@ -1646,12 +1689,14 @@
                             this.activeSessionMessages = [];
                             this.activeSessionDetailClipped = false;
                             this.activeSessionDetailError = res.error;
+                            this.cancelSessionTimelineSync();
                             this.sessionTimelineActiveKey = '';
                             this.sessionMessageRefMap = Object.create(null);
                             return;
                         }
 
-                        this.activeSessionMessages = Array.isArray(res.messages) ? res.messages : [];
+                        const rawMessages = Array.isArray(res.messages) ? res.messages : [];
+                        this.activeSessionMessages = rawMessages.map((message) => this.normalizeSessionMessage(message));
                         this.activeSessionDetailClipped = !!res.clipped;
                         if (this.activeSession) {
                             if (res.sourceLabel) {
@@ -1687,6 +1732,7 @@
                         this.activeSessionMessages = [];
                         this.activeSessionDetailClipped = false;
                         this.activeSessionDetailError = '加载会话内容失败: ' + e.message;
+                        this.cancelSessionTimelineSync();
                         this.sessionTimelineActiveKey = '';
                         this.sessionMessageRefMap = Object.create(null);
                     } finally {

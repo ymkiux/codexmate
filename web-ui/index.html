@@ -961,10 +961,10 @@
                                             :key="getRecordRenderKey(msg, idx)"
                                             :data-message-key="getRecordRenderKey(msg, idx)"
                                             :ref="(el) => bindSessionMessageRef(getRecordRenderKey(msg, idx), el)"
-                                            :class="['session-msg', msg.role === 'user' ? 'user' : (msg.role === 'system' ? 'system' : 'assistant')]">
+                                            :class="['session-msg', msg.normalizedRole === 'user' ? 'user' : (msg.normalizedRole === 'system' ? 'system' : 'assistant')]">
                                             <div class="session-msg-header">
                                                 <div class="session-msg-meta">
-                                                    <span class="session-msg-role">{{ msg.role === 'user' ? 'User' : (msg.role === 'system' ? 'System' : 'Assistant') }}</span>
+                                                    <span class="session-msg-role">{{ msg.roleLabel || 'Assistant' }}</span>
                                                     <span class="session-msg-time">{{ msg.timestamp || '' }}</span>
                                                 </div>
                                             </div>
@@ -980,6 +980,7 @@
                                     :key="'timeline-' + node.key"
                                     type="button"
                                     :class="['session-timeline-node', { active: sessionTimelineActiveKey === node.key }]"
+                                    :aria-current="sessionTimelineActiveKey === node.key ? 'true' : null"
                                     :style="{ top: `${node.safePercent}%` }"
                                     :title="node.title"
                                     @click="jumpToSessionTimelineNode(node.key)">
