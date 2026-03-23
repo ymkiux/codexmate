@@ -1,4 +1,4 @@
-const { assert } = require('./helpers');
+﻿const { assert, fs, path } = require('./helpers');
 
 /**
  * E2E 测试：Web UI 消息简化
@@ -76,6 +76,30 @@ module.exports = async function testMessages(ctx) {
 
     const agentsOpenclaw = await api('get-openclaw-agents-file');
     assert(agentsOpenclaw.content !== undefined || agentsOpenclaw.error, 'get-openclaw-agents-file should return content or error');
+
+    // ========== Skills 管理测试 ==========
+    const skillsRoot = path.join(tmpHome, '.codex', 'skills');
+    const skillAlpha = path.join(skillsRoot, 'e2e-skill-alpha');
+    const skillBeta = path.join(skillsRoot, 'e2e-skill-beta');
+    fs.mkdirSync(skillAlpha, { recursive: true });
+    fs.mkdirSync(skillBeta, { recursive: true });
+    fs.writeFileSync(path.join(skillAlpha, 'SKILL.md'), '# alpha', 'utf-8');
+    fs.writeFileSync(path.join(skillBeta, 'SKILL.md'), '# beta', 'utf-8');
+
+    const skillsList = await api('list-codex-skills');
+    assert(Array.isArray(skillsList.items), 'list-codex-skills should return items array');
+    assert(skillsList.items.some((item) => item && item.name === 'e2e-skill-alpha'), 'list-codex-skills should include alpha');
+    assert(skillsList.items.some((item) => item && item.name === 'e2e-skill-beta'), 'list-codex-skills should include beta');
+
+    const deleteNoSelection = await api('delete-codex-skills', { names: [] });
+    assert(deleteNoSelection.error, 'delete-codex-skills should fail for empty names');
+
+    const deleteSkills = await api('delete-codex-skills', { names: ['e2e-skill-alpha', 'e2e-skill-beta'] });
+    assert(Array.isArray(deleteSkills.deleted), 'delete-codex-skills should return deleted list');
+    assert(deleteSkills.deleted.includes('e2e-skill-alpha'), 'delete-codex-skills should delete alpha');
+    assert(deleteSkills.deleted.includes('e2e-skill-beta'), 'delete-codex-skills should delete beta');
+    assert(!fs.existsSync(skillAlpha), 'alpha skill directory should be removed');
+    assert(!fs.existsSync(skillBeta), 'beta skill directory should be removed');
 
     // ========== OpenClaw 配置测试 ==========
     const openclawResult = await api('get-openclaw-config');

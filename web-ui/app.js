@@ -81,6 +81,7 @@
                     showOpenclawConfigModal: false,
                     showConfigTemplateModal: false,
                     showAgentsModal: false,
+                    showSkillsModal: false,
                     showInstallModal: false,
                     configTemplateContent: '',
                     configTemplateApplying: false,
@@ -94,6 +95,11 @@
                     agentsContext: 'codex',
                     agentsModalTitle: 'AGENTS.md 编辑器',
                     agentsModalHint: '保存后会写入目标 AGENTS.md（与 config.toml 同级）。',
+                    skillsRootPath: '',
+                    skillsList: [],
+                    skillsSelectedNames: [],
+                    skillsLoading: false,
+                    skillsDeleting: false,
                     sessionsList: [],
                     sessionsLoading: false,
                     sessionFilterSource: 'all',
@@ -354,6 +360,22 @@
                 installRegistryPreview() {
                     return this.resolveInstallRegistryUrl(this.installRegistryPreset, this.installRegistryCustom);
                 },
+                skillsSelectableNames() {
+                    const list = Array.isArray(this.skillsList) ? this.skillsList : [];
+                    return list
+                        .map((item) => (item && typeof item.name === 'string' ? item.name.trim() : ''))
+                        .filter(Boolean);
+                },
+                skillsSelectedCount() {
+                    const selected = Array.isArray(this.skillsSelectedNames) ? this.skillsSelectedNames : [];
+                    return selected.length;
+                },
+                skillsAllSelected() {
+                    const selectable = this.skillsSelectableNames;
+                    if (!selectable.length) return false;
+                    const selectedSet = new Set(Array.isArray(this.skillsSelectedNames) ? this.skillsSelectedNames : []);
+                    return selectable.every((name) => selectedSet.has(name));
+                },
                 inspectorMainTabLabel() {
                     if (this.mainTab === 'config') return '配置中心';
                     if (this.mainTab === 'sessions') return '会话浏览';
@@ -418,6 +440,7 @@
                     if (this.codexModelsLoading || this.claudeModelsLoading) tasks.push('模型加载');
                     if (this.codexApplying || this.configTemplateApplying || this.openclawApplying) tasks.push('配置应用');
                     if (this.agentsSaving) tasks.push('AGENTS 保存');
+                    if (this.skillsLoading || this.skillsDeleting) tasks.push('Skills 管理');
                     if (this.proxySaving || this.proxyApplying || this.proxyStarting || this.proxyStopping) tasks.push('代理更新');
                     return tasks.length ? tasks.join(' / ') : '空闲';
                 },
@@ -1751,6 +1774,92 @@
                         this.showMessage('加载文件失败', 'error');
                     } finally {
                         this.agentsLoading = false;
+                    }
+                },
+
+                async openSkillsManager() {
+                    this.skillsSelectedNames = [];
+                    this.showSkillsModal = true;
+                    await this.refreshSkillsList({ silent: false });
+                },
+
+                closeSkillsModal() {
+                    this.showSkillsModal = false;
+                    this.skillsSelectedNames = [];
+                },
+
+                async refreshSkillsList(options = {}) {
+                    this.skillsLoading = true;
+                    try {
+                        const res = await api('list-codex-skills');
+                        if (res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        this.skillsRootPath = res.root || '';
+                        this.skillsList = Array.isArray(res.items) ? res.items : [];
+                        const currentNames = new Set(this.skillsSelectableNames);
+                        this.skillsSelectedNames = (Array.isArray(this.skillsSelectedNames) ? this.skillsSelectedNames : [])
+                            .filter((name) => currentNames.has(name));
+                        if (!options.silent) {
+                            const exists = res.exists !== false;
+                            if (!exists) {
+                                this.showMessage('skills 目录不存在，已按空列表显示', 'info');
+                            }
+                        }
+                    } catch (e) {
+                        this.showMessage('加载 skills 失败', 'error');
+                    } finally {
+                        this.skillsLoading = false;
+                    }
+                },
+
+                toggleAllSkillsSelection() {
+                    if (this.skillsAllSelected) {
+                        this.skillsSelectedNames = [];
+                        return;
+                    }
+                    this.skillsSelectedNames = [...this.skillsSelectableNames];
+                },
+
+                async deleteSelectedSkills() {
+                    if (this.skillsDeleting) return;
+                    const selected = Array.isArray(this.skillsSelectedNames)
+                        ? Array.from(new Set(this.skillsSelectedNames.map((item) => String(item || '').trim()).filter(Boolean)))
+                        : [];
+                    if (!selected.length) {
+                        this.showMessage('请先选择要删除的 skill', 'error');
+                        return;
+                    }
+                    const confirmed = window.confirm(`确认删除 ${selected.length} 个 skill 吗？此操作不可撤销。`);
+                    if (!confirmed) {
+                        return;
+                    }
+
+                    this.skillsDeleting = true;
+                    try {
+                        const res = await api('delete-codex-skills', { names: selected });
+                        if (res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+
+                        const deletedCount = Array.isArray(res.deleted) ? res.deleted.length : 0;
+                        const failedList = Array.isArray(res.failed) ? res.failed : [];
+                        const failedCount = failedList.length;
+                        if (failedCount > 0 && deletedCount > 0) {
+                            this.showMessage(`已删除 ${deletedCount} 个，失败 ${failedCount} 个`, 'error');
+                        } else if (failedCount > 0) {
+                            const first = failedList[0] && failedList[0].error ? failedList[0].error : '删除失败';
+                            this.showMessage(first, 'error');
+                        } else {
+                            this.showMessage(`已删除 ${deletedCount} 个 skill`, 'success');
+                        }
+                        await this.refreshSkillsList({ silent: true });
+                    } catch (e) {
+                        this.showMessage('删除 skill 失败', 'error');
+                    } finally {
+                        this.skillsDeleting = false;
                     }
                 },
 
@@ -3860,4 +3969,3 @@
         app.mount('#app');
     });
     
-
