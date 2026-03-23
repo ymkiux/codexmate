@@ -151,7 +151,7 @@ npm install -g codexmate
 Package name on npm: `codexmate`. If you want the latest repo version each time, install from GitHub:
 
 ```bash
-npm install -g SakuraByteCore/codexmate
+npm install -g github:SakuraByteCore/codexmate
 ```
 
 ### Requirements

@@ -151,7 +151,7 @@ npm install -g codexmate
 npm 包名：`codexmate`。若希望每次执行都更新到仓库最新版本，可使用：
 
 ```bash
-npm install -g SakuraByteCore/codexmate
+npm install -g github:SakuraByteCore/codexmate
 ```
 
 ### 环境要求
