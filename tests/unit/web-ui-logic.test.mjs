@@ -15,7 +15,12 @@ const {
     formatLatency,
     buildSpeedTestIssue,
     isSessionQueryEnabled,
-    buildSessionListParams
+    normalizeSessionSource,
+    normalizeSessionPathFilter,
+    buildSessionFilterCacheState,
+    buildSessionListParams,
+    formatSessionTimelineTimestamp,
+    buildSessionTimelineNodes
 } = logic;
 
 test('normalizeClaudeValue trims strings and ignores non-string', () => {
@@ -126,6 +131,36 @@ test('isSessionQueryEnabled supports codex/claude/all', () => {
     assert.strictEqual(isSessionQueryEnabled(''), false);
 });
 
+test('normalizeSessionSource returns safe source value for session filters', () => {
+    assert.strictEqual(normalizeSessionSource('codex'), 'codex');
+    assert.strictEqual(normalizeSessionSource('CLAUDE'), 'claude');
+    assert.strictEqual(normalizeSessionSource('all'), 'all');
+    assert.strictEqual(normalizeSessionSource('unknown'), 'all');
+    assert.strictEqual(normalizeSessionSource(''), 'all');
+    assert.strictEqual(normalizeSessionSource(null), 'all');
+});
+
+test('normalizeSessionPathFilter trims path and handles non-string', () => {
+    assert.strictEqual(normalizeSessionPathFilter('  D:/repo  '), 'D:/repo');
+    assert.strictEqual(normalizeSessionPathFilter(''), '');
+    assert.strictEqual(normalizeSessionPathFilter(null), '');
+    assert.strictEqual(normalizeSessionPathFilter(undefined), '');
+});
+
+test('buildSessionFilterCacheState normalizes source/path for local cache', () => {
+    const cached = buildSessionFilterCacheState('CLAUDE', '  D:/project/11/8  ');
+    assert.deepStrictEqual(cached, {
+        source: 'claude',
+        pathFilter: 'D:/project/11/8'
+    });
+
+    const fallback = buildSessionFilterCacheState('invalid-source', null);
+    assert.deepStrictEqual(fallback, {
+        source: 'all',
+        pathFilter: ''
+    });
+});
+
 test('buildSessionListParams keeps claude code lexicon query when enabled', () => {
     const paramsClaude = buildSessionListParams({
         source: 'claude',
@@ -183,4 +218,43 @@ test('buildSessionListParams clears query for unsupported sources', () => {
     assert.strictEqual(params.forceRefresh, true);
     assert.strictEqual(params.queryScope, 'content');
     assert.strictEqual(params.contentScanLimit, 50);
+});
+
+test('formatSessionTimelineTimestamp normalizes ISO-like strings for timeline labels', () => {
+    assert.strictEqual(formatSessionTimelineTimestamp('2026-03-23T09:10:11.000Z'), '03-23 09:10:11');
+    assert.strictEqual(formatSessionTimelineTimestamp('2026-03-23 19:20:00'), '03-23 19:20:00');
+    assert.strictEqual(formatSessionTimelineTimestamp('not-a-time'), 'not-a-time');
+    assert.strictEqual(formatSessionTimelineTimestamp(''), '');
+});
+
+test('buildSessionTimelineNodes builds per-message node metadata', () => {
+    const nodes = buildSessionTimelineNodes([
+        { role: 'user', timestamp: '2026-03-23T09:00:00Z' },
+        { role: 'assistant', timestamp: '2026-03-23T09:01:00Z' },
+        { role: 'system', timestamp: '' }
+    ], {
+        getKey(message, idx) {
+            return `${message.role}-${idx}`;
+        }
+    });
+
+    assert.strictEqual(nodes.length, 3);
+    assert.strictEqual(nodes[0].key, 'user-0');
+    assert.strictEqual(nodes[0].role, 'user');
+    assert.strictEqual(nodes[0].roleShort, 'U');
+    assert.strictEqual(nodes[0].displayTime, '03-23 09:00:00');
+    assert.strictEqual(nodes[0].title, '#1 · User · 03-23 09:00:00');
+    assert.strictEqual(nodes[0].percent, 0);
+    assert.strictEqual(nodes[0].safePercent, 6);
+
+    assert.strictEqual(nodes[1].key, 'assistant-1');
+    assert.strictEqual(nodes[1].roleShort, 'A');
+    assert.strictEqual(nodes[1].percent, 50);
+    assert.strictEqual(nodes[1].safePercent, 50);
+
+    assert.strictEqual(nodes[2].key, 'system-2');
+    assert.strictEqual(nodes[2].roleShort, 'S');
+    assert.strictEqual(nodes[2].title, '#3 · System');
+    assert.strictEqual(nodes[2].percent, 100);
+    assert.strictEqual(nodes[2].safePercent, 94);
 });
