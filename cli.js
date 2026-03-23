@@ -1410,13 +1410,66 @@ function parseSimpleSkillFrontmatter(content = '') {
     const frontmatterRaw = normalized.slice(4, endIndex);
     const result = {};
     const lines = frontmatterRaw.split('\n');
-    for (const line of lines) {
+    for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+        const line = lines[lineIndex];
         const trimmed = line.trim();
         if (!trimmed || trimmed.startsWith('#')) continue;
         const matched = trimmed.match(/^([A-Za-z0-9_-]+)\s*:\s*(.*)$/);
         if (!matched) continue;
         const key = matched[1];
         let value = matched[2] || '';
+        const indicator = value.trim();
+        if (/^[>|]/.test(indicator)) {
+            const blockLines = [];
+            let cursor = lineIndex + 1;
+            while (cursor < lines.length) {
+                const candidateLine = lines[cursor];
+                if (!candidateLine.trim()) {
+                    blockLines.push('');
+                    cursor += 1;
+                    continue;
+                }
+                if (/^\s/.test(candidateLine)) {
+                    blockLines.push(candidateLine);
+                    cursor += 1;
+                    continue;
+                }
+                break;
+            }
+            lineIndex = cursor - 1;
+            const indents = blockLines
+                .filter((item) => item.trim())
+                .map((item) => {
+                    const indentMatch = item.match(/^[ \t]*/);
+                    return indentMatch ? indentMatch[0].length : 0;
+                });
+            const commonIndent = indents.length ? Math.min(...indents) : 0;
+            const deindented = blockLines.map((item) => {
+                if (!item.trim()) return '';
+                return item.slice(commonIndent);
+            });
+            if (indicator.startsWith('>')) {
+                const paragraphs = [];
+                let paragraphLines = [];
+                for (const blockLine of deindented) {
+                    const blockTrimmed = blockLine.trim();
+                    if (!blockTrimmed) {
+                        if (paragraphLines.length) {
+                            paragraphs.push(paragraphLines.join(' '));
+                            paragraphLines = [];
+                        }
+                        continue;
+                    }
+                    paragraphLines.push(blockTrimmed);
+                }
+                if (paragraphLines.length) {
+                    paragraphs.push(paragraphLines.join(' '));
+                }
+                value = paragraphs.join('\n');
+            } else {
+                value = deindented.join('\n');
+            }
+        }
         if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith('\'') && value.endsWith('\''))) {
             value = value.slice(1, -1);
         }
@@ -1428,11 +1481,18 @@ function parseSimpleSkillFrontmatter(content = '') {
 function extractSkillDescriptionFromMarkdown(content = '') {
     const normalized = String(content || '').replace(/\r\n/g, '\n');
     const lines = normalized.split('\n');
+    let inFence = false;
     for (const line of lines) {
+        const trimmedStart = line.trimStart();
+        if (trimmedStart.startsWith('```')) {
+            inFence = !inFence;
+            continue;
+        }
+        if (inFence) continue;
+        if (/^( {4}|\t)/.test(line)) continue;
         const trimmed = line.trim();
         if (!trimmed) continue;
         if (trimmed.startsWith('#')) continue;
-        if (trimmed.startsWith('```')) continue;
         if (trimmed.startsWith('---')) continue;
         if (/^([A-Za-z0-9_-]+)\s*:\s*/.test(trimmed)) continue;
         return trimmed.slice(0, 200);
@@ -1728,7 +1788,7 @@ function importCodexSkills(params = {}) {
                 });
                 continue;
             }
-            copyDirRecursive(sourceDirForCopy, targetPath);
+            copyDirRecursive(sourceDirForCopy, targetPath, { dereferenceSymlinks: true });
             copiedToTarget = true;
             imported.push({
                 name: normalizedName.name,
@@ -6614,17 +6674,28 @@ async function prepareCodexDirDownload() {
     }
 }
 
-function copyDirRecursive(srcDir, destDir) {
+function copyDirRecursive(srcDir, destDir, options = {}) {
+    const dereferenceSymlinks = !!(options && options.dereferenceSymlinks);
     ensureDir(destDir);
     const entries = fs.readdirSync(srcDir, { withFileTypes: true });
     for (const entry of entries) {
         const srcPath = path.join(srcDir, entry.name);
         const destPath = path.join(destDir, entry.name);
         if (entry.isDirectory()) {
-            copyDirRecursive(srcPath, destPath);
+            copyDirRecursive(srcPath, destPath, options);
         } else if (entry.isSymbolicLink()) {
-            const target = fs.readlinkSync(srcPath);
-            fs.symlinkSync(target, destPath);
+            if (dereferenceSymlinks) {
+                const realPath = fs.realpathSync(srcPath);
+                const realStat = fs.statSync(realPath);
+                if (realStat.isDirectory()) {
+                    copyDirRecursive(realPath, destPath, options);
+                } else {
+                    fs.copyFileSync(realPath, destPath);
+                }
+            } else {
+                const target = fs.readlinkSync(srcPath);
+                fs.symlinkSync(target, destPath);
+            }
         } else {
             fs.copyFileSync(srcPath, destPath);
         }

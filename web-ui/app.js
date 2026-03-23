@@ -2190,11 +2190,11 @@
                             this.showMessage(`已导入 ${importedCount} 个 skill`, 'success');
                         }
                         await this.refreshSkillsList({ silent: true });
-                        await this.scanImportableSkills();
                     } catch (e) {
                         this.showMessage('导入 skill 失败', 'error');
                     } finally {
                         this.skillsImporting = false;
+                        await this.scanImportableSkills();
                     }
                 },
 
