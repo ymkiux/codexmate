@@ -31,6 +31,26 @@
                 <span class="sr-only">本地配置中枢，统一管理 Codex / Claude Code / OpenClaw / 会话。</span>
             </div>
         </div>
+        <div v-if="!sessionStandalone" class="hero-github">
+            <a
+                class="github-badge github-badge-mobile"
+                href="https://github.com/SakuraByteCore/codexmate"
+                target="_blank"
+                rel="noopener"
+                title="打开 GitHub 仓库">
+                <span class="github-badge-left">
+                    <svg class="github-badge-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path fill="currentColor" d="M12 2C6.48 2 2 6.58 2 12.26c0 4.5 2.87 8.32 6.84 9.67.5.1.68-.22.68-.49 0-.24-.01-.88-.01-1.73-2.78.62-3.37-1.38-3.37-1.38-.45-1.19-1.11-1.5-1.11-1.5-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.9 1.57 2.36 1.12 2.94.86.09-.66.35-1.12.63-1.38-2.22-.26-4.56-1.14-4.56-5.09 0-1.13.39-2.06 1.03-2.79-.1-.26-.45-1.31.1-2.73 0 0 .84-.28 2.75 1.06A9.36 9.36 0 0 1 12 6.8c.85 0 1.7.12 2.5.34 1.9-1.34 2.74-1.06 2.74-1.06.55 1.42.2 2.47.1 2.73.64.73 1.03 1.66 1.03 2.79 0 3.96-2.35 4.83-4.58 5.08.36.32.68.95.68 1.92 0 1.38-.01 2.5-.01 2.84 0 .27.18.59.69.49A10.04 10.04 0 0 0 22 12.26C22 6.58 17.52 2 12 2z"/>
+                    </svg>
+                    <span class="github-badge-label">GitHub</span>
+                </span>
+                <span class="github-badge-text" title="SakuraByteCore/codexmate">
+                    <span class="github-owner">SakuraByteCore</span>
+                    <span class="github-sep">/</span>
+                    <span class="github-repo">codexmate</span>
+                </span>
+            </a>
+        </div>
 
         <div v-if="!sessionStandalone" class="top-tabs" role="tablist" aria-label="主导航">
             <button class="top-tab"
@@ -92,6 +112,24 @@
                     <div class="brand-subtitle">
                         配置 / 会话切换器
                     </div>
+                    <a
+                        class="github-badge github-badge-rail"
+                        href="https://github.com/SakuraByteCore/codexmate"
+                        target="_blank"
+                        rel="noopener"
+                        title="打开 GitHub 仓库">
+                        <span class="github-badge-left">
+                            <svg class="github-badge-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path fill="currentColor" d="M12 2C6.48 2 2 6.58 2 12.26c0 4.5 2.87 8.32 6.84 9.67.5.1.68-.22.68-.49 0-.24-.01-.88-.01-1.73-2.78.62-3.37-1.38-3.37-1.38-.45-1.19-1.11-1.5-1.11-1.5-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.9 1.57 2.36 1.12 2.94.86.09-.66.35-1.12.63-1.38-2.22-.26-4.56-1.14-4.56-5.09 0-1.13.39-2.06 1.03-2.79-.1-.26-.45-1.31.1-2.73 0 0 .84-.28 2.75 1.06A9.36 9.36 0 0 1 12 6.8c.85 0 1.7.12 2.5.34 1.9-1.34 2.74-1.06 2.74-1.06.55 1.42.2 2.47.1 2.73.64.73 1.03 1.66 1.03 2.79 0 3.96-2.35 4.83-4.58 5.08.36.32.68.95.68 1.92 0 1.38-.01 2.5-.01 2.84 0 .27.18.59.69.49A10.04 10.04 0 0 0 22 12.26C22 6.58 17.52 2 12 2z"/>
+                            </svg>
+                            <span class="github-badge-label">GitHub</span>
+                        </span>
+                        <span class="github-badge-text" title="SakuraByteCore/codexmate">
+                            <span class="github-owner">SakuraByteCore</span>
+                            <span class="github-sep">/</span>
+                            <span class="github-repo">codexmate</span>
+                        </span>
+                    </a>
                 </div>
 
                 <div class="side-section" role="tablist" aria-label="配置管理">
@@ -350,6 +388,16 @@
 
                 <div class="selector-section">
                     <div class="selector-header">
+                        <span class="selector-title">Skills 管理</span>
+                    </div>
+                    <div class="config-template-hint skills-hint-line">管理 <code>~/.codex/skills</code> 自定义 skills，支持多选删除。</div>
+                    <button class="btn-tool" @click="openSkillsManager" :disabled="loading || !!initError || skillsLoading || skillsDeleting">
+                        {{ skillsLoading ? '加载中...' : '打开 Skills 管理' }}
+                    </button>
+                </div>
+
+                <div class="selector-section">
+                    <div class="selector-header">
                         <span class="selector-title">配置维护</span>
                     </div>
                     <div class="config-template-hint">备份当前 config.toml 后写入默认配置。</div>
@@ -362,8 +410,8 @@
                     <div class="selector-header">
                         <span class="selector-title">Codex 认证文件</span>
                     </div>
-                    <div class="config-template-hint">
-                        上传 JSON 后可切换账号（会写入 <code>~/.codex/auth.json</code>）。
+                    <div class="config-template-hint hint-single-line" title="上传 JSON 切换账号（写入 ~/.codex/auth.json）。">
+                        上传 JSON 切换账号（写入 <code>~/.codex/auth.json</code>）。
                     </div>
                     <button class="btn-tool" @click="triggerCodexAuthUpload" :disabled="codexAuthImportLoading || loading || !!initError">
                         {{ codexAuthImportLoading ? '上传中...' : '上传认证文件' }}
@@ -1598,6 +1646,59 @@
             </div>
         </div>
 
+        <div v-if="showSkillsModal" class="modal-overlay" @click.self="closeSkillsModal">
+            <div class="modal modal-wide skills-modal">
+                <div class="modal-header skills-modal-header">
+                    <div class="modal-title">Skills 管理</div>
+                    <div class="modal-header-actions skills-modal-actions">
+                        <button class="btn-mini" @click="refreshSkillsList({ silent: false })" :disabled="skillsLoading || skillsDeleting">
+                            {{ skillsLoading ? '刷新中...' : '刷新' }}
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Skills 目录</label>
+                    <div class="skills-root-box">{{ skillsRootPath || '~/.codex/skills' }}</div>
+                </div>
+
+                <div class="skill-toolbar">
+                    <label class="skill-select-all">
+                        <input type="checkbox" :checked="skillsAllSelected" @change="toggleAllSkillsSelection" :disabled="skillsLoading || skillsDeleting || skillsSelectableNames.length === 0">
+                        <span>{{ skillsAllSelected ? '取消全选' : '全选' }}</span>
+                    </label>
+                    <span class="skill-toolbar-count">已选 {{ skillsSelectedCount }} / {{ skillsSelectableNames.length }}</span>
+                </div>
+
+                <div v-if="skillsList.length === 0" class="skills-empty-state">暂无可管理的 skill。</div>
+                <div v-else class="skill-list">
+                    <label
+                        class="skill-item"
+                        :class="{ selected: skillsSelectedNames.includes(skill.name) }"
+                        v-for="skill in skillsList"
+                        :key="'skill-' + skill.name">
+                        <input type="checkbox" v-model="skillsSelectedNames" :value="skill.name" :disabled="skillsDeleting">
+                        <div class="skill-item-main">
+                            <div class="skill-item-title">{{ skill.name }}</div>
+                            <div class="skill-item-meta">
+                                <span>{{ skill.path }}</span>
+                                <span :class="['pill', skill.hasSkillFile ? 'configured' : 'empty']">
+                                    {{ skill.hasSkillFile ? '含 SKILL.md' : '缺少 SKILL.md' }}
+                                </span>
+                            </div>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-cancel" @click="closeSkillsModal" :disabled="skillsDeleting">关闭</button>
+                    <button class="btn btn-confirm btn-danger" @click="deleteSelectedSkills" :disabled="skillsDeleting || skillsSelectedCount === 0">
+                        {{ skillsDeleting ? '删除中...' : '删除选中' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Toast通知 -->
         
         <!-- Toast -->
@@ -1607,4 +1708,3 @@
     <script type="module" src="web-ui/app.js"></script>
 </body>
 </html>
-
