@@ -121,6 +121,7 @@ module.exports = async function testMessages(ctx) {
     assert(deleteSkills.deleted.includes('e2e-importable-skill'), 'delete-codex-skills should delete imported skill');
     assert(!fs.existsSync(skillAlpha), 'alpha skill directory should be removed');
     assert(!fs.existsSync(skillBeta), 'beta skill directory should be removed');
+    assert(!fs.existsSync(path.join(skillsRoot, 'e2e-importable-skill')), 'imported skill directory should be removed');
 
     // ========== OpenClaw 配置测试 ==========
     const openclawResult = await api('get-openclaw-config');

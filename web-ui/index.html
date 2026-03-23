@@ -1691,8 +1691,9 @@
                         class="form-input"
                         type="text"
                         v-model.trim="skillsKeyword"
+                        aria-label="按名称或描述筛选 skill"
                         placeholder="按目录名/显示名/描述检索">
-                    <select class="form-select skills-status-select" v-model="skillsStatusFilter">
+                    <select class="form-select skills-status-select" v-model="skillsStatusFilter" aria-label="按 SKILL.md 状态筛选 skill">
                         <option value="all">全部状态</option>
                         <option value="with-skill-file">仅含 SKILL.md</option>
                         <option value="missing-skill-file">仅缺少 SKILL.md</option>
