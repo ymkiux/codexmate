@@ -107,6 +107,14 @@ const SESSION_SCAN_MIN_FILES = 800;
 const MAX_SESSION_PATH_LIST_SIZE = 2000;
 const AGENTS_FILE_NAME = 'AGENTS.md';
 const CODEX_SKILLS_DIR = path.join(CONFIG_DIR, 'skills');
+const CLAUDE_SKILLS_DIR = path.join(CLAUDE_DIR, 'skills');
+const GEMINI_SKILLS_DIR = path.join(os.homedir(), '.gemini', 'skills');
+const OPENCODE_SKILLS_DIR = path.join(os.homedir(), '.opencode', 'skills');
+const SKILL_IMPORT_SOURCES = Object.freeze([
+    { app: 'claude', label: 'Claude Code', dir: CLAUDE_SKILLS_DIR },
+    { app: 'gemini', label: 'Gemini CLI', dir: GEMINI_SKILLS_DIR },
+    { app: 'opencode', label: 'OpenCode', dir: OPENCODE_SKILLS_DIR }
+]);
 const MODELS_CACHE_TTL_MS = 60 * 1000;
 const MODELS_NEGATIVE_CACHE_TTL_MS = 5 * 1000;
 const MODELS_CACHE_MAX_ENTRIES = 50;
@@ -1379,6 +1387,201 @@ function isSkillDirectoryEntry(entryName) {
     }
 }
 
+function normalizeSkillImportSourceApp(app) {
+    const value = typeof app === 'string' ? app.trim().toLowerCase() : '';
+    return SKILL_IMPORT_SOURCES.some((item) => item.app === value) ? value : '';
+}
+
+function getSkillImportSourceByApp(app) {
+    const normalizedApp = normalizeSkillImportSourceApp(app);
+    if (!normalizedApp) return null;
+    return SKILL_IMPORT_SOURCES.find((item) => item.app === normalizedApp) || null;
+}
+
+function parseSimpleSkillFrontmatter(content = '') {
+    const normalized = String(content || '').replace(/\r\n/g, '\n');
+    if (!normalized.startsWith('---\n')) {
+        return {};
+    }
+    const endIndex = normalized.indexOf('\n---\n', 4);
+    if (endIndex <= 4) {
+        return {};
+    }
+    const frontmatterRaw = normalized.slice(4, endIndex);
+    const result = {};
+    const lines = frontmatterRaw.split('\n');
+    for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+        const line = lines[lineIndex];
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const matched = trimmed.match(/^([A-Za-z0-9_-]+)\s*:\s*(.*)$/);
+        if (!matched) continue;
+        const key = matched[1];
+        let value = matched[2] || '';
+        const indicator = value.trim();
+        if (/^[>|]/.test(indicator)) {
+            const blockLines = [];
+            let cursor = lineIndex + 1;
+            while (cursor < lines.length) {
+                const candidateLine = lines[cursor];
+                if (!candidateLine.trim()) {
+                    blockLines.push('');
+                    cursor += 1;
+                    continue;
+                }
+                if (/^\s/.test(candidateLine)) {
+                    blockLines.push(candidateLine);
+                    cursor += 1;
+                    continue;
+                }
+                break;
+            }
+            lineIndex = cursor - 1;
+            const indents = blockLines
+                .filter((item) => item.trim())
+                .map((item) => {
+                    const indentMatch = item.match(/^[ \t]*/);
+                    return indentMatch ? indentMatch[0].length : 0;
+                });
+            const commonIndent = indents.length ? Math.min(...indents) : 0;
+            const deindented = blockLines.map((item) => {
+                if (!item.trim()) return '';
+                return item.slice(commonIndent);
+            });
+            if (indicator.startsWith('>')) {
+                const paragraphs = [];
+                let paragraphLines = [];
+                for (const blockLine of deindented) {
+                    const blockTrimmed = blockLine.trim();
+                    if (!blockTrimmed) {
+                        if (paragraphLines.length) {
+                            paragraphs.push(paragraphLines.join(' '));
+                            paragraphLines = [];
+                        }
+                        continue;
+                    }
+                    paragraphLines.push(blockTrimmed);
+                }
+                if (paragraphLines.length) {
+                    paragraphs.push(paragraphLines.join(' '));
+                }
+                value = paragraphs.join('\n');
+            } else {
+                value = deindented.join('\n');
+            }
+        }
+        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith('\'') && value.endsWith('\''))) {
+            value = value.slice(1, -1);
+        }
+        result[key] = value.trim();
+    }
+    return result;
+}
+
+function stripMarkdownFrontmatter(content = '') {
+    const normalized = String(content || '').replace(/\r\n/g, '\n');
+    if (!normalized.startsWith('---\n')) {
+        return normalized;
+    }
+    const endIndex = normalized.indexOf('\n---\n', 4);
+    if (endIndex <= 4) {
+        return normalized;
+    }
+    return normalized.slice(endIndex + 5);
+}
+
+function extractSkillDescriptionFromMarkdown(content = '') {
+    const normalized = String(content || '').replace(/\r\n/g, '\n');
+    const lines = normalized.split('\n');
+    let inFence = false;
+    for (const line of lines) {
+        const trimmedStart = line.trimStart();
+        if (trimmedStart.startsWith('```')) {
+            inFence = !inFence;
+            continue;
+        }
+        if (inFence) continue;
+        if (/^( {4}|\t)/.test(line)) continue;
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        if (trimmed.startsWith('#')) continue;
+        if (trimmed.startsWith('---')) continue;
+        if (/^([A-Za-z0-9_-]+)\s*:\s*/.test(trimmed)) continue;
+        return trimmed.slice(0, 200);
+    }
+    return '';
+}
+
+function readCodexSkillMetadata(skillPath) {
+    const skillFile = path.join(skillPath, 'SKILL.md');
+    if (!fs.existsSync(skillFile)) {
+        return {
+            hasSkillFile: false,
+            displayName: '',
+            description: ''
+        };
+    }
+    try {
+        const raw = fs.readFileSync(skillFile, 'utf-8');
+        const content = stripUtf8Bom(raw);
+        const frontmatter = parseSimpleSkillFrontmatter(content);
+        const contentWithoutFrontmatter = stripMarkdownFrontmatter(content);
+        const heading = contentWithoutFrontmatter.match(/^\s*#\s+(.+)$/m);
+        const displayName = typeof frontmatter.name === 'string' && frontmatter.name.trim()
+            ? frontmatter.name.trim()
+            : (heading && heading[1] ? heading[1].trim() : '');
+        const description = typeof frontmatter.description === 'string' && frontmatter.description.trim()
+            ? frontmatter.description.trim().slice(0, 200)
+            : extractSkillDescriptionFromMarkdown(contentWithoutFrontmatter);
+        return {
+            hasSkillFile: true,
+            displayName,
+            description
+        };
+    } catch (e) {
+        return {
+            hasSkillFile: false,
+            displayName: '',
+            description: ''
+        };
+    }
+}
+
+function getCodexSkillEntryInfoByName(entryName) {
+    const targetPath = path.join(CODEX_SKILLS_DIR, entryName);
+    const normalized = normalizeCodexSkillName(entryName);
+    if (normalized.error) {
+        return null;
+    }
+    const relativePath = path.relative(CODEX_SKILLS_DIR, targetPath);
+    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+        return null;
+    }
+
+    try {
+        const lstat = fs.lstatSync(targetPath);
+        const isSymbolicLink = lstat.isSymbolicLink();
+        if (!lstat.isDirectory() && !isSymbolicLink) {
+            return null;
+        }
+        if (isSymbolicLink && !isSkillDirectoryEntry(entryName)) {
+            return null;
+        }
+        const metadata = readCodexSkillMetadata(targetPath);
+        return {
+            name: entryName,
+            path: targetPath,
+            hasSkillFile: !!metadata.hasSkillFile,
+            displayName: metadata.displayName || entryName,
+            description: metadata.description || '',
+            sourceType: isSymbolicLink ? 'symlink' : 'directory',
+            updatedAt: Number.isFinite(lstat.mtimeMs) ? Math.floor(lstat.mtimeMs) : 0
+        };
+    } catch (e) {
+        return null;
+    }
+}
+
 function listCodexSkills() {
     if (!fs.existsSync(CODEX_SKILLS_DIR)) {
         return {
@@ -1393,20 +1596,10 @@ function listCodexSkills() {
             .map((entry) => {
                 const name = entry && entry.name ? entry.name : '';
                 if (!name || name.startsWith('.')) return null;
-                if (!entry.isDirectory()) {
-                    if (!entry.isSymbolicLink() || !isSkillDirectoryEntry(name)) {
-                        return null;
-                    }
-                }
-                const skillPath = path.join(CODEX_SKILLS_DIR, name);
-                return {
-                    name,
-                    path: skillPath,
-                    hasSkillFile: fs.existsSync(path.join(skillPath, 'SKILL.md'))
-                };
+                return getCodexSkillEntryInfoByName(name);
             })
             .filter(Boolean)
-            .sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'));
+            .sort((a, b) => a.displayName.localeCompare(b.displayName, 'zh-Hans-CN'));
         return {
             root: CODEX_SKILLS_DIR,
             exists: true,
@@ -1415,6 +1608,231 @@ function listCodexSkills() {
     } catch (e) {
         return { error: `读取 skills 目录失败: ${e.message}` };
     }
+}
+
+function listSkillEntriesByRoot(rootDir) {
+    if (!rootDir || !fs.existsSync(rootDir)) {
+        return [];
+    }
+    try {
+        const entries = fs.readdirSync(rootDir, { withFileTypes: true });
+        return entries
+            .map((entry) => {
+                const name = entry && entry.name ? entry.name : '';
+                if (!name || name.startsWith('.')) return null;
+                const normalized = normalizeCodexSkillName(name);
+                if (normalized.error) return null;
+                const skillPath = path.join(rootDir, name);
+                const relativePath = path.relative(rootDir, skillPath);
+                if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+                    return null;
+                }
+                try {
+                    const lstat = fs.lstatSync(skillPath);
+                    const isSymbolicLink = lstat.isSymbolicLink();
+                    if (!lstat.isDirectory() && !isSymbolicLink) {
+                        return null;
+                    }
+                    if (isSymbolicLink) {
+                        const realPath = fs.realpathSync(skillPath);
+                        const realStat = fs.statSync(realPath);
+                        if (!realStat.isDirectory()) {
+                            return null;
+                        }
+                    }
+                    return {
+                        name,
+                        path: skillPath,
+                        sourceType: isSymbolicLink ? 'symlink' : 'directory'
+                    };
+                } catch (e) {
+                    return null;
+                }
+            })
+            .filter(Boolean);
+    } catch (e) {
+        return [];
+    }
+}
+
+function scanUnmanagedCodexSkills() {
+    const existing = listCodexSkills();
+    if (existing.error) {
+        return { error: existing.error };
+    }
+    const existingNames = new Set((Array.isArray(existing.items) ? existing.items : [])
+        .map((item) => (item && typeof item.name === 'string' ? item.name.trim() : ''))
+        .filter(Boolean));
+
+    const items = [];
+    for (const source of SKILL_IMPORT_SOURCES) {
+        const sourceEntries = listSkillEntriesByRoot(source.dir);
+        for (const entry of sourceEntries) {
+            if (existingNames.has(entry.name)) {
+                continue;
+            }
+            const metadata = readCodexSkillMetadata(entry.path);
+            items.push({
+                key: `${source.app}:${entry.name}`,
+                name: entry.name,
+                displayName: metadata.displayName || entry.name,
+                description: metadata.description || '',
+                sourceApp: source.app,
+                sourceLabel: source.label,
+                sourcePath: entry.path,
+                sourceType: entry.sourceType,
+                hasSkillFile: !!metadata.hasSkillFile
+            });
+        }
+    }
+
+    items.sort((a, b) => {
+        const nameCompare = a.displayName.localeCompare(b.displayName, 'zh-Hans-CN');
+        if (nameCompare !== 0) return nameCompare;
+        return a.sourceLabel.localeCompare(b.sourceLabel, 'zh-Hans-CN');
+    });
+
+    return {
+        root: CODEX_SKILLS_DIR,
+        items,
+        sources: SKILL_IMPORT_SOURCES.map((source) => ({
+            app: source.app,
+            label: source.label,
+            path: source.dir,
+            exists: fs.existsSync(source.dir)
+        }))
+    };
+}
+
+function importCodexSkills(params = {}) {
+    const rawItems = Array.isArray(params.items) ? params.items : [];
+    if (!rawItems.length) {
+        return { error: '请先选择要导入的 skill' };
+    }
+
+    ensureDir(CODEX_SKILLS_DIR);
+
+    const imported = [];
+    const failed = [];
+    const dedup = new Set();
+
+    for (const rawItem of rawItems) {
+        const safeItem = rawItem && typeof rawItem === 'object' ? rawItem : {};
+        const normalizedName = normalizeCodexSkillName(safeItem.name);
+        if (normalizedName.error) {
+            failed.push({
+                name: safeItem && safeItem.name ? String(safeItem.name) : '',
+                sourceApp: safeItem && safeItem.sourceApp ? String(safeItem.sourceApp) : '',
+                error: normalizedName.error
+            });
+            continue;
+        }
+        const source = getSkillImportSourceByApp(safeItem.sourceApp);
+        if (!source) {
+            failed.push({
+                name: normalizedName.name,
+                sourceApp: safeItem && safeItem.sourceApp ? String(safeItem.sourceApp) : '',
+                error: '来源应用不支持'
+            });
+            continue;
+        }
+        const dedupKey = `${source.app}:${normalizedName.name}`;
+        if (dedup.has(dedupKey)) {
+            continue;
+        }
+        dedup.add(dedupKey);
+
+        const sourcePath = path.join(source.dir, normalizedName.name);
+        const sourceRelative = path.relative(source.dir, sourcePath);
+        if (sourceRelative.startsWith('..') || path.isAbsolute(sourceRelative)) {
+            failed.push({
+                name: normalizedName.name,
+                sourceApp: source.app,
+                error: '来源路径非法'
+            });
+            continue;
+        }
+        if (!fs.existsSync(sourcePath)) {
+            failed.push({
+                name: normalizedName.name,
+                sourceApp: source.app,
+                error: '来源 skill 不存在'
+            });
+            continue;
+        }
+
+        const targetPath = path.join(CODEX_SKILLS_DIR, normalizedName.name);
+        const targetRelative = path.relative(CODEX_SKILLS_DIR, targetPath);
+        if (targetRelative.startsWith('..') || path.isAbsolute(targetRelative)) {
+            failed.push({
+                name: normalizedName.name,
+                sourceApp: source.app,
+                error: '目标路径非法'
+            });
+            continue;
+        }
+        if (fs.existsSync(targetPath)) {
+            failed.push({
+                name: normalizedName.name,
+                sourceApp: source.app,
+                error: 'Codex 中已存在同名 skill'
+            });
+            continue;
+        }
+
+        let copiedToTarget = false;
+        try {
+            const lstat = fs.lstatSync(sourcePath);
+            if (!lstat.isDirectory() && !lstat.isSymbolicLink()) {
+                failed.push({
+                    name: normalizedName.name,
+                    sourceApp: source.app,
+                    error: '来源不是技能目录'
+                });
+                continue;
+            }
+            const sourceDirForCopy = lstat.isSymbolicLink() ? fs.realpathSync(sourcePath) : sourcePath;
+            const sourceStat = fs.statSync(sourceDirForCopy);
+            if (!sourceStat.isDirectory()) {
+                failed.push({
+                    name: normalizedName.name,
+                    sourceApp: source.app,
+                    error: '来源 skill 无法读取'
+                });
+                continue;
+            }
+            const visitedRealPaths = new Set([sourceDirForCopy]);
+            copyDirRecursive(sourceDirForCopy, targetPath, {
+                dereferenceSymlinks: true,
+                visitedRealPaths
+            });
+            copiedToTarget = true;
+            imported.push({
+                name: normalizedName.name,
+                sourceApp: source.app,
+                sourceLabel: source.label,
+                path: targetPath
+            });
+        } catch (e) {
+            if (!copiedToTarget && fs.existsSync(targetPath)) {
+                try {
+                    removeDirectoryRecursive(targetPath);
+                } catch (_) {}
+            }
+            failed.push({
+                name: normalizedName.name,
+                sourceApp: source.app,
+                error: e && e.message ? e.message : '导入失败'
+            });
+        }
+    }
+
+    return {
+        success: failed.length === 0,
+        imported,
+        failed,
+        root: CODEX_SKILLS_DIR
+    };
 }
 
 function removeDirectoryRecursive(targetPath) {
@@ -6273,17 +6691,57 @@ async function prepareCodexDirDownload() {
     }
 }
 
-function copyDirRecursive(srcDir, destDir) {
+function copyDirRecursive(srcDir, destDir, options = {}) {
+    const dereferenceSymlinks = !!(options && options.dereferenceSymlinks);
+    const visitedRealPaths = options && options.visitedRealPaths instanceof Set
+        ? options.visitedRealPaths
+        : new Set();
+    const childOptions = {
+        ...options,
+        dereferenceSymlinks,
+        visitedRealPaths
+    };
     ensureDir(destDir);
     const entries = fs.readdirSync(srcDir, { withFileTypes: true });
     for (const entry of entries) {
         const srcPath = path.join(srcDir, entry.name);
         const destPath = path.join(destDir, entry.name);
         if (entry.isDirectory()) {
-            copyDirRecursive(srcPath, destPath);
+            if (!dereferenceSymlinks) {
+                copyDirRecursive(srcPath, destPath, childOptions);
+                continue;
+            }
+            const realPath = fs.realpathSync(srcPath);
+            if (visitedRealPaths.has(realPath)) {
+                continue;
+            }
+            visitedRealPaths.add(realPath);
+            try {
+                copyDirRecursive(srcPath, destPath, childOptions);
+            } finally {
+                visitedRealPaths.delete(realPath);
+            }
         } else if (entry.isSymbolicLink()) {
-            const target = fs.readlinkSync(srcPath);
-            fs.symlinkSync(target, destPath);
+            if (dereferenceSymlinks) {
+                const realPath = fs.realpathSync(srcPath);
+                const realStat = fs.statSync(realPath);
+                if (realStat.isDirectory()) {
+                    if (visitedRealPaths.has(realPath)) {
+                        continue;
+                    }
+                    visitedRealPaths.add(realPath);
+                    try {
+                        copyDirRecursive(realPath, destPath, childOptions);
+                    } finally {
+                        visitedRealPaths.delete(realPath);
+                    }
+                } else {
+                    fs.copyFileSync(realPath, destPath);
+                }
+            } else {
+                const target = fs.readlinkSync(srcPath);
+                fs.symlinkSync(target, destPath);
+            }
         } else {
             fs.copyFileSync(srcPath, destPath);
         }
@@ -7186,6 +7644,12 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             break;
                         case 'delete-codex-skills':
                             result = deleteCodexSkills(params || {});
+                            break;
+                        case 'scan-unmanaged-codex-skills':
+                            result = scanUnmanagedCodexSkills();
+                            break;
+                        case 'import-codex-skills':
+                            result = importCodexSkills(params || {});
                             break;
                         case 'get-openclaw-config':
                             result = readOpenclawConfigFile();

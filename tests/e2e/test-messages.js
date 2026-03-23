@@ -83,23 +83,45 @@ module.exports = async function testMessages(ctx) {
     const skillBeta = path.join(skillsRoot, 'e2e-skill-beta');
     fs.mkdirSync(skillAlpha, { recursive: true });
     fs.mkdirSync(skillBeta, { recursive: true });
-    fs.writeFileSync(path.join(skillAlpha, 'SKILL.md'), '# alpha', 'utf-8');
+    fs.writeFileSync(path.join(skillAlpha, 'SKILL.md'), '---\nname: Alpha Skill\ndescription: alpha description\n---\n# alpha', 'utf-8');
     fs.writeFileSync(path.join(skillBeta, 'SKILL.md'), '# beta', 'utf-8');
 
     const skillsList = await api('list-codex-skills');
     assert(Array.isArray(skillsList.items), 'list-codex-skills should return items array');
     assert(skillsList.items.some((item) => item && item.name === 'e2e-skill-alpha'), 'list-codex-skills should include alpha');
     assert(skillsList.items.some((item) => item && item.name === 'e2e-skill-beta'), 'list-codex-skills should include beta');
+    const alphaItem = skillsList.items.find((item) => item && item.name === 'e2e-skill-alpha');
+    assert(alphaItem && alphaItem.displayName === 'Alpha Skill', 'list-codex-skills should expose displayName from SKILL.md');
+    assert(alphaItem && alphaItem.description === 'alpha description', 'list-codex-skills should expose description from SKILL.md');
+
+    const claudeSkillsRoot = path.join(tmpHome, '.claude', 'skills');
+    const importableFromClaude = path.join(claudeSkillsRoot, 'e2e-importable-skill');
+    fs.mkdirSync(importableFromClaude, { recursive: true });
+    fs.writeFileSync(path.join(importableFromClaude, 'SKILL.md'), '# importable', 'utf-8');
+
+    const unmanaged = await api('scan-unmanaged-codex-skills');
+    assert(Array.isArray(unmanaged.items), 'scan-unmanaged-codex-skills should return items array');
+    assert(unmanaged.items.some((item) => item && item.name === 'e2e-importable-skill' && item.sourceApp === 'claude'), 'scan-unmanaged-codex-skills should include claude source skills');
+
+    const importNoSelection = await api('import-codex-skills', { items: [] });
+    assert(importNoSelection.error, 'import-codex-skills should fail for empty items');
+
+    const importSkills = await api('import-codex-skills', { items: [{ name: 'e2e-importable-skill', sourceApp: 'claude' }] });
+    assert(Array.isArray(importSkills.imported), 'import-codex-skills should return imported list');
+    assert(importSkills.imported.some((item) => item && item.name === 'e2e-importable-skill'), 'import-codex-skills should import selected skill');
+    assert(fs.existsSync(path.join(skillsRoot, 'e2e-importable-skill')), 'imported skill should exist in codex skills root');
 
     const deleteNoSelection = await api('delete-codex-skills', { names: [] });
     assert(deleteNoSelection.error, 'delete-codex-skills should fail for empty names');
 
-    const deleteSkills = await api('delete-codex-skills', { names: ['e2e-skill-alpha', 'e2e-skill-beta'] });
+    const deleteSkills = await api('delete-codex-skills', { names: ['e2e-skill-alpha', 'e2e-skill-beta', 'e2e-importable-skill'] });
     assert(Array.isArray(deleteSkills.deleted), 'delete-codex-skills should return deleted list');
     assert(deleteSkills.deleted.includes('e2e-skill-alpha'), 'delete-codex-skills should delete alpha');
     assert(deleteSkills.deleted.includes('e2e-skill-beta'), 'delete-codex-skills should delete beta');
+    assert(deleteSkills.deleted.includes('e2e-importable-skill'), 'delete-codex-skills should delete imported skill');
     assert(!fs.existsSync(skillAlpha), 'alpha skill directory should be removed');
     assert(!fs.existsSync(skillBeta), 'beta skill directory should be removed');
+    assert(!fs.existsSync(path.join(skillsRoot, 'e2e-importable-skill')), 'imported skill directory should be removed');
 
     // ========== OpenClaw 配置测试 ==========
     const openclawResult = await api('get-openclaw-config');
