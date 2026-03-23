@@ -2992,6 +2992,24 @@ body::after {
     word-break: break-all;
 }
 
+.skills-filter-row {
+    display: flex;
+    gap: var(--spacing-xs);
+    margin-bottom: var(--spacing-xs);
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.skills-filter-row .form-input {
+    flex: 1;
+    min-width: 220px;
+}
+
+.skills-status-select {
+    width: 190px;
+    flex: 0 0 auto;
+}
+
 .skills-hint-line,
 .hint-single-line {
     display: block;
@@ -3036,6 +3054,12 @@ body::after {
     color: var(--color-text-secondary);
 }
 
+.skill-item-description {
+    font-size: var(--font-size-caption);
+    line-height: 1.45;
+    color: var(--color-text-tertiary);
+}
+
 .skill-item-meta {
     display: flex;
     flex-wrap: wrap;
@@ -3069,6 +3093,27 @@ body::after {
     font-size: var(--font-size-secondary);
     text-align: center;
     padding: 18px 12px;
+}
+
+.skills-import-block {
+    margin-bottom: var(--spacing-sm);
+    border-top: 1px dashed var(--color-border-soft);
+    padding-top: var(--spacing-xs);
+}
+
+.skills-import-title {
+    font-size: var(--font-size-secondary);
+    font-weight: var(--font-weight-secondary);
+    color: var(--color-text-secondary);
+    margin-bottom: 6px;
+}
+
+.skills-import-list {
+    max-height: min(28vh, 260px);
+}
+
+.skills-import-empty {
+    margin-bottom: 0;
 }
 
 .list-row {
