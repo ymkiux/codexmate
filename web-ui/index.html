@@ -1764,7 +1764,7 @@
                 </div>
 
                 <div class="btn-group">
-                    <button class="btn btn-cancel" @click="closeSkillsModal" :disabled="skillsDeleting">关闭</button>
+                    <button class="btn btn-cancel" @click="closeSkillsModal" :disabled="skillsDeleting || skillsImporting || skillsScanningImports">关闭</button>
                     <button class="btn btn-confirm" @click="importSelectedSkills" :disabled="skillsImporting || skillsImportSelectedCount === 0">
                         {{ skillsImporting ? '导入中...' : '导入选中' }}
                     </button>

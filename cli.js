@@ -1478,6 +1478,18 @@ function parseSimpleSkillFrontmatter(content = '') {
     return result;
 }
 
+function stripMarkdownFrontmatter(content = '') {
+    const normalized = String(content || '').replace(/\r\n/g, '\n');
+    if (!normalized.startsWith('---\n')) {
+        return normalized;
+    }
+    const endIndex = normalized.indexOf('\n---\n', 4);
+    if (endIndex <= 4) {
+        return normalized;
+    }
+    return normalized.slice(endIndex + 5);
+}
+
 function extractSkillDescriptionFromMarkdown(content = '') {
     const normalized = String(content || '').replace(/\r\n/g, '\n');
     const lines = normalized.split('\n');
@@ -1513,13 +1525,14 @@ function readCodexSkillMetadata(skillPath) {
         const raw = fs.readFileSync(skillFile, 'utf-8');
         const content = stripUtf8Bom(raw);
         const frontmatter = parseSimpleSkillFrontmatter(content);
-        const heading = content.match(/^\s*#\s+(.+)$/m);
+        const contentWithoutFrontmatter = stripMarkdownFrontmatter(content);
+        const heading = contentWithoutFrontmatter.match(/^\s*#\s+(.+)$/m);
         const displayName = typeof frontmatter.name === 'string' && frontmatter.name.trim()
             ? frontmatter.name.trim()
             : (heading && heading[1] ? heading[1].trim() : '');
         const description = typeof frontmatter.description === 'string' && frontmatter.description.trim()
             ? frontmatter.description.trim().slice(0, 200)
-            : extractSkillDescriptionFromMarkdown(content);
+            : extractSkillDescriptionFromMarkdown(contentWithoutFrontmatter);
         return {
             hasSkillFile: true,
             displayName,
@@ -1788,7 +1801,11 @@ function importCodexSkills(params = {}) {
                 });
                 continue;
             }
-            copyDirRecursive(sourceDirForCopy, targetPath, { dereferenceSymlinks: true });
+            const visitedRealPaths = new Set([sourceDirForCopy]);
+            copyDirRecursive(sourceDirForCopy, targetPath, {
+                dereferenceSymlinks: true,
+                visitedRealPaths
+            });
             copiedToTarget = true;
             imported.push({
                 name: normalizedName.name,
@@ -6676,19 +6693,48 @@ async function prepareCodexDirDownload() {
 
 function copyDirRecursive(srcDir, destDir, options = {}) {
     const dereferenceSymlinks = !!(options && options.dereferenceSymlinks);
+    const visitedRealPaths = options && options.visitedRealPaths instanceof Set
+        ? options.visitedRealPaths
+        : new Set();
+    const childOptions = {
+        ...options,
+        dereferenceSymlinks,
+        visitedRealPaths
+    };
     ensureDir(destDir);
     const entries = fs.readdirSync(srcDir, { withFileTypes: true });
     for (const entry of entries) {
         const srcPath = path.join(srcDir, entry.name);
         const destPath = path.join(destDir, entry.name);
         if (entry.isDirectory()) {
-            copyDirRecursive(srcPath, destPath, options);
+            if (!dereferenceSymlinks) {
+                copyDirRecursive(srcPath, destPath, childOptions);
+                continue;
+            }
+            const realPath = fs.realpathSync(srcPath);
+            if (visitedRealPaths.has(realPath)) {
+                continue;
+            }
+            visitedRealPaths.add(realPath);
+            try {
+                copyDirRecursive(srcPath, destPath, childOptions);
+            } finally {
+                visitedRealPaths.delete(realPath);
+            }
         } else if (entry.isSymbolicLink()) {
             if (dereferenceSymlinks) {
                 const realPath = fs.realpathSync(srcPath);
                 const realStat = fs.statSync(realPath);
                 if (realStat.isDirectory()) {
-                    copyDirRecursive(realPath, destPath, options);
+                    if (visitedRealPaths.has(realPath)) {
+                        continue;
+                    }
+                    visitedRealPaths.add(realPath);
+                    try {
+                        copyDirRecursive(realPath, destPath, childOptions);
+                    } finally {
+                        visitedRealPaths.delete(realPath);
+                    }
                 } else {
                     fs.copyFileSync(realPath, destPath);
                 }
