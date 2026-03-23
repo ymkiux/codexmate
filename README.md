@@ -4,11 +4,11 @@
 
 <img src="res/logo.png" alt="Codex Mate logo" width="110">
 
-[![Build](https://img.shields.io/github/actions/workflow/status/ymkiux/codexmate/release.yml?label=build)](https://github.com/ymkiux/codexmate/actions/workflows/release.yml)
+[![Build](https://img.shields.io/github/actions/workflow/status/SakuraByteCore/codexmate/release.yml?label=build)](https://github.com/SakuraByteCore/codexmate/actions/workflows/release.yml)
 [![Version](https://img.shields.io/npm/v/codexmate?label=version&registry_uri=https%3A%2F%2Fregistry.npmjs.org)](https://www.npmjs.com/package/codexmate)
 [![Downloads](https://img.shields.io/npm/dt/codexmate?label=downloads)](https://www.npmjs.com/package/codexmate)
-[![Status](https://img.shields.io/badge/status-alpha-orange)](https://github.com/ymkiux/codexmate)
-[![Maintain](https://img.shields.io/github/commit-activity/m/ymkiux/codexmate?label=maintain%2Fmonth)](https://github.com/ymkiux/codexmate/commits)
+[![Status](https://img.shields.io/badge/status-alpha-orange)](https://github.com/SakuraByteCore/codexmate)
+[![Maintain](https://img.shields.io/github/commit-activity/m/SakuraByteCore/codexmate?label=maintain%2Fmonth)](https://github.com/SakuraByteCore/codexmate/commits)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D14.0.0-green.svg)](https://nodejs.org)
 
@@ -31,7 +31,7 @@ Codex Mate 让 Codex 与 Claude Code 的提供商/模型切换变成“一条命
 环境要求：`Node.js >= 14`、`Git`
 
 ```bash
-git clone https://github.com/ymkiux/codexmate.git && cd codexmate && npm install && npm link && codexmate run
+git clone https://github.com/SakuraByteCore/codexmate.git && cd codexmate && npm install && npm link && codexmate run
 ```
 
 浏览器打开 `http://localhost:3737`。
@@ -125,7 +125,7 @@ codexmate export-session --source codex --session-id <ID>
 ### 从源码安装（推荐，一行命令）
 
 ```bash
-git clone https://github.com/ymkiux/codexmate.git && cd codexmate && npm install && npm link
+git clone https://github.com/SakuraByteCore/codexmate.git && cd codexmate && npm install && npm link
 ```
 
 安装完成后建议先验证：
@@ -151,7 +151,7 @@ npm install -g codexmate
 npm 包名：`codexmate`。若希望每次执行都更新到仓库最新版本，可使用：
 
 ```bash
-npm install -g ymkiux/codexmate
+npm install -g github:SakuraByteCore/codexmate
 ```
 
 ### 环境要求
