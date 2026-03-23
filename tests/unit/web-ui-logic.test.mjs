@@ -287,3 +287,43 @@ test('buildSessionTimelineNodes groups dense messages to avoid overlapping marke
 
     assert.ok(nodes.every(node => node.safePercent >= 6 && node.safePercent <= 94));
 });
+
+test('buildSessionTimelineNodes clamps maxMarkers into 1..80 and falls back on non-numeric values', () => {
+    const messages = Array.from({ length: 800 }, (_, idx) => ({
+        role: idx % 2 === 0 ? 'user' : 'assistant',
+        timestamp: `2026-03-23T09:${String(idx % 60).padStart(2, '0')}:00Z`
+    }));
+
+    const scenarios = [
+        { maxMarkers: 0, expectedLength: 1 },
+        { maxMarkers: -5, expectedLength: 1 },
+        { maxMarkers: 'not-a-number', expectedLength: 30 },
+        { maxMarkers: 10.7, expectedLength: 10 },
+        { maxMarkers: 999, expectedLength: 80 }
+    ];
+
+    for (const scenario of scenarios) {
+        const nodes = buildSessionTimelineNodes(messages, {
+            maxMarkers: scenario.maxMarkers,
+            getKey(_message, idx) {
+                return `msg-${idx}`;
+            }
+        });
+
+        assert.strictEqual(nodes.length, scenario.expectedLength);
+        assert.ok(nodes.length >= 1);
+        assert.ok(nodes[0].key.startsWith('msg-'));
+        assert.ok(Number.isInteger(nodes[0].startIndex) && nodes[0].startIndex >= 0);
+        assert.ok(Number.isInteger(nodes[0].endIndex) && nodes[0].endIndex >= nodes[0].startIndex);
+        assert.ok(Number.isInteger(nodes[0].messageCount) && nodes[0].messageCount > 0);
+        assert.ok(nodes[0].safePercent >= 6 && nodes[0].safePercent <= 94);
+
+        const last = nodes[nodes.length - 1];
+        assert.ok(last.key.startsWith('msg-'));
+        assert.ok(Number.isInteger(last.startIndex) && last.startIndex >= 0);
+        assert.ok(Number.isInteger(last.endIndex) && last.endIndex >= last.startIndex);
+        assert.ok(Number.isInteger(last.messageCount) && last.messageCount > 0);
+        assert.strictEqual(last.endIndex, messages.length - 1);
+        assert.ok(last.safePercent >= 6 && last.safePercent <= 94);
+    }
+});

@@ -177,7 +177,7 @@ export function buildSessionListParams(options = {}) {
     };
 }
 
-function normalizeSessionRole(role) {
+export function normalizeSessionMessageRole(role) {
     const value = typeof role === 'string' ? role.trim().toLowerCase() : '';
     if (value === 'user' || value === 'assistant' || value === 'system') {
         return value;
@@ -228,7 +228,7 @@ export function buildSessionTimelineNodes(messages = [], options = {}) {
         : 30;
 
     const buildSingleNode = (message, index) => {
-        const role = normalizeSessionRole(message && message.role);
+        const role = normalizeSessionMessageRole(message && (message.normalizedRole || message.role));
         const roleMeta = toRoleMeta(role);
         const key = String(getKey(message, index) || `msg-${index}`);
         const displayTime = formatSessionTimelineTimestamp(message && message.timestamp ? message.timestamp : '');
@@ -263,7 +263,7 @@ export function buildSessionTimelineNodes(messages = [], options = {}) {
         const messagesInGroup = end - start + 1;
         const roleSet = new Set();
         for (let i = start; i <= end; i += 1) {
-            roleSet.add(normalizeSessionRole(list[i] && list[i].role));
+            roleSet.add(normalizeSessionMessageRole(list[i] && (list[i].normalizedRole || list[i].role)));
         }
         const roleValue = roleSet.size === 1 ? Array.from(roleSet)[0] : 'mixed';
         const roleMeta = toRoleMeta(roleValue);
