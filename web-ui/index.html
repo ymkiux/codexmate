@@ -898,10 +898,10 @@
                         </div>
                     </div>
 
-                    <div :class="['session-preview', { active: !!activeSession }]">
+                    <div :class="['session-preview', { active: !!activeSession }]" :ref="setSessionPreviewContainerRef">
                         <template v-if="activeSession">
                             <div class="session-preview-scroll" :ref="setSessionPreviewScrollRef" @scroll="onSessionPreviewScroll">
-                                <div class="session-preview-header">
+                                <div class="session-preview-header" :ref="setSessionPreviewHeaderRef">
                                     <div>
                                         <div class="session-preview-title">{{ activeSession.title || activeSession.sessionId }}</div>
                                         <div class="session-preview-meta">
