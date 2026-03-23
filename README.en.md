@@ -408,7 +408,7 @@ Note: 7-Zip is optional. If missing, the built-in JS library is used. `--max` on
 
 ## Release (GitHub Actions)
 
-Create a tag that matches `package.json` (for example `v0.0.9`). Then run the `release` workflow in GitHub Actions and input that tag. It will create a GitHub Release and attach the `npm pack` `.tgz` artifact.
+Create a tag that matches `package.json` (for example `v0.0.14`). Then run the `release` workflow in GitHub Actions and input that tag. It will create a GitHub Release and attach the `npm pack` `.tgz` artifact.
 
 ## License
 
