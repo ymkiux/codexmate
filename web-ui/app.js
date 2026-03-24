@@ -14,6 +14,13 @@
     buildSessionTimelineNodes,
     normalizeSessionMessageRole
 } from './logic.mjs';
+import {
+    CONFIG_MODE_SET,
+    getProviderConfigModeMeta,
+    createConfigModeComputed
+} from './modules/config-mode.computed.mjs';
+import { createSkillsComputed } from './modules/skills.computed.mjs';
+import { createSkillsMethods } from './modules/skills.methods.mjs';
 
         document.addEventListener('DOMContentLoaded', () => {
             if (typeof Vue === 'undefined') {
@@ -111,6 +118,8 @@
                     skillsImportSelectedKeys: [],
                     skillsScanningImports: false,
                     skillsImporting: false,
+                    skillsZipImporting: false,
+                    skillsExporting: false,
                     sessionsList: [],
                     sessionsLoading: false,
                     sessionFilterSource: 'all',
@@ -400,141 +409,10 @@
                 installRegistryPreview() {
                     return this.resolveInstallRegistryUrl(this.installRegistryPreset, this.installRegistryCustom);
                 },
-                filteredSkillsList() {
-                    const list = Array.isArray(this.skillsList) ? this.skillsList : [];
-                    const keyword = typeof this.skillsKeyword === 'string' ? this.skillsKeyword.trim().toLowerCase() : '';
-                    const status = typeof this.skillsStatusFilter === 'string' ? this.skillsStatusFilter : 'all';
-                    return list.filter((item) => {
-                        const safe = item && typeof item === 'object' ? item : {};
-                        const hasSkillFile = !!safe.hasSkillFile;
-                        if (status === 'with-skill-file' && !hasSkillFile) return false;
-                        if (status === 'missing-skill-file' && hasSkillFile) return false;
-                        if (!keyword) return true;
-                        const fields = [
-                            safe.name,
-                            safe.displayName,
-                            safe.description,
-                            safe.path
-                        ];
-                        return fields.some((value) => typeof value === 'string' && value.toLowerCase().includes(keyword));
-                    });
-                },
-                skillsSelectableNames() {
-                    const list = Array.isArray(this.filteredSkillsList) ? this.filteredSkillsList : [];
-                    return list
-                        .map((item) => (item && typeof item.name === 'string' ? item.name.trim() : ''))
-                        .filter(Boolean);
-                },
-                skillsConfiguredCount() {
-                    const list = Array.isArray(this.skillsList) ? this.skillsList : [];
-                    return list.filter((item) => !!(item && item.hasSkillFile)).length;
-                },
-                skillsMissingSkillFileCount() {
-                    const list = Array.isArray(this.skillsList) ? this.skillsList : [];
-                    return list.filter((item) => !(item && item.hasSkillFile)).length;
-                },
-                skillsFilterDirty() {
-                    const keyword = typeof this.skillsKeyword === 'string' ? this.skillsKeyword.trim() : '';
-                    const status = typeof this.skillsStatusFilter === 'string' ? this.skillsStatusFilter : 'all';
-                    return keyword.length > 0 || status !== 'all';
-                },
-                skillsSelectedCount() {
-                    const selected = Array.isArray(this.skillsSelectedNames) ? this.skillsSelectedNames : [];
-                    return Array.from(new Set(selected.map((item) => String(item || '').trim()).filter(Boolean))).length;
-                },
-                skillsVisibleSelectedCount() {
-                    const selectable = this.skillsSelectableNames;
-                    const selectedSet = new Set(Array.isArray(this.skillsSelectedNames) ? this.skillsSelectedNames : []);
-                    return selectable.filter((name) => selectedSet.has(name)).length;
-                },
-                skillsAllSelected() {
-                    const selectable = this.skillsSelectableNames;
-                    if (!selectable.length) return false;
-                    const selectedSet = new Set(Array.isArray(this.skillsSelectedNames) ? this.skillsSelectedNames : []);
-                    return selectable.every((name) => selectedSet.has(name));
-                },
-                skillsImportSelectableKeys() {
-                    const list = Array.isArray(this.skillsImportList) ? this.skillsImportList : [];
-                    return list
-                        .map((item) => this.buildSkillImportKey(item))
-                        .filter(Boolean);
-                },
-                skillsImportSelectedCount() {
-                    const selectable = this.skillsImportSelectableKeys;
-                    const selectedSet = new Set(Array.isArray(this.skillsImportSelectedKeys) ? this.skillsImportSelectedKeys : []);
-                    return selectable.filter((key) => selectedSet.has(key)).length;
-                },
-                skillsImportAllSelected() {
-                    const selectable = this.skillsImportSelectableKeys;
-                    if (!selectable.length) return false;
-                    const selectedSet = new Set(Array.isArray(this.skillsImportSelectedKeys) ? this.skillsImportSelectedKeys : []);
-                    return selectable.every((key) => selectedSet.has(key));
-                },
-                skillsImportConfiguredCount() {
-                    const list = Array.isArray(this.skillsImportList) ? this.skillsImportList : [];
-                    return list.filter((item) => !!(item && item.hasSkillFile)).length;
-                },
-                skillsImportMissingSkillFileCount() {
-                    const list = Array.isArray(this.skillsImportList) ? this.skillsImportList : [];
-                    return list.filter((item) => !(item && item.hasSkillFile)).length;
-                },
-                inspectorMainTabLabel() {
-                    if (this.mainTab === 'config') return '配置中心';
-                    if (this.mainTab === 'sessions') return '会话浏览';
-                    if (this.mainTab === 'settings') return '设置';
-                    return '未知';
-                },
-                inspectorConfigModeLabel() {
-                    if (this.mainTab !== 'config') return '--';
-                    if (this.configMode === 'codex') return 'Codex';
-                    if (this.configMode === 'claude') return 'Claude Code';
-                    if (this.configMode === 'openclaw') return 'OpenClaw';
-                    return '未选择';
-                },
-                inspectorCurrentConfigLabel() {
-                    if (this.mainTab !== 'config') return '--';
-                    if (this.configMode === 'codex') {
-                        const provider = typeof this.currentProvider === 'string' ? this.currentProvider.trim() : '';
-                        return provider || '未选择';
-                    }
-                    if (this.configMode === 'claude') {
-                        const config = typeof this.currentClaudeConfig === 'string' ? this.currentClaudeConfig.trim() : '';
-                        return config || '未选择';
-                    }
-                    const openclaw = typeof this.currentOpenclawConfig === 'string' ? this.currentOpenclawConfig.trim() : '';
-                    return openclaw || '未选择';
-                },
-                inspectorCurrentModelLabel() {
-                    if (this.mainTab !== 'config') return '--';
-                    if (this.configMode === 'codex') {
-                        const model = typeof this.currentModel === 'string' ? this.currentModel.trim() : '';
-                        return model || '未选择';
-                    }
-                    if (this.configMode === 'claude') {
-                        const model = typeof this.currentClaudeModel === 'string' ? this.currentClaudeModel.trim() : '';
-                        return model || '未选择';
-                    }
-                    const model = this.openclawStructured && typeof this.openclawStructured.agentPrimary === 'string'
-                        ? this.openclawStructured.agentPrimary.trim()
-                        : '';
-                    return model || '按配置文件';
-                },
-                inspectorTemplateStatus() {
-                    if (this.mainTab !== 'config') return '--';
-                    if (this.configMode === 'codex') {
-                        if (this.configTemplateApplying || this.codexApplying) {
-                            return '模板应用中';
-                        }
-                        return '模板可编辑（手动确认应用）';
-                    }
-                    if (this.configMode === 'claude') {
-                        return '即时写入 Claude settings';
-                    }
-                    if (this.openclawApplying || this.openclawSaving) {
-                        return 'OpenClaw 保存/应用中';
-                    }
-                    return 'JSON5 可保存并应用';
-                },
+                ...createSkillsComputed(),
+
+                ...createConfigModeComputed(),
+
                 inspectorBusyStatus() {
                     const tasks = [];
                     if (this.loading) tasks.push('初始化');
@@ -542,7 +420,7 @@
                     if (this.codexModelsLoading || this.claudeModelsLoading) tasks.push('模型加载');
                     if (this.codexApplying || this.configTemplateApplying || this.openclawApplying) tasks.push('配置应用');
                     if (this.agentsSaving) tasks.push('AGENTS 保存');
-                    if (this.skillsLoading || this.skillsDeleting || this.skillsScanningImports || this.skillsImporting) tasks.push('Skills 管理');
+                    if (this.skillsLoading || this.skillsDeleting || this.skillsScanningImports || this.skillsImporting || this.skillsZipImporting || this.skillsExporting) tasks.push('Skills 管理');
                     if (this.proxySaving || this.proxyApplying || this.proxyStarting || this.proxyStopping) tasks.push('代理更新');
                     return tasks.length ? tasks.join(' / ') : '空闲';
                 },
@@ -846,9 +724,12 @@
                 },
 
                 switchConfigMode(mode) {
+                    const normalizedMode = typeof mode === 'string'
+                        ? mode.trim().toLowerCase()
+                        : '';
                     this.mainTab = 'config';
-                    this.configMode = mode;
-                    if (mode === 'claude') {
+                    this.configMode = CONFIG_MODE_SET.has(normalizedMode) ? normalizedMode : 'codex';
+                    if (this.configMode === 'claude') {
                         this.refreshClaudeModelContext();
                     }
                 },
@@ -1876,7 +1757,9 @@
                     if (this.modelsSource === 'remote' && this.models.length > 0 && !this.models.includes(this.currentModel)) {
                         this.currentModel = this.models[0];
                     }
-                    await this.applyCodexConfigDirect({ silent: true });
+                    if (getProviderConfigModeMeta(this.configMode)) {
+                        await this.applyCodexConfigDirect({ silent: true });
+                    }
                 },
 
                 async onModelChange() {
@@ -2080,191 +1963,8 @@
                     }
                 },
 
-                async openSkillsManager() {
-                    this.skillsSelectedNames = [];
-                    this.skillsKeyword = '';
-                    this.skillsStatusFilter = 'all';
-                    this.skillsImportList = [];
-                    this.skillsImportSelectedKeys = [];
-                    this.showSkillsModal = true;
-                    await this.refreshSkillsList({ silent: false });
-                },
-
-                closeSkillsModal() {
-                    this.showSkillsModal = false;
-                    this.skillsSelectedNames = [];
-                    this.skillsImportSelectedKeys = [];
-                },
-
-                async refreshSkillsList(options = {}) {
-                    this.skillsLoading = true;
-                    try {
-                        const res = await api('list-codex-skills');
-                        if (res.error) {
-                            this.showMessage(res.error, 'error');
-                            return;
-                        }
-                        this.skillsRootPath = res.root || '';
-                        this.skillsList = Array.isArray(res.items) ? res.items : [];
-                        const currentNames = new Set((Array.isArray(this.skillsList) ? this.skillsList : [])
-                            .map((item) => (item && typeof item.name === 'string' ? item.name.trim() : ''))
-                            .filter(Boolean));
-                        this.skillsSelectedNames = (Array.isArray(this.skillsSelectedNames) ? this.skillsSelectedNames : [])
-                            .filter((name) => currentNames.has(name));
-                        if (!options.silent) {
-                            const exists = res.exists !== false;
-                            if (!exists) {
-                                this.showMessage('skills 目录不存在，已按空列表显示', 'info');
-                            }
-                        }
-                    } catch (e) {
-                        this.showMessage('加载 skills 失败', 'error');
-                    } finally {
-                        this.skillsLoading = false;
-                    }
-                },
-
-                resetSkillsFilters() {
-                    this.skillsKeyword = '';
-                    this.skillsStatusFilter = 'all';
-                },
-
-                toggleAllSkillsSelection() {
-                    const selectable = this.skillsSelectableNames;
-                    if (this.skillsAllSelected) {
-                        const selectedSet = new Set(Array.isArray(this.skillsSelectedNames) ? this.skillsSelectedNames : []);
-                        selectable.forEach((name) => selectedSet.delete(name));
-                        this.skillsSelectedNames = Array.from(selectedSet);
-                        return;
-                    }
-                    const selectedSet = new Set(Array.isArray(this.skillsSelectedNames) ? this.skillsSelectedNames : []);
-                    selectable.forEach((name) => selectedSet.add(name));
-                    this.skillsSelectedNames = Array.from(selectedSet);
-                },
-
-                buildSkillImportKey(item) {
-                    const safe = item && typeof item === 'object' ? item : {};
-                    const sourceApp = typeof safe.sourceApp === 'string' ? safe.sourceApp.trim().toLowerCase() : '';
-                    const name = typeof safe.name === 'string' ? safe.name.trim() : '';
-                    if (!sourceApp || !name) return '';
-                    return `${sourceApp}:${name}`;
-                },
-
-                toggleAllSkillsImportSelection() {
-                    const selectable = this.skillsImportSelectableKeys;
-                    if (this.skillsImportAllSelected) {
-                        this.skillsImportSelectedKeys = [];
-                        return;
-                    }
-                    this.skillsImportSelectedKeys = [...selectable];
-                },
-
-                async scanImportableSkills() {
-                    if (this.skillsScanningImports || this.skillsImporting) return;
-                    this.skillsScanningImports = true;
-                    try {
-                        const res = await api('scan-unmanaged-codex-skills');
-                        if (res.error) {
-                            this.showMessage(res.error, 'error');
-                            return;
-                        }
-                        this.skillsImportList = Array.isArray(res.items) ? res.items : [];
-                        const availableKeys = new Set(this.skillsImportSelectableKeys);
-                        this.skillsImportSelectedKeys = (Array.isArray(this.skillsImportSelectedKeys) ? this.skillsImportSelectedKeys : [])
-                            .filter((key) => availableKeys.has(key));
-                        if (this.skillsImportList.length === 0) {
-                            this.showMessage('未扫描到可导入 skill', 'info');
-                        } else {
-                            this.showMessage(`扫描到 ${this.skillsImportList.length} 个可导入 skill`, 'success');
-                        }
-                    } catch (e) {
-                        this.showMessage('扫描可导入 skill 失败', 'error');
-                    } finally {
-                        this.skillsScanningImports = false;
-                    }
-                },
-
-                async importSelectedSkills() {
-                    if (this.skillsImporting) return;
-                    const selectedSet = new Set(Array.isArray(this.skillsImportSelectedKeys) ? this.skillsImportSelectedKeys : []);
-                    const selectedItems = (Array.isArray(this.skillsImportList) ? this.skillsImportList : [])
-                        .filter((item) => selectedSet.has(this.buildSkillImportKey(item)))
-                        .map((item) => ({
-                            name: item.name,
-                            sourceApp: item.sourceApp
-                        }));
-                    if (!selectedItems.length) {
-                        this.showMessage('请先选择要导入的 skill', 'error');
-                        return;
-                    }
-
-                    this.skillsImporting = true;
-                    try {
-                        const res = await api('import-codex-skills', { items: selectedItems });
-                        if (res.error) {
-                            this.showMessage(res.error, 'error');
-                            return;
-                        }
-                        const importedCount = Array.isArray(res.imported) ? res.imported.length : 0;
-                        const failedCount = Array.isArray(res.failed) ? res.failed.length : 0;
-                        if (failedCount > 0 && importedCount > 0) {
-                            this.showMessage(`已导入 ${importedCount} 个，失败 ${failedCount} 个`, 'error');
-                        } else if (failedCount > 0) {
-                            const first = res.failed[0] && res.failed[0].error ? res.failed[0].error : '导入失败';
-                            this.showMessage(first, 'error');
-                        } else {
-                            this.showMessage(`已导入 ${importedCount} 个 skill`, 'success');
-                        }
-                        await this.refreshSkillsList({ silent: true });
-                    } catch (e) {
-                        this.showMessage('导入 skill 失败', 'error');
-                    } finally {
-                        this.skillsImporting = false;
-                        await this.scanImportableSkills();
-                    }
-                },
-
-                async deleteSelectedSkills() {
-                    if (this.skillsDeleting) return;
-                    const selected = Array.isArray(this.skillsSelectedNames)
-                        ? Array.from(new Set(this.skillsSelectedNames.map((item) => String(item || '').trim()).filter(Boolean)))
-                        : [];
-                    if (!selected.length) {
-                        this.showMessage('请先选择要删除的 skill', 'error');
-                        return;
-                    }
-                    const confirmed = window.confirm(`确认删除 ${selected.length} 个 skill 吗？此操作不可撤销。`);
-                    if (!confirmed) {
-                        return;
-                    }
-
-                    this.skillsDeleting = true;
-                    try {
-                        const res = await api('delete-codex-skills', { names: selected });
-                        if (res.error) {
-                            this.showMessage(res.error, 'error');
-                            return;
-                        }
-
-                        const deletedCount = Array.isArray(res.deleted) ? res.deleted.length : 0;
-                        const failedList = Array.isArray(res.failed) ? res.failed : [];
-                        const failedCount = failedList.length;
-                        if (failedCount > 0 && deletedCount > 0) {
-                            this.showMessage(`已删除 ${deletedCount} 个，失败 ${failedCount} 个`, 'error');
-                        } else if (failedCount > 0) {
-                            const first = failedList[0] && failedList[0].error ? failedList[0].error : '删除失败';
-                            this.showMessage(first, 'error');
-                        } else {
-                            this.showMessage(`已删除 ${deletedCount} 个 skill`, 'success');
-                        }
-                        await this.refreshSkillsList({ silent: true });
-                    } catch (e) {
-                        this.showMessage('删除 skill 失败', 'error');
-                    } finally {
-                        this.skillsDeleting = false;
-                    }
-                },
-
+                ...createSkillsMethods({ api }),
+
                 async openOpenclawAgentsEditor() {
                     this.setAgentsModalContext('openclaw');
                     this.agentsLoading = true;

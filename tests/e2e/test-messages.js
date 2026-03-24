@@ -1,4 +1,66 @@
 ﻿const { assert, fs, path } = require('./helpers');
+const zipLib = require('zip-lib');
+const http = require('http');
+
+function postBinaryJson(port, requestPath, bodyBuffer, headers = {}, timeoutMs = 4000) {
+    return new Promise((resolve, reject) => {
+        const payload = Buffer.isBuffer(bodyBuffer) ? bodyBuffer : Buffer.from(bodyBuffer || '');
+        const req = http.request({
+            hostname: '127.0.0.1',
+            port,
+            path: requestPath,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/octet-stream',
+                'Content-Length': payload.length,
+                ...headers
+            }
+        }, (res) => {
+            let body = '';
+            res.setEncoding('utf-8');
+            res.on('data', chunk => body += chunk);
+            res.on('end', () => {
+                let parsed = {};
+                try {
+                    parsed = JSON.parse(body || '{}');
+                } catch (_) {
+                    parsed = { error: 'Invalid JSON response' };
+                }
+                resolve({
+                    statusCode: res.statusCode || 0,
+                    body: parsed
+                });
+            });
+        });
+        req.on('error', reject);
+        req.setTimeout(timeoutMs, () => req.destroy(new Error('Request timeout')));
+        req.write(payload);
+        req.end();
+    });
+}
+
+function getBinary(port, requestPath, timeoutMs = 4000) {
+    return new Promise((resolve, reject) => {
+        const req = http.request({
+            hostname: '127.0.0.1',
+            port,
+            path: requestPath,
+            method: 'GET'
+        }, (res) => {
+            const chunks = [];
+            res.on('data', chunk => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+            res.on('end', () => {
+                resolve({
+                    statusCode: res.statusCode || 0,
+                    body: Buffer.concat(chunks)
+                });
+            });
+        });
+        req.on('error', reject);
+        req.setTimeout(timeoutMs, () => req.destroy(new Error('Request timeout')));
+        req.end();
+    });
+}
 
 /**
  * E2E 测试：Web UI 消息简化
@@ -98,10 +160,15 @@ module.exports = async function testMessages(ctx) {
     const importableFromClaude = path.join(claudeSkillsRoot, 'e2e-importable-skill');
     fs.mkdirSync(importableFromClaude, { recursive: true });
     fs.writeFileSync(path.join(importableFromClaude, 'SKILL.md'), '# importable', 'utf-8');
+    const agentsSkillsRoot = path.join(tmpHome, '.agents', 'skills');
+    const importableFromAgents = path.join(agentsSkillsRoot, 'e2e-agents-skill');
+    fs.mkdirSync(importableFromAgents, { recursive: true });
+    fs.writeFileSync(path.join(importableFromAgents, 'SKILL.md'), '# agents-importable', 'utf-8');
 
     const unmanaged = await api('scan-unmanaged-codex-skills');
     assert(Array.isArray(unmanaged.items), 'scan-unmanaged-codex-skills should return items array');
     assert(unmanaged.items.some((item) => item && item.name === 'e2e-importable-skill' && item.sourceApp === 'claude'), 'scan-unmanaged-codex-skills should include claude source skills');
+    assert(unmanaged.items.some((item) => item && item.name === 'e2e-agents-skill' && item.sourceApp === 'agents'), 'scan-unmanaged-codex-skills should include agents source skills');
 
     const importNoSelection = await api('import-codex-skills', { items: [] });
     assert(importNoSelection.error, 'import-codex-skills should fail for empty items');
@@ -110,18 +177,68 @@ module.exports = async function testMessages(ctx) {
     assert(Array.isArray(importSkills.imported), 'import-codex-skills should return imported list');
     assert(importSkills.imported.some((item) => item && item.name === 'e2e-importable-skill'), 'import-codex-skills should import selected skill');
     assert(fs.existsSync(path.join(skillsRoot, 'e2e-importable-skill')), 'imported skill should exist in codex skills root');
+    const importAgentsSkills = await api('import-codex-skills', { items: [{ name: 'e2e-agents-skill', sourceApp: 'agents' }] });
+    assert(Array.isArray(importAgentsSkills.imported), 'import-codex-skills should return imported list for agents source');
+    assert(importAgentsSkills.imported.some((item) => item && item.name === 'e2e-agents-skill'), 'import-codex-skills should import agents source skill');
+    assert(fs.existsSync(path.join(skillsRoot, 'e2e-agents-skill')), 'agents source skill should exist in codex skills root');
+
+    const zipImportWorkspace = path.join(tmpHome, '.zip-import');
+    const zipSkillSourceRoot = path.join(zipImportWorkspace, 'bundle');
+    const zipSkillDir = path.join(zipSkillSourceRoot, 'e2e-zip-skill');
+    fs.mkdirSync(zipSkillDir, { recursive: true });
+    fs.writeFileSync(path.join(zipSkillDir, 'SKILL.md'), '# zip-skill', 'utf-8');
+    const zipPath = path.join(zipImportWorkspace, 'e2e-skills.zip');
+    await zipLib.archiveFolder(zipSkillSourceRoot, zipPath);
+    const zipUploadRes = await postBinaryJson(
+        ctx.port,
+        '/api/import-codex-skills-zip',
+        fs.readFileSync(zipPath),
+        {
+            'Content-Type': 'application/zip',
+            'x-codexmate-file-name': encodeURIComponent('e2e-skills.zip')
+        }
+    );
+    const importZipSkills = zipUploadRes.body;
+    assert(Array.isArray(importZipSkills.imported), 'import-codex-skills-zip should return imported list');
+    assert(importZipSkills.imported.some((item) => item && item.name === 'e2e-zip-skill'), 'import-codex-skills-zip should import skill from zip');
+    assert(fs.existsSync(path.join(skillsRoot, 'e2e-zip-skill')), 'zip imported skill should exist in codex skills root');
+
+    const exportNoSelection = await api('export-codex-skills', { names: [] });
+    assert(exportNoSelection.error, 'export-codex-skills should fail for empty names');
+    const exportSkills = await api('export-codex-skills', { names: ['e2e-skill-alpha', 'e2e-zip-skill'] });
+    assert(Array.isArray(exportSkills.exported), 'export-codex-skills should return exported list');
+    assert(exportSkills.exported.some((item) => item && item.name === 'e2e-skill-alpha'), 'export-codex-skills should export alpha');
+    assert(exportSkills.exported.some((item) => item && item.name === 'e2e-zip-skill'), 'export-codex-skills should export zip skill');
+    assert(exportSkills.fileName && typeof exportSkills.fileName === 'string', 'export-codex-skills should return downloadable fileName');
+    assert(path.basename(exportSkills.fileName) === exportSkills.fileName, 'export-codex-skills fileName should be basename only');
+    assert(!exportSkills.fileName.includes('..'), 'export-codex-skills fileName should not contain ..');
+    assert(!/[\\/]/.test(exportSkills.fileName), 'export-codex-skills fileName should not contain path separators');
+    const downloadPath = (typeof exportSkills.downloadPath === 'string' && exportSkills.downloadPath.trim())
+        ? exportSkills.downloadPath.trim()
+        : `/download/${encodeURIComponent(exportSkills.fileName)}`;
+    const downloadResult = await getBinary(ctx.port, downloadPath);
+    assert(downloadResult.statusCode === 200, 'export-codex-skills download should be available');
+    assert(downloadResult.body.length > 0, 'exported zip download should be non-empty');
+    if (downloadPath !== `/download/${encodeURIComponent(exportSkills.fileName)}`) {
+        const secondDownload = await getBinary(ctx.port, downloadPath);
+        assert(secondDownload.statusCode === 404, 'tokenized export should be removed after download');
+    }
 
     const deleteNoSelection = await api('delete-codex-skills', { names: [] });
     assert(deleteNoSelection.error, 'delete-codex-skills should fail for empty names');
 
-    const deleteSkills = await api('delete-codex-skills', { names: ['e2e-skill-alpha', 'e2e-skill-beta', 'e2e-importable-skill'] });
+    const deleteSkills = await api('delete-codex-skills', { names: ['e2e-skill-alpha', 'e2e-skill-beta', 'e2e-importable-skill', 'e2e-agents-skill', 'e2e-zip-skill'] });
     assert(Array.isArray(deleteSkills.deleted), 'delete-codex-skills should return deleted list');
     assert(deleteSkills.deleted.includes('e2e-skill-alpha'), 'delete-codex-skills should delete alpha');
     assert(deleteSkills.deleted.includes('e2e-skill-beta'), 'delete-codex-skills should delete beta');
     assert(deleteSkills.deleted.includes('e2e-importable-skill'), 'delete-codex-skills should delete imported skill');
+    assert(deleteSkills.deleted.includes('e2e-agents-skill'), 'delete-codex-skills should delete agents imported skill');
+    assert(deleteSkills.deleted.includes('e2e-zip-skill'), 'delete-codex-skills should delete zip imported skill');
     assert(!fs.existsSync(skillAlpha), 'alpha skill directory should be removed');
     assert(!fs.existsSync(skillBeta), 'beta skill directory should be removed');
     assert(!fs.existsSync(path.join(skillsRoot, 'e2e-importable-skill')), 'imported skill directory should be removed');
+    assert(!fs.existsSync(path.join(skillsRoot, 'e2e-agents-skill')), 'agents imported skill directory should be removed');
+    assert(!fs.existsSync(path.join(skillsRoot, 'e2e-zip-skill')), 'zip imported skill directory should be removed');
 
     // ========== OpenClaw 配置测试 ==========
     const openclawResult = await api('get-openclaw-config');
