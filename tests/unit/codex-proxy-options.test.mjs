@@ -23,6 +23,7 @@ function extractFunction(content, funcName) {
 
 const parseCodexProxyOptionsSrc = extractFunction(cliContent, 'parseCodexProxyOptions');
 const buildScriptCommandArgsSrc = extractFunction(cliContent, 'buildScriptCommandArgs');
+const runProxyCommandWithQueuedFollowUpsSrc = extractFunction(cliContent, 'runProxyCommandWithQueuedFollowUps');
 const parseContext = vm.createContext({});
 vm.runInContext(parseCodexProxyOptionsSrc, parseContext);
 const { parseCodexProxyOptions } = parseContext;
@@ -102,4 +103,13 @@ test('buildScriptCommandArgs throws on unsupported platform', () => {
         () => runBuildScriptArgs('win32', 'codex --yolo'),
         /当前平台暂不支持 --follow-up 自动排队/
     );
+});
+
+test('runProxyCommandWithQueuedFollowUps registers process-level cleanup handlers', () => {
+    assert.ok(runProxyCommandWithQueuedFollowUpsSrc.includes("process.on('exit'"), 'should listen to process exit');
+    assert.ok(runProxyCommandWithQueuedFollowUpsSrc.includes("process.on('SIGINT'"), 'should listen to SIGINT');
+    assert.ok(runProxyCommandWithQueuedFollowUpsSrc.includes("process.on('SIGTERM'"), 'should listen to SIGTERM');
+    assert.ok(runProxyCommandWithQueuedFollowUpsSrc.includes("process.removeListener('exit'"), 'should unbind process exit listener');
+    assert.ok(runProxyCommandWithQueuedFollowUpsSrc.includes("process.removeListener('SIGINT'"), 'should unbind SIGINT listener');
+    assert.ok(runProxyCommandWithQueuedFollowUpsSrc.includes("process.removeListener('SIGTERM'"), 'should unbind SIGTERM listener');
 });
