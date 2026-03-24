@@ -14,14 +14,12 @@ function readProjectFile(relativePath) {
 test('config template keeps expected config tabs in top and side navigation', () => {
     const html = readProjectFile('web-ui/index.html');
     const topTabModes = [...html.matchAll(/id="tab-config-([a-z]+)"/g)]
-        .map((match) => match[1])
-        .sort();
+        .map((match) => match[1]);
     const sideTabModes = [...html.matchAll(/id="side-tab-config-([a-z]+)"/g)]
-        .map((match) => match[1])
-        .sort();
+        .map((match) => match[1]);
 
-    assert.deepStrictEqual(topTabModes, ['claude', 'codex', 'openclaw']);
-    assert.deepStrictEqual(sideTabModes, ['claude', 'codex', 'openclaw']);
+    assert.deepStrictEqual(topTabModes, ['codex', 'claude', 'openclaw']);
+    assert.deepStrictEqual(sideTabModes, ['codex', 'claude', 'openclaw']);
     assert.match(html, /activeProviderBridgeHint/);
     assert.match(html, /isProviderConfigMode/);
 });
