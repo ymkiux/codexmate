@@ -7784,6 +7784,269 @@ async function cmdUnzip(zipPath, outputDir) {
     }
 }
 
+function normalizeExtractSuffix(rawSuffix) {
+    if (typeof rawSuffix !== 'string') {
+        return '.json';
+    }
+
+    const trimmed = rawSuffix.trim().toLowerCase();
+    if (!trimmed) {
+        return '.json';
+    }
+    return trimmed.startsWith('.') ? trimmed : `.${trimmed}`;
+}
+
+function buildDefaultExtractOutputDir(baseCwd = process.cwd()) {
+    const normalizedCwd = path.resolve(baseCwd || process.cwd());
+    const parentDir = path.dirname(normalizedCwd);
+    const timestamp = formatTimestampForFileName().replace(/-/g, '');
+    return path.join(parentDir, timestamp);
+}
+
+function sanitizeNameSegment(rawValue, fallback = 'item') {
+    const value = typeof rawValue === 'string' ? rawValue.trim() : '';
+    const sanitized = value
+        .replace(/[^\w.-]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+    return sanitized || fallback;
+}
+
+function resolveDuplicateOutputPath(outputDir, originalFileName, zipPath = '') {
+    const fallbackName = `file${path.extname(originalFileName || '')}`;
+    const fileName = path.basename(originalFileName || '') || fallbackName;
+    const firstChoice = path.join(outputDir, fileName);
+    if (!fs.existsSync(firstChoice)) {
+        return firstChoice;
+    }
+
+    const ext = path.extname(fileName);
+    const baseName = path.basename(fileName, ext);
+    const safeBaseName = sanitizeNameSegment(baseName, 'file');
+    const zipBaseName = sanitizeNameSegment(path.basename(zipPath || '', '.zip'), 'zip');
+
+    for (let index = 1; index <= 100000; index++) {
+        const candidateName = `${safeBaseName}__${zipBaseName}__${index}${ext}`;
+        const candidatePath = path.join(outputDir, candidateName);
+        if (!fs.existsSync(candidatePath)) {
+            return candidatePath;
+        }
+    }
+
+    throw new Error(`重名文件过多，无法生成唯一文件名: ${fileName}`);
+}
+
+function collectZipFilesFromDir(rootDir, recursive = true) {
+    const queue = [rootDir];
+    const result = [];
+
+    while (queue.length > 0) {
+        const currentDir = queue.shift();
+        let entries = [];
+        try {
+            entries = fs.readdirSync(currentDir, { withFileTypes: true });
+        } catch (e) {
+            throw new Error(`读取目录失败: ${currentDir} (${e.message})`);
+        }
+
+        for (const entry of entries) {
+            const entryPath = path.join(currentDir, entry.name);
+            if (entry.isDirectory()) {
+                if (recursive) {
+                    queue.push(entryPath);
+                }
+                continue;
+            }
+            if (entry.isFile() && entry.name.toLowerCase().endsWith('.zip')) {
+                result.push(entryPath);
+            }
+        }
+    }
+
+    result.sort((a, b) => a.localeCompare(b));
+    return result;
+}
+
+function extractMatchedEntriesFromZip(zipPath, outputDir, suffix) {
+    return new Promise((resolve, reject) => {
+        yauzl.open(zipPath, { lazyEntries: true, autoClose: true }, (openErr, zipFile) => {
+            if (openErr) {
+                reject(openErr);
+                return;
+            }
+            if (!zipFile) {
+                reject(new Error('无法读取 ZIP 文件'));
+                return;
+            }
+
+            let settled = false;
+            let matched = 0;
+            let extracted = 0;
+            let skipped = 0;
+
+            const finish = (err) => {
+                if (settled) return;
+                settled = true;
+                try {
+                    zipFile.close();
+                } catch (_) {}
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve({ matched, extracted, skipped });
+                }
+            };
+
+            zipFile.on('entry', (entry) => {
+                if (settled) return;
+                const rawEntryName = typeof entry.fileName === 'string' ? entry.fileName : '';
+                const normalizedEntryName = rawEntryName.replace(/\\/g, '/');
+
+                if (!normalizedEntryName || normalizedEntryName.endsWith('/')) {
+                    skipped += 1;
+                    zipFile.readEntry();
+                    return;
+                }
+
+                const entryBaseName = path.basename(normalizedEntryName);
+                if (!entryBaseName || !entryBaseName.toLowerCase().endsWith(suffix)) {
+                    skipped += 1;
+                    zipFile.readEntry();
+                    return;
+                }
+
+                matched += 1;
+                zipFile.openReadStream(entry, (streamErr, readStream) => {
+                    if (streamErr || !readStream) {
+                        finish(streamErr || new Error('无法读取 ZIP 条目流'));
+                        return;
+                    }
+
+                    let completed = false;
+                    const outputPath = resolveDuplicateOutputPath(outputDir, entryBaseName, zipPath);
+                    const writeStream = fs.createWriteStream(outputPath);
+                    const fail = (writeErr) => {
+                        if (completed) return;
+                        completed = true;
+                        try {
+                            readStream.destroy();
+                        } catch (_) {}
+                        try {
+                            writeStream.destroy();
+                        } catch (_) {}
+                        finish(writeErr);
+                    };
+
+                    readStream.on('error', fail);
+                    writeStream.on('error', fail);
+                    writeStream.on('finish', () => {
+                        if (completed || settled) return;
+                        completed = true;
+                        extracted += 1;
+                        zipFile.readEntry();
+                    });
+
+                    readStream.pipe(writeStream);
+                });
+            });
+
+            zipFile.on('end', () => {
+                finish(null);
+            });
+            zipFile.on('error', (zipErr) => {
+                finish(zipErr);
+            });
+
+            zipFile.readEntry();
+        });
+    });
+}
+
+async function cmdUnzipExt(zipDirPath, outputDir, options = {}) {
+    if (!zipDirPath) {
+        console.error('用法: codexmate unzip-ext <zip目录> [输出目录] [--ext:后缀] [--recursive]');
+        console.log('\n示例:');
+        console.log('  codexmate unzip-ext ./archives');
+        console.log('  codexmate unzip-ext ./archives ./output --ext:json');
+        console.log('  codexmate unzip-ext D:/data/zips --ext:txt --recursive');
+        process.exit(1);
+    }
+
+    const recursive = options.recursive !== false;
+    const suffix = normalizeExtractSuffix(options.ext);
+    const absZipDir = path.resolve(zipDirPath);
+    const absOutputDir = outputDir ? path.resolve(outputDir) : buildDefaultExtractOutputDir(process.cwd());
+
+    if (!fs.existsSync(absZipDir)) {
+        console.error('错误: 目录不存在:', absZipDir);
+        process.exit(1);
+    }
+    try {
+        if (!fs.statSync(absZipDir).isDirectory()) {
+            console.error('错误: 仅支持目录路径:', absZipDir);
+            process.exit(1);
+        }
+    } catch (e) {
+        console.error('错误: 无法读取目录信息:', e.message);
+        process.exit(1);
+    }
+
+    ensureDir(absOutputDir);
+
+    let zipFiles = [];
+    try {
+        zipFiles = collectZipFilesFromDir(absZipDir, recursive);
+    } catch (e) {
+        console.error('扫描 ZIP 文件失败:', e.message);
+        process.exit(1);
+    }
+
+    if (zipFiles.length === 0) {
+        console.error('错误: 未找到任何 ZIP 文件');
+        process.exit(1);
+    }
+
+    console.log('\n批量解压配置:');
+    console.log('  ZIP 目录:', absZipDir);
+    console.log('  输出目录:', absOutputDir);
+    console.log('  后缀过滤:', suffix);
+    console.log('  递归扫描:', recursive ? '是' : '否');
+    console.log('  ZIP 数量:', zipFiles.length);
+    console.log('\n开始提取...\n');
+
+    let totalMatched = 0;
+    let totalExtracted = 0;
+    let totalSkipped = 0;
+    const failed = [];
+
+    for (const zipFilePath of zipFiles) {
+        try {
+            const result = await extractMatchedEntriesFromZip(zipFilePath, absOutputDir, suffix);
+            totalMatched += result.matched;
+            totalExtracted += result.extracted;
+            totalSkipped += result.skipped;
+            console.log(`✓ ${path.basename(zipFilePath)}: 命中 ${result.matched}，提取 ${result.extracted}`);
+        } catch (e) {
+            failed.push({ zipFilePath, message: e && e.message ? e.message : String(e) });
+            console.error(`✗ ${path.basename(zipFilePath)}: ${e && e.message ? e.message : e}`);
+        }
+    }
+
+    console.log('\n提取结果:');
+    console.log('  输出目录:', absOutputDir);
+    console.log('  扫描 ZIP:', zipFiles.length);
+    console.log('  命中条目:', totalMatched);
+    console.log('  已提取:', totalExtracted);
+    console.log('  已跳过:', totalSkipped);
+    if (failed.length > 0) {
+        console.error('  失败数量:', failed.length);
+        for (const item of failed) {
+            console.error(`    - ${item.zipFilePath}: ${item.message}`);
+        }
+        process.exit(1);
+    }
+    console.log();
+}
+
 function resolveExportOutputPath(outputPath, defaultFileName) {
     const fallback = path.resolve(process.cwd(), defaultFileName);
     if (typeof outputPath !== 'string' || !outputPath.trim()) {
@@ -10771,6 +11034,7 @@ async function main() {
         console.log('  codexmate export-session --source <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]');
         console.log('  codexmate zip <路径> [--max:级别]  压缩（系统 zip 优先，其次 zip-lib）');
         console.log('  codexmate unzip <zip文件> [输出目录]  解压（zip-lib）');
+        console.log('  codexmate unzip-ext <zip目录> [输出目录] [--ext:后缀] [--recursive]  批量提取 ZIP 指定后缀文件');
         console.log('');
         process.exit(0);
     }
@@ -10823,6 +11087,32 @@ async function main() {
             break;
         }
         case 'unzip': await cmdUnzip(args[1], args[2]); break;
+        case 'unzip-ext': {
+            const unzipExtOptions = {
+                ext: 'json',
+                recursive: true
+            };
+            let zipDirPath = null;
+            let outputDir = null;
+            for (let i = 1; i < args.length; i++) {
+                const arg = args[i];
+                if (arg.startsWith('--ext:')) {
+                    unzipExtOptions.ext = arg.substring(6);
+                } else if (arg.startsWith('--ext=')) {
+                    unzipExtOptions.ext = arg.substring(6);
+                } else if (arg === '--recursive') {
+                    unzipExtOptions.recursive = true;
+                } else if (arg === '--no-recursive') {
+                    unzipExtOptions.recursive = false;
+                } else if (!zipDirPath) {
+                    zipDirPath = arg;
+                } else if (!outputDir) {
+                    outputDir = arg;
+                }
+            }
+            await cmdUnzipExt(zipDirPath, outputDir, unzipExtOptions);
+            break;
+        }
         default:
             console.error('错误: 未知命令:', command);
             console.log('运行 "codexmate" 查看帮助');

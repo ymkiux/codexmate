@@ -14,6 +14,7 @@ await import(pathToFileURL(path.join(__dirname, 'mcp-stdio.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'workflow-engine.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'skills-modal-ui.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'config-tabs-ui.test.mjs')));
+await import(pathToFileURL(path.join(__dirname, 'unzip-ext.test.mjs')));
 
 let failures = 0;
 for (const { name, fn } of tests) {
