@@ -123,12 +123,12 @@ codexmate run --no-browser
 | `codexmate add <name> <URL> [API_KEY]` | 添加提供商 |
 | `codexmate delete <name>` | 删除提供商 |
 | `codexmate claude <BaseURL> <API_KEY> [model]` | 写入 Claude Code 配置 |
-| `codexmate auth <list|import|switch|delete|status>` | 认证档案管理 |
-| `codexmate proxy <status|set|apply|enable|start|stop>` | 内建代理管理 |
-| `codexmate workflow <list|get|validate|run|runs>` | MCP 工作流管理 |
+| `codexmate auth <list\|import\|switch\|delete\|status>` | 认证档案管理 |
+| `codexmate proxy <status\|set\|apply\|enable\|start\|stop>` | 内建代理管理 |
+| `codexmate workflow <list\|get\|validate\|run\|runs>` | MCP 工作流管理 |
 | `codexmate run [--host <HOST>] [--no-browser]` | 启动 Web UI |
-| `codexmate mcp serve [--read-only|--allow-write]` | 启动 MCP stdio 服务 |
-| `codexmate export-session --source <codex|claude> ...` | 导出会话为 Markdown |
+| `codexmate mcp serve [--read-only\|--allow-write]` | 启动 MCP stdio 服务 |
+| `codexmate export-session --source <codex\|claude> ...` | 导出会话为 Markdown |
 | `codexmate zip <path> [--max:0-9]` / `codexmate unzip <zip> [out]` | 压缩 / 解压 |
 
 ## Web 界面

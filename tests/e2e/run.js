@@ -83,9 +83,10 @@ async function main() {
 
         const port = 18000 + Math.floor(Math.random() * 1000);
         debug('start web server');
+        const { CODEXMATE_NO_BROWSER: _noBrowserFlag, ...serverEnvBase } = env;
         try {
             webServer = spawn(node, [cliPath, 'run', '--no-browser'], {
-                env: { ...env, CODEXMATE_PORT: String(port) },
+                env: { ...serverEnvBase, CODEXMATE_PORT: String(port) },
                 stdio: ['ignore', 'pipe', 'pipe']
             });
         } catch (err) {

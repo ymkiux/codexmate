@@ -123,12 +123,12 @@ codexmate run --no-browser
 | `codexmate add <name> <URL> [API_KEY]` | Add provider |
 | `codexmate delete <name>` | Delete provider |
 | `codexmate claude <BaseURL> <API_KEY> [model]` | Write Claude Code config |
-| `codexmate auth <list|import|switch|delete|status>` | Auth profile management |
-| `codexmate proxy <status|set|apply|enable|start|stop>` | Built-in proxy management |
-| `codexmate workflow <list|get|validate|run|runs>` | MCP workflow management |
+| `codexmate auth <list\|import\|switch\|delete\|status>` | Auth profile management |
+| `codexmate proxy <status\|set\|apply\|enable\|start\|stop>` | Built-in proxy management |
+| `codexmate workflow <list\|get\|validate\|run\|runs>` | MCP workflow management |
 | `codexmate run [--host <HOST>] [--no-browser]` | Start Web UI |
-| `codexmate mcp serve [--read-only|--allow-write]` | Start MCP stdio server |
-| `codexmate export-session --source <codex|claude> ...` | Export session to Markdown |
+| `codexmate mcp serve [--read-only\|--allow-write]` | Start MCP stdio server |
+| `codexmate export-session --source <codex\|claude> ...` | Export session to Markdown |
 | `codexmate zip <path> [--max:0-9]` / `codexmate unzip <zip> [out]` | Zip / unzip |
 
 ## Web UI
