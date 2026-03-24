@@ -9836,7 +9836,7 @@ async function runProxyCommandWithQueuedFollowUps(selectedBin, finalArgs = [], q
             rejectOnce(new Error(`运行 ${selectedBin} 失败: ${err.message}`));
         });
 
-        child.on('exit', (code, signal) => {
+        child.on('close', (code, signal) => {
             cleanup();
             if (typeof code === 'number') {
                 resolveOnce(code);
