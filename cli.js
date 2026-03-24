@@ -6964,7 +6964,7 @@ function registerDownloadArtifact(filePath, options = {}) {
     };
 }
 
-function resolveDownloadArtifact(tokenOrFileName) {
+function resolveDownloadArtifact(tokenOrFileName, options = {}) {
     if (!tokenOrFileName) return null;
     const token = typeof tokenOrFileName === 'string' ? tokenOrFileName.trim() : '';
     if (!token) return null;
@@ -6981,6 +6981,9 @@ function resolveDownloadArtifact(tokenOrFileName) {
             } catch (_) {}
         }
         return null;
+    }
+    if (options && options.consume === true) {
+        g_downloadArtifacts.delete(token);
     }
     return {
         token,
@@ -7223,6 +7226,12 @@ function writeUploadZipStream(req, prefix, originalName = '', maxSize = MAX_SKIL
         };
 
         req.on('error', (err) => fail(err));
+        req.on('aborted', () => fail(new Error('上传已中断')));
+        req.on('close', () => {
+            if (!settled && !req.complete) {
+                fail(new Error('上传已中断'));
+            }
+        });
         stream.on('error', (err) => fail(err));
         req.on('data', (chunk) => {
             if (settled) return;
@@ -8531,15 +8540,11 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                 return;
             }
 
-            const artifact = resolveDownloadArtifact(decodedFileName);
+            const artifact = resolveDownloadArtifact(decodedFileName, { consume: true });
             if (artifact) {
-                const artifactToken = artifact.token;
                 streamZipDownloadResponse(res, artifact.filePath, {
                     fileName: artifact.fileName,
-                    deleteAfterDownload: artifact.deleteAfterDownload !== false,
-                    onAfterComplete: () => {
-                        g_downloadArtifacts.delete(artifactToken);
-                    }
+                    deleteAfterDownload: artifact.deleteAfterDownload !== false
                 });
                 return;
             }
