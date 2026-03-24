@@ -90,7 +90,7 @@ test('unzip-ext extracts default json suffix recursively into timestamp dir', as
     }
 });
 
-test('unzip-ext honors custom suffix and explicit output directory', async () => {
+test('unzip-ext honors custom multi suffix and explicit output directory', async () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'codexmate-unzip-ext-custom-'));
     try {
         const zipRoot = path.join(tempRoot, 'archives');
@@ -99,16 +99,66 @@ test('unzip-ext honors custom suffix and explicit output directory', async () =>
         ensureDir(zipRoot);
         writeText(path.join(srcDir, 'data.json'), '{"v":1}\n');
         writeText(path.join(srcDir, 'notes.txt'), 'hello\n');
+        writeText(path.join(srcDir, 'ignore.md'), 'skip\n');
 
         const zipPath = path.join(zipRoot, 'sample.zip');
         await zipLib.archiveFolder(srcDir, zipPath);
 
-        const result = runCli(['unzip-ext', zipRoot, outputDir, '--ext:txt'], tempRoot);
+        const result = runCli(['unzip-ext', zipRoot, outputDir, '--ext:txt,json'], tempRoot);
         assert.strictEqual(result.status, 0, `stderr: ${result.stderr}\nstdout: ${result.stdout}`);
 
         const outputFiles = fs.readdirSync(outputDir).sort();
-        assert.deepStrictEqual(outputFiles, ['notes.txt'], 'custom txt suffix should only extract txt files');
+        assert.deepStrictEqual(outputFiles, ['data.json', 'notes.txt'], 'custom txt,json suffix should extract both types');
         assert.strictEqual(fs.readFileSync(path.join(outputDir, 'notes.txt'), 'utf-8').trim(), 'hello');
+    } finally {
+        fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+});
+
+test('unzip-ext supports --no-recursive to skip nested zip files', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'codexmate-unzip-ext-norec-'));
+    try {
+        const zipRoot = path.join(tempRoot, 'zip-root');
+        const nestedDir = path.join(zipRoot, 'nested');
+        const outputDir = path.join(tempRoot, 'out');
+        const topSrc = path.join(tempRoot, 'top-src');
+        const nestedSrc = path.join(tempRoot, 'nested-src');
+        ensureDir(nestedDir);
+
+        writeText(path.join(topSrc, 'top.json'), '{"k":"top"}\n');
+        writeText(path.join(nestedSrc, 'nested.json'), '{"k":"nested"}\n');
+
+        await zipLib.archiveFolder(topSrc, path.join(zipRoot, 'top.zip'));
+        await zipLib.archiveFolder(nestedSrc, path.join(nestedDir, 'nested.zip'));
+
+        const result = runCli(['unzip-ext', zipRoot, outputDir, '--no-recursive'], tempRoot);
+        assert.strictEqual(result.status, 0, `stderr: ${result.stderr}\nstdout: ${result.stdout}`);
+
+        const outputFiles = fs.readdirSync(outputDir).sort();
+        assert.deepStrictEqual(outputFiles, ['top.json'], 'non-recursive mode should only process top-level zip files');
+    } finally {
+        fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+});
+
+test('unzip-ext merges repeated --ext flags', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'codexmate-unzip-ext-repeat-'));
+    try {
+        const zipRoot = path.join(tempRoot, 'zip-root');
+        const outputDir = path.join(tempRoot, 'out');
+        const srcDir = path.join(tempRoot, 'src');
+        ensureDir(zipRoot);
+
+        writeText(path.join(srcDir, 'a.json'), '{"a":1}\n');
+        writeText(path.join(srcDir, 'b.txt'), 'b\n');
+        writeText(path.join(srcDir, 'c.log'), 'c\n');
+        await zipLib.archiveFolder(srcDir, path.join(zipRoot, 'mix.zip'));
+
+        const result = runCli(['unzip-ext', zipRoot, outputDir, '--ext', 'json', '--ext=txt'], tempRoot);
+        assert.strictEqual(result.status, 0, `stderr: ${result.stderr}\nstdout: ${result.stdout}`);
+
+        const outputFiles = fs.readdirSync(outputDir).sort();
+        assert.deepStrictEqual(outputFiles, ['a.json', 'b.txt'], 'repeated --ext flags should merge suffix filters');
     } finally {
         fs.rmSync(tempRoot, { recursive: true, force: true });
     }
