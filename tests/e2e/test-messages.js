@@ -1,5 +1,66 @@
-﻿const { assert, fs, path, os } = require('./helpers');
+﻿const { assert, fs, path } = require('./helpers');
 const zipLib = require('zip-lib');
+const http = require('http');
+
+function postBinaryJson(port, requestPath, bodyBuffer, headers = {}, timeoutMs = 4000) {
+    return new Promise((resolve, reject) => {
+        const payload = Buffer.isBuffer(bodyBuffer) ? bodyBuffer : Buffer.from(bodyBuffer || '');
+        const req = http.request({
+            hostname: '127.0.0.1',
+            port,
+            path: requestPath,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/octet-stream',
+                'Content-Length': payload.length,
+                ...headers
+            }
+        }, (res) => {
+            let body = '';
+            res.setEncoding('utf-8');
+            res.on('data', chunk => body += chunk);
+            res.on('end', () => {
+                let parsed = {};
+                try {
+                    parsed = JSON.parse(body || '{}');
+                } catch (_) {
+                    parsed = { error: 'Invalid JSON response' };
+                }
+                resolve({
+                    statusCode: res.statusCode || 0,
+                    body: parsed
+                });
+            });
+        });
+        req.on('error', reject);
+        req.setTimeout(timeoutMs, () => req.destroy(new Error('Request timeout')));
+        req.write(payload);
+        req.end();
+    });
+}
+
+function getBinary(port, requestPath, timeoutMs = 4000) {
+    return new Promise((resolve, reject) => {
+        const req = http.request({
+            hostname: '127.0.0.1',
+            port,
+            path: requestPath,
+            method: 'GET'
+        }, (res) => {
+            const chunks = [];
+            res.on('data', chunk => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+            res.on('end', () => {
+                resolve({
+                    statusCode: res.statusCode || 0,
+                    body: Buffer.concat(chunks)
+                });
+            });
+        });
+        req.on('error', reject);
+        req.setTimeout(timeoutMs, () => req.destroy(new Error('Request timeout')));
+        req.end();
+    });
+}
 
 /**
  * E2E 测试：Web UI 消息简化
@@ -128,10 +189,16 @@ module.exports = async function testMessages(ctx) {
     fs.writeFileSync(path.join(zipSkillDir, 'SKILL.md'), '# zip-skill', 'utf-8');
     const zipPath = path.join(zipImportWorkspace, 'e2e-skills.zip');
     await zipLib.archiveFolder(zipSkillSourceRoot, zipPath);
-    const importZipSkills = await api('import-codex-skills-zip', {
-        fileName: 'e2e-skills.zip',
-        fileBase64: fs.readFileSync(zipPath).toString('base64')
-    });
+    const zipUploadRes = await postBinaryJson(
+        ctx.port,
+        '/api/import-codex-skills-zip',
+        fs.readFileSync(zipPath),
+        {
+            'Content-Type': 'application/zip',
+            'x-codexmate-file-name': encodeURIComponent('e2e-skills.zip')
+        }
+    );
+    const importZipSkills = zipUploadRes.body;
     assert(Array.isArray(importZipSkills.imported), 'import-codex-skills-zip should return imported list');
     assert(importZipSkills.imported.some((item) => item && item.name === 'e2e-zip-skill'), 'import-codex-skills-zip should import skill from zip');
     assert(fs.existsSync(path.join(skillsRoot, 'e2e-zip-skill')), 'zip imported skill should exist in codex skills root');
@@ -141,11 +208,21 @@ module.exports = async function testMessages(ctx) {
     const exportSkills = await api('export-codex-skills', { names: ['e2e-skill-alpha', 'e2e-zip-skill'] });
     assert(Array.isArray(exportSkills.exported), 'export-codex-skills should return exported list');
     assert(exportSkills.exported.some((item) => item && item.name === 'e2e-skill-alpha'), 'export-codex-skills should export alpha');
+    assert(exportSkills.exported.some((item) => item && item.name === 'e2e-zip-skill'), 'export-codex-skills should export zip skill');
     assert(exportSkills.fileName && typeof exportSkills.fileName === 'string', 'export-codex-skills should return downloadable fileName');
-    const exportedZipPath = path.join(os.tmpdir(), exportSkills.fileName);
-    assert(fs.existsSync(exportedZipPath), 'exported zip should exist in tmp directory');
-    assert(fs.statSync(exportedZipPath).size > 0, 'exported zip should be non-empty');
-    fs.rmSync(exportedZipPath, { force: true });
+    assert(path.basename(exportSkills.fileName) === exportSkills.fileName, 'export-codex-skills fileName should be basename only');
+    assert(!exportSkills.fileName.includes('..'), 'export-codex-skills fileName should not contain ..');
+    assert(!/[\\/]/.test(exportSkills.fileName), 'export-codex-skills fileName should not contain path separators');
+    const downloadPath = (typeof exportSkills.downloadPath === 'string' && exportSkills.downloadPath.trim())
+        ? exportSkills.downloadPath.trim()
+        : `/download/${encodeURIComponent(exportSkills.fileName)}`;
+    const downloadResult = await getBinary(ctx.port, downloadPath);
+    assert(downloadResult.statusCode === 200, 'export-codex-skills download should be available');
+    assert(downloadResult.body.length > 0, 'exported zip download should be non-empty');
+    if (downloadPath !== `/download/${encodeURIComponent(exportSkills.fileName)}`) {
+        const secondDownload = await getBinary(ctx.port, downloadPath);
+        assert(secondDownload.statusCode === 404, 'tokenized export should be removed after download');
+    }
 
     const deleteNoSelection = await api('delete-codex-skills', { names: [] });
     assert(deleteNoSelection.error, 'delete-codex-skills should fail for empty names');

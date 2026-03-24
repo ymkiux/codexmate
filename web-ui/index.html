@@ -59,7 +59,7 @@
                 :tabindex="mainTab === 'config' && configMode === 'codex' ? 0 : -1"
                 :aria-selected="mainTab === 'config' && configMode === 'codex'"
                 :aria-pressed="mainTab === 'config' && configMode === 'codex'"
-                aria-controls="panel-config-codex"
+                aria-controls="panel-config-provider"
                 :class="{ active: mainTab === 'config' && configMode === 'codex' }"
                 @click="switchConfigMode('codex')">Codex 配置</button>
             <button class="top-tab"
@@ -68,7 +68,7 @@
                 :tabindex="mainTab === 'config' && configMode === 'gemini' ? 0 : -1"
                 :aria-selected="mainTab === 'config' && configMode === 'gemini'"
                 :aria-pressed="mainTab === 'config' && configMode === 'gemini'"
-                aria-controls="panel-config-gemini"
+                aria-controls="panel-config-provider"
                 :class="{ active: mainTab === 'config' && configMode === 'gemini' }"
                 @click="switchConfigMode('gemini')">Gemini 配置</button>
             <button class="top-tab"
@@ -77,7 +77,7 @@
                 :tabindex="mainTab === 'config' && configMode === 'opencode' ? 0 : -1"
                 :aria-selected="mainTab === 'config' && configMode === 'opencode'"
                 :aria-pressed="mainTab === 'config' && configMode === 'opencode'"
-                aria-controls="panel-config-opencode"
+                aria-controls="panel-config-provider"
                 :class="{ active: mainTab === 'config' && configMode === 'opencode' }"
                 @click="switchConfigMode('opencode')">OpenCode 配置</button>
             <button class="top-tab"
@@ -155,7 +155,7 @@
                     <button
                         role="tab"
                         id="side-tab-config-codex"
-                        aria-controls="panel-config-codex"
+                        aria-controls="panel-config-provider"
                         :tabindex="mainTab === 'config' && configMode === 'codex' ? 0 : -1"
                         :aria-selected="mainTab === 'config' && configMode === 'codex'"
                         :aria-pressed="mainTab === 'config' && configMode === 'codex'"
@@ -170,7 +170,7 @@
                     <button
                         role="tab"
                         id="side-tab-config-gemini"
-                        aria-controls="panel-config-gemini"
+                        aria-controls="panel-config-provider"
                         :tabindex="mainTab === 'config' && configMode === 'gemini' ? 0 : -1"
                         :aria-selected="mainTab === 'config' && configMode === 'gemini'"
                         :aria-pressed="mainTab === 'config' && configMode === 'gemini'"
@@ -185,7 +185,7 @@
                     <button
                         role="tab"
                         id="side-tab-config-opencode"
-                        aria-controls="panel-config-opencode"
+                        aria-controls="panel-config-provider"
                         :tabindex="mainTab === 'config' && configMode === 'opencode' ? 0 : -1"
                         :aria-selected="mainTab === 'config' && configMode === 'opencode'"
                         :aria-pressed="mainTab === 'config' && configMode === 'opencode'"
@@ -355,7 +355,7 @@
                     <div
                         v-show="mainTab === 'config' && isProviderConfigMode"
                         class="mode-content mode-cards"
-                        :id="'panel-config-' + configMode"
+                        id="panel-config-provider"
                         role="tabpanel"
                         :aria-labelledby="'tab-config-' + configMode">
                 <!-- 添加提供商按钮 -->
