@@ -3,11 +3,11 @@ layout: home
 
 hero:
   name: Codex Mate
-  text: 一站式管理 Codex / Claude Code / OpenClaw 配置与本地会话
-  tagline: 面向 AI CLI 用户的本地配置与会话管理中枢：上手快、路径清、可回滚。
+  text: Codex / Claude Code / OpenClaw 本地配置与会话管理
+  tagline: 用一个 CLI + Web UI 管理多工具配置与本地会话。
   actions:
     - theme: brand
-      text: 60 秒上手
+      text: 快速开始
       link: /guide/getting-started
     - theme: alt
       text: 核心工作流
@@ -17,120 +17,84 @@ hero:
       link: https://github.com/SakuraByteCore/codexmate
 
 features:
-  - title: 配置切换更快
-    details: 用同一套 CLI + Web UI 完成 provider/model 切换、配置应用与会话管理。
-  - title: 本地优先与可回滚
-    details: 配置与会话默认留在本机，首次接管自动备份，避免误覆盖。
-  - title: 会话统一视图
-    details: 在同一页面浏览 Codex 与 Claude 会话，并支持筛选、导出、批量清理。
-  - title: 完整能力覆盖
-    details: 覆盖 Codex、Claude、OpenClaw、Skills 管理、会话导出与压缩解压等场景。
+  - title: 统一入口
+    details: Codex、Claude Code、OpenClaw 配置在同一入口管理。
+  - title: 本地优先
+    details: 配置写入本地文件，首轮接管有备份，便于回滚。
+  - title: 会话可管理
+    details: 支持会话筛选、导出、删除与批量清理。
+  - title: 自动化友好
+    details: 提供 MCP stdio 能力，可按需开启写入工具。
 ---
 
-## 概览
+## 这是什么
 
-Codex Mate 让 Codex 与 Claude Code 的 provider/model 切换变成“一条命令或一次点击”，并在同一 Web 页面统一管理本地会话。
+Codex Mate 是一个本地优先的配置与会话管理工具，覆盖：
 
-## 60 秒上手（源码一行安装）
+- Codex provider/model 切换与配置写入
+- Claude Code 配置方案管理（写入 `~/.claude/settings.json`）
+- OpenClaw JSON5 配置与 Workspace `AGENTS.md`
+- Codex / Claude 本地会话浏览、导出、删除
+
+## 快速开始
 
 ```bash
-git clone https://github.com/SakuraByteCore/codexmate.git && cd codexmate && npm install && npm link && codexmate run
-```
-
-首次建议补两条确认命令：
-
-```bash
+npm install -g codexmate
 codexmate setup
 codexmate status
+codexmate run
 ```
 
-如果你只想临时试用：
+仅启动服务（测试 / CI）：
 
 ```bash
-npx codexmate@latest run
+codexmate run --no-browser
 ```
 
-## 核心命令速查
+## 命令速查
 
-- 查看状态：`codexmate status`
-- 启动 Web：`codexmate run`
-- 交互初始化：`codexmate setup`
-- 查看提供商/模型：`codexmate list` / `codexmate models`
-- 切换提供商/模型：`codexmate switch <provider>` / `codexmate use <model>`
-- 一键写入 Claude 配置：`codexmate claude <BaseURL> <API_KEY> [model]`
-- 导出会话：`codexmate export-session --source <codex|claude> ...`
+- `codexmate status`
+- `codexmate setup`
+- `codexmate list` / `codexmate models`
+- `codexmate switch <provider>` / `codexmate use <model>`
+- `codexmate claude <BaseURL> <API_KEY> [model]`
+- `codexmate auth <list|import|switch|delete|status>`
+- `codexmate proxy <status|set|apply|enable|start|stop>`
+- `codexmate workflow <list|get|validate|run|runs>`
+- `codexmate run [--host <HOST>] [--no-browser]`
+- `codexmate export-session --source <codex|claude> ...`
 
-## 三条高频路径
+## 模块能力
 
-1. 快速切换 Codex 提供商与模型
+### Codex
 
-```bash
-codexmate switch <提供商>
-codexmate use <模型>
-```
-
-2. 一行写入 Claude Code 配置
-
-```bash
-codexmate claude <BaseURL> <API_KEY> <模型>
-```
-
-3. 导出本地会话到 Markdown
-
-```bash
-codexmate export-session --source codex --session-id <ID>
-```
-
-## 完整功能介绍
-
-### Codex 配置
-
-- 提供商/模型切换
-- 模型列表管理
+- provider / model 切换
 - `config.toml` 模板确认写入
-- `~/.codex/AGENTS.md` 指令文件编辑
+- `~/.codex/AGENTS.md` 与 skills 管理
 
-### Skills 管理
-
-- 统计概览（总数 / 缺少 `SKILL.md` / 可导入）
-- 关键词检索与状态筛选
-- 多选批量删除
-- 跨应用扫描导入
-
-### Claude Code 配置
+### Claude Code
 
 - 多配置方案管理
-- API Key、Base URL、模型统一维护
-- 默认写入 `~/.claude/settings.json`
-- 支持“分享导入命令”一键复制
+- 一键写入 `~/.claude/settings.json`
 
-### OpenClaw 配置
+### OpenClaw
 
-- OpenClaw JSON5 多方案管理
-- 应用到 `~/.openclaw/openclaw.json`
-- 管理 Workspace 下 `AGENTS.md`
+- JSON5 多方案管理
+- 写入 `~/.openclaw/openclaw.json`
+- 管理 `~/.openclaw/workspace/AGENTS.md`
 
-### 会话浏览与导出
+### 会话
 
-- 同页查看 Codex + Claude 会话
-- 来源筛选与 cwd 路径筛选
-- 指定会话导出 Markdown
-- 会话级与消息级删除、批量清理
+- Codex + Claude 会话统一视图
+- 搜索、筛选、导出、删除、批量清理
 
-### 附属工具
+## 测试约定
 
-- Zip 压缩/解压（优先 7-Zip，多线程；缺失则 JS 库兜底）
-- `codexmate mcp serve`（stdio，默认只读，可选写入）
+- 自动化测试只启动服务，不打开页面。
+- 推荐命令：`codexmate run --no-browser`。
 
-## 为什么选 Codex Mate
+## 设计边界
 
-- 聚焦三件事：Codex 切换 + Claude Code 配置 + OpenClaw 配置
-- 本地优先：配置与密钥落地本机
-- 轻量：CLI + Web，无需额外桌面客户端
-- 安全感：接管前自动备份，关键操作可追溯
-
-## 设计边界（避免误解）
-
-- 不做云端托管与账号体系
-- 不代管你的密钥，配置写入本地文件
-- 不替代原工具，只负责“配置管理 + 会话可视化”这一层
+- 不做云端托管与账号体系。
+- 不代管密钥，配置写入本地文件。
+- 不替代原工具，仅负责配置管理与会话管理层。

@@ -40,7 +40,8 @@ async function main() {
         ...process.env,
         HOME: tmpHome,
         USERPROFILE: tmpHome,
-        CODEXMATE_FORCE_RESET_EXISTING_CONFIG: '1'
+        CODEXMATE_FORCE_RESET_EXISTING_CONFIG: '1',
+        CODEXMATE_NO_BROWSER: '1'
     };
     const cliPath = path.resolve(__dirname, '../../cli.js');
     const node = process.execPath;
@@ -82,9 +83,10 @@ async function main() {
 
         const port = 18000 + Math.floor(Math.random() * 1000);
         debug('start web server');
+        const { CODEXMATE_NO_BROWSER: _noBrowserFlag, ...serverEnvBase } = env;
         try {
-            webServer = spawn(node, [cliPath, 'run'], {
-                env: { ...env, CODEXMATE_PORT: String(port) },
+            webServer = spawn(node, [cliPath, 'run', '--no-browser'], {
+                env: { ...serverEnvBase, CODEXMATE_PORT: String(port) },
                 stdio: ['ignore', 'pipe', 'pipe']
             });
         } catch (err) {
