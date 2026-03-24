@@ -63,24 +63,6 @@
                 :class="{ active: mainTab === 'config' && configMode === 'codex' }"
                 @click="switchConfigMode('codex')">Codex 配置</button>
             <button class="top-tab"
-                id="tab-config-gemini"
-                role="tab"
-                :tabindex="mainTab === 'config' && configMode === 'gemini' ? 0 : -1"
-                :aria-selected="mainTab === 'config' && configMode === 'gemini'"
-                :aria-pressed="mainTab === 'config' && configMode === 'gemini'"
-                aria-controls="panel-config-provider"
-                :class="{ active: mainTab === 'config' && configMode === 'gemini' }"
-                @click="switchConfigMode('gemini')">Gemini 配置</button>
-            <button class="top-tab"
-                id="tab-config-opencode"
-                role="tab"
-                :tabindex="mainTab === 'config' && configMode === 'opencode' ? 0 : -1"
-                :aria-selected="mainTab === 'config' && configMode === 'opencode'"
-                :aria-pressed="mainTab === 'config' && configMode === 'opencode'"
-                aria-controls="panel-config-provider"
-                :class="{ active: mainTab === 'config' && configMode === 'opencode' }"
-                @click="switchConfigMode('opencode')">OpenCode 配置</button>
-            <button class="top-tab"
                 id="tab-config-claude"
                 role="tab"
                 :tabindex="mainTab === 'config' && configMode === 'claude' ? 0 : -1"
@@ -169,36 +151,6 @@
                     </button>
                     <button
                         role="tab"
-                        id="side-tab-config-gemini"
-                        aria-controls="panel-config-provider"
-                        :tabindex="mainTab === 'config' && configMode === 'gemini' ? 0 : -1"
-                        :aria-selected="mainTab === 'config' && configMode === 'gemini'"
-                        :aria-pressed="mainTab === 'config' && configMode === 'gemini'"
-                        :class="['side-item', { active: mainTab === 'config' && configMode === 'gemini' }]"
-                        @click="switchConfigMode('gemini')">
-                        <div class="side-item-title">Gemini 配置</div>
-                        <div class="side-item-meta">
-                            <span>提供商 / 模型</span>
-                            <span v-if="currentProvider">当前 {{ currentProvider }}</span>
-                        </div>
-                    </button>
-                    <button
-                        role="tab"
-                        id="side-tab-config-opencode"
-                        aria-controls="panel-config-provider"
-                        :tabindex="mainTab === 'config' && configMode === 'opencode' ? 0 : -1"
-                        :aria-selected="mainTab === 'config' && configMode === 'opencode'"
-                        :aria-pressed="mainTab === 'config' && configMode === 'opencode'"
-                        :class="['side-item', { active: mainTab === 'config' && configMode === 'opencode' }]"
-                        @click="switchConfigMode('opencode')">
-                        <div class="side-item-title">OpenCode 配置</div>
-                        <div class="side-item-meta">
-                            <span>提供商 / 模型</span>
-                            <span v-if="currentProvider">当前 {{ currentProvider }}</span>
-                        </div>
-                    </button>
-                    <button
-                        role="tab"
                         id="side-tab-config-claude"
                         aria-controls="panel-config-claude"
                         :tabindex="mainTab === 'config' && configMode === 'claude' ? 0 : -1"
@@ -272,8 +224,8 @@
                         {{ mainTab === 'config' ? '配置中心' : (mainTab === 'sessions' ? '会话浏览' : '设置') }}
                     </h1>
                     <p class="subtitle" v-if="mainTab === 'config'">
-                        配置中枢：管理 Codex / Gemini / OpenCode / Claude / OpenClaw
-                        <span class="sr-only">本地配置中枢，统一管理 Codex / Gemini / OpenCode / Claude Code / OpenClaw。</span>
+                        配置中枢：管理 Codex / Claude / OpenClaw
+                        <span class="sr-only">本地配置中枢，统一管理 Codex / Claude Code / OpenClaw。</span>
                     </p>
                     <p class="subtitle" v-else-if="mainTab === 'sessions'">
                         浏览、导出或独立查看 Codex / Claude 会话记录。
@@ -335,12 +287,6 @@
                     <button :class="['config-subtab', { active: configMode === 'codex' }]" @click="switchConfigMode('codex')">
                         Codex 配置
                     </button>
-                    <button :class="['config-subtab', { active: configMode === 'gemini' }]" @click="switchConfigMode('gemini')">
-                        Gemini 配置
-                    </button>
-                    <button :class="['config-subtab', { active: configMode === 'opencode' }]" @click="switchConfigMode('opencode')">
-                        OpenCode 配置
-                    </button>
                     <button :class="['config-subtab', { active: configMode === 'claude' }]" @click="switchConfigMode('claude')">
                         Claude Code 配置
                     </button>
@@ -351,7 +297,7 @@
 
                 <!-- 内容包裹器 - 稳定布局 -->
                 <div class="content-wrapper">
-                    <!-- Provider 配置模式（Codex / Gemini / OpenCode） -->
+                    <!-- Provider 配置模式（Codex） -->
                     <div
                         v-show="mainTab === 'config' && isProviderConfigMode"
                         class="mode-content mode-cards"

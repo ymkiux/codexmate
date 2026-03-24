@@ -2,7 +2,7 @@
 
 # Codex Mate
 
-**Local configuration and session manager for Codex / Gemini / OpenCode / Claude Code / OpenClaw**
+**Local configuration and session manager for Codex / Claude Code / OpenClaw**
 
 [![Build](https://img.shields.io/github/actions/workflow/status/SakuraByteCore/codexmate/release.yml?label=build)](https://github.com/SakuraByteCore/codexmate/actions/workflows/release.yml)
 [![Version](https://img.shields.io/npm/v/codexmate?label=version&registry_uri=https%3A%2F%2Fregistry.npmjs.org)](https://www.npmjs.com/package/codexmate)
@@ -21,11 +21,10 @@
 Codex Mate is a local-first CLI + Web UI for unified management of:
 
 - Codex provider/model switching and config writes
-- Gemini/OpenCode provider/model config views
 - Claude Code profiles (writes to `~/.claude/settings.json`)
 - OpenClaw JSON5 profiles and workspace `AGENTS.md`
 - Local Codex/Claude sessions (list/filter/export/delete)
-- `codexmate gemini` / `codexmate qwen` passthrough commands
+- `codexmate qwen` passthrough command
 
 It works on local files directly and does not require cloud hosting.
 
@@ -33,7 +32,7 @@ It works on local files directly and does not require cloud hosting.
 
 | Dimension | Codex Mate | Manual File Editing |
 | --- | --- | --- |
-| Multi-tool management | Codex + Gemini + OpenCode + Claude Code + OpenClaw in one entry | Different files and folders per tool |
+| Multi-tool management | Codex + Claude Code + OpenClaw in one entry | Different files and folders per tool |
 | Operation mode | CLI + local Web UI | Manual TOML/JSON/JSON5 edits |
 | Session handling | Browse/export/batch cleanup | Manual file location and processing |
 | Rollback readiness | Backup before first takeover | Easy to overwrite by mistake |
@@ -44,7 +43,6 @@ It works on local files directly and does not require cloud hosting.
 **Configuration**
 - Provider/model switching (`switch`, `use`)
 - Codex `config.toml` template confirmation before write
-- Gemini/OpenCode config modes (Web UI)
 - Claude Code profile management and apply
 - OpenClaw JSON5 profile management
 
@@ -58,7 +56,7 @@ It works on local files directly and does not require cloud hosting.
 - MCP stdio domains (`tools`, `resources`, `prompts`)
 - Built-in proxy controls (`proxy`)
 - Auth profile management (`auth`)
-- `codexmate gemini` / `codexmate qwen` compatibility entrypoints (passthrough with `--yolo`)
+- `codexmate qwen` compatibility entrypoint (passthrough with `--yolo`)
 - Zip/unzip utilities
 
 ## Architecture
@@ -130,7 +128,7 @@ codexmate run --no-browser
 | `codexmate auth <list\|import\|switch\|delete\|status>` | Auth profile management |
 | `codexmate proxy <status\|set\|apply\|enable\|start\|stop>` | Built-in proxy management |
 | `codexmate workflow <list\|get\|validate\|run\|runs>` | MCP workflow management |
-| `codexmate gemini [args...]` / `codexmate qwen [args...]` | Gemini/Qwen CLI passthrough entrypoints |
+| `codexmate qwen [args...]` | Qwen CLI passthrough entrypoint |
 | `codexmate run [--host <HOST>] [--no-browser]` | Start Web UI |
 | `codexmate mcp serve [--read-only\|--allow-write]` | Start MCP stdio server |
 | `codexmate export-session --source <codex\|claude> ...` | Export session to Markdown |
@@ -144,9 +142,6 @@ codexmate run --no-browser
 - `~/.codex/AGENTS.md` editing
 - `~/.codex/skills` management (filter, batch delete, cross-app import)
 
-### Gemini / OpenCode Mode
-- Gemini/OpenCode provider/model switching
-- Managed in the same config workspace as Codex
 
 ### Claude Code Mode
 - Multi-profile management
