@@ -9546,6 +9546,7 @@ async function cmdWorkflow(args = []) {
     throw new Error(`未知 workflow 子命令: ${subcommand}`);
 }
 
+// #region parseCodexProxyOptions
 function parseCodexProxyOptions(args = []) {
     const options = {
         passthroughArgs: [],
@@ -9593,21 +9594,27 @@ function parseCodexProxyOptions(args = []) {
 
     return options;
 }
+// #endregion parseCodexProxyOptions
 
 function shellEscapePosixArg(value) {
     const text = value === undefined || value === null ? '' : String(value);
     return `'${text.replace(/'/g, `'\"'\"'`)}'`;
 }
 
+// #region buildScriptCommandArgs
 function buildScriptCommandArgs(commandLine) {
     const platform = process.platform;
     // util-linux script needs -e/--return to propagate child exit code.
     if (platform === 'linux' || platform === 'android') {
         return ['-q', '-e', '-c', commandLine, '/dev/null'];
     }
-    // OpenBSD/NetBSD support "-c" and should still use "-e" for child exit status.
-    if (platform === 'openbsd' || platform === 'netbsd') {
+    // NetBSD supports -e/-c, matching util-linux style contract.
+    if (platform === 'netbsd') {
         return ['-q', '-e', '-c', commandLine, '/dev/null'];
+    }
+    // OpenBSD supports "-c <command>" with a trailing output file path.
+    if (platform === 'openbsd') {
+        return ['-c', commandLine, '/dev/null'];
     }
     // BSD/macOS script does not support util-linux "-c <cmd>" syntax.
     if (platform === 'darwin' || platform === 'freebsd') {
@@ -9615,7 +9622,9 @@ function buildScriptCommandArgs(commandLine) {
     }
     throw new Error(`当前平台暂不支持 --follow-up 自动排队（platform=${platform}）`);
 }
+// #endregion buildScriptCommandArgs
 
+// #region runProxyCommandWithQueuedFollowUps
 async function runProxyCommandWithQueuedFollowUps(selectedBin, finalArgs = [], queuedFollowUps = []) {
     if (!process.stdin || !process.stdin.isTTY) {
         throw new Error('当前 stdin 不是 TTY，无法使用 --follow-up 自动排队。');
@@ -9630,6 +9639,7 @@ async function runProxyCommandWithQueuedFollowUps(selectedBin, finalArgs = [], q
     const scriptArgs = buildScriptCommandArgs(commandLine);
 
     return new Promise((resolve, reject) => {
+        let settled = false;
         const child = spawn(scriptPath, scriptArgs, {
             stdio: ['pipe', 'pipe', 'pipe']
         });
@@ -9637,12 +9647,79 @@ async function runProxyCommandWithQueuedFollowUps(selectedBin, finalArgs = [], q
         const stdin = process.stdin;
         const hadRawMode = !!stdin.isRaw;
         let cleanedUp = false;
+        let waitingDrain = false;
         let followUpsFlushed = false;
         let outputReadyDetected = false;
         const timers = [];
+        const pendingWrites = [];
+        let onChildStdinDrain = null;
+        let onChildStdinError = null;
+        const resolveOnce = (code) => {
+            if (settled) return;
+            settled = true;
+            resolve(code);
+        };
+        const rejectOnce = (error) => {
+            if (settled) return;
+            settled = true;
+            reject(error);
+        };
+        const handleWriteFailure = (error) => {
+            const err = error instanceof Error ? error : new Error(String(error || 'unknown'));
+            cleanup();
+            try {
+                if (!child.killed) {
+                    child.kill('SIGTERM');
+                }
+            } catch (_) {
+                // Ignore failure to terminate child after stdin write failure.
+            }
+            rejectOnce(new Error(`写入 ${selectedBin} stdin 失败: ${err.message}`));
+        };
+        const flushPendingWrites = () => {
+            if (cleanedUp || child.stdin.destroyed) {
+                pendingWrites.length = 0;
+                return;
+            }
+            while (pendingWrites.length > 0) {
+                const chunk = pendingWrites[0];
+                let canContinue = true;
+                try {
+                    canContinue = child.stdin.write(chunk, (error) => {
+                        if (error) {
+                            handleWriteFailure(error);
+                        }
+                    });
+                } catch (error) {
+                    handleWriteFailure(error);
+                    return;
+                }
+                pendingWrites.shift();
+                if (!canContinue) {
+                    waitingDrain = true;
+                    try {
+                        stdin.pause();
+                    } catch (_) {
+                        // Ignore stdin pause failures.
+                    }
+                    return;
+                }
+            }
+            waitingDrain = false;
+            try {
+                stdin.resume();
+            } catch (_) {
+                // Ignore stdin resume failures.
+            }
+        };
+        const enqueueWrite = (chunk) => {
+            if (cleanedUp) return;
+            pendingWrites.push(chunk);
+            flushPendingWrites();
+        };
         const onInput = (chunk) => {
             if (!child.stdin.destroyed) {
-                child.stdin.write(chunk);
+                enqueueWrite(chunk);
             }
         };
         const flushQueuedFollowUps = () => {
@@ -9652,7 +9729,7 @@ async function runProxyCommandWithQueuedFollowUps(selectedBin, finalArgs = [], q
                 const timer = setTimeout(() => {
                     if (!child.stdin.destroyed) {
                         // PTY submit should use CR instead of LF.
-                        child.stdin.write(`${message}\r`);
+                        enqueueWrite(`${message}\r`);
                     }
                 }, index * 80);
                 timers.push(timer);
@@ -9707,6 +9784,12 @@ async function runProxyCommandWithQueuedFollowUps(selectedBin, finalArgs = [], q
             process.removeListener('SIGTERM', onProcessSigterm);
             child.stdout.removeListener('data', onStdoutData);
             child.stderr.removeListener('data', onStderrData);
+            if (onChildStdinDrain) {
+                child.stdin.removeListener('drain', onChildStdinDrain);
+            }
+            if (onChildStdinError) {
+                child.stdin.removeListener('error', onChildStdinError);
+            }
             while (timers.length > 0) {
                 clearTimeout(timers.pop());
             }
@@ -9724,6 +9807,15 @@ async function runProxyCommandWithQueuedFollowUps(selectedBin, finalArgs = [], q
         process.on('SIGTERM', onProcessSigterm);
         child.stdout.on('data', onStdoutData);
         child.stderr.on('data', onStderrData);
+        onChildStdinDrain = () => {
+            waitingDrain = false;
+            flushPendingWrites();
+        };
+        onChildStdinError = (error) => {
+            handleWriteFailure(error);
+        };
+        child.stdin.on('drain', onChildStdinDrain);
+        child.stdin.on('error', onChildStdinError);
         try {
             if (typeof stdin.setRawMode === 'function' && !hadRawMode) {
                 stdin.setRawMode(true);
@@ -9741,27 +9833,28 @@ async function runProxyCommandWithQueuedFollowUps(selectedBin, finalArgs = [], q
 
         child.on('error', (err) => {
             cleanup();
-            reject(new Error(`运行 ${selectedBin} 失败: ${err.message}`));
+            rejectOnce(new Error(`运行 ${selectedBin} 失败: ${err.message}`));
         });
 
         child.on('exit', (code, signal) => {
             cleanup();
             if (typeof code === 'number') {
-                resolve(code);
+                resolveOnce(code);
                 return;
             }
             if (signal === 'SIGINT') {
-                resolve(130);
+                resolveOnce(130);
                 return;
             }
             if (signal === 'SIGTERM') {
-                resolve(143);
+                resolveOnce(143);
                 return;
             }
-            resolve(1);
+            resolveOnce(1);
         });
     });
 }
+// #endregion runProxyCommandWithQueuedFollowUps
 
 async function runProxyCommand(displayName, binNames, args = [], installTip = '', runtimeOptions = {}) {
     const extraArgs = Array.isArray(args) ? args.filter(arg => arg !== undefined) : [];
