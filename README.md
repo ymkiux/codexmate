@@ -135,7 +135,7 @@ codexmate run --no-browser
 | `codexmate mcp serve [--read-only\|--allow-write]` | 启动 MCP stdio 服务 |
 | `codexmate export-session --source <codex\|claude> ...` | 导出会话为 Markdown |
 | `codexmate zip <path> [--max:0-9]` / `codexmate unzip <zip> [out]` | 压缩 / 解压 |
-| `codexmate unzip-ext <zip-dir> [out] [--ext:suffix] [--recursive]` | 批量提取目录下 ZIP 内指定后缀文件（默认 `json`） |
+| `codexmate unzip-ext <zip-dir> [out] [--ext:suffix[,suffix...]] [--no-recursive]` | 批量提取目录下 ZIP 内指定后缀文件（默认 `.json`，默认递归） |
 
 ## Web 界面
 

@@ -123,6 +123,7 @@ const MAX_UPLOAD_SIZE = 200 * 1024 * 1024;
 const MAX_SKILLS_ZIP_UPLOAD_SIZE = 20 * 1024 * 1024;
 const MAX_SKILLS_ZIP_ENTRY_COUNT = 2000;
 const MAX_SKILLS_ZIP_UNCOMPRESSED_BYTES = 512 * 1024 * 1024;
+const DEFAULT_EXTRACT_SUFFIXES = Object.freeze(['.json']);
 const DOWNLOAD_ARTIFACT_TTL_MS = 10 * 60 * 1000;
 const g_downloadArtifacts = new Map();
 const BUILTIN_PROXY_PROVIDER_NAME = 'codexmate-proxy';
@@ -7784,16 +7785,40 @@ async function cmdUnzip(zipPath, outputDir) {
     }
 }
 
-function normalizeExtractSuffix(rawSuffix) {
-    if (typeof rawSuffix !== 'string') {
-        return '.json';
+function splitExtractSuffixInput(rawValue) {
+    if (Array.isArray(rawValue)) {
+        return rawValue.flatMap((item) => splitExtractSuffixInput(item));
+    }
+    if (typeof rawValue !== 'string') {
+        return [];
+    }
+    return rawValue
+        .split(/[,\s]+/g)
+        .map((item) => item.trim())
+        .filter(Boolean);
+}
+
+function normalizeExtractSuffix(rawSuffix, fallbackSuffixes = DEFAULT_EXTRACT_SUFFIXES) {
+    const fallbackItems = splitExtractSuffixInput(fallbackSuffixes);
+    const sourceItems = splitExtractSuffixInput(rawSuffix);
+    const source = sourceItems.length > 0 ? sourceItems : fallbackItems;
+    const dedup = new Set();
+
+    for (const item of source) {
+        const lower = item.toLowerCase();
+        if (!lower) {
+            continue;
+        }
+        const normalized = lower.startsWith('.') ? lower : `.${lower}`;
+        if (normalized.length > 1) {
+            dedup.add(normalized);
+        }
     }
 
-    const trimmed = rawSuffix.trim().toLowerCase();
-    if (!trimmed) {
-        return '.json';
+    if (dedup.size === 0) {
+        return [...DEFAULT_EXTRACT_SUFFIXES];
     }
-    return trimmed.startsWith('.') ? trimmed : `.${trimmed}`;
+    return Array.from(dedup);
 }
 
 function buildDefaultExtractOutputDir(baseCwd = process.cwd()) {
@@ -7866,7 +7891,8 @@ function collectZipFilesFromDir(rootDir, recursive = true) {
     return result;
 }
 
-function extractMatchedEntriesFromZip(zipPath, outputDir, suffix) {
+function extractMatchedEntriesFromZip(zipPath, outputDir, suffixes) {
+    const normalizedSuffixes = normalizeExtractSuffix(suffixes);
     return new Promise((resolve, reject) => {
         yauzl.open(zipPath, { lazyEntries: true, autoClose: true }, (openErr, zipFile) => {
             if (openErr) {
@@ -7908,7 +7934,9 @@ function extractMatchedEntriesFromZip(zipPath, outputDir, suffix) {
                 }
 
                 const entryBaseName = path.basename(normalizedEntryName);
-                if (!entryBaseName || !entryBaseName.toLowerCase().endsWith(suffix)) {
+                const lowerBaseName = entryBaseName.toLowerCase();
+                const matchedSuffix = normalizedSuffixes.some((suffix) => lowerBaseName.endsWith(suffix));
+                if (!entryBaseName || !matchedSuffix) {
                     skipped += 1;
                     zipFile.readEntry();
                     return;
@@ -7932,6 +7960,11 @@ function extractMatchedEntriesFromZip(zipPath, outputDir, suffix) {
                         } catch (_) {}
                         try {
                             writeStream.destroy();
+                        } catch (_) {}
+                        try {
+                            if (fs.existsSync(outputPath)) {
+                                fs.unlinkSync(outputPath);
+                            }
                         } catch (_) {}
                         finish(writeErr);
                     };
@@ -7963,16 +7996,17 @@ function extractMatchedEntriesFromZip(zipPath, outputDir, suffix) {
 
 async function cmdUnzipExt(zipDirPath, outputDir, options = {}) {
     if (!zipDirPath) {
-        console.error('用法: codexmate unzip-ext <zip目录> [输出目录] [--ext:后缀] [--recursive]');
+        console.error('用法: codexmate unzip-ext <zip目录> [输出目录] [--ext:后缀[,后缀...]] [--no-recursive]');
         console.log('\n示例:');
         console.log('  codexmate unzip-ext ./archives');
-        console.log('  codexmate unzip-ext ./archives ./output --ext:json');
-        console.log('  codexmate unzip-ext D:/data/zips --ext:txt --recursive');
+        console.log('  codexmate unzip-ext ./archives ./output --ext:json,txt');
+        console.log('  codexmate unzip-ext D:/data/zips --ext:txt --no-recursive');
+        console.log('  说明: 默认递归扫描子目录，可通过 --no-recursive 关闭递归');
         process.exit(1);
     }
 
     const recursive = options.recursive !== false;
-    const suffix = normalizeExtractSuffix(options.ext);
+    const suffixes = normalizeExtractSuffix(options.ext);
     const absZipDir = path.resolve(zipDirPath);
     const absOutputDir = outputDir ? path.resolve(outputDir) : buildDefaultExtractOutputDir(process.cwd());
 
@@ -8008,7 +8042,7 @@ async function cmdUnzipExt(zipDirPath, outputDir, options = {}) {
     console.log('\n批量解压配置:');
     console.log('  ZIP 目录:', absZipDir);
     console.log('  输出目录:', absOutputDir);
-    console.log('  后缀过滤:', suffix);
+    console.log('  后缀过滤:', suffixes.join(', '));
     console.log('  递归扫描:', recursive ? '是' : '否');
     console.log('  ZIP 数量:', zipFiles.length);
     console.log('\n开始提取...\n');
@@ -8020,7 +8054,11 @@ async function cmdUnzipExt(zipDirPath, outputDir, options = {}) {
 
     for (const zipFilePath of zipFiles) {
         try {
-            const result = await extractMatchedEntriesFromZip(zipFilePath, absOutputDir, suffix);
+            await inspectZipArchiveLimits(zipFilePath, {
+                maxEntryCount: MAX_SKILLS_ZIP_ENTRY_COUNT,
+                maxUncompressedBytes: MAX_SKILLS_ZIP_UNCOMPRESSED_BYTES
+            });
+            const result = await extractMatchedEntriesFromZip(zipFilePath, absOutputDir, suffixes);
             totalMatched += result.matched;
             totalExtracted += result.extracted;
             totalSkipped += result.skipped;
@@ -11034,7 +11072,7 @@ async function main() {
         console.log('  codexmate export-session --source <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]');
         console.log('  codexmate zip <路径> [--max:级别]  压缩（系统 zip 优先，其次 zip-lib）');
         console.log('  codexmate unzip <zip文件> [输出目录]  解压（zip-lib）');
-        console.log('  codexmate unzip-ext <zip目录> [输出目录] [--ext:后缀] [--recursive]  批量提取 ZIP 指定后缀文件');
+        console.log('  codexmate unzip-ext <zip目录> [输出目录] [--ext:后缀[,后缀...]] [--no-recursive]  批量提取 ZIP 指定后缀文件（默认递归）');
         console.log('');
         process.exit(0);
     }
@@ -11089,7 +11127,7 @@ async function main() {
         case 'unzip': await cmdUnzip(args[1], args[2]); break;
         case 'unzip-ext': {
             const unzipExtOptions = {
-                ext: 'json',
+                ext: [],
                 recursive: true
             };
             let zipDirPath = null;
@@ -11097,9 +11135,15 @@ async function main() {
             for (let i = 1; i < args.length; i++) {
                 const arg = args[i];
                 if (arg.startsWith('--ext:')) {
-                    unzipExtOptions.ext = arg.substring(6);
+                    unzipExtOptions.ext.push(...splitExtractSuffixInput(arg.substring(6)));
                 } else if (arg.startsWith('--ext=')) {
-                    unzipExtOptions.ext = arg.substring(6);
+                    unzipExtOptions.ext.push(...splitExtractSuffixInput(arg.substring(6)));
+                } else if (arg === '--ext') {
+                    const nextArg = args[i + 1];
+                    if (typeof nextArg === 'string' && !nextArg.startsWith('--')) {
+                        unzipExtOptions.ext.push(...splitExtractSuffixInput(nextArg));
+                        i += 1;
+                    }
                 } else if (arg === '--recursive') {
                     unzipExtOptions.recursive = true;
                 } else if (arg === '--no-recursive') {
