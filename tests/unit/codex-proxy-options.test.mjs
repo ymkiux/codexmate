@@ -247,7 +247,7 @@ test('runProxyCommandWithQueuedFollowUps registers and removes process-level cle
     assert.strictEqual(processMock.listenerCount('SIGINT'), sigintBefore + 1);
     assert.strictEqual(processMock.listenerCount('SIGTERM'), sigtermBefore + 1);
 
-    child.emit('exit', 0, null);
+    child.emit('close', 0, null);
     await runPromise;
 
     assert.strictEqual(processMock.listenerCount('exit'), exitBefore);
@@ -267,7 +267,7 @@ test('runProxyCommandWithQueuedFollowUps flushes follow-ups after readiness/time
 
     assert.strictEqual(child.stdin.chunks.includes('first follow-up\r'), true, 'should flush follow-up after timers');
 
-    child.emit('exit', 0, null);
+    child.emit('close', 0, null);
     await runPromise;
 });
 
@@ -281,6 +281,6 @@ test('runProxyCommandWithQueuedFollowUps submits follow-ups with CR in PTY', asy
 
     assertArrayEquals(child.stdin.chunks, ['submit check\r']);
 
-    child.emit('exit', 0, null);
+    child.emit('close', 0, null);
     await runPromise;
 });
