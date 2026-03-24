@@ -3,7 +3,7 @@ layout: home
 
 hero:
   name: Codex Mate
-  text: Codex / Claude Code / OpenClaw 本地配置与会话管理
+  text: Codex / Gemini / OpenCode / Claude Code / OpenClaw 本地配置与会话管理
   tagline: 用一个 CLI + Web UI 管理多工具配置与本地会话。
   actions:
     - theme: brand
@@ -18,7 +18,7 @@ hero:
 
 features:
   - title: 统一入口
-    details: Codex、Claude Code、OpenClaw 配置在同一入口管理。
+    details: Codex、Gemini、OpenCode、Claude Code、OpenClaw 配置在同一入口管理。
   - title: 本地优先
     details: 配置写入本地文件，首轮接管有备份，便于回滚。
   - title: 会话可管理
@@ -32,9 +32,11 @@ features:
 Codex Mate 是一个本地优先的配置与会话管理工具，覆盖：
 
 - Codex provider/model 切换与配置写入
+- Gemini / OpenCode provider/model 配置视图
 - Claude Code 配置方案管理（写入 `~/.claude/settings.json`）
 - OpenClaw JSON5 配置与 Workspace `AGENTS.md`
 - Codex / Claude 本地会话浏览、导出、删除
+- `codexmate gemini` / `codexmate qwen` 透传入口
 
 ## 快速开始
 
@@ -61,6 +63,7 @@ codexmate run --no-browser
 - `codexmate auth <list|import|switch|delete|status>`
 - `codexmate proxy <status|set|apply|enable|start|stop>`
 - `codexmate workflow <list|get|validate|run|runs>`
+- `codexmate gemini [args...]` / `codexmate qwen [args...]`
 - `codexmate run [--host <HOST>] [--no-browser]`
 - `codexmate export-session --source <codex|claude> ...`
 
@@ -71,6 +74,11 @@ codexmate run --no-browser
 - provider / model 切换
 - `config.toml` 模板确认写入
 - `~/.codex/AGENTS.md` 与 skills 管理
+
+### Gemini / OpenCode
+
+- Gemini 与 OpenCode 的 provider / model 配置切换
+- 与 Codex 配置同一页面集中管理
 
 ### Claude Code
 

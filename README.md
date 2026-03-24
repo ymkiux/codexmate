@@ -2,7 +2,7 @@
 
 # Codex Mate
 
-**Codex / Claude Code / OpenClaw 的本地配置与会话管理工具**
+**Codex / Gemini / OpenCode / Claude Code / OpenClaw 的本地配置与会话管理工具**
 
 [![Build](https://img.shields.io/github/actions/workflow/status/SakuraByteCore/codexmate/release.yml?label=build)](https://github.com/SakuraByteCore/codexmate/actions/workflows/release.yml)
 [![Version](https://img.shields.io/npm/v/codexmate?label=version&registry_uri=https%3A%2F%2Fregistry.npmjs.org)](https://www.npmjs.com/package/codexmate)
@@ -21,9 +21,11 @@
 Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 
 - Codex 的 provider / model 切换与配置写入
+- Gemini / OpenCode 的 provider / model 配置视图
 - Claude Code 配置方案（写入 `~/.claude/settings.json`）
 - OpenClaw JSON5 配置与 Workspace `AGENTS.md`
 - Codex / Claude 本地会话浏览、筛选、导出、删除
+- `codexmate gemini` / `codexmate qwen` 快捷透传命令
 
 项目不依赖云端托管，配置写入你的本地文件，便于审计和回滚。
 
@@ -31,7 +33,7 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 
 | 维度 | Codex Mate | 手动维护配置 |
 | --- | --- | --- |
-| 多工具管理 | Codex + Claude Code + OpenClaw 统一入口 | 多文件、多目录分散修改 |
+| 多工具管理 | Codex + Gemini + OpenCode + Claude Code + OpenClaw 统一入口 | 多文件、多目录分散修改 |
 | 使用方式 | CLI + 本地 Web UI | 纯手改 TOML / JSON / JSON5 |
 | 会话处理 | 支持浏览、导出、批量清理 | 需要手动定位和处理文件 |
 | 可回滚性 | 首次接管前自动备份 | 易误覆盖、回滚成本高 |
@@ -42,6 +44,7 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 **配置管理**
 - provider / model 切换（`switch` / `use`）
 - Codex `config.toml` 模板确认后写入
+- Gemini / OpenCode 配置模式（Web UI）
 - Claude Code 多配置方案管理与一键应用
 - OpenClaw JSON5 配置方案管理
 
@@ -55,6 +58,7 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 - MCP stdio 能力（tools/resources/prompts）
 - 内建代理配置与状态控制（`proxy`）
 - 认证档案管理（`auth`）
+- `codexmate gemini` / `codexmate qwen` 兼容启动入口（默认透传 `--yolo`）
 - Zip 压缩/解压（优先系统工具，失败回退 JS 库）
 
 ## 架构总览
@@ -126,6 +130,7 @@ codexmate run --no-browser
 | `codexmate auth <list\|import\|switch\|delete\|status>` | 认证档案管理 |
 | `codexmate proxy <status\|set\|apply\|enable\|start\|stop>` | 内建代理管理 |
 | `codexmate workflow <list\|get\|validate\|run\|runs>` | MCP 工作流管理 |
+| `codexmate gemini [args...]` / `codexmate qwen [args...]` | Gemini / Qwen CLI 透传入口 |
 | `codexmate run [--host <HOST>] [--no-browser]` | 启动 Web UI |
 | `codexmate mcp serve [--read-only\|--allow-write]` | 启动 MCP stdio 服务 |
 | `codexmate export-session --source <codex\|claude> ...` | 导出会话为 Markdown |
@@ -138,6 +143,10 @@ codexmate run --no-browser
 - 模型管理
 - `~/.codex/AGENTS.md` 编辑
 - `~/.codex/skills` 管理（筛选、批量删除、跨应用导入）
+
+### Gemini / OpenCode 配置模式
+- Gemini 与 OpenCode 的 provider / model 配置切换
+- 与 Codex 配置同一页面集中管理
 
 ### Claude Code 配置模式
 - 多配置方案管理
