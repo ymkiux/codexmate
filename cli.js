@@ -110,10 +110,12 @@ const CODEX_SKILLS_DIR = path.join(CONFIG_DIR, 'skills');
 const CLAUDE_SKILLS_DIR = path.join(CLAUDE_DIR, 'skills');
 const GEMINI_SKILLS_DIR = path.join(os.homedir(), '.gemini', 'skills');
 const OPENCODE_SKILLS_DIR = path.join(os.homedir(), '.opencode', 'skills');
+const AGENTS_SKILLS_DIR = path.join(os.homedir(), '.agents', 'skills');
 const SKILL_IMPORT_SOURCES = Object.freeze([
     { app: 'claude', label: 'Claude Code', dir: CLAUDE_SKILLS_DIR },
     { app: 'gemini', label: 'Gemini CLI', dir: GEMINI_SKILLS_DIR },
-    { app: 'opencode', label: 'OpenCode', dir: OPENCODE_SKILLS_DIR }
+    { app: 'opencode', label: 'OpenCode', dir: OPENCODE_SKILLS_DIR },
+    { app: 'agents', label: 'Agents', dir: AGENTS_SKILLS_DIR }
 ]);
 const MODELS_CACHE_TTL_MS = 60 * 1000;
 const MODELS_NEGATIVE_CACHE_TTL_MS = 5 * 1000;
@@ -1833,6 +1835,270 @@ function importCodexSkills(params = {}) {
         failed,
         root: CODEX_SKILLS_DIR
     };
+}
+
+function collectSkillDirectoriesFromRoot(rootDir, limit = 300) {
+    const results = [];
+    if (!rootDir || !fs.existsSync(rootDir)) {
+        return results;
+    }
+    const normalizedLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 300;
+    const stack = [rootDir];
+    while (stack.length > 0 && results.length < normalizedLimit) {
+        const currentDir = stack.pop();
+        let entries = [];
+        try {
+            entries = fs.readdirSync(currentDir, { withFileTypes: true });
+        } catch (e) {
+            continue;
+        }
+
+        const hasSkillFile = entries.some((entry) => entry && entry.isFile() && String(entry.name || '').toLowerCase() === 'skill.md');
+        if (hasSkillFile) {
+            results.push(currentDir);
+            continue;
+        }
+
+        for (const entry of entries) {
+            if (!entry || !entry.isDirectory()) continue;
+            const entryName = typeof entry.name === 'string' ? entry.name.trim() : '';
+            if (!entryName || entryName.startsWith('.')) {
+                continue;
+            }
+            stack.push(path.join(currentDir, entryName));
+        }
+    }
+    return results;
+}
+
+function resolveSkillNameFromImportedDirectory(skillDir, extractionRoot, fallbackName = '') {
+    const directoryBaseName = path.basename(skillDir || '');
+    const extractionBaseName = path.basename(extractionRoot || '');
+    let candidate = directoryBaseName;
+    if (!candidate || candidate === extractionBaseName || candidate.startsWith('.')) {
+        const fallback = typeof fallbackName === 'string' ? fallbackName.trim() : '';
+        const fallbackBase = fallback ? path.basename(fallback, path.extname(fallback)) : '';
+        candidate = fallbackBase || candidate;
+    }
+    return normalizeCodexSkillName(candidate);
+}
+
+async function importCodexSkillsFromZip(payload = {}) {
+    if (!payload || typeof payload.fileBase64 !== 'string' || !payload.fileBase64.trim()) {
+        return { error: '缺少技能压缩包内容' };
+    }
+    const upload = writeUploadZip(payload.fileBase64, 'codex-skills-import', payload.fileName || 'codex-skills.zip');
+    if (upload.error) {
+        return { error: upload.error };
+    }
+
+    const imported = [];
+    const failed = [];
+    const dedupNames = new Set();
+    const extractionRoot = path.join(upload.tempDir, 'extract');
+
+    try {
+        await extractUploadZip(upload.zipPath, extractionRoot);
+        const discoveredDirs = collectSkillDirectoriesFromRoot(extractionRoot, 500);
+        if (discoveredDirs.length === 0) {
+            return { error: '压缩包中未发现包含 SKILL.md 的技能目录' };
+        }
+
+        ensureDir(CODEX_SKILLS_DIR);
+        for (const skillDir of discoveredDirs) {
+            const normalizedName = resolveSkillNameFromImportedDirectory(skillDir, extractionRoot, payload.fileName || '');
+            if (normalizedName.error) {
+                failed.push({
+                    name: path.basename(skillDir || ''),
+                    error: normalizedName.error
+                });
+                continue;
+            }
+            const dedupKey = normalizedName.name.toLowerCase();
+            if (dedupNames.has(dedupKey)) {
+                continue;
+            }
+            dedupNames.add(dedupKey);
+
+            const targetPath = path.join(CODEX_SKILLS_DIR, normalizedName.name);
+            const targetRelative = path.relative(CODEX_SKILLS_DIR, targetPath);
+            if (targetRelative.startsWith('..') || path.isAbsolute(targetRelative)) {
+                failed.push({
+                    name: normalizedName.name,
+                    error: '目标路径非法'
+                });
+                continue;
+            }
+            if (fs.existsSync(targetPath)) {
+                failed.push({
+                    name: normalizedName.name,
+                    error: 'Codex 中已存在同名 skill'
+                });
+                continue;
+            }
+
+            let copiedToTarget = false;
+            try {
+                const sourceRealPath = fs.realpathSync(skillDir);
+                const sourceStat = fs.statSync(sourceRealPath);
+                if (!sourceStat.isDirectory()) {
+                    failed.push({
+                        name: normalizedName.name,
+                        error: '来源 skill 无法读取'
+                    });
+                    continue;
+                }
+                const visitedRealPaths = new Set([sourceRealPath]);
+                copyDirRecursive(sourceRealPath, targetPath, {
+                    dereferenceSymlinks: true,
+                    visitedRealPaths
+                });
+                copiedToTarget = true;
+                imported.push({
+                    name: normalizedName.name,
+                    path: targetPath
+                });
+            } catch (e) {
+                if (!copiedToTarget && fs.existsSync(targetPath)) {
+                    try {
+                        removeDirectoryRecursive(targetPath);
+                    } catch (_) {}
+                }
+                failed.push({
+                    name: normalizedName.name,
+                    error: e && e.message ? e.message : '导入失败'
+                });
+            }
+        }
+
+        if (imported.length === 0 && failed.length > 0) {
+            return {
+                error: failed[0].error || '导入失败',
+                imported,
+                failed,
+                root: CODEX_SKILLS_DIR
+            };
+        }
+
+        return {
+            success: failed.length === 0,
+            imported,
+            failed,
+            root: CODEX_SKILLS_DIR
+        };
+    } catch (e) {
+        return {
+            error: `导入失败：${e && e.message ? e.message : '未知错误'}`
+        };
+    } finally {
+        try {
+            fs.rmSync(upload.tempDir, { recursive: true, force: true });
+        } catch (_) {}
+    }
+}
+
+async function exportCodexSkills(params = {}) {
+    const rawNames = Array.isArray(params.names) ? params.names : [];
+    const uniqueNames = Array.from(new Set(rawNames
+        .map((item) => (typeof item === 'string' ? item.trim() : ''))
+        .filter(Boolean)));
+    if (uniqueNames.length === 0) {
+        return { error: '请先选择要导出的 skill' };
+    }
+
+    const exported = [];
+    const failed = [];
+    const stagingTempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-skills-export-'));
+    const stagingRoot = path.join(stagingTempDir, 'skills');
+    ensureDir(stagingRoot);
+
+    try {
+        for (const rawName of uniqueNames) {
+            const normalizedName = normalizeCodexSkillName(rawName);
+            if (normalizedName.error) {
+                failed.push({ name: rawName, error: normalizedName.error });
+                continue;
+            }
+            const sourcePath = path.join(CODEX_SKILLS_DIR, normalizedName.name);
+            const sourceRelative = path.relative(CODEX_SKILLS_DIR, sourcePath);
+            if (sourceRelative.startsWith('..') || path.isAbsolute(sourceRelative)) {
+                failed.push({ name: normalizedName.name, error: '来源路径非法' });
+                continue;
+            }
+            if (!fs.existsSync(sourcePath)) {
+                failed.push({ name: normalizedName.name, error: 'skill 不存在' });
+                continue;
+            }
+
+            try {
+                const lstat = fs.lstatSync(sourcePath);
+                if (!lstat.isDirectory() && !lstat.isSymbolicLink()) {
+                    failed.push({ name: normalizedName.name, error: '来源不是技能目录' });
+                    continue;
+                }
+                const sourceDirForCopy = lstat.isSymbolicLink() ? fs.realpathSync(sourcePath) : sourcePath;
+                const sourceStat = fs.statSync(sourceDirForCopy);
+                if (!sourceStat.isDirectory()) {
+                    failed.push({ name: normalizedName.name, error: '来源 skill 无法读取' });
+                    continue;
+                }
+                const targetPath = path.join(stagingRoot, normalizedName.name);
+                const visitedRealPaths = new Set([sourceDirForCopy]);
+                copyDirRecursive(sourceDirForCopy, targetPath, {
+                    dereferenceSymlinks: true,
+                    visitedRealPaths
+                });
+                exported.push({
+                    name: normalizedName.name,
+                    path: sourcePath
+                });
+            } catch (e) {
+                failed.push({
+                    name: normalizedName.name,
+                    error: e && e.message ? e.message : '导出失败'
+                });
+            }
+        }
+
+        if (exported.length === 0) {
+            return {
+                error: failed[0] && failed[0].error ? failed[0].error : '无可导出的 skill',
+                exported,
+                failed,
+                root: CODEX_SKILLS_DIR
+            };
+        }
+
+        const timestamp = Date.now();
+        const zipFileName = `codex-skills-${timestamp}.zip`;
+        const zipFilePath = path.join(os.tmpdir(), zipFileName);
+        if (fs.existsSync(zipFilePath)) {
+            try {
+                fs.unlinkSync(zipFilePath);
+            } catch (_) {}
+        }
+        await zipLib.archiveFolder(stagingRoot, zipFilePath);
+
+        return {
+            success: failed.length === 0,
+            fileName: zipFileName,
+            downloadPath: zipFilePath,
+            exported,
+            failed,
+            root: CODEX_SKILLS_DIR
+        };
+    } catch (e) {
+        return {
+            error: `导出失败：${e && e.message ? e.message : '未知错误'}`,
+            exported,
+            failed,
+            root: CODEX_SKILLS_DIR
+        };
+    } finally {
+        try {
+            fs.rmSync(stagingTempDir, { recursive: true, force: true });
+        } catch (_) {}
+    }
 }
 
 function removeDirectoryRecursive(targetPath) {
@@ -7650,6 +7916,12 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             break;
                         case 'import-codex-skills':
                             result = importCodexSkills(params || {});
+                            break;
+                        case 'import-codex-skills-zip':
+                            result = await importCodexSkillsFromZip(params || {});
+                            break;
+                        case 'export-codex-skills':
+                            result = await exportCodexSkills(params || {});
                             break;
                         case 'get-openclaw-config':
                             result = readOpenclawConfigFile();
