@@ -135,6 +135,7 @@ codexmate run --no-browser
 | `codexmate mcp serve [--read-only\|--allow-write]` | Start MCP stdio server |
 | `codexmate export-session --source <codex\|claude> ...` | Export session to Markdown |
 | `codexmate zip <path> [--max:0-9]` / `codexmate unzip <zip> [out]` | Zip / unzip |
+| `codexmate unzip-ext <zip-dir> [out] [--ext:suffix[,suffix...]] [--no-recursive]` | Extract files with target suffixes from ZIP files in a directory (default `.json`, recursive by default) |
 
 ## Web UI
 
