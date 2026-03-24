@@ -130,12 +130,22 @@ codexmate run --no-browser
 | `codexmate auth <list\|import\|switch\|delete\|status>` | 认证档案管理 |
 | `codexmate proxy <status\|set\|apply\|enable\|start\|stop>` | 内建代理管理 |
 | `codexmate workflow <list\|get\|validate\|run\|runs>` | MCP 工作流管理 |
+| `codexmate codex [args...] [--follow-up <文本> 可重复]` | Codex CLI 透传入口（默认补 `--yolo`，可追加 queued follow-up） |
 | `codexmate qwen [args...]` | Qwen CLI 透传入口 |
 | `codexmate run [--host <HOST>] [--no-browser]` | 启动 Web UI |
 | `codexmate mcp serve [--read-only\|--allow-write]` | 启动 MCP stdio 服务 |
 | `codexmate export-session --source <codex\|claude> ...` | 导出会话为 Markdown |
 | `codexmate zip <path> [--max:0-9]` / `codexmate unzip <zip> [out]` | 压缩 / 解压 |
 | `codexmate unzip-ext <zip-dir> [out] [--ext:suffix[,suffix...]] [--no-recursive]` | 批量提取目录下 ZIP 内指定后缀文件（默认 `.json`，默认递归） |
+
+### Codex follow-up 追加（可选）
+
+```bash
+codexmate codex --follow-up "先扫描项目" --follow-up "再修复失败测试"
+codexmate codex --model gpt-5.3-codex --follow-up "步骤1" --follow-up "步骤2"
+```
+
+> 说明：`--follow-up` / `--queued-follow-up` 都可用，支持重复。
 
 ## Web 界面
 
