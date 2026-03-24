@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag (e.g., v0.0.1). Empty = latest tag.'
+        description: 'Tag (e.g., v0.0.1). Empty = use package.json version.'
         required: false
         default: ''
 permissions:
@@ -42,10 +42,28 @@ jobs:
             const [major, minor, patch] = version.split('.').map(n => Number(n));
             return { major, minor, patch };
           };
+          const compareSemver = (a, b) => {
+            const pa = parseSemver(a);
+            const pb = parseSemver(b);
+            if (!pa || !pb) return 0;
+            if (pa.major !== pb.major) return pa.major - pb.major;
+            if (pa.minor !== pb.minor) return pa.minor - pb.minor;
+            return pa.patch - pb.patch;
+          };
+          const hasTag = (tag) => {
+            if (!tag) return false;
+            try {
+              execSync(`git show-ref --tags --verify --quiet refs/tags/${tag}`, { stdio: 'ignore' });
+              return true;
+            } catch (e) {
+              return false;
+            }
+          };
 
           let latestTag = '';
           try {
-            latestTag = execSync("git tag --list 'v*' --sort=-v:refname | head -n 1", { encoding: 'utf8' }).trim();
+            const tagOutput = execSync("git tag --list v* --sort=-v:refname", { encoding: 'utf8' }).trim();
+            latestTag = tagOutput.split(/\r?\n/).find(Boolean) || '';
           } catch (e) {
             latestTag = '';
           }
@@ -65,6 +83,7 @@ jobs:
           let mode = '';
           let baseVersion = '';
           let baseSource = '';
+          let tagExists = false;
 
           if (inputTagRaw) {
             if (!/^v?\d+\.\d+\.\d+$/.test(inputTagRaw)) {
@@ -74,20 +93,24 @@ jobs:
             resolvedTag = inputTagRaw.startsWith('v') ? inputTagRaw : `v${inputTagRaw}`;
             expectedVersion = normalizeTag(resolvedTag);
             mode = 'manual';
+            tagExists = hasTag(resolvedTag);
+            baseVersion = tagExists ? expectedVersion : '';
+            baseSource = tagExists ? 'input_tag' : 'input_tag_new';
           } else {
             mode = 'auto';
-            if (!latestTag) {
-              console.error('No git tag found. Please create an initial tag or use manual tag input.');
-              process.exit(1);
-            }
-            if (!latestSemver) {
+            if (latestTag && !latestSemver) {
               console.error(`Latest tag ${latestTag} is not a valid semver.`);
               process.exit(1);
             }
-            resolvedTag = latestTag;
-            expectedVersion = latestVersion;
+            if (latestSemver && compareSemver(pkgVersion, latestVersion) < 0) {
+              console.error(`package.json version ${pkgVersion} is lower than latest tag ${latestTag}.`);
+              process.exit(1);
+            }
+            resolvedTag = `v${pkgVersion}`;
+            expectedVersion = pkgVersion;
+            tagExists = hasTag(resolvedTag);
             baseVersion = latestVersion;
-            baseSource = 'latest_tag';
+            baseSource = tagExists ? 'package_tag' : 'package_version';
           }
 
           const envLines = [
@@ -97,7 +120,8 @@ jobs:
             `LATEST_TAG=${latestTag}`,
             `PACKAGE_VERSION=${pkgVersion}`,
             `BASE_VERSION=${baseVersion}`,
-            `BASE_SOURCE=${baseSource}`
+            `BASE_SOURCE=${baseSource}`,
+            `TAG_EXISTS=${tagExists ? 'true' : 'false'}`
           ].join('\n') + '\n';
           fs.appendFileSync(process.env.GITHUB_ENV, envLines);
 
@@ -108,7 +132,8 @@ jobs:
             `latest_tag=${latestTag}`,
             `package_version=${pkgVersion}`,
             `base_version=${baseVersion}`,
-            `base_source=${baseSource}`
+            `base_source=${baseSource}`,
+            `tag_exists=${tagExists ? 'true' : 'false'}`
           ].join('\n') + '\n';
           fs.appendFileSync(process.env.GITHUB_OUTPUT, outputLines);
 
@@ -121,22 +146,31 @@ jobs:
             `- base_version: ${baseVersion || '(none)'}`,
             `- base_source: ${baseSource || '(none)'}`,
             `- resolved_tag: ${resolvedTag}`,
+            `- tag_exists: ${tagExists ? 'yes' : 'no'}`,
             `- expected_version: ${expectedVersion}`
           ].join('\n');
           fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summaryLines + '\n');
           console.log(`::notice title=Resolved Tag::${resolvedTag}`);
           NODE
       - name: Checkout target tag
+        if: ${{ steps.resolve.outputs.tag_exists == 'true' }}
         env:
           RELEASE_TAG: ${{ steps.resolve.outputs.release_tag }}
         run: |
           git rev-parse "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1
           git checkout "${RELEASE_TAG}"
       - name: Verify tag matches package.json version
+        if: ${{ steps.resolve.outputs.tag_exists == 'true' }}
         env:
           RELEASE_TAG: ${{ steps.resolve.outputs.release_tag }}
         run: |
           node -e "const pkg=require('./package.json'); const tag=process.env.RELEASE_TAG; const expected='v'+pkg.version; if(tag!==expected){ console.error('Tag '+tag+' does not match package.json version '+expected); process.exit(1);} console.log('Tag matches '+expected);"
+      - name: Verify package.json matches release tag
+        if: ${{ steps.resolve.outputs.tag_exists != 'true' }}
+        env:
+          RELEASE_TAG: ${{ steps.resolve.outputs.release_tag }}
+        run: |
+          node -e "const pkg=require('./package.json'); const tag=process.env.RELEASE_TAG; const expected='v'+pkg.version; if(tag!==expected){ console.error('Current commit package.json '+expected+' does not match resolved release tag '+tag); process.exit(1);} console.log('Current package matches '+expected);"
       - name: Compute release name
         env:
           RELEASE_TAG: ${{ steps.resolve.outputs.release_tag }}
@@ -152,6 +186,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.resolve.outputs.release_tag }}
+          target_commitish: ${{ github.sha }}
           name: ${{ env.RELEASE_NAME }}
           prerelease: false
           draft: false
