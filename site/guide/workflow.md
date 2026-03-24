@@ -9,14 +9,14 @@ codexmate status
 
 目标：确认 provider、model 与关键配置路径可读。
 
-## 2. 切换 Codex provider/model
+## 2. 切换 Codex / Gemini / OpenCode provider/model
 
 ```bash
 codexmate switch <provider>
 codexmate use <model>
 ```
 
-目标：在不改业务代码的前提下完成模型路由切换。
+目标：在不改业务代码的前提下完成模型路由切换（Codex/Gemini/OpenCode）。
 
 ## 3. 应用 Claude / OpenClaw 配置
 
@@ -35,6 +35,7 @@ codexmate run
 可在 Web UI 完成：
 
 - Codex provider/model 切换
+- Gemini / OpenCode provider/model 切换
 - Claude 配置方案管理
 - OpenClaw JSON5 配置管理
 - 会话筛选、删除与导出
