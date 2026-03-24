@@ -9636,10 +9636,36 @@ async function runProxyCommandWithQueuedFollowUps(selectedBin, finalArgs = [], q
 
         const stdin = process.stdin;
         const hadRawMode = !!stdin.isRaw;
+        let cleanedUp = false;
         const onInput = (chunk) => {
             if (!child.stdin.destroyed) {
                 child.stdin.write(chunk);
             }
+        };
+        const onProcessExit = () => {
+            cleanup();
+        };
+        const onProcessSigint = () => {
+            cleanup();
+            try {
+                if (!child.killed) {
+                    child.kill('SIGINT');
+                }
+            } catch (_) {
+                // Ignore forwarding failures and keep exit path deterministic.
+            }
+            process.exit(130);
+        };
+        const onProcessSigterm = () => {
+            cleanup();
+            try {
+                if (!child.killed) {
+                    child.kill('SIGTERM');
+                }
+            } catch (_) {
+                // Ignore forwarding failures and keep exit path deterministic.
+            }
+            process.exit(143);
         };
 
         try {
@@ -9652,13 +9678,21 @@ async function runProxyCommandWithQueuedFollowUps(selectedBin, finalArgs = [], q
 
         stdin.resume();
         stdin.on('data', onInput);
+        process.on('exit', onProcessExit);
+        process.on('SIGINT', onProcessSigint);
+        process.on('SIGTERM', onProcessSigterm);
 
         for (const message of queuedFollowUps) {
             child.stdin.write(`${message}\n`);
         }
 
         const cleanup = () => {
+            if (cleanedUp) return;
+            cleanedUp = true;
             stdin.removeListener('data', onInput);
+            process.removeListener('exit', onProcessExit);
+            process.removeListener('SIGINT', onProcessSigint);
+            process.removeListener('SIGTERM', onProcessSigterm);
             try {
                 if (typeof stdin.setRawMode === 'function' && !hadRawMode) {
                     stdin.setRawMode(false);
