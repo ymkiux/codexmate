@@ -130,12 +130,22 @@ codexmate run --no-browser
 | `codexmate auth <list\|import\|switch\|delete\|status>` | Auth profile management |
 | `codexmate proxy <status\|set\|apply\|enable\|start\|stop>` | Built-in proxy management |
 | `codexmate workflow <list\|get\|validate\|run\|runs>` | MCP workflow management |
+| `codexmate codex [args...] [--follow-up <text> repeatable]` | Codex CLI passthrough entrypoint (auto-adds `--yolo`, supports queued follow-up appends) |
 | `codexmate qwen [args...]` | Qwen CLI passthrough entrypoint |
 | `codexmate run [--host <HOST>] [--no-browser]` | Start Web UI |
 | `codexmate mcp serve [--read-only\|--allow-write]` | Start MCP stdio server |
 | `codexmate export-session --source <codex\|claude> ...` | Export session to Markdown |
 | `codexmate zip <path> [--max:0-9]` / `codexmate unzip <zip> [out]` | Zip / unzip |
 | `codexmate unzip-ext <zip-dir> [out] [--ext:suffix[,suffix...]] [--no-recursive]` | Extract files with target suffixes from ZIP files in a directory (default `.json`, recursive by default) |
+
+### Codex Follow-up Append (Optional)
+
+```bash
+codexmate codex --follow-up "scan repository first" --follow-up "then fix failing tests"
+codexmate codex --model gpt-5.3-codex --follow-up "step1" --follow-up "step2"
+```
+
+> Note: both `--follow-up` and `--queued-follow-up` are accepted and repeatable.
 
 ## Web UI
 
