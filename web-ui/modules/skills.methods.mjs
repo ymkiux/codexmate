@@ -11,6 +11,15 @@
         },
 
         closeSkillsModal() {
+            const busy = !!(
+                this.skillsLoading
+                || this.skillsDeleting
+                || this.skillsScanningImports
+                || this.skillsImporting
+                || this.skillsZipImporting
+                || this.skillsExporting
+            );
+            if (busy) return;
             this.showSkillsModal = false;
             this.skillsSelectedNames = [];
             this.skillsImportSelectedKeys = [];
@@ -21,7 +30,20 @@
             try {
                 const res = await api('list-codex-skills');
                 if (res.error) {
+                    this.skillsRootPath = '';
+                    this.skillsList = [];
+                    this.skillsSelectedNames = [];
                     this.showMessage(res.error, 'error');
+                    return;
+                }
+                const exists = res.exists !== false;
+                if (!exists) {
+                    this.skillsRootPath = '';
+                    this.skillsList = [];
+                    this.skillsSelectedNames = [];
+                    if (!options.silent) {
+                        this.showMessage('skills 目录不存在，已按空列表显示', 'info');
+                    }
                     return;
                 }
                 this.skillsRootPath = res.root || '';
@@ -31,13 +53,10 @@
                     .filter(Boolean));
                 this.skillsSelectedNames = (Array.isArray(this.skillsSelectedNames) ? this.skillsSelectedNames : [])
                     .filter((name) => currentNames.has(name));
-                if (!options.silent) {
-                    const exists = res.exists !== false;
-                    if (!exists) {
-                        this.showMessage('skills 目录不存在，已按空列表显示', 'info');
-                    }
-                }
             } catch (e) {
+                this.skillsRootPath = '';
+                this.skillsList = [];
+                this.skillsSelectedNames = [];
                 this.showMessage('加载 skills 失败', 'error');
             } finally {
                 this.skillsLoading = false;
@@ -79,26 +98,35 @@
             this.skillsImportSelectedKeys = [...selectable];
         },
 
-        async scanImportableSkills() {
+        async scanImportableSkills(options = {}) {
             if (this.skillsScanningImports || this.skillsImporting || this.skillsZipImporting || this.skillsExporting) return;
+            const silent = !!(options && options.silent);
             this.skillsScanningImports = true;
             try {
                 const res = await api('scan-unmanaged-codex-skills');
                 if (res.error) {
-                    this.showMessage(res.error, 'error');
+                    this.skillsImportList = [];
+                    this.skillsImportSelectedKeys = [];
+                    if (!silent) {
+                        this.showMessage(res.error, 'error');
+                    }
                     return;
                 }
                 this.skillsImportList = Array.isArray(res.items) ? res.items : [];
                 const availableKeys = new Set(this.skillsImportSelectableKeys);
                 this.skillsImportSelectedKeys = (Array.isArray(this.skillsImportSelectedKeys) ? this.skillsImportSelectedKeys : [])
                     .filter((key) => availableKeys.has(key));
-                if (this.skillsImportList.length === 0) {
+                if (!silent && this.skillsImportList.length === 0) {
                     this.showMessage('未扫描到可导入 skill', 'info');
-                } else {
+                } else if (!silent) {
                     this.showMessage(`扫描到 ${this.skillsImportList.length} 个可导入 skill`, 'success');
                 }
             } catch (e) {
-                this.showMessage('扫描可导入 skill 失败', 'error');
+                this.skillsImportList = [];
+                this.skillsImportSelectedKeys = [];
+                if (!silent) {
+                    this.showMessage('扫描可导入 skill 失败', 'error');
+                }
             } finally {
                 this.skillsScanningImports = false;
             }
@@ -140,7 +168,7 @@
                 this.showMessage('导入 skill 失败', 'error');
             } finally {
                 this.skillsImporting = false;
-                await this.scanImportableSkills();
+                await this.scanImportableSkills({ silent: true });
             }
         },
 
@@ -166,21 +194,40 @@
             }
         },
 
+        async uploadSkillsZipStream(file) {
+            const fileName = (file && typeof file.name === 'string' && file.name.trim())
+                ? file.name.trim()
+                : 'codex-skills.zip';
+            const response = await fetch('/api/import-codex-skills-zip', {
+                method: 'POST',
+                headers: {
+                    'x-codexmate-file-name': encodeURIComponent(fileName)
+                },
+                body: file
+            });
+            let payload = {};
+            try {
+                payload = await response.json();
+            } catch (_) {
+                payload = {};
+            }
+            if (!response.ok && !payload.error) {
+                payload.error = `上传失败（HTTP ${response.status}）`;
+            }
+            return payload;
+        },
+
         async importSkillsFromZipFile(file) {
             if (this.skillsZipImporting || this.skillsImporting || this.skillsExporting) return;
-            const maxSize = 200 * 1024 * 1024;
+            const maxSize = 20 * 1024 * 1024;
             if (file.size > maxSize) {
-                this.showMessage('ZIP 文件过大，限制 200MB', 'error');
+                this.showMessage('ZIP 文件过大，限制 20MB', 'error');
                 this.resetSkillsZipImportInput();
                 return;
             }
             this.skillsZipImporting = true;
             try {
-                const base64 = await this.readFileAsBase64(file);
-                const res = await api('import-codex-skills-zip', {
-                    fileName: file.name || 'codex-skills.zip',
-                    fileBase64: base64
-                });
+                const res = await this.uploadSkillsZipStream(file);
                 if (res && res.error) {
                     this.showMessage(res.error, 'error');
                     return;
@@ -201,7 +248,7 @@
             } finally {
                 this.skillsZipImporting = false;
                 this.resetSkillsZipImportInput();
-                await this.scanImportableSkills();
+                await this.scanImportableSkills({ silent: true });
             }
         },
 
@@ -227,7 +274,9 @@
                 }
                 const exportedCount = Array.isArray(res.exported) ? res.exported.length : 0;
                 const failedCount = Array.isArray(res.failed) ? res.failed.length : 0;
-                const downloadUrl = `/download/${encodeURIComponent(res.fileName)}`;
+                const downloadUrl = typeof res.downloadPath === 'string' && res.downloadPath.trim()
+                    ? res.downloadPath.trim()
+                    : `/download/${encodeURIComponent(res.fileName)}`;
                 const link = document.createElement('a');
                 link.href = downloadUrl;
                 link.download = res.fileName;

@@ -82,8 +82,11 @@ export function createConfigModeComputed() {
                 const config = typeof this.currentClaudeConfig === 'string' ? this.currentClaudeConfig.trim() : '';
                 return config || '未选择';
             }
-            const openclaw = typeof this.currentOpenclawConfig === 'string' ? this.currentOpenclawConfig.trim() : '';
-            return openclaw || '未选择';
+            if (this.configMode === 'openclaw') {
+                const openclaw = typeof this.currentOpenclawConfig === 'string' ? this.currentOpenclawConfig.trim() : '';
+                return openclaw || '未选择';
+            }
+            return '未选择';
         },
         inspectorCurrentModelLabel() {
             if (this.mainTab !== 'config') return '--';
@@ -95,10 +98,13 @@ export function createConfigModeComputed() {
                 const model = typeof this.currentClaudeModel === 'string' ? this.currentClaudeModel.trim() : '';
                 return model || '未选择';
             }
-            const model = this.openclawStructured && typeof this.openclawStructured.agentPrimary === 'string'
-                ? this.openclawStructured.agentPrimary.trim()
-                : '';
-            return model || '按配置文件';
+            if (this.configMode === 'openclaw') {
+                const model = this.openclawStructured && typeof this.openclawStructured.agentPrimary === 'string'
+                    ? this.openclawStructured.agentPrimary.trim()
+                    : '';
+                return model || '按配置文件';
+            }
+            return '未选择';
         },
         inspectorTemplateStatus() {
             if (this.mainTab !== 'config') return '--';
@@ -117,10 +123,13 @@ export function createConfigModeComputed() {
             if (this.configMode === 'claude') {
                 return '即时写入 Claude settings';
             }
-            if (this.openclawApplying || this.openclawSaving) {
-                return 'OpenClaw 保存/应用中';
+            if (this.configMode === 'openclaw') {
+                if (this.openclawApplying || this.openclawSaving) {
+                    return 'OpenClaw 保存/应用中';
+                }
+                return 'JSON5 可保存并应用';
             }
-            return 'JSON5 可保存并应用';
+            return '未选择';
         }
     };
 }
