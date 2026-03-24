@@ -1871,7 +1871,7 @@
                 </div>
 
                 <div class="btn-group">
-                    <button class="btn btn-cancel" @click="closeSkillsModal" :disabled="skillsDeleting || skillsImporting || skillsScanningImports || skillsZipImporting || skillsExporting">关闭</button>
+                    <button class="btn btn-cancel" @click="closeSkillsModal" :disabled="skillsLoading || skillsDeleting || skillsImporting || skillsScanningImports || skillsZipImporting || skillsExporting">关闭</button>
                     <button class="btn btn-cancel" @click="triggerSkillsZipImport" :disabled="skillsZipImporting || skillsDeleting || skillsImporting || skillsScanningImports || skillsExporting">
                         {{ skillsZipImporting ? 'ZIP 导入中...' : '导入 ZIP' }}
                     </button>

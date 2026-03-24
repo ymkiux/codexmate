@@ -1844,14 +1844,21 @@ function importCodexSkills(params = {}) {
     };
 }
 
-function collectSkillDirectoriesFromRoot(rootDir, limit = 300) {
+function collectSkillDirectoriesFromRoot(rootDir, limit = MAX_SKILLS_ZIP_ENTRY_COUNT) {
     const results = [];
+    let truncated = false;
     if (!rootDir || !fs.existsSync(rootDir)) {
-        return results;
+        return { results, truncated };
     }
-    const normalizedLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 300;
+    const normalizedLimit = Number.isFinite(limit) && limit > 0
+        ? Math.floor(limit)
+        : MAX_SKILLS_ZIP_ENTRY_COUNT;
     const stack = [rootDir];
-    while (stack.length > 0 && results.length < normalizedLimit) {
+    while (stack.length > 0) {
+        if (results.length >= normalizedLimit) {
+            truncated = true;
+            break;
+        }
         const currentDir = stack.pop();
         let entries = [];
         try {
@@ -1875,7 +1882,7 @@ function collectSkillDirectoriesFromRoot(rootDir, limit = 300) {
             stack.push(path.join(currentDir, entryName));
         }
     }
-    return results;
+    return { results, truncated };
 }
 
 function resolveSkillNameFromImportedDirectory(skillDir, extractionRoot, fallbackName = '') {
@@ -1905,9 +1912,13 @@ async function importCodexSkillsFromZipFile(zipPath, options = {}) {
         });
 
         await extractUploadZip(zipPath, extractionRoot);
-        const discoveredDirs = collectSkillDirectoriesFromRoot(extractionRoot, 500);
+        const discovery = collectSkillDirectoriesFromRoot(extractionRoot, MAX_SKILLS_ZIP_ENTRY_COUNT);
+        const discoveredDirs = discovery.results;
         if (discoveredDirs.length === 0) {
             return { error: '压缩包中未发现包含 SKILL.md 的技能目录' };
+        }
+        if (discovery.truncated) {
+            return { error: '压缩包中的技能目录数量超出导入上限' };
         }
 
         ensureDir(CODEX_SKILLS_DIR);

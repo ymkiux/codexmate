@@ -37,7 +37,7 @@
   "dependencies": {
     "@iarna/toml": "^2.2.5",
     "json5": "^2.2.3",
-    "yauzl": "^2.10.0",
+    "yauzl": "^3.2.1",
     "zip-lib": "^1.2.1"
   },
   "engines": {
