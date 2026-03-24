@@ -109,13 +109,9 @@ const MAX_SESSION_PATH_LIST_SIZE = 2000;
 const AGENTS_FILE_NAME = 'AGENTS.md';
 const CODEX_SKILLS_DIR = path.join(CONFIG_DIR, 'skills');
 const CLAUDE_SKILLS_DIR = path.join(CLAUDE_DIR, 'skills');
-const GEMINI_SKILLS_DIR = path.join(os.homedir(), '.gemini', 'skills');
-const OPENCODE_SKILLS_DIR = path.join(os.homedir(), '.opencode', 'skills');
 const AGENTS_SKILLS_DIR = path.join(os.homedir(), '.agents', 'skills');
 const SKILL_IMPORT_SOURCES = Object.freeze([
     { app: 'claude', label: 'Claude Code', dir: CLAUDE_SKILLS_DIR },
-    { app: 'gemini', label: 'Gemini CLI', dir: GEMINI_SKILLS_DIR },
-    { app: 'opencode', label: 'OpenCode', dir: OPENCODE_SKILLS_DIR },
     { app: 'agents', label: 'Agents', dir: AGENTS_SKILLS_DIR }
 ]);
 const MODELS_CACHE_TTL_MS = 60 * 1000;
@@ -9309,10 +9305,6 @@ async function cmdQwen(args = []) {
     return runProxyCommand('Qwen', ['qwen', 'qwen-code'], args, 'npm install -g @qwen-code/qwen-code');
 }
 
-async function cmdGemini(args = []) {
-    return runProxyCommand('Gemini', ['gemini', 'gemini-cli'], args, 'npm install -g @google/gemini-cli');
-}
-
 function parseMcpOptions(args = []) {
     const options = {
         subcommand: 'serve',
@@ -10775,7 +10767,6 @@ async function main() {
         console.log('  codexmate run [--host <HOST>] [--no-browser]    启动 Web 界面');
         console.log('  codexmate codex [参数...]  等同于 codex --yolo');
         console.log('  codexmate qwen [参数...]   等同于 qwen --yolo');
-        console.log('  codexmate gemini [参数...] 等同于 gemini --yolo');
         console.log('  codexmate mcp [serve] [--transport stdio] [--allow-write|--read-only]');
         console.log('  codexmate export-session --source <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]');
         console.log('  codexmate zip <路径> [--max:级别]  压缩（系统 zip 优先，其次 zip-lib）');
@@ -10811,11 +10802,6 @@ async function main() {
         }
         case 'qwen': {
             const exitCode = await cmdQwen(args.slice(1));
-            process.exit(exitCode);
-            break;
-        }
-        case 'gemini': {
-            const exitCode = await cmdGemini(args.slice(1));
             process.exit(exitCode);
             break;
         }

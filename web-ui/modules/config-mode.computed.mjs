@@ -4,18 +4,6 @@
         modelPlaceholder: '例如: gpt-5.3-codex',
         statusConfigLabel: 'Codex 提供商',
         statusModelLabel: 'Codex 模型'
-    }),
-    gemini: Object.freeze({
-        label: 'Gemini',
-        modelPlaceholder: '例如: gemini-2.5-pro',
-        statusConfigLabel: 'Gemini 提供商',
-        statusModelLabel: 'Gemini 模型'
-    }),
-    opencode: Object.freeze({
-        label: 'OpenCode',
-        modelPlaceholder: '例如: gpt-5.3-codex',
-        statusConfigLabel: 'OpenCode 提供商',
-        statusModelLabel: 'OpenCode 模型'
     })
 });
 

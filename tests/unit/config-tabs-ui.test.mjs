@@ -11,19 +11,22 @@ function readProjectFile(relativePath) {
     return fs.readFileSync(path.join(projectRoot, relativePath), 'utf8');
 }
 
-test('config template includes gemini and opencode tabs in top and side navigation', () => {
+test('config template keeps expected config tabs in top and side navigation', () => {
     const html = readProjectFile('web-ui/index.html');
-    assert.match(html, /id="tab-config-gemini"/);
-    assert.match(html, /id="tab-config-opencode"/);
-    assert.match(html, /id="side-tab-config-gemini"/);
-    assert.match(html, /id="side-tab-config-opencode"/);
-    assert.match(html, /switchConfigMode\('gemini'\)/);
-    assert.match(html, /switchConfigMode\('opencode'\)/);
+    const topTabModes = [...html.matchAll(/id="tab-config-([a-z]+)"/g)]
+        .map((match) => match[1])
+        .sort();
+    const sideTabModes = [...html.matchAll(/id="side-tab-config-([a-z]+)"/g)]
+        .map((match) => match[1])
+        .sort();
+
+    assert.deepStrictEqual(topTabModes, ['claude', 'codex', 'openclaw']);
+    assert.deepStrictEqual(sideTabModes, ['claude', 'codex', 'openclaw']);
     assert.match(html, /activeProviderBridgeHint/);
     assert.match(html, /isProviderConfigMode/);
 });
 
-test('web ui script defines provider mode metadata for codex gemini and opencode', () => {
+test('web ui script defines provider mode metadata for codex only', () => {
     const appScript = readProjectFile('web-ui/app.js');
     const configModeComputed = readProjectFile('web-ui/modules/config-mode.computed.mjs');
 
@@ -35,8 +38,9 @@ test('web ui script defines provider mode metadata for codex gemini and opencode
     assert.match(appScript, /mode\.trim\(\)\.toLowerCase\(\)/);
 
     assert.match(configModeComputed, /const PROVIDER_CONFIG_MODE_META = Object\.freeze\(/);
-    assert.match(configModeComputed, /gemini:\s*Object\.freeze\(/);
-    assert.match(configModeComputed, /opencode:\s*Object\.freeze\(/);
+    const providerModeKeys = [...configModeComputed.matchAll(/^\s*([a-z]+):\s*Object\.freeze\(/gm)]
+        .map((match) => match[1]);
+    assert.deepStrictEqual(providerModeKeys, ['codex']);
     assert.match(configModeComputed, /export const CONFIG_MODE_SET = new Set\(/);
     assert.match(configModeComputed, /isProviderConfigMode\(\)/);
     assert.match(configModeComputed, /activeProviderModelPlaceholder\(\)/);
