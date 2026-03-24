@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const toml = require('@iarna/toml');
 const JSON5 = require('json5');
 const zipLib = require('zip-lib');
+const yauzl = require('yauzl');
 const { exec, execSync, spawn, spawnSync } = require('child_process');
 const http = require('http');
 const https = require('https');
@@ -110,10 +111,12 @@ const CODEX_SKILLS_DIR = path.join(CONFIG_DIR, 'skills');
 const CLAUDE_SKILLS_DIR = path.join(CLAUDE_DIR, 'skills');
 const GEMINI_SKILLS_DIR = path.join(os.homedir(), '.gemini', 'skills');
 const OPENCODE_SKILLS_DIR = path.join(os.homedir(), '.opencode', 'skills');
+const AGENTS_SKILLS_DIR = path.join(os.homedir(), '.agents', 'skills');
 const SKILL_IMPORT_SOURCES = Object.freeze([
     { app: 'claude', label: 'Claude Code', dir: CLAUDE_SKILLS_DIR },
     { app: 'gemini', label: 'Gemini CLI', dir: GEMINI_SKILLS_DIR },
-    { app: 'opencode', label: 'OpenCode', dir: OPENCODE_SKILLS_DIR }
+    { app: 'opencode', label: 'OpenCode', dir: OPENCODE_SKILLS_DIR },
+    { app: 'agents', label: 'Agents', dir: AGENTS_SKILLS_DIR }
 ]);
 const MODELS_CACHE_TTL_MS = 60 * 1000;
 const MODELS_NEGATIVE_CACHE_TTL_MS = 5 * 1000;
@@ -121,6 +124,11 @@ const MODELS_CACHE_MAX_ENTRIES = 50;
 const MODELS_RESPONSE_MAX_BYTES = 1024 * 1024;
 const MAX_RECENT_CONFIGS = 3;
 const MAX_UPLOAD_SIZE = 200 * 1024 * 1024;
+const MAX_SKILLS_ZIP_UPLOAD_SIZE = 20 * 1024 * 1024;
+const MAX_SKILLS_ZIP_ENTRY_COUNT = 2000;
+const MAX_SKILLS_ZIP_UNCOMPRESSED_BYTES = 512 * 1024 * 1024;
+const DOWNLOAD_ARTIFACT_TTL_MS = 10 * 60 * 1000;
+const g_downloadArtifacts = new Map();
 const BUILTIN_PROXY_PROVIDER_NAME = 'codexmate-proxy';
 const DEFAULT_BUILTIN_PROXY_SETTINGS = Object.freeze({
     enabled: false,
@@ -1804,6 +1812,7 @@ function importCodexSkills(params = {}) {
             const visitedRealPaths = new Set([sourceDirForCopy]);
             copyDirRecursive(sourceDirForCopy, targetPath, {
                 dereferenceSymlinks: true,
+                allowedRootRealPath: sourceDirForCopy,
                 visitedRealPaths
             });
             copiedToTarget = true;
@@ -1833,6 +1842,306 @@ function importCodexSkills(params = {}) {
         failed,
         root: CODEX_SKILLS_DIR
     };
+}
+
+function collectSkillDirectoriesFromRoot(rootDir, limit = MAX_SKILLS_ZIP_ENTRY_COUNT) {
+    const results = [];
+    let truncated = false;
+    if (!rootDir || !fs.existsSync(rootDir)) {
+        return { results, truncated };
+    }
+    const normalizedLimit = Number.isFinite(limit) && limit > 0
+        ? Math.floor(limit)
+        : MAX_SKILLS_ZIP_ENTRY_COUNT;
+    const stack = [rootDir];
+    while (stack.length > 0) {
+        if (results.length >= normalizedLimit) {
+            truncated = true;
+            break;
+        }
+        const currentDir = stack.pop();
+        let entries = [];
+        try {
+            entries = fs.readdirSync(currentDir, { withFileTypes: true });
+        } catch (e) {
+            continue;
+        }
+
+        const hasSkillFile = entries.some((entry) => entry && entry.isFile() && String(entry.name || '') === 'SKILL.md');
+        if (hasSkillFile) {
+            results.push(currentDir);
+            continue;
+        }
+
+        for (const entry of entries) {
+            if (!entry || !entry.isDirectory()) continue;
+            const entryName = typeof entry.name === 'string' ? entry.name.trim() : '';
+            if (!entryName || entryName.startsWith('.')) {
+                continue;
+            }
+            stack.push(path.join(currentDir, entryName));
+        }
+    }
+    return { results, truncated };
+}
+
+function resolveSkillNameFromImportedDirectory(skillDir, extractionRoot, fallbackName = '') {
+    const directoryBaseName = path.basename(skillDir || '');
+    const extractionBaseName = path.basename(extractionRoot || '');
+    let candidate = directoryBaseName;
+    if (!candidate || candidate === extractionBaseName || candidate.startsWith('.')) {
+        const fallback = typeof fallbackName === 'string' ? fallbackName.trim() : '';
+        const fallbackBase = fallback ? path.basename(fallback, path.extname(fallback)) : '';
+        candidate = fallbackBase || candidate;
+    }
+    return normalizeCodexSkillName(candidate);
+}
+
+async function importCodexSkillsFromZipFile(zipPath, options = {}) {
+    const fallbackName = typeof options.fallbackName === 'string' ? options.fallbackName : '';
+    const tempDir = typeof options.tempDir === 'string' ? options.tempDir : '';
+    const imported = [];
+    const failed = [];
+    const dedupNames = new Set();
+    const extractionRoot = path.join(tempDir || path.dirname(zipPath), 'extract');
+
+    try {
+        await inspectZipArchiveLimits(zipPath, {
+            maxEntryCount: MAX_SKILLS_ZIP_ENTRY_COUNT,
+            maxUncompressedBytes: MAX_SKILLS_ZIP_UNCOMPRESSED_BYTES
+        });
+
+        await extractUploadZip(zipPath, extractionRoot);
+        const discovery = collectSkillDirectoriesFromRoot(extractionRoot, MAX_SKILLS_ZIP_ENTRY_COUNT);
+        const discoveredDirs = discovery.results;
+        if (discoveredDirs.length === 0) {
+            return { error: '压缩包中未发现包含 SKILL.md 的技能目录' };
+        }
+        if (discovery.truncated) {
+            return { error: '压缩包中的技能目录数量超出导入上限' };
+        }
+
+        ensureDir(CODEX_SKILLS_DIR);
+        for (const skillDir of discoveredDirs) {
+            const normalizedName = resolveSkillNameFromImportedDirectory(skillDir, extractionRoot, fallbackName);
+            if (normalizedName.error) {
+                failed.push({
+                    name: path.basename(skillDir || ''),
+                    error: normalizedName.error
+                });
+                continue;
+            }
+            const dedupKey = normalizedName.name.toLowerCase();
+            if (dedupNames.has(dedupKey)) {
+                continue;
+            }
+            dedupNames.add(dedupKey);
+
+            const targetPath = path.join(CODEX_SKILLS_DIR, normalizedName.name);
+            const targetRelative = path.relative(CODEX_SKILLS_DIR, targetPath);
+            if (targetRelative.startsWith('..') || path.isAbsolute(targetRelative)) {
+                failed.push({
+                    name: normalizedName.name,
+                    error: '目标路径非法'
+                });
+                continue;
+            }
+            if (fs.existsSync(targetPath)) {
+                failed.push({
+                    name: normalizedName.name,
+                    error: 'Codex 中已存在同名 skill'
+                });
+                continue;
+            }
+
+            let copiedToTarget = false;
+            try {
+                const sourceRealPath = fs.realpathSync(skillDir);
+                const sourceStat = fs.statSync(sourceRealPath);
+                if (!sourceStat.isDirectory()) {
+                    failed.push({
+                        name: normalizedName.name,
+                        error: '来源 skill 无法读取'
+                    });
+                    continue;
+                }
+                const visitedRealPaths = new Set([sourceRealPath]);
+                copyDirRecursive(sourceRealPath, targetPath, {
+                    dereferenceSymlinks: true,
+                    allowedRootRealPath: sourceRealPath,
+                    visitedRealPaths
+                });
+                copiedToTarget = true;
+                imported.push({
+                    name: normalizedName.name,
+                    path: targetPath
+                });
+            } catch (e) {
+                if (!copiedToTarget && fs.existsSync(targetPath)) {
+                    try {
+                        removeDirectoryRecursive(targetPath);
+                    } catch (_) {}
+                }
+                failed.push({
+                    name: normalizedName.name,
+                    error: e && e.message ? e.message : '导入失败'
+                });
+            }
+        }
+
+        if (imported.length === 0 && failed.length > 0) {
+            return {
+                error: failed[0].error || '导入失败',
+                imported,
+                failed,
+                root: CODEX_SKILLS_DIR
+            };
+        }
+
+        return {
+            success: failed.length === 0,
+            imported,
+            failed,
+            root: CODEX_SKILLS_DIR
+        };
+    } catch (e) {
+        return {
+            error: `导入失败：${e && e.message ? e.message : '未知错误'}`
+        };
+    } finally {
+        if (tempDir) {
+            try {
+                fs.rmSync(tempDir, { recursive: true, force: true });
+            } catch (_) {}
+        } else if (fs.existsSync(extractionRoot)) {
+            try {
+                fs.rmSync(extractionRoot, { recursive: true, force: true });
+            } catch (_) {}
+        }
+    }
+}
+
+async function importCodexSkillsFromZip(payload = {}) {
+    if (!payload || typeof payload.fileBase64 !== 'string' || !payload.fileBase64.trim()) {
+        return { error: '缺少技能压缩包内容' };
+    }
+    const upload = writeUploadZip(payload.fileBase64, 'codex-skills-import', payload.fileName || 'codex-skills.zip');
+    if (upload.error) {
+        return { error: upload.error };
+    }
+    return importCodexSkillsFromZipFile(upload.zipPath, {
+        tempDir: upload.tempDir,
+        fallbackName: payload.fileName || ''
+    });
+}
+
+async function exportCodexSkills(params = {}) {
+    const rawNames = Array.isArray(params.names) ? params.names : [];
+    const uniqueNames = Array.from(new Set(rawNames
+        .map((item) => (typeof item === 'string' ? item.trim() : ''))
+        .filter(Boolean)));
+    if (uniqueNames.length === 0) {
+        return { error: '请先选择要导出的 skill' };
+    }
+
+    const exported = [];
+    const failed = [];
+    const stagingTempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-skills-export-'));
+    const stagingRoot = path.join(stagingTempDir, 'skills');
+    ensureDir(stagingRoot);
+
+    try {
+        for (const rawName of uniqueNames) {
+            const normalizedName = normalizeCodexSkillName(rawName);
+            if (normalizedName.error) {
+                failed.push({ name: rawName, error: normalizedName.error });
+                continue;
+            }
+            const sourcePath = path.join(CODEX_SKILLS_DIR, normalizedName.name);
+            const sourceRelative = path.relative(CODEX_SKILLS_DIR, sourcePath);
+            if (sourceRelative.startsWith('..') || path.isAbsolute(sourceRelative)) {
+                failed.push({ name: normalizedName.name, error: '来源路径非法' });
+                continue;
+            }
+            if (!fs.existsSync(sourcePath)) {
+                failed.push({ name: normalizedName.name, error: 'skill 不存在' });
+                continue;
+            }
+
+            try {
+                const lstat = fs.lstatSync(sourcePath);
+                if (!lstat.isDirectory() && !lstat.isSymbolicLink()) {
+                    failed.push({ name: normalizedName.name, error: '来源不是技能目录' });
+                    continue;
+                }
+                const sourceDirForCopy = lstat.isSymbolicLink() ? fs.realpathSync(sourcePath) : sourcePath;
+                const sourceStat = fs.statSync(sourceDirForCopy);
+                if (!sourceStat.isDirectory()) {
+                    failed.push({ name: normalizedName.name, error: '来源 skill 无法读取' });
+                    continue;
+                }
+                const targetPath = path.join(stagingRoot, normalizedName.name);
+                const visitedRealPaths = new Set([sourceDirForCopy]);
+                copyDirRecursive(sourceDirForCopy, targetPath, {
+                    dereferenceSymlinks: true,
+                    allowedRootRealPath: sourceDirForCopy,
+                    visitedRealPaths
+                });
+                exported.push({
+                    name: normalizedName.name,
+                    path: sourcePath
+                });
+            } catch (e) {
+                failed.push({
+                    name: normalizedName.name,
+                    error: e && e.message ? e.message : '导出失败'
+                });
+            }
+        }
+
+        if (exported.length === 0) {
+            return {
+                error: failed[0] && failed[0].error ? failed[0].error : '无可导出的 skill',
+                exported,
+                failed,
+                root: CODEX_SKILLS_DIR
+            };
+        }
+
+        const randomToken = crypto.randomBytes(12).toString('hex');
+        const zipFileName = `codex-skills-${randomToken}.zip`;
+        const zipFilePath = path.join(os.tmpdir(), zipFileName);
+        if (fs.existsSync(zipFilePath)) {
+            try {
+                fs.unlinkSync(zipFilePath);
+            } catch (_) {}
+        }
+        await zipLib.archiveFolder(stagingRoot, zipFilePath);
+        const artifact = registerDownloadArtifact(zipFilePath, {
+            fileName: zipFileName,
+            deleteAfterDownload: true
+        });
+
+        return {
+            success: failed.length === 0,
+            fileName: zipFileName,
+            downloadPath: artifact.downloadPath,
+            exported,
+            failed,
+            root: CODEX_SKILLS_DIR
+        };
+    } catch (e) {
+        return {
+            error: `导出失败：${e && e.message ? e.message : '未知错误'}`,
+            exported,
+            failed,
+            root: CODEX_SKILLS_DIR
+        };
+    } finally {
+        try {
+            fs.rmSync(stagingTempDir, { recursive: true, force: true });
+        } catch (_) {}
+    }
 }
 
 function removeDirectoryRecursive(targetPath) {
@@ -6629,6 +6938,70 @@ function readClaudeSettingsInfo() {
     };
 }
 
+function registerDownloadArtifact(filePath, options = {}) {
+    const token = crypto.randomBytes(16).toString('hex');
+    const fileName = typeof options.fileName === 'string' && options.fileName.trim()
+        ? options.fileName.trim()
+        : path.basename(filePath || '');
+    const ttlMs = Number.isFinite(options.ttlMs) && options.ttlMs > 0
+        ? Math.floor(options.ttlMs)
+        : DOWNLOAD_ARTIFACT_TTL_MS;
+    const expiresAt = Date.now() + ttlMs;
+    const deleteAfterDownload = options.deleteAfterDownload !== false;
+
+    g_downloadArtifacts.set(token, {
+        filePath,
+        fileName,
+        deleteAfterDownload,
+        expiresAt
+    });
+
+    setTimeout(() => {
+        const artifact = g_downloadArtifacts.get(token);
+        if (!artifact) return;
+        if (Date.now() < artifact.expiresAt) return;
+        g_downloadArtifacts.delete(token);
+        if (artifact.deleteAfterDownload && artifact.filePath && fs.existsSync(artifact.filePath)) {
+            try {
+                fs.unlinkSync(artifact.filePath);
+            } catch (_) {}
+        }
+    }, ttlMs + 2000);
+
+    return {
+        token,
+        fileName,
+        downloadPath: `/download/${encodeURIComponent(token)}`
+    };
+}
+
+function resolveDownloadArtifact(tokenOrFileName, options = {}) {
+    if (!tokenOrFileName) return null;
+    const token = typeof tokenOrFileName === 'string' ? tokenOrFileName.trim() : '';
+    if (!token) return null;
+
+    const artifact = g_downloadArtifacts.get(token);
+    if (!artifact) {
+        return null;
+    }
+    if (Date.now() > artifact.expiresAt) {
+        g_downloadArtifacts.delete(token);
+        if (artifact.deleteAfterDownload && artifact.filePath && fs.existsSync(artifact.filePath)) {
+            try {
+                fs.unlinkSync(artifact.filePath);
+            } catch (_) {}
+        }
+        return null;
+    }
+    if (options && options.consume === true) {
+        g_downloadArtifacts.delete(token);
+    }
+    return {
+        token,
+        ...artifact
+    };
+}
+
 // API: 打包 Claude 配置目录（系统 zip 可用则使用，否则回退 zip-lib）
 async function prepareClaudeDirDownload() {
     try {
@@ -6693,12 +7066,16 @@ async function prepareCodexDirDownload() {
 
 function copyDirRecursive(srcDir, destDir, options = {}) {
     const dereferenceSymlinks = !!(options && options.dereferenceSymlinks);
+    const allowedRootRealPath = (options && typeof options.allowedRootRealPath === 'string')
+        ? options.allowedRootRealPath
+        : '';
     const visitedRealPaths = options && options.visitedRealPaths instanceof Set
         ? options.visitedRealPaths
         : new Set();
     const childOptions = {
         ...options,
         dereferenceSymlinks,
+        allowedRootRealPath,
         visitedRealPaths
     };
     ensureDir(destDir);
@@ -6712,6 +7089,9 @@ function copyDirRecursive(srcDir, destDir, options = {}) {
                 continue;
             }
             const realPath = fs.realpathSync(srcPath);
+            if (allowedRootRealPath && !isPathInside(realPath, allowedRootRealPath)) {
+                throw new Error(`symlink escapes skill root: ${srcPath}`);
+            }
             if (visitedRealPaths.has(realPath)) {
                 continue;
             }
@@ -6724,6 +7104,9 @@ function copyDirRecursive(srcDir, destDir, options = {}) {
         } else if (entry.isSymbolicLink()) {
             if (dereferenceSymlinks) {
                 const realPath = fs.realpathSync(srcPath);
+                if (allowedRootRealPath && !isPathInside(realPath, allowedRootRealPath)) {
+                    throw new Error(`symlink escapes skill root: ${srcPath}`);
+                }
                 const realStat = fs.statSync(realPath);
                 if (realStat.isDirectory()) {
                     if (visitedRealPaths.has(realPath)) {
@@ -6746,6 +7129,139 @@ function copyDirRecursive(srcDir, destDir, options = {}) {
             fs.copyFileSync(srcPath, destPath);
         }
     }
+}
+
+function inspectZipArchiveLimits(zipPath, options = {}) {
+    const maxEntryCount = Number.isFinite(options.maxEntryCount) && options.maxEntryCount > 0
+        ? Math.floor(options.maxEntryCount)
+        : MAX_SKILLS_ZIP_ENTRY_COUNT;
+    const maxUncompressedBytes = Number.isFinite(options.maxUncompressedBytes) && options.maxUncompressedBytes > 0
+        ? Math.floor(options.maxUncompressedBytes)
+        : MAX_SKILLS_ZIP_UNCOMPRESSED_BYTES;
+
+    return new Promise((resolve, reject) => {
+        yauzl.open(zipPath, { lazyEntries: true, autoClose: true }, (openErr, zipFile) => {
+            if (openErr) {
+                reject(openErr);
+                return;
+            }
+            if (!zipFile) {
+                reject(new Error('无法读取 ZIP 文件'));
+                return;
+            }
+            let entryCount = 0;
+            let totalUncompressedBytes = 0;
+            let settled = false;
+            const finish = (err, data) => {
+                if (settled) return;
+                settled = true;
+                try {
+                    zipFile.close();
+                } catch (_) {}
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(data);
+                }
+            };
+
+            zipFile.on('entry', (entry) => {
+                if (settled) return;
+                entryCount += 1;
+                const entrySize = Number.isFinite(entry.uncompressedSize) ? entry.uncompressedSize : 0;
+                totalUncompressedBytes += entrySize;
+                if (entryCount > maxEntryCount) {
+                    finish(new Error(`压缩包条目过多（>${maxEntryCount}）`));
+                    return;
+                }
+                if (totalUncompressedBytes > maxUncompressedBytes) {
+                    finish(new Error(`压缩包解压总大小超限（>${Math.floor(maxUncompressedBytes / 1024 / 1024)}MB）`));
+                    return;
+                }
+                zipFile.readEntry();
+            });
+
+            zipFile.on('end', () => {
+                finish(null, { entryCount, totalUncompressedBytes });
+            });
+
+            zipFile.on('error', (zipErr) => {
+                finish(zipErr);
+            });
+
+            zipFile.readEntry();
+        });
+    });
+}
+
+function writeUploadZipStream(req, prefix, originalName = '', maxSize = MAX_SKILLS_ZIP_UPLOAD_SIZE) {
+    return new Promise((resolve, reject) => {
+        const lengthHeader = parseInt(req.headers['content-length'] || '0', 10);
+        if (Number.isFinite(lengthHeader) && lengthHeader > maxSize) {
+            reject(new Error(`备份文件过大（>${Math.floor(maxSize / 1024 / 1024)}MB）`));
+            return;
+        }
+
+        const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-`));
+        const rawName = originalName && typeof originalName === 'string' ? originalName : `${prefix}.zip`;
+        const fileName = path.basename(rawName);
+        const zipPath = path.join(tempDir, fileName.toLowerCase().endsWith('.zip') ? fileName : `${fileName}.zip`);
+        const stream = fs.createWriteStream(zipPath);
+        let bytesWritten = 0;
+        let settled = false;
+        let hasContent = false;
+
+        const fail = (err) => {
+            if (settled) return;
+            settled = true;
+            try {
+                stream.destroy();
+            } catch (_) {}
+            try {
+                fs.rmSync(tempDir, { recursive: true, force: true });
+            } catch (_) {}
+            reject(err);
+        };
+
+        const done = () => {
+            if (settled) return;
+            settled = true;
+            if (!hasContent || bytesWritten <= 0) {
+                try {
+                    fs.rmSync(tempDir, { recursive: true, force: true });
+                } catch (_) {}
+                reject(new Error('备份文件为空'));
+                return;
+            }
+            resolve({ tempDir, zipPath });
+        };
+
+        req.on('error', (err) => fail(err));
+        req.on('aborted', () => fail(new Error('上传已中断')));
+        req.on('close', () => {
+            if (!settled && !req.complete) {
+                fail(new Error('上传已中断'));
+            }
+        });
+        stream.on('error', (err) => fail(err));
+        req.on('data', (chunk) => {
+            if (settled) return;
+            hasContent = true;
+            bytesWritten += chunk.length;
+            if (bytesWritten > maxSize) {
+                fail(new Error(`备份文件过大（>${Math.floor(maxSize / 1024 / 1024)}MB）`));
+                try {
+                    req.destroy();
+                } catch (_) {}
+                return;
+            }
+            stream.write(chunk);
+        });
+        req.on('end', () => {
+            if (settled) return;
+            stream.end(() => done());
+        });
+    });
 }
 
 function writeUploadZip(base64, prefix, originalName = '') {
@@ -7523,11 +8039,125 @@ function watchPathsForRestart(targets, onChange) {
     };
 }
 
+function writeJsonResponse(res, statusCode, payload) {
+    const body = JSON.stringify(payload, null, 2);
+    res.writeHead(statusCode, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Length': Buffer.byteLength(body, 'utf-8')
+    });
+    res.end(body, 'utf-8');
+}
+
+function streamZipDownloadResponse(res, filePath, options = {}) {
+    if (!filePath || !fs.existsSync(filePath)) {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('File Not Found');
+        return;
+    }
+    const stat = fs.statSync(filePath);
+    if (!stat.isFile()) {
+        res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Not a File');
+        return;
+    }
+    const downloadName = typeof options.fileName === 'string' && options.fileName.trim()
+        ? options.fileName.trim()
+        : path.basename(filePath);
+    const deleteAfterDownload = !!options.deleteAfterDownload;
+    const onAfterComplete = typeof options.onAfterComplete === 'function'
+        ? options.onAfterComplete
+        : null;
+    res.writeHead(200, {
+        'Content-Type': 'application/zip',
+        'Content-Disposition': `attachment; filename="${path.basename(downloadName)}"`,
+        'Content-Length': stat.size
+    });
+
+    const stream = fs.createReadStream(filePath);
+    let finished = false;
+    const finalize = () => {
+        if (finished) return;
+        finished = true;
+        if (deleteAfterDownload && fs.existsSync(filePath)) {
+            try {
+                fs.unlinkSync(filePath);
+            } catch (_) {}
+        }
+        if (onAfterComplete) {
+            try {
+                onAfterComplete();
+            } catch (_) {}
+        }
+    };
+    stream.on('error', () => {
+        if (!res.headersSent) {
+            res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+            res.end('Download Error');
+        } else {
+            try {
+                res.destroy();
+            } catch (_) {}
+        }
+        finalize();
+    });
+    res.on('finish', finalize);
+    res.on('close', finalize);
+    stream.pipe(res);
+}
+
+function resolveUploadFileNameFromRequest(req, fallbackName = 'codex-skills.zip') {
+    const rawHeader = req.headers['x-codexmate-file-name'];
+    const source = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
+    const fallback = typeof fallbackName === 'string' && fallbackName.trim()
+        ? fallbackName.trim()
+        : 'codex-skills.zip';
+    if (!source || typeof source !== 'string') {
+        return fallback;
+    }
+    const decoded = (() => {
+        try {
+            return decodeURIComponent(source);
+        } catch (_) {
+            return source;
+        }
+    })();
+    const normalized = path.basename(decoded.trim());
+    return normalized || fallback;
+}
+
+async function handleImportCodexSkillsZipUpload(req, res) {
+    if (req.method !== 'POST') {
+        writeJsonResponse(res, 405, { error: 'Method Not Allowed' });
+        return;
+    }
+    try {
+        const fileName = resolveUploadFileNameFromRequest(req, 'codex-skills.zip');
+        const upload = await writeUploadZipStream(
+            req,
+            'codex-skills-import',
+            fileName,
+            MAX_SKILLS_ZIP_UPLOAD_SIZE
+        );
+        const result = await importCodexSkillsFromZipFile(upload.zipPath, {
+            tempDir: upload.tempDir,
+            fallbackName: fileName
+        });
+        writeJsonResponse(res, 200, result || {});
+    } catch (e) {
+        const message = e && e.message ? e.message : '上传失败';
+        writeJsonResponse(res, 400, { error: message });
+    }
+}
+
 function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser }) {
     const connections = new Set();
 
     const server = http.createServer((req, res) => {
         const requestPath = (req.url || '/').split('?')[0];
+        if (requestPath === '/api/import-codex-skills-zip') {
+            void handleImportCodexSkillsZipUpload(req, res);
+            return;
+        }
         if (requestPath === '/api') {
             let body = '';
             req.on('data', chunk => body += chunk);
@@ -7650,6 +8280,9 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             break;
                         case 'import-codex-skills':
                             result = importCodexSkills(params || {});
+                            break;
+                        case 'export-codex-skills':
+                            result = await exportCodexSkills(params || {});
                             break;
                         case 'get-openclaw-config':
                             result = readOpenclawConfigFile();
@@ -7909,32 +8542,35 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
             fs.createReadStream(filePath).pipe(res);
         } else if (requestPath.startsWith('/download/')) {
             const fileName = requestPath.slice('/download/'.length);
-            const decodedFileName = decodeURIComponent(fileName);
-            const tempDir = os.tmpdir();
-            const filePath = path.join(tempDir, decodedFileName);
+            let decodedFileName = '';
+            try {
+                decodedFileName = decodeURIComponent(fileName);
+            } catch (_) {
+                res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+                res.end('Bad Request');
+                return;
+            }
 
-            if (!isPathInside(filePath, tempDir)) {
+            const artifact = resolveDownloadArtifact(decodedFileName, { consume: true });
+            if (artifact) {
+                streamZipDownloadResponse(res, artifact.filePath, {
+                    fileName: artifact.fileName,
+                    deleteAfterDownload: artifact.deleteAfterDownload !== false
+                });
+                return;
+            }
+
+            const tempDir = os.tmpdir();
+            const legacyFilePath = path.join(tempDir, decodedFileName);
+            if (!isPathInside(legacyFilePath, tempDir)) {
                 res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
                 res.end('Forbidden');
                 return;
             }
-            if (!fs.existsSync(filePath)) {
-                res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-                res.end('File Not Found');
-                return;
-            }
-            const stat = fs.statSync(filePath);
-            if (!stat.isFile()) {
-                res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
-                res.end('Not a File');
-                return;
-            }
-            res.writeHead(200, {
-                'Content-Type': 'application/zip',
-                'Content-Disposition': `attachment; filename="${path.basename(filePath)}"`,
-                'Content-Length': stat.size
+            streamZipDownloadResponse(res, legacyFilePath, {
+                fileName: path.basename(legacyFilePath),
+                deleteAfterDownload: false
             });
-            fs.createReadStream(filePath).pipe(res);
         } else if (requestPath.startsWith('/res/')) {
             const normalized = path.normalize(requestPath).replace(/^([\\.\\/])+/, '');
             const filePath = path.join(__dirname, normalized);

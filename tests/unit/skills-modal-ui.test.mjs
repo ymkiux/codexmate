@@ -17,16 +17,32 @@ test('skills modal template includes overview counters and reset entry', () => {
     assert.match(html, /skillsConfiguredCount/);
     assert.match(html, /skillsMissingSkillFileCount/);
     assert.match(html, /resetSkillsFilters/);
+    assert.match(html, /triggerSkillsZipImport/);
+    assert.match(html, /exportSelectedSkills/);
+    assert.match(html, /skillsZipImportInput/);
 });
 
-test('skills modal script exposes derived counters and filter reset method', () => {
-    const script = readProjectFile('web-ui/app.js');
-    assert.match(script, /skillsConfiguredCount\(\)/);
-    assert.match(script, /skillsMissingSkillFileCount\(\)/);
-    assert.match(script, /skillsImportConfiguredCount\(\)/);
-    assert.match(script, /skillsImportMissingSkillFileCount\(\)/);
-    assert.match(script, /skillsFilterDirty\(\)/);
-    assert.match(script, /resetSkillsFilters\(\)/);
+test('skills modal script is modularized and exposes computed/methods from skills modules', () => {
+    const appScript = readProjectFile('web-ui/app.js');
+    const skillsComputed = readProjectFile('web-ui/modules/skills.computed.mjs');
+    const skillsMethods = readProjectFile('web-ui/modules/skills.methods.mjs');
+
+    assert.match(appScript, /createSkillsComputed/);
+    assert.match(appScript, /createSkillsMethods/);
+    assert.match(appScript, /\.\.\.createSkillsComputed\(\)/);
+    assert.match(appScript, /\.\.\.createSkillsMethods\(\{ api \}\)/);
+
+    assert.match(skillsComputed, /skillsConfiguredCount\(\)/);
+    assert.match(skillsComputed, /skillsMissingSkillFileCount\(\)/);
+    assert.match(skillsComputed, /skillsImportConfiguredCount\(\)/);
+    assert.match(skillsComputed, /skillsImportMissingSkillFileCount\(\)/);
+    assert.match(skillsComputed, /skillsFilterDirty\(\)/);
+
+    assert.match(skillsMethods, /resetSkillsFilters\(\)/);
+    assert.match(skillsMethods, /skillsZipImporting/);
+    assert.match(skillsMethods, /skillsExporting/);
+    assert.match(skillsMethods, /importSkillsFromZipFile/);
+    assert.match(skillsMethods, /exportSelectedSkills\(\)/);
 });
 
 test('skills modal styles define summary and panel layout hooks', () => {
