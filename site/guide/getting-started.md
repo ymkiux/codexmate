@@ -3,18 +3,17 @@
 ## 环境要求
 
 - `Node.js >= 14`
-- `Git`
 - Windows / macOS / Linux
 
-## 安装方式
+## 安装
 
-### 方式 1：全局安装
+### 全局安装
 
 ```bash
 npm install -g codexmate
 ```
 
-### 方式 2：免安装试用
+### 免安装试用
 
 ```bash
 npx codexmate@latest status
@@ -28,7 +27,13 @@ codexmate status
 codexmate run
 ```
 
-启动后默认访问：`http://localhost:3737`
+默认监听 `127.0.0.1:3737`，并尝试自动打开浏览器。
+
+仅启动服务（测试 / CI）：
+
+```bash
+codexmate run --no-browser
+```
 
 ## 常用命令
 
@@ -38,11 +43,14 @@ codexmate models
 codexmate switch <provider>
 codexmate use <model>
 codexmate claude <BaseURL> <API_KEY> [model]
+codexmate auth <list|import|switch|delete|status>
+codexmate proxy <status|set|apply|enable|start|stop>
+codexmate workflow <list|get|validate|run|runs>
 codexmate export-session --source <codex|claude> --session-id <ID>
 ```
 
-## 使用建议
+## 校验建议
 
-- 先 `status` 再切换，避免误操作
-- 先在 Web UI 预览配置，再应用到运行时文件
-- 导出会话时优先按来源筛选，减少无关记录
+- 执行 `codexmate status` 确认当前 provider/model。
+- 先在 Web UI 预览后再应用配置。
+- 导出会话时先按来源筛选，减少噪音数据。

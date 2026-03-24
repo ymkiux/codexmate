@@ -83,7 +83,7 @@ async function run() {
     };
 
     const cliPath = path.join(__dirname, '..', '..', 'cli.js');
-    const child = spawn(process.execPath, [cliPath, 'start'], {
+    const child = spawn(process.execPath, [cliPath, 'run', '--no-browser'], {
         env,
         stdio: ['ignore', 'pipe', 'pipe']
     });
