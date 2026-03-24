@@ -209,7 +209,11 @@
             try {
                 payload = await response.json();
             } catch (_) {
-                payload = {};
+                payload = {
+                    error: response.ok
+                        ? 'ZIP 导入响应无效'
+                        : `上传失败（HTTP ${response.status}）`
+                };
             }
             if (!response.ok && !payload.error) {
                 payload.error = `上传失败（HTTP ${response.status}）`;
@@ -333,6 +337,7 @@
                 this.showMessage('删除 skill 失败', 'error');
             } finally {
                 this.skillsDeleting = false;
+                await this.scanImportableSkills({ silent: true });
             }
         }
     };
