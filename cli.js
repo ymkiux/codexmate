@@ -7822,7 +7822,7 @@ function normalizeExtractSuffix(rawSuffix, fallbackSuffixes = DEFAULT_EXTRACT_SU
 }
 
 function buildDefaultExtractOutputDir(baseCwd = process.cwd()) {
-    const normalizedCwd = path.resolve(baseCwd || process.cwd());
+    const normalizedCwd = path.resolve(baseCwd);
     const parentDir = path.dirname(normalizedCwd);
     const timestamp = formatTimestampForFileName().replace(/-/g, '');
     return path.join(parentDir, timestamp);
@@ -7836,23 +7836,30 @@ function sanitizeNameSegment(rawValue, fallback = 'item') {
     return sanitized || fallback;
 }
 
-function resolveDuplicateOutputPath(outputDir, originalFileName, zipPath = '') {
+function resolveDuplicateOutputPath(outputDir, originalFileName, zipPath = '', counters = new Map()) {
     const fallbackName = `file${path.extname(originalFileName || '')}`;
     const fileName = path.basename(originalFileName || '') || fallbackName;
     const firstChoice = path.join(outputDir, fileName);
-    if (!fs.existsSync(firstChoice)) {
-        return firstChoice;
+    const firstChoiceKey = `exact:${fileName}`;
+    if (!counters.has(firstChoiceKey)) {
+        counters.set(firstChoiceKey, true);
+        if (!fs.existsSync(firstChoice)) {
+            return firstChoice;
+        }
     }
 
     const ext = path.extname(fileName);
     const baseName = path.basename(fileName, ext);
     const safeBaseName = sanitizeNameSegment(baseName, 'file');
     const zipBaseName = sanitizeNameSegment(path.basename(zipPath || '', '.zip'), 'zip');
+    const duplicateKey = `dup:${safeBaseName}|${zipBaseName}|${ext}`;
+    let index = counters.has(duplicateKey) ? counters.get(duplicateKey) : 1;
 
-    for (let index = 1; index <= 100000; index++) {
+    for (; index <= 100000; index++) {
         const candidateName = `${safeBaseName}__${zipBaseName}__${index}${ext}`;
         const candidatePath = path.join(outputDir, candidateName);
         if (!fs.existsSync(candidatePath)) {
+            counters.set(duplicateKey, index + 1);
             return candidatePath;
         }
     }
@@ -7891,10 +7898,10 @@ function collectZipFilesFromDir(rootDir, recursive = true) {
     return result;
 }
 
-function extractMatchedEntriesFromZip(zipPath, outputDir, suffixes) {
+function extractMatchedEntriesFromZip(zipPath, outputDir, suffixes, duplicateCounters = new Map()) {
     const normalizedSuffixes = normalizeExtractSuffix(suffixes);
     return new Promise((resolve, reject) => {
-        yauzl.open(zipPath, { lazyEntries: true, autoClose: true }, (openErr, zipFile) => {
+        yauzl.open(zipPath, { lazyEntries: true, autoClose: false }, (openErr, zipFile) => {
             if (openErr) {
                 reject(openErr);
                 return;
@@ -7907,7 +7914,8 @@ function extractMatchedEntriesFromZip(zipPath, outputDir, suffixes) {
             let settled = false;
             let matched = 0;
             let extracted = 0;
-            let skipped = 0;
+            let skippedDir = 0;
+            let skippedExt = 0;
 
             const finish = (err) => {
                 if (settled) return;
@@ -7918,7 +7926,7 @@ function extractMatchedEntriesFromZip(zipPath, outputDir, suffixes) {
                 if (err) {
                     reject(err);
                 } else {
-                    resolve({ matched, extracted, skipped });
+                    resolve({ matched, extracted, skippedDir, skippedExt });
                 }
             };
 
@@ -7928,7 +7936,7 @@ function extractMatchedEntriesFromZip(zipPath, outputDir, suffixes) {
                 const normalizedEntryName = rawEntryName.replace(/\\/g, '/');
 
                 if (!normalizedEntryName || normalizedEntryName.endsWith('/')) {
-                    skipped += 1;
+                    skippedDir += 1;
                     zipFile.readEntry();
                     return;
                 }
@@ -7937,7 +7945,7 @@ function extractMatchedEntriesFromZip(zipPath, outputDir, suffixes) {
                 const lowerBaseName = entryBaseName.toLowerCase();
                 const matchedSuffix = normalizedSuffixes.some((suffix) => lowerBaseName.endsWith(suffix));
                 if (!entryBaseName || !matchedSuffix) {
-                    skipped += 1;
+                    skippedExt += 1;
                     zipFile.readEntry();
                     return;
                 }
@@ -7950,7 +7958,7 @@ function extractMatchedEntriesFromZip(zipPath, outputDir, suffixes) {
                     }
 
                     let completed = false;
-                    const outputPath = resolveDuplicateOutputPath(outputDir, entryBaseName, zipPath);
+                    const outputPath = resolveDuplicateOutputPath(outputDir, entryBaseName, zipPath, duplicateCounters);
                     const writeStream = fs.createWriteStream(outputPath);
                     const fail = (writeErr) => {
                         if (completed) return;
@@ -8024,8 +8032,6 @@ async function cmdUnzipExt(zipDirPath, outputDir, options = {}) {
         process.exit(1);
     }
 
-    ensureDir(absOutputDir);
-
     let zipFiles = [];
     try {
         zipFiles = collectZipFilesFromDir(absZipDir, recursive);
@@ -8039,6 +8045,8 @@ async function cmdUnzipExt(zipDirPath, outputDir, options = {}) {
         process.exit(1);
     }
 
+    ensureDir(absOutputDir);
+
     console.log('\n批量解压配置:');
     console.log('  ZIP 目录:', absZipDir);
     console.log('  输出目录:', absOutputDir);
@@ -8049,8 +8057,10 @@ async function cmdUnzipExt(zipDirPath, outputDir, options = {}) {
 
     let totalMatched = 0;
     let totalExtracted = 0;
-    let totalSkipped = 0;
+    let totalSkippedDir = 0;
+    let totalSkippedExt = 0;
     const failed = [];
+    const duplicateCounters = new Map();
 
     for (const zipFilePath of zipFiles) {
         try {
@@ -8058,10 +8068,11 @@ async function cmdUnzipExt(zipDirPath, outputDir, options = {}) {
                 maxEntryCount: MAX_SKILLS_ZIP_ENTRY_COUNT,
                 maxUncompressedBytes: MAX_SKILLS_ZIP_UNCOMPRESSED_BYTES
             });
-            const result = await extractMatchedEntriesFromZip(zipFilePath, absOutputDir, suffixes);
+            const result = await extractMatchedEntriesFromZip(zipFilePath, absOutputDir, suffixes, duplicateCounters);
             totalMatched += result.matched;
             totalExtracted += result.extracted;
-            totalSkipped += result.skipped;
+            totalSkippedDir += result.skippedDir;
+            totalSkippedExt += result.skippedExt;
             console.log(`✓ ${path.basename(zipFilePath)}: 命中 ${result.matched}，提取 ${result.extracted}`);
         } catch (e) {
             failed.push({ zipFilePath, message: e && e.message ? e.message : String(e) });
@@ -8074,7 +8085,8 @@ async function cmdUnzipExt(zipDirPath, outputDir, options = {}) {
     console.log('  扫描 ZIP:', zipFiles.length);
     console.log('  命中条目:', totalMatched);
     console.log('  已提取:', totalExtracted);
-    console.log('  已跳过:', totalSkipped);
+    console.log('  已跳过(目录条目):', totalSkippedDir);
+    console.log('  已跳过(后缀不匹配):', totalSkippedExt);
     if (failed.length > 0) {
         console.error('  失败数量:', failed.length);
         for (const item of failed) {
