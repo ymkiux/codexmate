@@ -1,5 +1,10 @@
 ﻿# Changelog
 
+## 0.0.15
+
+- Release: bump package version to 0.0.15
+- Docs: sync README / README.en with current release marker
+
 ## 0.0.14
 
 - Skills Manager: polish modal layout with overview counters and clearer section structure
