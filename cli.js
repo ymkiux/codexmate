@@ -9599,10 +9599,20 @@ function shellEscapePosixArg(value) {
     return `'${text.replace(/'/g, `'\"'\"'`)}'`;
 }
 
-async function runProxyCommandWithQueuedFollowUps(selectedBin, finalArgs = [], queuedFollowUps = []) {
-    if (process.platform === 'win32') {
-        throw new Error('当前平台暂不支持 --follow-up 自动排队，请改为进入 Codex 后手动追加。');
+function buildScriptCommandArgs(commandLine) {
+    const platform = process.platform;
+    // util-linux script needs -e/--return to propagate child exit code.
+    if (platform === 'linux' || platform === 'android') {
+        return ['-q', '-e', '-c', commandLine, '/dev/null'];
     }
+    // BSD/macOS script does not support util-linux "-c <cmd>" syntax.
+    if (platform === 'darwin' || platform === 'freebsd' || platform === 'openbsd' || platform === 'netbsd') {
+        return ['-q', '/dev/null', 'sh', '-lc', commandLine];
+    }
+    throw new Error(`当前平台暂不支持 --follow-up 自动排队（platform=${platform}）`);
+}
+
+async function runProxyCommandWithQueuedFollowUps(selectedBin, finalArgs = [], queuedFollowUps = []) {
     if (!process.stdin || !process.stdin.isTTY) {
         throw new Error('当前 stdin 不是 TTY，无法使用 --follow-up 自动排队。');
     }
@@ -9613,9 +9623,10 @@ async function runProxyCommandWithQueuedFollowUps(selectedBin, finalArgs = [], q
     }
 
     const commandLine = [selectedBin, ...finalArgs].map((item) => shellEscapePosixArg(item)).join(' ');
+    const scriptArgs = buildScriptCommandArgs(commandLine);
 
     return new Promise((resolve, reject) => {
-        const child = spawn(scriptPath, ['-q', '-c', commandLine, '/dev/null'], {
+        const child = spawn(scriptPath, scriptArgs, {
             stdio: ['pipe', 'inherit', 'inherit']
         });
 
@@ -11221,7 +11232,7 @@ async function main() {
         console.log('  codexmate proxy <status|set|apply|enable|start|stop>  内建代理');
         console.log('  codexmate workflow <list|get|validate|run|runs>  MCP 工作流中心');
         console.log('  codexmate run [--host <HOST>] [--no-browser]    启动 Web 界面');
-        console.log('  codexmate codex [参数...] [--follow-up <文本> 可重复]  等同于 codex --yolo');
+        console.log('  codexmate codex [参数...] [--follow-up <文本>|--queued-follow-up <文本> 可重复]  等同于 codex --yolo');
         console.log('  codexmate qwen [参数...]   等同于 qwen --yolo');
         console.log('  codexmate mcp [serve] [--transport stdio] [--allow-write|--read-only]');
         console.log('  codexmate export-session --source <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]');

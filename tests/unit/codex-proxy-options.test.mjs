@@ -22,9 +22,10 @@ function extractFunction(content, funcName) {
 }
 
 const parseCodexProxyOptionsSrc = extractFunction(cliContent, 'parseCodexProxyOptions');
-const context = vm.createContext({});
-vm.runInContext(parseCodexProxyOptionsSrc, context);
-const { parseCodexProxyOptions } = context;
+const buildScriptCommandArgsSrc = extractFunction(cliContent, 'buildScriptCommandArgs');
+const parseContext = vm.createContext({});
+vm.runInContext(parseCodexProxyOptionsSrc, parseContext);
+const { parseCodexProxyOptions } = parseContext;
 
 function assertArrayEquals(actual, expected, msg) {
     assert.strictEqual(JSON.stringify(actual), JSON.stringify(expected), msg);
@@ -70,5 +71,30 @@ test('parseCodexProxyOptions throws when inline follow-up content is empty', () 
     assert.throws(
         () => parseCodexProxyOptions(['--queued-follow-up=']),
         /--queued-follow-up 需要提供非空内容/
+    );
+});
+
+function runBuildScriptArgs(platform, commandLine) {
+    const context = vm.createContext({
+        process: { platform }
+    });
+    vm.runInContext(buildScriptCommandArgsSrc, context);
+    return context.buildScriptCommandArgs(commandLine);
+}
+
+test('buildScriptCommandArgs uses util-linux style args on linux', () => {
+    const args = runBuildScriptArgs('linux', 'codex --yolo');
+    assertArrayEquals(args, ['-q', '-e', '-c', 'codex --yolo', '/dev/null']);
+});
+
+test('buildScriptCommandArgs uses BSD/macOS style args on darwin', () => {
+    const args = runBuildScriptArgs('darwin', "codex --yolo --model 'gpt-5'");
+    assertArrayEquals(args, ['-q', '/dev/null', 'sh', '-lc', "codex --yolo --model 'gpt-5'"]);
+});
+
+test('buildScriptCommandArgs throws on unsupported platform', () => {
+    assert.throws(
+        () => runBuildScriptArgs('win32', 'codex --yolo'),
+        /当前平台暂不支持 --follow-up 自动排队/
     );
 });
