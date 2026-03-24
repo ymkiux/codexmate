@@ -9546,7 +9546,138 @@ async function cmdWorkflow(args = []) {
     throw new Error(`未知 workflow 子命令: ${subcommand}`);
 }
 
-async function runProxyCommand(displayName, binNames, args = [], installTip = '') {
+function parseCodexProxyOptions(args = []) {
+    const options = {
+        passthroughArgs: [],
+        queuedFollowUps: []
+    };
+    const argv = Array.isArray(args) ? args : [];
+
+    const pushFollowUp = (value, optionName) => {
+        const raw = value === undefined || value === null ? '' : String(value);
+        if (!raw.trim()) {
+            throw new Error(`${optionName} 需要提供非空内容`);
+        }
+        options.queuedFollowUps.push(raw);
+    };
+
+    for (let i = 0; i < argv.length; i++) {
+        const arg = argv[i];
+        if (arg === undefined || arg === null) {
+            continue;
+        }
+        const text = String(arg);
+        if (text === '--') {
+            options.passthroughArgs.push(...argv.slice(i).map((item) => String(item)));
+            break;
+        }
+        if (text === '--queued-follow-up' || text === '--follow-up') {
+            const next = argv[i + 1];
+            if (next === undefined) {
+                throw new Error(`${text} 需要提供内容`);
+            }
+            pushFollowUp(next, text);
+            i += 1;
+            continue;
+        }
+        if (text.startsWith('--queued-follow-up=')) {
+            pushFollowUp(text.slice('--queued-follow-up='.length), '--queued-follow-up');
+            continue;
+        }
+        if (text.startsWith('--follow-up=')) {
+            pushFollowUp(text.slice('--follow-up='.length), '--follow-up');
+            continue;
+        }
+        options.passthroughArgs.push(text);
+    }
+
+    return options;
+}
+
+function shellEscapePosixArg(value) {
+    const text = value === undefined || value === null ? '' : String(value);
+    return `'${text.replace(/'/g, `'\"'\"'`)}'`;
+}
+
+async function runProxyCommandWithQueuedFollowUps(selectedBin, finalArgs = [], queuedFollowUps = []) {
+    if (process.platform === 'win32') {
+        throw new Error('当前平台暂不支持 --follow-up 自动排队，请改为进入 Codex 后手动追加。');
+    }
+    if (!process.stdin || !process.stdin.isTTY) {
+        throw new Error('当前 stdin 不是 TTY，无法使用 --follow-up 自动排队。');
+    }
+
+    const scriptPath = resolveCommandPath('script');
+    if (!scriptPath) {
+        throw new Error('未找到 script 命令，无法自动注入 queued follow-up 消息。');
+    }
+
+    const commandLine = [selectedBin, ...finalArgs].map((item) => shellEscapePosixArg(item)).join(' ');
+
+    return new Promise((resolve, reject) => {
+        const child = spawn(scriptPath, ['-q', '-c', commandLine, '/dev/null'], {
+            stdio: ['pipe', 'inherit', 'inherit']
+        });
+
+        const stdin = process.stdin;
+        const hadRawMode = !!stdin.isRaw;
+        const onInput = (chunk) => {
+            if (!child.stdin.destroyed) {
+                child.stdin.write(chunk);
+            }
+        };
+
+        try {
+            if (typeof stdin.setRawMode === 'function' && !hadRawMode) {
+                stdin.setRawMode(true);
+            }
+        } catch (_) {
+            // Keep graceful fallback if raw mode toggle is not supported.
+        }
+
+        stdin.resume();
+        stdin.on('data', onInput);
+
+        for (const message of queuedFollowUps) {
+            child.stdin.write(`${message}\n`);
+        }
+
+        const cleanup = () => {
+            stdin.removeListener('data', onInput);
+            try {
+                if (typeof stdin.setRawMode === 'function' && !hadRawMode) {
+                    stdin.setRawMode(false);
+                }
+            } catch (_) {
+                // Ignore raw mode restore failures at shutdown.
+            }
+        };
+
+        child.on('error', (err) => {
+            cleanup();
+            reject(new Error(`运行 ${selectedBin} 失败: ${err.message}`));
+        });
+
+        child.on('exit', (code, signal) => {
+            cleanup();
+            if (typeof code === 'number') {
+                resolve(code);
+                return;
+            }
+            if (signal === 'SIGINT') {
+                resolve(130);
+                return;
+            }
+            if (signal === 'SIGTERM') {
+                resolve(143);
+                return;
+            }
+            resolve(1);
+        });
+    });
+}
+
+async function runProxyCommand(displayName, binNames, args = [], installTip = '', runtimeOptions = {}) {
     const extraArgs = Array.isArray(args) ? args.filter(arg => arg !== undefined) : [];
     const hasYolo = extraArgs.includes('--yolo');
     const finalArgs = hasYolo ? extraArgs : ['--yolo', ...extraArgs];
@@ -9570,6 +9701,14 @@ async function runProxyCommand(displayName, binNames, args = [], installTip = ''
             msg += `\n安装建议: ${installTip}`;
         }
         throw new Error(msg);
+    }
+
+    const queuedFollowUps = runtimeOptions && Array.isArray(runtimeOptions.queuedFollowUps)
+        ? runtimeOptions.queuedFollowUps.filter((item) => typeof item === 'string' && item.trim())
+        : [];
+
+    if (queuedFollowUps.length > 0) {
+        return runProxyCommandWithQueuedFollowUps(selectedBin, finalArgs, queuedFollowUps);
     }
 
     return new Promise((resolve, reject) => {
@@ -9601,6 +9740,8 @@ async function runProxyCommand(displayName, binNames, args = [], installTip = ''
 }
 
 async function cmdCodex(args = []) {
+    const parsed = parseCodexProxyOptions(args);
+
     const ensureResult = await ensureBuiltinProxyForCodexDefault({});
     if (!ensureResult || ensureResult.success !== true) {
         const message = ensureResult && ensureResult.error
@@ -9611,7 +9752,9 @@ async function cmdCodex(args = []) {
     if (ensureResult.runtime && ensureResult.runtime.listenUrl) {
         console.log(`~ Codex 默认走内建代理: ${ensureResult.runtime.listenUrl}`);
     }
-    return runProxyCommand('Codex', 'codex', args);
+    return runProxyCommand('Codex', 'codex', parsed.passthroughArgs, '', {
+        queuedFollowUps: parsed.queuedFollowUps
+    });
 }
 
 async function cmdQwen(args = []) {
@@ -11078,7 +11221,7 @@ async function main() {
         console.log('  codexmate proxy <status|set|apply|enable|start|stop>  内建代理');
         console.log('  codexmate workflow <list|get|validate|run|runs>  MCP 工作流中心');
         console.log('  codexmate run [--host <HOST>] [--no-browser]    启动 Web 界面');
-        console.log('  codexmate codex [参数...]  等同于 codex --yolo');
+        console.log('  codexmate codex [参数...] [--follow-up <文本> 可重复]  等同于 codex --yolo');
         console.log('  codexmate qwen [参数...]   等同于 qwen --yolo');
         console.log('  codexmate mcp [serve] [--transport stdio] [--allow-write|--read-only]');
         console.log('  codexmate export-session --source <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]');
