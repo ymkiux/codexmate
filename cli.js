@@ -7959,7 +7959,7 @@ async function cmdExportSession(args = []) {
 }
 
 function parseStartOptions(args = []) {
-    const options = { host: '' };
+    const options = { host: '', noBrowser: false };
     if (!Array.isArray(args)) {
         return options;
     }
@@ -7967,6 +7967,10 @@ function parseStartOptions(args = []) {
     for (let i = 0; i < args.length; i++) {
         const arg = args[i];
         if (!arg) continue;
+        if (arg === '--no-browser') {
+            options.noBrowser = true;
+            continue;
+        }
         if (arg.startsWith('--host=')) {
             options.host = arg.slice('--host='.length);
             continue;
@@ -8693,7 +8697,7 @@ function cmdStart(options = {}) {
         webDir,
         host,
         port,
-        openBrowser: true
+        openBrowser: !options.noBrowser
     });
 
     const proxySettings = readBuiltinProxySettings();
@@ -10768,7 +10772,7 @@ async function main() {
         console.log('  codexmate auth <list|import|switch|delete|status>  认证文件管理');
         console.log('  codexmate proxy <status|set|apply|enable|start|stop>  内建代理');
         console.log('  codexmate workflow <list|get|validate|run|runs>  MCP 工作流中心');
-        console.log('  codexmate run [--host <HOST>]    启动 Web 界面');
+        console.log('  codexmate run [--host <HOST>] [--no-browser]    启动 Web 界面');
         console.log('  codexmate codex [参数...]  等同于 codex --yolo');
         console.log('  codexmate qwen [参数...]   等同于 qwen --yolo');
         console.log('  codexmate gemini [参数...] 等同于 gemini --yolo');
