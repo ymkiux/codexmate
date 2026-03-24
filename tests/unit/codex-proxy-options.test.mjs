@@ -92,6 +92,11 @@ test('buildScriptCommandArgs uses BSD/macOS style args on darwin', () => {
     assertArrayEquals(args, ['-q', '/dev/null', 'sh', '-lc', "codex --yolo --model 'gpt-5'"]);
 });
 
+test('buildScriptCommandArgs uses -e/-c style args on openbsd', () => {
+    const args = runBuildScriptArgs('openbsd', 'codex --yolo');
+    assertArrayEquals(args, ['-q', '-e', '-c', 'codex --yolo', '/dev/null']);
+});
+
 test('buildScriptCommandArgs throws on unsupported platform', () => {
     assert.throws(
         () => runBuildScriptArgs('win32', 'codex --yolo'),

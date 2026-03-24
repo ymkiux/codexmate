@@ -9605,8 +9605,12 @@ function buildScriptCommandArgs(commandLine) {
     if (platform === 'linux' || platform === 'android') {
         return ['-q', '-e', '-c', commandLine, '/dev/null'];
     }
+    // OpenBSD/NetBSD support "-c" and should still use "-e" for child exit status.
+    if (platform === 'openbsd' || platform === 'netbsd') {
+        return ['-q', '-e', '-c', commandLine, '/dev/null'];
+    }
     // BSD/macOS script does not support util-linux "-c <cmd>" syntax.
-    if (platform === 'darwin' || platform === 'freebsd' || platform === 'openbsd' || platform === 'netbsd') {
+    if (platform === 'darwin' || platform === 'freebsd') {
         return ['-q', '/dev/null', 'sh', '-lc', commandLine];
     }
     throw new Error(`当前平台暂不支持 --follow-up 自动排队（platform=${platform}）`);
