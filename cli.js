@@ -11401,6 +11401,7 @@ async function main() {
         console.log('  codexmate workflow <list|get|validate|run|runs>  MCP 工作流中心');
         console.log('  codexmate run [--host <HOST>] [--no-browser]    启动 Web 界面');
         console.log('  codexmate codex [参数...] [--follow-up <文本>|--queued-follow-up <文本> 可重复]  等同于 codex --yolo');
+        console.log('    注: follow-up 自动排队仅支持 linux/android/netbsd/openbsd/darwin/freebsd 且 stdin 必须是 TTY，其他平台会报错');
         console.log('  codexmate qwen [参数...]   等同于 qwen --yolo');
         console.log('  codexmate mcp [serve] [--transport stdio] [--allow-write|--read-only]');
         console.log('  codexmate export-session --source <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]');
