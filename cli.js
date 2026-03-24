@@ -9631,16 +9631,47 @@ async function runProxyCommandWithQueuedFollowUps(selectedBin, finalArgs = [], q
 
     return new Promise((resolve, reject) => {
         const child = spawn(scriptPath, scriptArgs, {
-            stdio: ['pipe', 'inherit', 'inherit']
+            stdio: ['pipe', 'pipe', 'pipe']
         });
 
         const stdin = process.stdin;
         const hadRawMode = !!stdin.isRaw;
         let cleanedUp = false;
+        let followUpsFlushed = false;
+        let outputReadyDetected = false;
+        const timers = [];
         const onInput = (chunk) => {
             if (!child.stdin.destroyed) {
                 child.stdin.write(chunk);
             }
+        };
+        const flushQueuedFollowUps = () => {
+            if (followUpsFlushed) return;
+            followUpsFlushed = true;
+            queuedFollowUps.forEach((message, index) => {
+                const timer = setTimeout(() => {
+                    if (!child.stdin.destroyed) {
+                        // PTY submit should use CR instead of LF.
+                        child.stdin.write(`${message}\r`);
+                    }
+                }, index * 80);
+                timers.push(timer);
+            });
+        };
+        const markOutputReady = () => {
+            if (outputReadyDetected) return;
+            outputReadyDetected = true;
+            timers.push(setTimeout(() => {
+                flushQueuedFollowUps();
+            }, 120));
+        };
+        const onStdoutData = (chunk) => {
+            process.stdout.write(chunk);
+            markOutputReady();
+        };
+        const onStderrData = (chunk) => {
+            process.stderr.write(chunk);
+            markOutputReady();
         };
         const onProcessExit = () => {
             cleanup();
@@ -9667,7 +9698,32 @@ async function runProxyCommandWithQueuedFollowUps(selectedBin, finalArgs = [], q
             }
             process.exit(143);
         };
+        const cleanup = () => {
+            if (cleanedUp) return;
+            cleanedUp = true;
+            stdin.removeListener('data', onInput);
+            process.removeListener('exit', onProcessExit);
+            process.removeListener('SIGINT', onProcessSigint);
+            process.removeListener('SIGTERM', onProcessSigterm);
+            child.stdout.removeListener('data', onStdoutData);
+            child.stderr.removeListener('data', onStderrData);
+            while (timers.length > 0) {
+                clearTimeout(timers.pop());
+            }
+            try {
+                if (typeof stdin.setRawMode === 'function' && !hadRawMode) {
+                    stdin.setRawMode(false);
+                }
+            } catch (_) {
+                // Ignore raw mode restore failures at shutdown.
+            }
+        };
 
+        process.on('exit', onProcessExit);
+        process.on('SIGINT', onProcessSigint);
+        process.on('SIGTERM', onProcessSigterm);
+        child.stdout.on('data', onStdoutData);
+        child.stderr.on('data', onStderrData);
         try {
             if (typeof stdin.setRawMode === 'function' && !hadRawMode) {
                 stdin.setRawMode(true);
@@ -9678,29 +9734,10 @@ async function runProxyCommandWithQueuedFollowUps(selectedBin, finalArgs = [], q
 
         stdin.resume();
         stdin.on('data', onInput);
-        process.on('exit', onProcessExit);
-        process.on('SIGINT', onProcessSigint);
-        process.on('SIGTERM', onProcessSigterm);
-
-        for (const message of queuedFollowUps) {
-            child.stdin.write(`${message}\n`);
-        }
-
-        const cleanup = () => {
-            if (cleanedUp) return;
-            cleanedUp = true;
-            stdin.removeListener('data', onInput);
-            process.removeListener('exit', onProcessExit);
-            process.removeListener('SIGINT', onProcessSigint);
-            process.removeListener('SIGTERM', onProcessSigterm);
-            try {
-                if (typeof stdin.setRawMode === 'function' && !hadRawMode) {
-                    stdin.setRawMode(false);
-                }
-            } catch (_) {
-                // Ignore raw mode restore failures at shutdown.
-            }
-        };
+        // Fallback in case the child stays silent before prompt render.
+        timers.push(setTimeout(() => {
+            flushQueuedFollowUps();
+        }, 1500));
 
         child.on('error', (err) => {
             cleanup();

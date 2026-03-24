@@ -113,3 +113,13 @@ test('runProxyCommandWithQueuedFollowUps registers process-level cleanup handler
     assert.ok(runProxyCommandWithQueuedFollowUpsSrc.includes("process.removeListener('SIGINT'"), 'should unbind SIGINT listener');
     assert.ok(runProxyCommandWithQueuedFollowUpsSrc.includes("process.removeListener('SIGTERM'"), 'should unbind SIGTERM listener');
 });
+
+test('runProxyCommandWithQueuedFollowUps flushes follow-ups after output/timer, not immediately', () => {
+    assert.ok(runProxyCommandWithQueuedFollowUpsSrc.includes("child.stdout.on('data'"), 'should watch stdout readiness');
+    assert.ok(runProxyCommandWithQueuedFollowUpsSrc.includes('setTimeout(() => {\n                flushQueuedFollowUps();'), 'should defer queued flush');
+});
+
+test('runProxyCommandWithQueuedFollowUps submits follow-ups with CR in PTY', () => {
+    assert.ok(runProxyCommandWithQueuedFollowUpsSrc.includes('${message}\\r'), 'should submit with CR');
+    assert.ok(!runProxyCommandWithQueuedFollowUpsSrc.includes('${message}\\n'), 'should avoid LF submit');
+});
