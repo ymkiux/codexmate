@@ -22,6 +22,9 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.deepStrictEqual(sideTabModes, ['codex', 'claude', 'openclaw']);
     assert.match(html, /activeProviderBridgeHint/);
     assert.match(html, /isProviderConfigMode/);
+    assert.match(html, /provider-fast-switch-select/);
+    assert.match(html, /forceCompactLayout/);
+    assert.match(html, /quickSwitchProvider\(\$event\.target\.value\)/);
 });
 
 test('web ui script defines provider mode metadata for codex only', () => {
@@ -34,6 +37,11 @@ test('web ui script defines provider mode metadata for codex only', () => {
     assert.match(appScript, /\.\.\.createConfigModeComputed\(\)/);
     assert.match(appScript, /switchConfigMode\(mode\)/);
     assert.match(appScript, /mode\.trim\(\)\.toLowerCase\(\)/);
+    assert.match(appScript, /quickSwitchProvider\(name\)/);
+    assert.match(appScript, /performProviderSwitch\(name\)/);
+    assert.match(appScript, /runLatestOnlyQueue\(/);
+    assert.match(appScript, /providerSwitchInProgress:\s*false/);
+    assert.match(appScript, /pendingProviderSwitch:\s*''/);
 
     assert.match(configModeComputed, /const PROVIDER_CONFIG_MODE_META = Object\.freeze\(/);
     const providerModeKeys = [...configModeComputed.matchAll(/^\s*([a-z]+):\s*Object\.freeze\(/gm)]

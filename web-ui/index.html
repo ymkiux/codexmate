@@ -282,6 +282,20 @@
                         <span class="value">{{ sessionsList.length }}</span>
                     </div>
                 </div>
+                <div
+                    v-if="!sessionStandalone && mainTab === 'config' && isProviderConfigMode && forceCompactLayout && !loading && !initError && providersList.length > 1"
+                    class="provider-fast-switch">
+                    <label class="provider-fast-switch-label" for="provider-fast-switch-select">快速切换提供商</label>
+                    <select
+                        id="provider-fast-switch-select"
+                        class="provider-fast-switch-select"
+                        :value="currentProvider"
+                        @change="quickSwitchProvider($event.target.value)">
+                        <option v-for="provider in providersList" :key="'quick-switch-' + provider.name" :value="provider.name">
+                            {{ provider.name }}
+                        </option>
+                    </select>
+                </div>
 
                 <div v-if="false && mainTab === 'config' && !sessionStandalone" class="config-subtabs">
                     <button :class="['config-subtab', { active: configMode === 'codex' }]" @click="switchConfigMode('codex')">

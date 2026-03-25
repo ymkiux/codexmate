@@ -126,6 +126,63 @@ export function buildSpeedTestIssue(name, result) {
     return null;
 }
 
+export async function runLatestOnlyQueue(initialTarget, options = {}) {
+    const perform = typeof options.perform === 'function'
+        ? options.perform
+        : async () => {};
+    const consumePending = typeof options.consumePending === 'function'
+        ? options.consumePending
+        : () => '';
+    let currentTarget = typeof initialTarget === 'string' ? initialTarget.trim() : '';
+    let lastError = '';
+
+    while (currentTarget) {
+        try {
+            await perform(currentTarget);
+        } catch (e) {
+            lastError = e && e.message ? e.message : 'queue task failed';
+        }
+        const queued = String(consumePending() || '').trim();
+        if (!queued || queued === currentTarget) {
+            break;
+        }
+        currentTarget = queued;
+    }
+
+    return {
+        lastTarget: currentTarget,
+        lastError
+    };
+}
+
+export function shouldForceCompactLayoutMode(options = {}) {
+    const viewportWidth = Number(options.viewportWidth || 0);
+    const screenWidth = Number(options.screenWidth || 0);
+    const screenHeight = Number(options.screenHeight || 0);
+    const shortEdge = Number(options.shortEdge || (screenWidth > 0 && screenHeight > 0 ? Math.min(screenWidth, screenHeight) : 0));
+    const maxTouchPoints = Number(options.maxTouchPoints || 0);
+    const userAgent = typeof options.userAgent === 'string' ? options.userAgent : '';
+    const isMobileUa = typeof options.isMobileUa === 'boolean'
+        ? options.isMobileUa
+        : /(Android|iPhone|iPad|iPod|Mobile)/i.test(userAgent);
+    const coarsePointer = !!options.coarsePointer;
+    const noHover = !!options.noHover;
+    const isSmallPhysicalScreen = shortEdge > 0 && shortEdge <= 920;
+    const isNarrowViewport = viewportWidth > 0 && viewportWidth <= 960;
+    const pointerSuggestsTouchOnly = coarsePointer && noHover;
+
+    if (isMobileUa) {
+        return isNarrowViewport || isSmallPhysicalScreen;
+    }
+    if (!pointerSuggestsTouchOnly) {
+        return false;
+    }
+    if (maxTouchPoints <= 0) {
+        return false;
+    }
+    return isSmallPhysicalScreen;
+}
+
 // Session filtering helpers
 export function isSessionQueryEnabled(source) {
     const normalized = normalizeSessionSource(source, '');
