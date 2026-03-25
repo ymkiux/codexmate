@@ -135,7 +135,13 @@ body.force-compact .status-inspector {
 
 body.force-compact .top-tabs {
     display: grid !important;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+@media (min-width: 541px) {
+    body.force-compact .top-tabs {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
 body.force-compact .hero-logo {
@@ -173,16 +179,18 @@ body.force-compact .card-content {
 }
 
 body.force-compact .card-title,
-body.force-compact .card-title > span:first-child,
-body.force-compact .card-subtitle {
+body.force-compact .card-title > span:first-child {
     white-space: normal;
     overflow: visible;
     text-overflow: clip;
     overflow-wrap: anywhere;
-    word-break: break-word;
 }
 
 body.force-compact .card-subtitle {
+    white-space: normal;
+    overflow: hidden;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;

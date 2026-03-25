@@ -139,6 +139,7 @@ export async function runLatestOnlyQueue(initialTarget, options = {}) {
     while (currentTarget) {
         try {
             await perform(currentTarget);
+            lastError = '';
         } catch (e) {
             lastError = e && e.message ? e.message : 'queue task failed';
         }

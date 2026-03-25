@@ -39,6 +39,10 @@ test('web ui script defines provider mode metadata for codex only', () => {
     assert.match(appScript, /mode\.trim\(\)\.toLowerCase\(\)/);
     assert.match(appScript, /quickSwitchProvider\(name\)/);
     assert.match(appScript, /performProviderSwitch\(name\)/);
+    assert.match(appScript, /waitForCodexApplyIdle\(maxWaitMs = 20000\)/);
+    assert.match(appScript, /target === this\.pendingProviderSwitch/);
+    assert.match(appScript, /!this\.providerSwitchInProgress && target === this\.currentProvider/);
+    assert.match(appScript, /await this\.waitForCodexApplyIdle\(\);/);
     assert.match(appScript, /runLatestOnlyQueue\(/);
     assert.match(appScript, /providerSwitchInProgress:\s*false/);
     assert.match(appScript, /pendingProviderSwitch:\s*''/);
