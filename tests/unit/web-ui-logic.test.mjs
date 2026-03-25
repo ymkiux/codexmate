@@ -20,7 +20,9 @@ const {
     buildSessionFilterCacheState,
     buildSessionListParams,
     formatSessionTimelineTimestamp,
-    buildSessionTimelineNodes
+    buildSessionTimelineNodes,
+    runLatestOnlyQueue,
+    shouldForceCompactLayoutMode
 } = logic;
 
 test('normalizeClaudeValue trims strings and ignores non-string', () => {
@@ -120,6 +122,113 @@ test('buildSpeedTestIssue maps errors and status codes', () => {
 
     const http400 = buildSpeedTestIssue('p1', { ok: false, status: 400 });
     assert.strictEqual(http400.code, 'remote-speedtest-http-error');
+});
+
+test('runLatestOnlyQueue drains pending targets in order', async () => {
+    let pending = '';
+    const visited = [];
+    const result = await runLatestOnlyQueue('alpha', {
+        perform: async (target) => {
+            visited.push(target);
+            if (target === 'alpha') pending = 'beta';
+            if (target === 'beta') pending = 'gamma';
+        },
+        consumePending: () => {
+            const next = pending;
+            pending = '';
+            return next;
+        }
+    });
+    assert.deepStrictEqual(visited, ['alpha', 'beta', 'gamma']);
+    assert.strictEqual(result.lastTarget, 'gamma');
+    assert.strictEqual(result.lastError, '');
+});
+
+test('runLatestOnlyQueue continues after failure and preserves latest error', async () => {
+    let pending = '';
+    const visited = [];
+    const result = await runLatestOnlyQueue('alpha', {
+        perform: async (target) => {
+            visited.push(target);
+            if (target === 'alpha') {
+                pending = 'beta';
+                throw new Error('alpha failed');
+            }
+        },
+        consumePending: () => {
+            const next = pending;
+            pending = '';
+            return next;
+        }
+    });
+    assert.deepStrictEqual(visited, ['alpha', 'beta']);
+    assert.strictEqual(result.lastTarget, 'beta');
+    assert.strictEqual(result.lastError, 'alpha failed');
+});
+
+test('shouldForceCompactLayoutMode keeps desktop layout for narrow non-touch windows', () => {
+    const enabled = shouldForceCompactLayoutMode({
+        viewportWidth: 840,
+        screenWidth: 1920,
+        screenHeight: 1080,
+        maxTouchPoints: 0,
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        coarsePointer: false,
+        noHover: false
+    });
+    assert.strictEqual(enabled, false);
+});
+
+test('shouldForceCompactLayoutMode enables compact mode for mobile UA on narrow viewport', () => {
+    const enabled = shouldForceCompactLayoutMode({
+        viewportWidth: 390,
+        screenWidth: 390,
+        screenHeight: 844,
+        maxTouchPoints: 5,
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile',
+        coarsePointer: true,
+        noHover: true
+    });
+    assert.strictEqual(enabled, true);
+});
+
+test('shouldForceCompactLayoutMode enables compact mode for phone-like touch device with desktop UA', () => {
+    const enabled = shouldForceCompactLayoutMode({
+        viewportWidth: 430,
+        screenWidth: 430,
+        screenHeight: 932,
+        maxTouchPoints: 5,
+        userAgent: 'Mozilla/5.0 (X11; Linux x86_64)',
+        coarsePointer: true,
+        noHover: true
+    });
+    assert.strictEqual(enabled, true);
+});
+
+test('shouldForceCompactLayoutMode keeps desktop layout for touch laptop with large screen', () => {
+    const enabled = shouldForceCompactLayoutMode({
+        viewportWidth: 1366,
+        screenWidth: 1366,
+        screenHeight: 1024,
+        maxTouchPoints: 10,
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        coarsePointer: false,
+        noHover: false
+    });
+    assert.strictEqual(enabled, false);
+});
+
+test('shouldForceCompactLayoutMode requires touch points for non-mobile UA compact fallback', () => {
+    const enabled = shouldForceCompactLayoutMode({
+        viewportWidth: 768,
+        screenWidth: 768,
+        screenHeight: 1024,
+        maxTouchPoints: 0,
+        userAgent: 'Mozilla/5.0 (X11; Linux x86_64)',
+        coarsePointer: true,
+        noHover: true
+    });
+    assert.strictEqual(enabled, false);
 });
 
 test('isSessionQueryEnabled supports codex/claude/all', () => {
