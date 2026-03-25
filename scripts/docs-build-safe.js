@@ -5,7 +5,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const root = path.resolve(__dirname, '..');
-const tempRoot = path.join(os.homedir(), '.cache', 'codexmate-docs-build');
+const tempBase = path.join(os.homedir(), '.cache');
 const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
 function removePath(targetPath) {
@@ -102,9 +102,7 @@ function ensureVitepress(cwd) {
   if (fs.existsSync(vitepressCli)) return true;
 
   const installResult = runCommand(npmCmd, ['install', '--include=dev'], cwd);
-  if (installResult.status !== 0) {
-    process.exit(installResult.status == null ? 1 : installResult.status);
-  }
+  if (installResult.status !== 0) return false;
   return fs.existsSync(vitepressCli);
 }
 
@@ -149,6 +147,19 @@ function copyDistBack(sourceRoot) {
   copyRecursive(sourceDist, targetDist);
 }
 
+function createTempWorkspace() {
+  fs.mkdirSync(tempBase, { recursive: true });
+  return fs.mkdtempSync(path.join(tempBase, 'codexmate-docs-build-'));
+}
+
+function cleanupTempWorkspace(tempRoot) {
+  try {
+    removePath(tempRoot);
+  } catch (error) {
+    console.warn(`[codexmate] temp workspace cleanup skipped: ${error.message || error}`);
+  }
+}
+
 if (!ensureVitepress(root)) {
   console.error('[codexmate] vitepress is unavailable after dependency installation.');
   process.exit(1);
@@ -174,22 +185,26 @@ if (!isNoexecFailure(directBuild)) {
 console.log('[codexmate] Detected noexec native-module failure, retrying in temp workspace...');
 flushOutput(directBuild);
 
-copyInputWorkspace(tempRoot);
+const tempRoot = createTempWorkspace();
+let fallbackExitCode = 0;
 
-if (!ensureVitepress(tempRoot)) {
-  console.error('[codexmate] vitepress is unavailable in temp workspace.');
-  process.exit(1);
-}
-
-const tempBuild = runDocsBuild(tempRoot);
-if (tempBuild.status !== 0) {
-  process.exit(tempBuild.status == null ? 1 : tempBuild.status);
-}
-
-copyDistBack(tempRoot);
 try {
-  removePath(tempRoot);
-} catch (error) {
-  console.warn(`[codexmate] temp workspace cleanup skipped: ${error.message || error}`);
+  copyInputWorkspace(tempRoot);
+
+  if (!ensureVitepress(tempRoot)) {
+    console.error('[codexmate] vitepress is unavailable in temp workspace.');
+    fallbackExitCode = 1;
+  } else {
+    const tempBuild = runDocsBuild(tempRoot);
+    if (tempBuild.status !== 0) {
+      fallbackExitCode = tempBuild.status == null ? 1 : tempBuild.status;
+    } else {
+      copyDistBack(tempRoot);
+      console.log(`[codexmate] Docs build succeeded via temp workspace: ${tempRoot}`);
+    }
+  }
+} finally {
+  cleanupTempWorkspace(tempRoot);
 }
-console.log(`[codexmate] Docs build succeeded via temp workspace: ${tempRoot}`);
+
+process.exit(fallbackExitCode);
