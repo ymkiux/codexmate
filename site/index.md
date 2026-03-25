@@ -35,7 +35,6 @@ Codex Mate 是一个本地优先的配置与会话管理工具，覆盖：
 - Claude Code 配置方案管理（写入 `~/.claude/settings.json`）
 - OpenClaw JSON5 配置与 Workspace `AGENTS.md`
 - Codex / Claude 本地会话浏览、导出、删除
-- `codexmate qwen` 透传入口
 
 ## 快速开始
 
