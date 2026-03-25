@@ -26,7 +26,6 @@ Codex Mate is a local-first CLI + Web UI for unified management of:
 - Claude Code profiles (writes to `~/.claude/settings.json`)
 - OpenClaw JSON5 profiles and workspace `AGENTS.md`
 - Local Codex/Claude sessions (list/filter/export/delete)
-- `codexmate qwen` passthrough command
 
 It works on local files directly and does not require cloud hosting.
 
@@ -58,7 +57,6 @@ It works on local files directly and does not require cloud hosting.
 - MCP stdio domains (`tools`, `resources`, `prompts`)
 - Built-in proxy controls (`proxy`)
 - Auth profile management (`auth`)
-- `codexmate qwen` compatibility entrypoint (passthrough with `--yolo`)
 - Zip/unzip utilities
 
 ## Architecture
