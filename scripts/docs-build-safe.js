@@ -166,6 +166,7 @@ if (!isNoexecFailure(directBuild)) {
 }
 
 console.log('[codexmate] Detected noexec native-module failure, retrying in temp workspace...');
+flushOutput(directBuild);
 
 copyInputWorkspace(tempRoot);
 

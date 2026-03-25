@@ -22,6 +22,7 @@ bodyClass: oi-home
   <div class="oi-vignette-layer" aria-hidden="true"></div>
 
   <header class="oi-header">
+    <a class="oi-skip-link" href="#oi-main">跳转到主要内容</a>
     <div class="oi-shell">
       <div class="oi-header-pill">
         <a class="oi-brand" href="./">Codex Mate</a>
@@ -33,7 +34,7 @@ bodyClass: oi-home
     <div class="oi-divider"></div>
   </header>
 
-  <main class="oi-main">
+  <main class="oi-main" id="oi-main">
     <section class="oi-hero">
       <h1 class="oi-title">Codex Mate</h1>
       <p class="oi-subtitle">本地优先的 Codex / Claude Code / OpenClaw 配置与会话管理工具。统一管理 Provider、模型与会话数据，减少切换成本。</p>

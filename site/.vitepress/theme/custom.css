@@ -46,6 +46,23 @@ body.oi-home #app {
   border: 0;
 }
 
+.oi-skip-link {
+  position: absolute;
+  left: -9999px;
+  z-index: 999;
+}
+
+.oi-skip-link:focus {
+  left: 50%;
+  top: 8px;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: var(--oi-primary);
+  color: var(--oi-primary-text);
+  text-decoration: none;
+}
+
 .oi-hexagon-layer,
 .oi-ambient-layer,
 .oi-vignette-layer {
@@ -349,6 +366,14 @@ body.oi-home #app {
   animation: oi-hex-pulse 7s ease-in-out infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .oi-hexagon-svg,
+  .oi-accent {
+    animation: none;
+    transform: translate(-50%, -50%);
+  }
+}
+
 @media (max-width: 1180px) {
   .oi-feature-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -360,7 +385,7 @@ body.oi-home #app {
   .oi-section,
   .oi-workflow,
   .oi-hero {
-    width: min(100% - 30px, 100%);
+    width: calc(100% - 30px);
   }
 
   .oi-header-pill {
