@@ -140,7 +140,7 @@ function copyInputWorkspace(targetRoot) {
 function copyDistBack(sourceRoot) {
   const sourceDist = path.join(sourceRoot, 'site', '.vitepress', 'dist');
   if (!fs.existsSync(sourceDist)) {
-    return;
+    throw new Error(`[codexmate] Build succeeded but dist not found at: ${sourceDist}`);
   }
 
   const targetDist = path.join(root, 'site', '.vitepress', 'dist');
