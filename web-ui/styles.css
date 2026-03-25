@@ -27,9 +27,7 @@
     --color-error: #C44536;
 
     --bg-warm-gradient:
-        radial-gradient(circle at 16% 10%, rgba(201, 94, 75, 0.14), transparent 48%),
-        radial-gradient(circle at 90% 6%, rgba(255, 255, 255, 0.9), transparent 42%),
-        linear-gradient(135deg, #F8F2EA 0%, #F1E4D8 44%, #F8F2EA 100%);
+        linear-gradient(180deg, #F8F2EA 0%, #F8F2EA 100%);
 
     /* 字体系统 */
     --font-family-body: 'JetBrainsMono Nerd Font Mono', 'OPPO Sans 4.0', 'Fira Mono', 'JetBrains Mono', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', monospace;
@@ -240,10 +238,8 @@ body::before {
     position: fixed;
     inset: 0;
     background-image:
-        radial-gradient(circle at 12% 18%, rgba(201, 94, 75, 0.1), transparent 38%),
-        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.4) 0 1px, transparent 1px 120px),
-        repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.35) 0 1px, transparent 1px 120px);
-    opacity: 0.28;
+        linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0));
+    opacity: 0.16;
     pointer-events: none;
     z-index: 0;
 }
@@ -254,10 +250,10 @@ body::after {
     position: fixed;
     inset: 0;
     background-image:
-        linear-gradient(90deg, rgba(255, 255, 255, 0.15) 1px, transparent 1px),
-        linear-gradient(0deg, rgba(255, 255, 255, 0.12) 1px, transparent 1px);
-    background-size: 120px 120px;
-    opacity: 0.22;
+        linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+    background-size: 180px 180px;
+    opacity: 0.08;
     pointer-events: none;
     z-index: 0;
 }
