@@ -36,7 +36,7 @@ function copyRecursive(sourcePath, targetPath) {
     try {
       fs.symlinkSync(linkTarget, targetPath);
     } catch (error) {
-      if (!error || error.code !== 'EEXIST') {
+      if (error.code !== 'EEXIST') {
         throw error;
       }
     }
@@ -187,4 +187,9 @@ if (tempBuild.status !== 0) {
 }
 
 copyDistBack(tempRoot);
+try {
+  removePath(tempRoot);
+} catch (error) {
+  console.warn(`[codexmate] temp workspace cleanup skipped: ${error.message || error}`);
+}
 console.log(`[codexmate] Docs build succeeded via temp workspace: ${tempRoot}`);
