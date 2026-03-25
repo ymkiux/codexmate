@@ -28,7 +28,21 @@ function removePath(targetPath) {
 }
 
 function copyRecursive(sourcePath, targetPath) {
-  const stat = fs.statSync(sourcePath);
+  const stat = fs.lstatSync(sourcePath);
+
+  if (stat.isSymbolicLink()) {
+    const linkTarget = fs.readlinkSync(sourcePath);
+    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+    try {
+      fs.symlinkSync(linkTarget, targetPath);
+    } catch (error) {
+      if (!error || error.code !== 'EEXIST') {
+        throw error;
+      }
+    }
+    return;
+  }
+
   if (stat.isDirectory()) {
     fs.mkdirSync(targetPath, { recursive: true });
     for (const entry of fs.readdirSync(sourcePath)) {
@@ -95,7 +109,10 @@ function ensureVitepress(cwd) {
 }
 
 function isNoexecFailure(result) {
-  const payload = `${result.stdout || ''}\n${result.stderr || ''}\n${result.error || ''}`;
+  const errorDetails = result.error
+    ? [result.error.message || String(result.error), result.error.stack || ''].join('\n')
+    : '';
+  const payload = `${result.stdout || ''}\n${result.stderr || ''}\n${errorDetails}`;
   return /EACCES|ERR_DLOPEN_FAILED|not accessible for the namespace|@rollup\/rollup-|node_modules\/esbuild/i.test(
     payload,
   );

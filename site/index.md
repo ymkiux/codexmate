@@ -44,6 +44,7 @@ bodyClass: oi-home
     </section>
 
     <section class="oi-section">
+      <h2 class="oi-visually-hidden">功能特性</h2>
       <div class="oi-feature-grid">
         <article class="oi-card">
           <div class="oi-card-head">
