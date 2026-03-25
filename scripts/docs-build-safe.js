@@ -156,6 +156,12 @@ if (!ensureVitepress(root)) {
 
 const directBuild = runDocsBuild(root, { echo: false });
 if (directBuild.status === 0) {
+  const directDist = path.join(root, 'site', '.vitepress', 'dist');
+  if (!fs.existsSync(directDist)) {
+    flushOutput(directBuild);
+    console.error(`[codexmate] Build succeeded but dist not found at: ${directDist}`);
+    process.exit(1);
+  }
   flushOutput(directBuild);
   process.exit(0);
 }
