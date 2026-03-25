@@ -1810,19 +1810,34 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
 
                 async quickSwitchProvider(name) {
                     const target = String(name || '').trim();
-                    if (!target || target === this.currentProvider) {
+                    if (!target || target === this.pendingProviderSwitch) {
+                        return;
+                    }
+                    if (!this.providerSwitchInProgress && target === this.currentProvider) {
                         return;
                     }
                     await this.switchProvider(target);
                 },
 
+                async waitForCodexApplyIdle(maxWaitMs = 20000) {
+                    const startedAt = Date.now();
+                    while (this.codexApplying) {
+                        if ((Date.now() - startedAt) > maxWaitMs) {
+                            throw new Error('等待配置应用完成超时');
+                        }
+                        await new Promise((resolve) => setTimeout(resolve, 50));
+                    }
+                },
+
                 async performProviderSwitch(name) {
+                    await this.waitForCodexApplyIdle();
                     this.currentProvider = name;
                     await this.loadModelsForProvider(name);
                     if (this.modelsSource === 'remote' && this.models.length > 0 && !this.models.includes(this.currentModel)) {
                         this.currentModel = this.models[0];
                     }
                     if (getProviderConfigModeMeta(this.configMode)) {
+                        await this.waitForCodexApplyIdle();
                         await this.applyCodexConfigDirect({ silent: true });
                     }
                 },

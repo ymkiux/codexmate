@@ -29,8 +29,13 @@ test('styles include force-compact fallback rules for readability on touch devic
     assert.match(styles, /body\.force-compact\s*\{/);
     assert.match(styles, /body\.force-compact\s+\.app-shell\s*\{/);
     assert.match(styles, /body\.force-compact\s+\.status-inspector\s*\{[\s\S]*display:\s*none;/);
-    assert.match(styles, /body\.force-compact\s+\.top-tabs\s*\{[\s\S]*display:\s*grid\s*!important;/);
+    assert.match(styles, /body\.force-compact\s+\.top-tabs\s*\{[\s\S]*display:\s*grid\s*!important;[\s\S]*grid-template-columns:\s*repeat\(1,\s*minmax\(0,\s*1fr\)\);/);
+    assert.match(styles, /@media\s*\(min-width:\s*541px\)\s*\{[\s\S]*body\.force-compact\s+\.top-tabs\s*\{[\s\S]*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
     assert.match(styles, /body\.force-compact\s+\.card-subtitle/);
+    const compactSubtitleBlock = styles.match(/body\.force-compact\s+\.card-subtitle\s*\{[\s\S]*?\n\}/);
+    assert.ok(compactSubtitleBlock, 'missing compact subtitle block');
+    assert.match(compactSubtitleBlock[0], /overflow:\s*hidden;/);
+    assert.doesNotMatch(compactSubtitleBlock[0], /word-break:\s*break-word;/);
     assert.match(styles, /body\.force-compact\s+\.provider-fast-switch\s*\{/);
     assert.match(styles, /body\.force-compact\s+\.card\s*\{[\s\S]*flex-direction:\s*column;/);
     assert.match(styles, /body\.force-compact\s+\.card-trailing\s*\{[\s\S]*justify-items:\s*end;/);

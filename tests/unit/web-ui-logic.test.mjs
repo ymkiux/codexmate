@@ -144,7 +144,7 @@ test('runLatestOnlyQueue drains pending targets in order', async () => {
     assert.strictEqual(result.lastError, '');
 });
 
-test('runLatestOnlyQueue continues after failure and preserves latest error', async () => {
+test('runLatestOnlyQueue clears stale error after a later success', async () => {
     let pending = '';
     const visited = [];
     const result = await runLatestOnlyQueue('alpha', {
@@ -163,7 +163,32 @@ test('runLatestOnlyQueue continues after failure and preserves latest error', as
     });
     assert.deepStrictEqual(visited, ['alpha', 'beta']);
     assert.strictEqual(result.lastTarget, 'beta');
-    assert.strictEqual(result.lastError, 'alpha failed');
+    assert.strictEqual(result.lastError, '');
+});
+
+test('runLatestOnlyQueue keeps error when final target fails', async () => {
+    let pending = '';
+    const visited = [];
+    const result = await runLatestOnlyQueue('alpha', {
+        perform: async (target) => {
+            visited.push(target);
+            if (target === 'alpha') {
+                pending = 'beta';
+                return;
+            }
+            if (target === 'beta') {
+                throw new Error('beta failed');
+            }
+        },
+        consumePending: () => {
+            const next = pending;
+            pending = '';
+            return next;
+        }
+    });
+    assert.deepStrictEqual(visited, ['alpha', 'beta']);
+    assert.strictEqual(result.lastTarget, 'beta');
+    assert.strictEqual(result.lastError, 'beta failed');
 });
 
 test('shouldForceCompactLayoutMode keeps desktop layout for narrow non-touch windows', () => {
