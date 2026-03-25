@@ -1,4 +1,4 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Source+Sans+3:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+﻿@import url('https://fonts.googleapis.com/css2?family=Fira+Mono:wght@400;500&family=JetBrains+Mono:wght@400;500&family=Source+Sans+3:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 /* ============================================
    设计系统 - Design Tokens
@@ -32,9 +32,9 @@
         linear-gradient(135deg, #F8F2EA 0%, #F1E4D8 44%, #F8F2EA 100%);
 
     /* 字体系统 */
-    --font-family-body: 'Source Sans 3', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-    --font-family-display: 'Space Grotesk', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-    --font-family-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+    --font-family-body: 'JetBrainsMono Nerd Font Mono', 'OPPO Sans 4.0', 'Fira Mono', 'JetBrains Mono', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', monospace;
+    --font-family-display: 'JetBrainsMono Nerd Font Mono', 'OPPO Sans 4.0', 'Fira Mono', 'JetBrains Mono', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', monospace;
+    --font-family-mono: 'JetBrainsMono Nerd Font Mono', 'OPPO Sans 4.0', 'Fira Mono', 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
     --font-family: var(--font-family-body);
 
     --font-size-display: 52px;

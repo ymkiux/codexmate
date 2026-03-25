@@ -4,7 +4,7 @@
 
 **Local configuration and session manager for Codex / Claude Code / OpenClaw**
 
-> Current version: `v0.0.15`
+> Current version: `v0.0.16`
 
 [![Build](https://img.shields.io/github/actions/workflow/status/SakuraByteCore/codexmate/release.yml?label=build)](https://github.com/SakuraByteCore/codexmate/actions/workflows/release.yml)
 [![Version](https://img.shields.io/npm/v/codexmate?label=version&registry_uri=https%3A%2F%2Fregistry.npmjs.org)](https://www.npmjs.com/package/codexmate)
