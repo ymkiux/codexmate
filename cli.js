@@ -9920,17 +9920,6 @@ async function runProxyCommand(displayName, binNames, args = [], installTip = ''
 
 async function cmdCodex(args = []) {
     const parsed = parseCodexProxyOptions(args);
-
-    const ensureResult = await ensureBuiltinProxyForCodexDefault({});
-    if (!ensureResult || ensureResult.success !== true) {
-        const message = ensureResult && ensureResult.error
-            ? ensureResult.error
-            : '内建代理准备失败';
-        throw new Error(message);
-    }
-    if (ensureResult.runtime && ensureResult.runtime.listenUrl) {
-        console.log(`~ Codex 默认走内建代理: ${ensureResult.runtime.listenUrl}`);
-    }
     return runProxyCommand('Codex', 'codex', parsed.passthroughArgs, '', {
         queuedFollowUps: parsed.queuedFollowUps
     });

@@ -31,6 +31,14 @@ function extractByRegion(content, regionName) {
 const parseCodexProxyOptionsSrc = extractByRegion(cliContent, 'parseCodexProxyOptions');
 const buildScriptCommandArgsSrc = extractByRegion(cliContent, 'buildScriptCommandArgs');
 const runProxyCommandWithQueuedFollowUpsSrc = extractByRegion(cliContent, 'runProxyCommandWithQueuedFollowUps');
+const cmdCodexStart = 'async function cmdCodex(args = []) {';
+const cmdQwenStart = 'async function cmdQwen(args = []) {';
+const cmdCodexStartIndex = cliContent.indexOf(cmdCodexStart);
+const cmdQwenStartIndex = cliContent.indexOf(cmdQwenStart, cmdCodexStartIndex);
+if (cmdCodexStartIndex === -1 || cmdQwenStartIndex === -1) {
+    throw new Error('Failed to locate cmdCodex source block');
+}
+const cmdCodexSrc = cliContent.slice(cmdCodexStartIndex, cmdQwenStartIndex).trim();
 
 function instantiateFunction(funcSource, funcName, bindings = {}) {
     const bindingNames = Object.keys(bindings);
@@ -85,6 +93,44 @@ test('parseCodexProxyOptions throws when inline follow-up content is empty', () 
         () => parseCodexProxyOptions(['--queued-follow-up=']),
         /--queued-follow-up 需要提供非空内容/
     );
+});
+
+test('cmdCodex should only launch codex and must not auto-enable builtin proxy', async () => {
+    let ensureCalls = 0;
+    const logs = [];
+    let runProxyCall = null;
+    const cmdCodex = instantiateFunction(cmdCodexSrc, 'cmdCodex', {
+        parseCodexProxyOptions: (args) => ({
+            passthroughArgs: Array.isArray(args) ? [...args] : [],
+            queuedFollowUps: []
+        }),
+        ensureBuiltinProxyForCodexDefault: async () => {
+            ensureCalls += 1;
+            return {
+                success: true,
+                runtime: { listenUrl: 'http://127.0.0.1:8323' }
+            };
+        },
+        runProxyCommand: (...args) => {
+            runProxyCall = args;
+            return 0;
+        },
+        console: {
+            log: (message) => logs.push(String(message))
+        }
+    });
+
+    const exitCode = await cmdCodex(['--model', 'gpt-5.3-codex']);
+    assert.strictEqual(exitCode, 0);
+    assert.strictEqual(ensureCalls, 0, 'cmdCodex should not call ensureBuiltinProxyForCodexDefault');
+    assert.deepStrictEqual(runProxyCall, [
+        'Codex',
+        'codex',
+        ['--model', 'gpt-5.3-codex'],
+        '',
+        { queuedFollowUps: [] }
+    ]);
+    assert.strictEqual(logs.length, 0, 'cmdCodex should not print builtin proxy banner');
 });
 
 function runBuildScriptArgs(platform, commandLine) {
