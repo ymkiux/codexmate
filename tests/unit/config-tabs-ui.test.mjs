@@ -25,6 +25,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /provider-fast-switch-select/);
     assert.match(html, /forceCompactLayout/);
     assert.match(html, /quickSwitchProvider\(\$event\.target\.value\)/);
+    assert.match(html, /<button class="card-action-btn"[^>]*@click="copyClaudeShareCommand\(name\)"[^>]*disabled[^>]*>/);
 });
 
 test('web ui script defines provider mode metadata for codex only', () => {

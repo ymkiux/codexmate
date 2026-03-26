@@ -686,7 +686,7 @@
                                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                                     </svg>
                                 </button>
-                                <button class="card-action-btn" :class="{ loading: claudeShareLoading[name] }" @click="copyClaudeShareCommand(name)" title="分享导入命令" aria-label="Share import command">
+                                <button class="card-action-btn" :class="{ loading: claudeShareLoading[name] }" @click="copyClaudeShareCommand(name)" disabled title="分享导入命令（暂时禁用）" aria-label="Share import command">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/>
                                         <path d="M16 6l-4-4-4 4"/>

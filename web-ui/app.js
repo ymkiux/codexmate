@@ -549,7 +549,8 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     }
                 },
 
-                async loadModelsForProvider(providerName) {
+                async loadModelsForProvider(providerName, options = {}) {
+                    const silentError = !!options.silentError;
                     this.codexModelsLoading = true;
                     if (!providerName) {
                         this.models = [];
@@ -567,7 +568,9 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             return;
                         }
                         if (res.error) {
-                            this.showMessage('获取模型列表失败', 'error');
+                            if (!silentError) {
+                                this.showMessage('获取模型列表失败', 'error');
+                            }
                             this.models = [];
                             this.modelsSource = 'error';
                             this.modelsHasCurrent = true;
@@ -578,7 +581,9 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         this.modelsSource = res.source || 'remote';
                         this.modelsHasCurrent = !!this.currentModel && list.includes(this.currentModel);
                     } catch (e) {
-                        this.showMessage('获取模型列表失败', 'error');
+                        if (!silentError) {
+                            this.showMessage('获取模型列表失败', 'error');
+                        }
                         this.models = [];
                         this.modelsSource = 'error';
                         this.modelsHasCurrent = true;
@@ -661,6 +666,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
 
                 async refreshClaudeSelectionFromSettings(options = {}) {
                     const silent = !!options.silent;
+                    const silentModelError = !!options.silentModelError || silent;
                     try {
                         const res = await api('get-claude-settings');
                         if (res && res.error) {
@@ -674,7 +680,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             if (this.currentClaudeConfig !== matchName) {
                                 this.currentClaudeConfig = matchName;
                             }
-                            this.refreshClaudeModelContext();
+                            this.refreshClaudeModelContext({ silentError: silentModelError });
                             return;
                         }
                         const importedName = this.ensureClaudeConfigFromSettings((res && res.env) || {});
@@ -682,7 +688,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             if (this.currentClaudeConfig !== importedName) {
                                 this.currentClaudeConfig = importedName;
                             }
-                            this.refreshClaudeModelContext();
+                            this.refreshClaudeModelContext({ silentError: silentModelError });
                             if (!silent) {
                                 this.showMessage(`检测到外部 Claude 配置，已自动导入：${importedName}`, 'success');
                             }
@@ -709,9 +715,9 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this.currentClaudeModel = config && config.model ? config.model : '';
                 },
 
-                refreshClaudeModelContext() {
+                refreshClaudeModelContext(options = {}) {
                     this.syncClaudeModelFromConfig();
-                    this.loadClaudeModels();
+                    return this.loadClaudeModels(options);
                 },
 
                 resetClaudeModelsState() {
@@ -726,7 +732,8 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this.claudeModelsHasCurrent = !!currentModel && this.claudeModels.includes(currentModel);
                 },
 
-                async loadClaudeModels() {
+                async loadClaudeModels(options = {}) {
+                    const silentError = !!options.silentError;
                     const config = this.getCurrentClaudeConfig();
                     if (!config) {
                         this.resetClaudeModelsState();
@@ -734,9 +741,18 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     }
                     const baseUrl = (config.baseUrl || '').trim();
                     const apiKey = (config.apiKey || '').trim();
+                    const externalCredentialType = typeof config.externalCredentialType === 'string'
+                        ? config.externalCredentialType.trim()
+                        : '';
 
                     if (!baseUrl) {
                         this.resetClaudeModelsState();
+                        return;
+                    }
+                    if (!apiKey && externalCredentialType) {
+                        this.claudeModels = [];
+                        this.claudeModelsSource = 'unlimited';
+                        this.claudeModelsHasCurrent = true;
                         return;
                     }
 
@@ -750,7 +766,9 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             return;
                         }
                         if (res.error) {
-                            this.showMessage('获取模型列表失败', 'error');
+                            if (!silentError) {
+                                this.showMessage('获取模型列表失败', 'error');
+                            }
                             this.claudeModels = [];
                             this.claudeModelsSource = 'error';
                             this.claudeModelsHasCurrent = true;
@@ -761,7 +779,9 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         this.claudeModelsSource = res.source || 'remote';
                         this.updateClaudeModelsCurrent();
                     } catch (e) {
-                        this.showMessage('获取模型列表失败', 'error');
+                        if (!silentError) {
+                            this.showMessage('获取模型列表失败', 'error');
+                        }
                         this.claudeModels = [];
                         this.claudeModelsSource = 'error';
                         this.claudeModelsHasCurrent = true;
