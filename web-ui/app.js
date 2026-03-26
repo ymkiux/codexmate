@@ -610,14 +610,45 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     return findDuplicateClaudeConfigName(this.claudeConfigs, config);
                 },
 
-                async refreshClaudeSelectionFromSettings(options = {}) {
-                    const configNames = Object.keys(this.claudeConfigs || {});
-                    if (configNames.length === 0) {
-                        this.currentClaudeConfig = '';
-                        this.currentClaudeModel = '';
-                        this.resetClaudeModelsState();
-                        return;
+                buildClaudeImportedConfigName(baseUrl) {
+                    const normalizedUrl = typeof baseUrl === 'string' ? baseUrl.trim() : '';
+                    if (!normalizedUrl) return '导入配置';
+                    try {
+                        const parsed = new URL(normalizedUrl);
+                        const host = typeof parsed.host === 'string' ? parsed.host.trim() : '';
+                        if (host) return `导入-${host}`;
+                    } catch (_) {
+                        // keep generic fallback name
                     }
+                    return '导入配置';
+                },
+
+                ensureClaudeConfigFromSettings(env = {}) {
+                    const normalized = this.normalizeClaudeSettingsEnv(env);
+                    if (!normalized.baseUrl || !normalized.apiKey) return '';
+
+                    const duplicateName = this.findDuplicateClaudeConfigName(normalized);
+                    if (duplicateName) return duplicateName;
+
+                    const preferredName = this.buildClaudeImportedConfigName(normalized.baseUrl);
+                    let candidateName = preferredName;
+                    let suffix = 2;
+                    while (this.claudeConfigs[candidateName]) {
+                        candidateName = `${preferredName}-${suffix}`;
+                        suffix += 1;
+                    }
+
+                    this.claudeConfigs[candidateName] = {
+                        apiKey: normalized.apiKey,
+                        baseUrl: normalized.baseUrl,
+                        model: normalized.model || 'glm-4.7',
+                        hasKey: true
+                    };
+                    this.saveClaudeConfigs();
+                    return candidateName;
+                },
+
+                async refreshClaudeSelectionFromSettings(options = {}) {
                     const silent = !!options.silent;
                     try {
                         const res = await api('get-claude-settings');
@@ -633,6 +664,17 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                                 this.currentClaudeConfig = matchName;
                             }
                             this.refreshClaudeModelContext();
+                            return;
+                        }
+                        const importedName = this.ensureClaudeConfigFromSettings((res && res.env) || {});
+                        if (importedName) {
+                            if (this.currentClaudeConfig !== importedName) {
+                                this.currentClaudeConfig = importedName;
+                            }
+                            this.refreshClaudeModelContext();
+                            if (!silent) {
+                                this.showMessage(`检测到外部 Claude 配置，已自动导入：${importedName}`, 'success');
+                            }
                             return;
                         }
                         this.currentClaudeConfig = '';
@@ -1003,6 +1045,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     const name = typeof payload.name === 'string' ? payload.name.trim() : '';
                     const baseUrl = typeof payload.baseUrl === 'string' ? payload.baseUrl.trim() : '';
                     const apiKey = typeof payload.apiKey === 'string' ? payload.apiKey : '';
+                    const model = typeof payload.model === 'string' ? payload.model.trim() : '';
                     if (!name || !baseUrl) return '';
 
                     const nameArg = this.quoteShellArg(name);
@@ -1012,7 +1055,8 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     const addCmd = apiKey
                         ? `codexmate add ${nameArg} ${urlArg} ${keyArg}`
                         : `codexmate add ${nameArg} ${urlArg}`;
-                    return `${addCmd} && ${switchCmd}`;
+                    const modelCmd = model ? ` && codexmate use ${this.quoteShellArg(model)}` : '';
+                    return `${addCmd} && ${switchCmd}${modelCmd}`;
                 },
 
                 buildClaudeShareCommand(payload) {
