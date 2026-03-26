@@ -53,6 +53,18 @@ function instantiateFunction(funcSource, funcName, bindings = {}) {
     return Function(...bindingNames, `${funcSource}\nreturn ${funcName};`)(...bindingValues);
 }
 
+function createProviderShareCommandBuilder(appSourceText) {
+    const quoteShellArgSource = extractMethodAsFunction(appSourceText, 'quoteShellArg(value) {', 'quoteShellArg');
+    const buildProviderShareCommandSource = extractMethodAsFunction(
+        appSourceText,
+        'buildProviderShareCommand(payload) {',
+        'buildProviderShareCommand'
+    );
+    const quoteShellArg = instantiateFunction(quoteShellArgSource, 'quoteShellArg');
+    const buildProviderShareCommand = instantiateFunction(buildProviderShareCommandSource, 'buildProviderShareCommand');
+    return (payload) => buildProviderShareCommand.call({ quoteShellArg }, payload);
+}
+
 test('buildProviderSharePayload includes model for shared provider', () => {
     const source = extractBlockBySignature(cliSource, 'function buildProviderSharePayload(params = {}) {');
     const buildProviderSharePayload = instantiateFunction(source, 'buildProviderSharePayload', {
@@ -79,24 +91,13 @@ test('buildProviderSharePayload includes model for shared provider', () => {
 });
 
 test('buildProviderShareCommand appends model switch command when model exists', () => {
-    const quoteShellArgSource = extractMethodAsFunction(appSource, 'quoteShellArg(value) {', 'quoteShellArg');
-    const buildProviderShareCommandSource = extractMethodAsFunction(
-        appSource,
-        'buildProviderShareCommand(payload) {',
-        'buildProviderShareCommand'
-    );
-    const quoteShellArg = instantiateFunction(quoteShellArgSource, 'quoteShellArg');
-    const buildProviderShareCommand = instantiateFunction(buildProviderShareCommandSource, 'buildProviderShareCommand');
-
-    const command = buildProviderShareCommand.call(
-        { quoteShellArg },
-        {
-            name: 'alpha',
-            baseUrl: 'https://api.example.com/v1',
-            apiKey: 'sk-alpha',
-            model: 'alpha-share-model'
-        }
-    );
+    const buildProviderShareCommand = createProviderShareCommandBuilder(appSource);
+    const command = buildProviderShareCommand({
+        name: 'alpha',
+        baseUrl: 'https://api.example.com/v1',
+        apiKey: 'sk-alpha',
+        model: 'alpha-share-model'
+    });
 
     assert.strictEqual(
         command,
@@ -105,24 +106,13 @@ test('buildProviderShareCommand appends model switch command when model exists',
 });
 
 test('buildProviderShareCommand keeps legacy command when payload model is empty', () => {
-    const quoteShellArgSource = extractMethodAsFunction(appSource, 'quoteShellArg(value) {', 'quoteShellArg');
-    const buildProviderShareCommandSource = extractMethodAsFunction(
-        appSource,
-        'buildProviderShareCommand(payload) {',
-        'buildProviderShareCommand'
-    );
-    const quoteShellArg = instantiateFunction(quoteShellArgSource, 'quoteShellArg');
-    const buildProviderShareCommand = instantiateFunction(buildProviderShareCommandSource, 'buildProviderShareCommand');
-
-    const command = buildProviderShareCommand.call(
-        { quoteShellArg },
-        {
-            name: 'alpha',
-            baseUrl: 'https://api.example.com/v1',
-            apiKey: 'sk-alpha',
-            model: ''
-        }
-    );
+    const buildProviderShareCommand = createProviderShareCommandBuilder(appSource);
+    const command = buildProviderShareCommand({
+        name: 'alpha',
+        baseUrl: 'https://api.example.com/v1',
+        apiKey: 'sk-alpha',
+        model: ''
+    });
 
     assert.strictEqual(command, "codexmate add alpha 'https://api.example.com/v1' sk-alpha && codexmate switch alpha");
 });

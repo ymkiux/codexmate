@@ -5891,7 +5891,7 @@ function buildProviderSharePayload(params = {}) {
 
     const baseUrl = typeof provider.base_url === 'string' ? provider.base_url.trim() : '';
     const apiKey = typeof provider.preferred_auth_method === 'string'
-        ? provider.preferred_auth_method
+        ? provider.preferred_auth_method.trim()
         : '';
     const currentModels = readCurrentModels();
     const savedModel = currentModels && typeof currentModels[name] === 'string'
