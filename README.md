@@ -25,7 +25,6 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 - Claude Code 配置方案（写入 `~/.claude/settings.json`）
 - OpenClaw JSON5 配置与 Workspace `AGENTS.md`
 - Codex / Claude 本地会话浏览、筛选、导出、删除
-- `codexmate qwen` 快捷透传命令
 
 项目不依赖云端托管，配置写入你的本地文件，便于审计和回滚。
 
@@ -57,7 +56,6 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 - MCP stdio 能力（tools/resources/prompts）
 - 内建代理配置与状态控制（`proxy`）
 - 认证档案管理（`auth`）
-- `codexmate qwen` 兼容启动入口（默认透传 `--yolo`）
 - Zip 压缩/解压（优先系统工具，失败回退 JS 库）
 
 ## 架构总览

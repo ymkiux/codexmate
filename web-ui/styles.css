@@ -88,6 +88,145 @@
 }
 
 /* ============================================
+   手机桌面 UA 兜底：触控设备强制紧凑排版
+   ============================================ */
+body.force-compact {
+    --font-size-title: 20px;
+    --font-size-body: 16px;
+    --font-size-secondary: 14px;
+    --font-size-caption: 12px;
+}
+
+body.force-compact .container {
+    max-width: 760px;
+    padding: 10px 10px 16px;
+}
+
+body.force-compact .provider-fast-switch {
+    position: sticky;
+    top: 8px;
+    z-index: 16;
+}
+
+body.force-compact .provider-fast-switch-select {
+    min-height: 44px;
+    font-size: 16px;
+}
+
+body.force-compact .app-shell {
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+
+body.force-compact .main-panel {
+    position: relative;
+    top: auto;
+    align-self: stretch;
+    width: 100%;
+    height: auto;
+}
+
+body.force-compact .side-rail,
+body.force-compact .status-inspector {
+    display: none;
+}
+
+body.force-compact .top-tabs {
+    display: grid !important;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+@media (min-width: 541px) {
+    body.force-compact .top-tabs {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+body.force-compact .hero-logo {
+    display: block;
+}
+
+body.force-compact .hero-github {
+    display: flex;
+}
+
+body.force-compact .main-panel {
+    padding: 14px 12px;
+}
+
+body.force-compact .hero-title {
+    font-size: 34px;
+}
+
+body.force-compact .card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 12px;
+    gap: 10px;
+}
+
+body.force-compact .card-leading {
+    align-items: flex-start;
+    width: 100%;
+}
+
+body.force-compact .card-content {
+    width: 100%;
+}
+
+body.force-compact .card-title,
+body.force-compact .card-title > span:first-child {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+}
+
+body.force-compact .card-subtitle {
+    white-space: normal;
+    overflow: hidden;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+body.force-compact .card-trailing {
+    width: 100%;
+    margin-top: 0;
+    grid-auto-flow: row;
+    grid-auto-columns: 1fr;
+    justify-content: stretch;
+    justify-items: end;
+}
+
+body.force-compact .card-trailing .card-actions {
+    width: 100%;
+    justify-content: flex-end;
+    justify-self: stretch;
+    flex-wrap: wrap;
+}
+
+body.force-compact .card-actions {
+    opacity: 1;
+    transform: none;
+}
+
+body.force-compact .card-trailing .pill,
+body.force-compact .card-trailing .latency {
+    justify-self: end;
+}
+
+body.force-compact .btn-add,
+body.force-compact .btn-tool,
+body.force-compact .card-action-btn {
+    min-height: 44px;
+}
+
+/* ============================================
    基础重置
    ============================================ */
 * {
@@ -611,6 +750,47 @@ body::after {
     word-break: break-word;
 }
 
+.provider-fast-switch {
+    margin: 0 0 var(--spacing-sm);
+    padding: 10px 12px;
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(216, 201, 184, 0.6);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 249, 243, 0.96) 100%);
+    box-shadow: var(--shadow-subtle);
+    display: grid;
+    gap: 6px;
+}
+
+.provider-fast-switch-label {
+    font-size: var(--font-size-caption);
+    color: var(--color-text-tertiary);
+    letter-spacing: 0.02em;
+}
+
+.provider-fast-switch-select {
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 12px;
+    padding-right: 38px;
+    border: 1px solid var(--color-border-soft);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-body);
+    color: var(--color-text-primary);
+    background-color: var(--color-surface-alt);
+    outline: none;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='none' stroke='%23505A66' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 12px;
+}
+
+.provider-fast-switch-select:focus {
+    border-color: var(--color-brand);
+    box-shadow: var(--shadow-input-focus);
+}
+
 .main-panel {
     min-width: 0;
     background: rgba(255, 255, 255, 0.95);
@@ -1093,8 +1273,9 @@ body::after {
     grid-auto-columns: max-content;
     column-gap: var(--spacing-xs);
     row-gap: 6px;
-    align-items: center;
+    align-items: start;
     justify-content: end;
+    align-self: flex-start;
 }
 
 .card-trailing .card-actions {
