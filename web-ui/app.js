@@ -610,6 +610,21 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     return findDuplicateClaudeConfigName(this.claudeConfigs, config);
                 },
 
+                mergeClaudeConfig(existing = {}, updates = {}) {
+                    const previous = this.normalizeClaudeConfig(existing);
+                    const next = this.normalizeClaudeConfig({ ...existing, ...updates });
+                    const externalCredentialType = next.apiKey
+                        ? ''
+                        : (next.externalCredentialType || previous.externalCredentialType || '');
+                    return {
+                        apiKey: next.apiKey,
+                        baseUrl: next.baseUrl,
+                        model: next.model || previous.model || 'glm-4.7',
+                        hasKey: !!(next.apiKey || externalCredentialType),
+                        externalCredentialType
+                    };
+                },
+
                 buildClaudeImportedConfigName(baseUrl) {
                     const normalizedUrl = typeof baseUrl === 'string' ? baseUrl.trim() : '';
                     if (!normalizedUrl) return '导入配置';
@@ -625,7 +640,8 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
 
                 ensureClaudeConfigFromSettings(env = {}) {
                     const normalized = this.normalizeClaudeSettingsEnv(env);
-                    if (!normalized.baseUrl || !normalized.apiKey) return '';
+                    const hasCredential = !!(normalized.apiKey || normalized.authToken || normalized.useKey);
+                    if (!normalized.baseUrl || !hasCredential) return '';
 
                     const duplicateName = this.findDuplicateClaudeConfigName(normalized);
                     if (duplicateName) return duplicateName;
@@ -638,12 +654,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         suffix += 1;
                     }
 
-                    this.claudeConfigs[candidateName] = {
-                        apiKey: normalized.apiKey,
-                        baseUrl: normalized.baseUrl,
-                        model: normalized.model || 'glm-4.7',
-                        hasKey: true
-                    };
+                    this.claudeConfigs[candidateName] = this.mergeClaudeConfig({}, normalized);
                     this.saveClaudeConfigs();
                     return candidateName;
                 },
@@ -2500,12 +2511,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     }
                     const existing = this.claudeConfigs[name] || {};
                     this.currentClaudeModel = model;
-                    this.claudeConfigs[name] = {
-                        apiKey: existing.apiKey || '',
-                        baseUrl: existing.baseUrl || '',
-                        model: model,
-                        hasKey: !!existing.apiKey
-                    };
+                    this.claudeConfigs[name] = this.mergeClaudeConfig(existing, { model });
                     this.saveClaudeConfigs();
                     this.updateClaudeModelsCurrent();
                     if (!this.claudeConfigs[name].apiKey) {
@@ -2532,12 +2538,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
 
                 updateConfig() {
                     const name = this.editingConfig.name;
-                    this.claudeConfigs[name] = {
-                        apiKey: this.editingConfig.apiKey,
-                        baseUrl: this.editingConfig.baseUrl,
-                        model: this.editingConfig.model,
-                        hasKey: !!this.editingConfig.apiKey
-                    };
+                    this.claudeConfigs[name] = this.mergeClaudeConfig(this.claudeConfigs[name], this.editingConfig);
                     this.saveClaudeConfigs();
                     this.showMessage('操作成功', 'success');
                     this.closeEditConfigModal();
@@ -2553,12 +2554,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
 
                 async saveAndApplyConfig() {
                     const name = this.editingConfig.name;
-                    this.claudeConfigs[name] = {
-                        apiKey: this.editingConfig.apiKey,
-                        baseUrl: this.editingConfig.baseUrl,
-                        model: this.editingConfig.model,
-                        hasKey: !!this.editingConfig.apiKey
-                    };
+                    this.claudeConfigs[name] = this.mergeClaudeConfig(this.claudeConfigs[name], this.editingConfig);
                     this.saveClaudeConfigs();
 
                     const config = this.claudeConfigs[name];
@@ -2597,12 +2593,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         return this.showMessage('配置已存在', 'info');
                     }
 
-                    this.claudeConfigs[name] = {
-                        apiKey: this.newClaudeConfig.apiKey,
-                        baseUrl: this.newClaudeConfig.baseUrl,
-                        model: this.newClaudeConfig.model,
-                        hasKey: !!this.newClaudeConfig.apiKey
-                    };
+                    this.claudeConfigs[name] = this.mergeClaudeConfig({}, this.newClaudeConfig);
 
                     this.currentClaudeConfig = name;
                     this.saveClaudeConfigs();
@@ -2633,6 +2624,9 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     const config = this.claudeConfigs[name];
 
                     if (!config.apiKey) {
+                        if (config.externalCredentialType) {
+                            return this.showMessage('检测到外部 Claude 认证状态；当前仅支持展示，若需由 codexmate 接管请补充 API Key', 'info');
+                        }
                         return this.showMessage('请先配置 API Key', 'error');
                     }
 

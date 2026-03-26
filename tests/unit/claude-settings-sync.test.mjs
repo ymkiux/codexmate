@@ -215,13 +215,27 @@ test('ensureClaudeConfigFromSettings creates imported config for unmatched Claud
         normalizeClaudeSettingsEnv: (env = {}) => ({
             apiKey: typeof env.ANTHROPIC_API_KEY === 'string' ? env.ANTHROPIC_API_KEY.trim() : '',
             baseUrl: typeof env.ANTHROPIC_BASE_URL === 'string' ? env.ANTHROPIC_BASE_URL.trim() : '',
-            model: typeof env.ANTHROPIC_MODEL === 'string' ? env.ANTHROPIC_MODEL.trim() : ''
+            model: typeof env.ANTHROPIC_MODEL === 'string' ? env.ANTHROPIC_MODEL.trim() || 'glm-4.7' : 'glm-4.7',
+            authToken: typeof env.ANTHROPIC_AUTH_TOKEN === 'string' ? env.ANTHROPIC_AUTH_TOKEN.trim() : '',
+            useKey: typeof env.CLAUDE_CODE_USE_KEY === 'string' ? env.CLAUDE_CODE_USE_KEY.trim() : '',
+            externalCredentialType: typeof env.ANTHROPIC_API_KEY === 'string' && env.ANTHROPIC_API_KEY.trim()
+                ? ''
+                : ((typeof env.ANTHROPIC_AUTH_TOKEN === 'string' && env.ANTHROPIC_AUTH_TOKEN.trim())
+                    ? 'auth-token'
+                    : ((typeof env.CLAUDE_CODE_USE_KEY === 'string' && env.CLAUDE_CODE_USE_KEY.trim()) ? 'claude-code-use-key' : ''))
         }),
         findDuplicateClaudeConfigName: () => '',
         buildClaudeImportedConfigName: () => '导入-maxx-direct.cloverstd.com',
         saveClaudeConfigs: () => {
             saveCount += 1;
-        }
+        },
+        mergeClaudeConfig: (_, normalized) => ({
+            apiKey: normalized.apiKey,
+            baseUrl: normalized.baseUrl,
+            model: normalized.model || 'glm-4.7',
+            hasKey: !!(normalized.apiKey || normalized.authToken || normalized.useKey),
+            externalCredentialType: normalized.externalCredentialType || ''
+        })
     };
 
     const result = ensureClaudeConfigFromSettings.call(context, {
@@ -236,7 +250,8 @@ test('ensureClaudeConfigFromSettings creates imported config for unmatched Claud
         apiKey: 'maxx-key',
         baseUrl: 'https://maxx-direct.cloverstd.com/project/ym/111',
         model: 'claude-opus-4-6',
-        hasKey: true
+        hasKey: true,
+        externalCredentialType: ''
     });
 });
 
@@ -289,4 +304,123 @@ test('refreshClaudeSelectionFromSettings selects imported config when settings m
     assert.strictEqual(context.currentClaudeConfig, '导入-maxx-direct.cloverstd.com');
     assert.strictEqual(refreshCount, 1);
     assert.deepStrictEqual(messages, []);
+});
+
+test('ensureClaudeConfigFromSettings imports external auth-token backed Claude settings', () => {
+    const source = extractMethodAsFunction(appSource, 'ensureClaudeConfigFromSettings');
+    const ensureClaudeConfigFromSettings = instantiateFunction(source, 'ensureClaudeConfigFromSettings');
+
+    let saveCount = 0;
+    const context = {
+        claudeConfigs: {},
+        normalizeClaudeSettingsEnv: (env = {}) => ({
+            apiKey: typeof env.ANTHROPIC_API_KEY === 'string' ? env.ANTHROPIC_API_KEY.trim() : '',
+            baseUrl: typeof env.ANTHROPIC_BASE_URL === 'string' ? env.ANTHROPIC_BASE_URL.trim() : '',
+            model: typeof env.ANTHROPIC_MODEL === 'string' ? env.ANTHROPIC_MODEL.trim() || 'glm-4.7' : 'glm-4.7',
+            authToken: typeof env.ANTHROPIC_AUTH_TOKEN === 'string' ? env.ANTHROPIC_AUTH_TOKEN.trim() : '',
+            useKey: typeof env.CLAUDE_CODE_USE_KEY === 'string' ? env.CLAUDE_CODE_USE_KEY.trim() : '',
+            externalCredentialType: (typeof env.ANTHROPIC_AUTH_TOKEN === 'string' && env.ANTHROPIC_AUTH_TOKEN.trim())
+                ? 'auth-token'
+                : ((typeof env.CLAUDE_CODE_USE_KEY === 'string' && env.CLAUDE_CODE_USE_KEY.trim()) ? 'claude-code-use-key' : '')
+        }),
+        findDuplicateClaudeConfigName: () => '',
+        buildClaudeImportedConfigName: () => '导入-api.anthropic.com',
+        saveClaudeConfigs: () => {
+            saveCount += 1;
+        },
+        mergeClaudeConfig: (_, normalized) => ({
+            apiKey: normalized.apiKey,
+            baseUrl: normalized.baseUrl,
+            model: normalized.model || 'glm-4.7',
+            hasKey: !!(normalized.apiKey || normalized.authToken || normalized.useKey),
+            externalCredentialType: normalized.externalCredentialType || ''
+        })
+    };
+
+    const result = ensureClaudeConfigFromSettings.call(context, {
+        ANTHROPIC_AUTH_TOKEN: 'anth-token',
+        ANTHROPIC_BASE_URL: 'https://api.anthropic.com',
+        ANTHROPIC_MODEL: 'claude-3-7-sonnet'
+    });
+
+    assert.strictEqual(result, '导入-api.anthropic.com');
+    assert.strictEqual(saveCount, 1);
+    assert.deepStrictEqual(context.claudeConfigs[result], {
+        apiKey: '',
+        baseUrl: 'https://api.anthropic.com',
+        model: 'claude-3-7-sonnet',
+        hasKey: true,
+        externalCredentialType: 'auth-token'
+    });
+});
+
+test('applyClaudeConfig reports informative message for external credential only config', async () => {
+    const source = extractMethodAsFunction(appSource, 'applyClaudeConfig');
+    const applyClaudeConfig = instantiateFunction(source, 'applyClaudeConfig', {
+        api: async () => {
+            throw new Error('should not call apply api without apiKey');
+        }
+    });
+
+    const messages = [];
+    let refreshCount = 0;
+    const context = {
+        claudeConfigs: {
+            imported: {
+                apiKey: '',
+                baseUrl: 'https://api.anthropic.com',
+                model: 'claude-3-7-sonnet',
+                hasKey: true,
+                externalCredentialType: 'auth-token'
+            }
+        },
+        currentClaudeConfig: '',
+        refreshClaudeModelContext: () => {
+            refreshCount += 1;
+        },
+        showMessage: (msg, type) => {
+            messages.push({ msg, type });
+            return { msg, type };
+        }
+    };
+
+    const result = await applyClaudeConfig.call(context, 'imported');
+    assert.strictEqual(context.currentClaudeConfig, 'imported');
+    assert.strictEqual(refreshCount, 1);
+    assert.deepStrictEqual(messages, [{ msg: '检测到外部 Claude 认证状态；当前仅支持展示，若需由 codexmate 接管请补充 API Key', type: 'info' }]);
+    assert.deepStrictEqual(result, messages[0]);
+});
+
+test('mergeClaudeConfig preserves externalCredentialType across edits without api key', () => {
+    const source = extractMethodAsFunction(appSource, 'mergeClaudeConfig');
+    const mergeClaudeConfig = instantiateFunction(source, 'mergeClaudeConfig');
+    const context = {
+        normalizeClaudeConfig: (config = {}) => ({
+            apiKey: typeof config.apiKey === 'string' ? config.apiKey.trim() : '',
+            baseUrl: typeof config.baseUrl === 'string' ? config.baseUrl.trim() : '',
+            model: typeof config.model === 'string' ? config.model.trim() : '',
+            authToken: typeof config.authToken === 'string' ? config.authToken.trim() : '',
+            useKey: typeof config.useKey === 'string' ? config.useKey.trim() : '',
+            externalCredentialType: typeof config.externalCredentialType === 'string' ? config.externalCredentialType.trim() : ''
+        })
+    };
+
+    const merged = mergeClaudeConfig.call(context, {
+        apiKey: '',
+        baseUrl: 'https://api.anthropic.com',
+        model: 'claude-3-7-sonnet',
+        hasKey: true,
+        externalCredentialType: 'auth-token'
+    }, {
+        baseUrl: 'https://api.anthropic.com/',
+        model: ''
+    });
+
+    assert.deepStrictEqual(merged, {
+        apiKey: '',
+        baseUrl: 'https://api.anthropic.com/',
+        model: 'claude-3-7-sonnet',
+        hasKey: true,
+        externalCredentialType: 'auth-token'
+    });
 });
