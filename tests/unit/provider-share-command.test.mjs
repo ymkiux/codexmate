@@ -13,6 +13,10 @@ const appPath = path.join(__dirname, '..', '..', 'web-ui', 'app.js');
 const cliSource = fs.readFileSync(cliPath, 'utf-8');
 const appSource = fs.readFileSync(appPath, 'utf-8');
 
+// NOTE: This extractor uses naive brace counting for speed in unit tests.
+// It assumes target snippets do not contain confusing braces in strings,
+// template literals, comments, or regex literals. If those patterns appear,
+// switch to a tokenizer/AST-based extraction approach.
 function extractBlockBySignature(source, signature) {
     const startIndex = source.indexOf(signature);
     if (startIndex === -1) {
@@ -88,6 +92,31 @@ test('buildProviderSharePayload includes model for shared provider', () => {
     const result = buildProviderSharePayload({ name: 'alpha' });
     assert(result && result.payload, 'share payload should exist');
     assert.strictEqual(result.payload.model, 'alpha-share-model');
+});
+
+test('buildProviderSharePayload falls back to active model when saved model is empty', () => {
+    const source = extractBlockBySignature(cliSource, 'function buildProviderSharePayload(params = {}) {');
+    const buildProviderSharePayload = instantiateFunction(source, 'buildProviderSharePayload', {
+        readConfigOrVirtualDefault: () => ({
+            config: {
+                model_provider: 'alpha',
+                model: 'alpha-fallback-model',
+                model_providers: {
+                    alpha: {
+                        base_url: 'https://api.example.com/v1',
+                        preferred_auth_method: 'sk-alpha'
+                    }
+                }
+            }
+        }),
+        readCurrentModels: () => ({
+            alpha: '   '
+        })
+    });
+
+    const result = buildProviderSharePayload({ name: 'alpha' });
+    assert(result && result.payload, 'share payload should exist');
+    assert.strictEqual(result.payload.model, 'alpha-fallback-model');
 });
 
 test('buildProviderShareCommand appends model switch command when model exists', () => {
