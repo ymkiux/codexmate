@@ -1,4 +1,4 @@
-import assert from 'assert';
+﻿import assert from 'assert';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -423,4 +423,134 @@ test('mergeClaudeConfig preserves externalCredentialType across edits without ap
         hasKey: true,
         externalCredentialType: 'auth-token'
     });
+});
+
+test('refreshClaudeSelectionFromSettings forwards silent model-error flag', async () => {
+    const source = extractMethodAsFunction(appSource, 'refreshClaudeSelectionFromSettings');
+    const refreshClaudeSelectionFromSettings = instantiateFunction(source, 'refreshClaudeSelectionFromSettings', {
+        api: async () => ({
+            exists: true,
+            env: {
+                ANTHROPIC_API_KEY: 'maxx-key',
+                ANTHROPIC_BASE_URL: 'https://maxx-direct.cloverstd.com/project/ym/111',
+                ANTHROPIC_MODEL: 'claude-opus-4-6'
+            }
+        })
+    });
+
+    const refreshOptions = [];
+    const context = {
+        claudeConfigs: {},
+        currentClaudeConfig: '',
+        currentClaudeModel: '',
+        matchClaudeConfigFromSettings: () => '导入-maxx-direct.cloverstd.com',
+        ensureClaudeConfigFromSettings: () => '',
+        refreshClaudeModelContext: (options) => {
+            refreshOptions.push(options || {});
+        },
+        resetClaudeModelsState: () => {
+            throw new Error('should not reset when match exists');
+        },
+        showMessage: () => {
+            throw new Error('silent mode should not emit toast');
+        }
+    };
+
+    await refreshClaudeSelectionFromSettings.call(context, { silent: true });
+    assert.deepStrictEqual(refreshOptions, [{ silentError: true }]);
+});
+
+test('loadModelsForProvider keeps error state but suppresses toast in silent mode', async () => {
+    const source = extractMethodAsFunction(appSource, 'loadModelsForProvider');
+    const loadModelsForProvider = instantiateFunction(source, 'loadModelsForProvider', {
+        api: async () => ({ error: 'Request failed: 401' })
+    });
+
+    const messages = [];
+    const context = {
+        codexModelsLoading: false,
+        models: ['old-model'],
+        modelsSource: 'remote',
+        modelsHasCurrent: false,
+        currentModel: 'gpt-5.2-codex',
+        showMessage: (msg, type) => messages.push({ msg, type })
+    };
+
+    await loadModelsForProvider.call(context, 'c', { silentError: true });
+    assert.strictEqual(context.codexModelsLoading, false);
+    assert.deepStrictEqual(context.models, []);
+    assert.strictEqual(context.modelsSource, 'error');
+    assert.strictEqual(context.modelsHasCurrent, true);
+    assert.deepStrictEqual(messages, []);
+});
+
+test('loadClaudeModels keeps error state but suppresses toast in silent mode', async () => {
+    const source = extractMethodAsFunction(appSource, 'loadClaudeModels');
+    const loadClaudeModels = instantiateFunction(source, 'loadClaudeModels', {
+        api: async () => ({ error: 'Request failed: 401' })
+    });
+
+    const messages = [];
+    const context = {
+        claudeModelsLoading: false,
+        claudeModels: ['old-model'],
+        claudeModelsSource: 'remote',
+        claudeModelsHasCurrent: false,
+        getCurrentClaudeConfig: () => ({
+            baseUrl: 'https://maxx-direct.cloverstd.com/project/ym/',
+            apiKey: 'maxx-key',
+            model: 'gpt-5.2-codex'
+        }),
+        resetClaudeModelsState: () => {
+            throw new Error('should not reset when config exists');
+        },
+        updateClaudeModelsCurrent: () => {
+            throw new Error('should not update current on error branch');
+        },
+        showMessage: (msg, type) => messages.push({ msg, type })
+    };
+
+    await loadClaudeModels.call(context, { silentError: true });
+    assert.strictEqual(context.claudeModelsLoading, false);
+    assert.deepStrictEqual(context.claudeModels, []);
+    assert.strictEqual(context.claudeModelsSource, 'error');
+    assert.strictEqual(context.claudeModelsHasCurrent, true);
+    assert.deepStrictEqual(messages, []);
+});
+
+test('loadClaudeModels skips remote fetch for external-credential config without api key', async () => {
+    const source = extractMethodAsFunction(appSource, 'loadClaudeModels');
+    const loadClaudeModels = instantiateFunction(source, 'loadClaudeModels', {
+        api: async () => {
+            throw new Error('should not request models endpoint for external credential config');
+        }
+    });
+
+    const messages = [];
+    const context = {
+        claudeModelsLoading: false,
+        claudeModels: ['old-model'],
+        claudeModelsSource: 'remote',
+        claudeModelsHasCurrent: false,
+        getCurrentClaudeConfig: () => ({
+            baseUrl: 'https://maxx-direct.cloverstd.com/project/ym/',
+            apiKey: '',
+            model: 'claude-opus-4-6',
+            externalCredentialType: 'auth-token'
+        }),
+        resetClaudeModelsState: () => {
+            throw new Error('should not reset when config exists');
+        },
+        updateClaudeModelsCurrent: () => {
+            throw new Error('should not update current when skipping remote fetch');
+        },
+        showMessage: (msg, type) => messages.push({ msg, type })
+    };
+
+    await loadClaudeModels.call(context);
+    assert.strictEqual(context.claudeModelsLoading, false);
+    assert.deepStrictEqual(context.claudeModels, []);
+    assert.strictEqual(context.claudeModelsSource, 'unlimited');
+    assert.strictEqual(context.claudeModelsHasCurrent, true);
+    assert.deepStrictEqual(messages, []);
 });
