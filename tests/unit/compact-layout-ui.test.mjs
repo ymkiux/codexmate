@@ -43,3 +43,17 @@ test('styles include force-compact fallback rules for readability on touch devic
     assert.match(styles, /body\.force-compact\s+\.card-trailing\s+\.pill,\s*[\s\S]*justify-self:\s*end;/);
     assert.match(styles, /body\.force-compact\s+\.card-actions\s*\{[\s\S]*opacity:\s*1;/);
 });
+
+test('styles keep desktop layout wide and session history readable on large screens', () => {
+    const styles = readProjectFile('web-ui/styles.css');
+    assert.match(styles, /\.container\s*\{[\s\S]*max-width:\s*2200px;/);
+    assert.match(styles, /\.session-layout\s*\{[\s\S]*grid-template-columns:\s*minmax\(260px,\s*360px\)\s*minmax\(0,\s*1fr\);/);
+    assert.match(styles, /\.session-item\s*\{[\s\S]*min-height:\s*102px;/);
+
+    const titleBlock = styles.match(/\.session-item-title\s*\{[\s\S]*?\n\}/);
+    assert.ok(titleBlock, 'missing session item title style block');
+    assert.match(titleBlock[0], /display:\s*-webkit-box;/);
+    assert.match(titleBlock[0], /-webkit-line-clamp:\s*2;/);
+    assert.match(titleBlock[0], /white-space:\s*normal;/);
+    assert.match(titleBlock[0], /max-width:\s*none;/);
+});
