@@ -32,8 +32,8 @@ test('normalizeClaudeValue trims strings and ignores non-string', () => {
 });
 
 test('normalizeClaudeConfig trims all fields', () => {
-    const cfg = normalizeClaudeConfig({ apiKey: ' key ', baseUrl: ' url ', model: ' model ' });
-    assert.deepStrictEqual(cfg, { apiKey: 'key', baseUrl: 'url', model: 'model' });
+    const cfg = normalizeClaudeConfig({ apiKey: ' key ', baseUrl: ' url ', model: ' model ', authToken: ' token ', useKey: ' yes ', externalCredentialType: ' auth-token ' });
+    assert.deepStrictEqual(cfg, { apiKey: 'key', baseUrl: 'url', model: 'model', authToken: 'token', useKey: 'yes', externalCredentialType: 'auth-token' });
 });
 
 test('normalizeClaudeSettingsEnv trims settings env', () => {
@@ -49,7 +49,8 @@ test('normalizeClaudeSettingsEnv trims settings env', () => {
         baseUrl: 'url',
         model: 'model',
         authToken: 'token',
-        useKey: 'true'
+        useKey: 'true',
+        externalCredentialType: ''
     });
 });
 
@@ -58,9 +59,10 @@ test('normalizeClaudeSettingsEnv fills missing fields with empty strings', () =>
     assert.deepStrictEqual(normalizeClaudeSettingsEnv(env), {
         apiKey: 'k',
         baseUrl: '',
-        model: '',
+        model: 'glm-4.7',
         authToken: '',
-        useKey: ''
+        useKey: '',
+        externalCredentialType: ''
     });
 });
 
@@ -79,6 +81,21 @@ test('matchClaudeConfigFromSettings tolerates trailing slash differences', () =>
 test('matchClaudeConfigFromSettings matches external token-backed config by baseUrl and model', () => {
     const configs = { imported: { apiKey: '', baseUrl: 'https://example.com/anthropic/', model: 'm', externalCredentialType: 'auth-token' } };
     const env = { ANTHROPIC_AUTH_TOKEN: 'token', ANTHROPIC_BASE_URL: 'https://example.com/anthropic', ANTHROPIC_MODEL: 'm' };
+    assert.strictEqual(matchClaudeConfigFromSettings(configs, env), 'imported');
+});
+
+test('matchClaudeConfigFromSettings ignores placeholder blank-apiKey configs for external auth', () => {
+    const configs = {
+        local: { apiKey: '', baseUrl: 'https://example.com/anthropic', model: 'm' },
+        imported: { apiKey: '', baseUrl: 'https://example.com/anthropic', model: 'm', externalCredentialType: 'auth-token' }
+    };
+    const env = { ANTHROPIC_AUTH_TOKEN: 'token', ANTHROPIC_BASE_URL: 'https://example.com/anthropic', ANTHROPIC_MODEL: 'm' };
+    assert.strictEqual(matchClaudeConfigFromSettings(configs, env), 'imported');
+});
+
+test('matchClaudeConfigFromSettings supports CLAUDE_CODE_USE_KEY external configs', () => {
+    const configs = { imported: { apiKey: '', baseUrl: 'https://example.com/anthropic', model: 'm', externalCredentialType: 'claude-code-use-key' } };
+    const env = { CLAUDE_CODE_USE_KEY: '1', ANTHROPIC_BASE_URL: 'https://example.com/anthropic', ANTHROPIC_MODEL: 'm' };
     assert.strictEqual(matchClaudeConfigFromSettings(configs, env), 'imported');
 });
 
@@ -101,6 +118,14 @@ test('findDuplicateClaudeConfigName detects duplicates', () => {
     };
     const duplicate = { apiKey: 'k2', baseUrl: 'u2', model: 'm2' };
     assert.strictEqual(findDuplicateClaudeConfigName(configs, duplicate), 'second');
+});
+
+test('findDuplicateClaudeConfigName detects external credential duplicates', () => {
+    const configs = {
+        imported: { apiKey: '', baseUrl: 'https://example.com/anthropic/', model: 'm', externalCredentialType: 'auth-token' }
+    };
+    const duplicate = { apiKey: '', baseUrl: 'https://example.com/anthropic', model: 'm', externalCredentialType: 'auth-token' };
+    assert.strictEqual(findDuplicateClaudeConfigName(configs, duplicate), 'imported');
 });
 
 test('findDuplicateClaudeConfigName returns empty when no match', () => {
