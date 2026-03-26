@@ -16,6 +16,7 @@ await import(pathToFileURL(path.join(__dirname, 'skills-modal-ui.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'config-tabs-ui.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'compact-layout-ui.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'unzip-ext.test.mjs')));
+await import(pathToFileURL(path.join(__dirname, 'provider-share-command.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'codex-proxy-options.test.mjs')));
 
 let failures = 0;

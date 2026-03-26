@@ -1003,6 +1003,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     const name = typeof payload.name === 'string' ? payload.name.trim() : '';
                     const baseUrl = typeof payload.baseUrl === 'string' ? payload.baseUrl.trim() : '';
                     const apiKey = typeof payload.apiKey === 'string' ? payload.apiKey : '';
+                    const model = typeof payload.model === 'string' ? payload.model.trim() : '';
                     if (!name || !baseUrl) return '';
 
                     const nameArg = this.quoteShellArg(name);
@@ -1012,7 +1013,8 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     const addCmd = apiKey
                         ? `codexmate add ${nameArg} ${urlArg} ${keyArg}`
                         : `codexmate add ${nameArg} ${urlArg}`;
-                    return `${addCmd} && ${switchCmd}`;
+                    const modelCmd = model ? ` && codexmate use ${this.quoteShellArg(model)}` : '';
+                    return `${addCmd} && ${switchCmd}${modelCmd}`;
                 },
 
                 buildClaudeShareCommand(payload) {
