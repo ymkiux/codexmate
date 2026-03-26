@@ -37,19 +37,49 @@ test('normalizeClaudeConfig trims all fields', () => {
 });
 
 test('normalizeClaudeSettingsEnv trims settings env', () => {
-    const env = { ANTHROPIC_API_KEY: ' key ', ANTHROPIC_BASE_URL: ' url ', ANTHROPIC_MODEL: ' model ' };
-    assert.deepStrictEqual(normalizeClaudeSettingsEnv(env), { apiKey: 'key', baseUrl: 'url', model: 'model' });
+    const env = {
+        ANTHROPIC_API_KEY: ' key ',
+        ANTHROPIC_BASE_URL: ' url ',
+        ANTHROPIC_MODEL: ' model ',
+        ANTHROPIC_AUTH_TOKEN: ' token ',
+        CLAUDE_CODE_USE_KEY: ' true '
+    };
+    assert.deepStrictEqual(normalizeClaudeSettingsEnv(env), {
+        apiKey: 'key',
+        baseUrl: 'url',
+        model: 'model',
+        authToken: 'token',
+        useKey: 'true'
+    });
 });
 
 test('normalizeClaudeSettingsEnv fills missing fields with empty strings', () => {
     const env = { ANTHROPIC_API_KEY: 'k' };
-    assert.deepStrictEqual(normalizeClaudeSettingsEnv(env), { apiKey: 'k', baseUrl: '', model: '' });
+    assert.deepStrictEqual(normalizeClaudeSettingsEnv(env), {
+        apiKey: 'k',
+        baseUrl: '',
+        model: '',
+        authToken: '',
+        useKey: ''
+    });
 });
 
 test('matchClaudeConfigFromSettings matches identical config', () => {
     const configs = { default: { apiKey: 'k', baseUrl: 'u', model: 'm' } };
     const env = { ANTHROPIC_API_KEY: 'k', ANTHROPIC_BASE_URL: 'u', ANTHROPIC_MODEL: 'm' };
     assert.strictEqual(matchClaudeConfigFromSettings(configs, env), 'default');
+});
+
+test('matchClaudeConfigFromSettings tolerates trailing slash differences', () => {
+    const configs = { default: { apiKey: 'k', baseUrl: 'https://example.com/anthropic/', model: 'm' } };
+    const env = { ANTHROPIC_API_KEY: 'k', ANTHROPIC_BASE_URL: 'https://example.com/anthropic', ANTHROPIC_MODEL: 'm' };
+    assert.strictEqual(matchClaudeConfigFromSettings(configs, env), 'default');
+});
+
+test('matchClaudeConfigFromSettings matches external token-backed config by baseUrl and model', () => {
+    const configs = { imported: { apiKey: '', baseUrl: 'https://example.com/anthropic/', model: 'm', externalCredentialType: 'auth-token' } };
+    const env = { ANTHROPIC_AUTH_TOKEN: 'token', ANTHROPIC_BASE_URL: 'https://example.com/anthropic', ANTHROPIC_MODEL: 'm' };
+    assert.strictEqual(matchClaudeConfigFromSettings(configs, env), 'imported');
 });
 
 test('matchClaudeConfigFromSettings returns empty when incomplete', () => {

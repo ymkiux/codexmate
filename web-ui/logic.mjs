@@ -17,24 +17,42 @@ export function normalizeClaudeSettingsEnv(env) {
     return {
         apiKey: normalizeClaudeValue(safe.ANTHROPIC_API_KEY),
         baseUrl: normalizeClaudeValue(safe.ANTHROPIC_BASE_URL),
-        model: normalizeClaudeValue(safe.ANTHROPIC_MODEL)
+        model: normalizeClaudeValue(safe.ANTHROPIC_MODEL),
+        authToken: normalizeClaudeValue(safe.ANTHROPIC_AUTH_TOKEN),
+        useKey: normalizeClaudeValue(safe.CLAUDE_CODE_USE_KEY)
     };
+}
+
+function normalizeClaudeComparableUrl(value) {
+    const trimmed = normalizeClaudeValue(value);
+    if (!trimmed) return '';
+    return trimmed.replace(/\/+$/g, '');
+}
+
+function hasClaudeCredential(config = {}) {
+    return !!(config.apiKey || config.authToken || config.useKey);
 }
 
 export function matchClaudeConfigFromSettings(claudeConfigs = {}, env = {}) {
     const normalizedSettings = normalizeClaudeSettingsEnv(env);
-    if (!normalizedSettings.apiKey || !normalizedSettings.baseUrl || !normalizedSettings.model) {
+    if (!normalizedSettings.baseUrl || !normalizedSettings.model || !hasClaudeCredential(normalizedSettings)) {
         return '';
     }
+    const comparableSettingsUrl = normalizeClaudeComparableUrl(normalizedSettings.baseUrl);
     const entries = Object.entries(claudeConfigs || {});
     for (const [name, config] of entries) {
         const normalizedConfig = normalizeClaudeConfig(config);
-        if (!normalizedConfig.apiKey || !normalizedConfig.baseUrl || !normalizedConfig.model) {
+        if (!normalizedConfig.baseUrl || !normalizedConfig.model) {
             continue;
         }
-        if (normalizedConfig.apiKey === normalizedSettings.apiKey
-            && normalizedConfig.baseUrl === normalizedSettings.baseUrl
-            && normalizedConfig.model === normalizedSettings.model) {
+        if (normalizeClaudeComparableUrl(normalizedConfig.baseUrl) !== comparableSettingsUrl
+            || normalizedConfig.model !== normalizedSettings.model) {
+            continue;
+        }
+        if (normalizedSettings.apiKey && normalizedConfig.apiKey === normalizedSettings.apiKey) {
+            return name;
+        }
+        if (!normalizedSettings.apiKey && normalizedConfig.apiKey === '') {
             return name;
         }
     }

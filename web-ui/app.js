@@ -625,7 +625,8 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
 
                 ensureClaudeConfigFromSettings(env = {}) {
                     const normalized = this.normalizeClaudeSettingsEnv(env);
-                    if (!normalized.baseUrl || !normalized.apiKey) return '';
+                    const hasCredential = !!(normalized.apiKey || normalized.authToken || normalized.useKey);
+                    if (!normalized.baseUrl || !hasCredential) return '';
 
                     const duplicateName = this.findDuplicateClaudeConfigName(normalized);
                     if (duplicateName) return duplicateName;
@@ -638,11 +639,16 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         suffix += 1;
                     }
 
+                    const externalCredentialType = normalized.apiKey
+                        ? ''
+                        : (normalized.authToken ? 'auth-token' : (normalized.useKey ? 'claude-code-use-key' : ''));
+
                     this.claudeConfigs[candidateName] = {
                         apiKey: normalized.apiKey,
                         baseUrl: normalized.baseUrl,
                         model: normalized.model || 'glm-4.7',
-                        hasKey: true
+                        hasKey: hasCredential,
+                        externalCredentialType
                     };
                     this.saveClaudeConfigs();
                     return candidateName;
@@ -2633,6 +2639,9 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     const config = this.claudeConfigs[name];
 
                     if (!config.apiKey) {
+                        if (config.externalCredentialType) {
+                            return this.showMessage('检测到外部 Claude 认证状态；当前仅支持展示，若需由 codexmate 接管请补充 API Key', 'info');
+                        }
                         return this.showMessage('请先配置 API Key', 'error');
                     }
 
