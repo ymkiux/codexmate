@@ -12,7 +12,9 @@
     normalizeSessionPathFilter,
     buildSessionFilterCacheState,
     buildSessionTimelineNodes,
-    normalizeSessionMessageRole
+    normalizeSessionMessageRole,
+    runLatestOnlyQueue,
+    shouldForceCompactLayoutMode
 } from './logic.mjs';
 import {
     CONFIG_MODE_SET,
@@ -170,6 +172,8 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     claudeSpeedLoading: {},
                     claudeShareLoading: {},
                     providerShareLoading: {},
+                    providerSwitchInProgress: false,
+                    pendingProviderSwitch: '',
                     installPackageManager: 'npm',
                     installCommandAction: 'install',
                     installRegistryPreset: 'default',
@@ -291,11 +295,13 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     proxyStarting: false,
                     proxyStopping: false,
                     proxyApplying: false,
-                    showProxyAdvanced: false
+                    showProxyAdvanced: false,
+                    forceCompactLayout: false
                 }
             },
             mounted() {
                 this.initSessionStandalone();
+                this.updateCompactLayoutMode();
                 const savedSessionYolo = localStorage.getItem('codexmateSessionResumeYolo');
                 if (savedSessionYolo === '0' || savedSessionYolo === 'false') {
                     this.sessionResumeWithYolo = false;
@@ -343,6 +349,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 this.cancelSessionTimelineSync();
                 this.disconnectSessionPreviewHeaderResizeObserver();
                 window.removeEventListener('resize', this.onWindowResize);
+                this.applyCompactLayoutClass(false);
                 this.sessionPreviewScrollEl = null;
                 this.sessionPreviewContainerEl = null;
                 this.sessionPreviewHeaderEl = null;
@@ -1399,8 +1406,58 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this.scheduleSessionTimelineSync();
                 },
                 onWindowResize() {
+                    this.updateCompactLayoutMode();
                     this.updateSessionTimelineOffset();
                     this.scheduleSessionTimelineSync();
+                },
+                shouldForceCompactLayout() {
+                    if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+                        return false;
+                    }
+                    const doc = typeof document !== 'undefined' ? document : null;
+                    const viewportWidth = Math.max(
+                        0,
+                        Number(window.innerWidth || 0),
+                        Number(doc && doc.documentElement ? doc.documentElement.clientWidth : 0)
+                    );
+                    const screenWidth = Number(window.screen && window.screen.width ? window.screen.width : 0);
+                    const screenHeight = Number(window.screen && window.screen.height ? window.screen.height : 0);
+                    const shortEdge = screenWidth > 0 && screenHeight > 0
+                        ? Math.min(screenWidth, screenHeight)
+                        : 0;
+                    const touchPoints = Number(navigator.maxTouchPoints || 0);
+                    const userAgent = String(navigator.userAgent || '');
+                    const isMobileUa = /(Android|iPhone|iPad|iPod|Mobile)/i.test(userAgent);
+                    let coarsePointer = false;
+                    let noHover = false;
+                    try {
+                        coarsePointer = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+                    } catch (_) {}
+                    try {
+                        noHover = !!(window.matchMedia && window.matchMedia('(hover: none)').matches);
+                    } catch (_) {}
+                    return shouldForceCompactLayoutMode({
+                        viewportWidth,
+                        screenWidth,
+                        screenHeight,
+                        shortEdge,
+                        maxTouchPoints: touchPoints,
+                        userAgent,
+                        isMobileUa,
+                        coarsePointer,
+                        noHover
+                    });
+                },
+                applyCompactLayoutClass(enabled) {
+                    if (typeof document === 'undefined' || !document.body) {
+                        return;
+                    }
+                    document.body.classList.toggle('force-compact', !!enabled);
+                },
+                updateCompactLayoutMode() {
+                    const enabled = this.shouldForceCompactLayout();
+                    this.forceCompactLayout = enabled;
+                    this.applyCompactLayoutClass(enabled);
                 },
                 syncSessionTimelineActiveFromScroll() {
                     const nodes = Array.isArray(this.sessionTimelineNodes) ? this.sessionTimelineNodes : [];
@@ -1751,14 +1808,72 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     }
                 },
 
-                async switchProvider(name) {
+                async quickSwitchProvider(name) {
+                    const target = String(name || '').trim();
+                    if (!target || target === this.pendingProviderSwitch) {
+                        return;
+                    }
+                    if (!this.providerSwitchInProgress && target === this.currentProvider) {
+                        return;
+                    }
+                    await this.switchProvider(target);
+                },
+
+                async waitForCodexApplyIdle(maxWaitMs = 20000) {
+                    const startedAt = Date.now();
+                    while (this.codexApplying) {
+                        if ((Date.now() - startedAt) > maxWaitMs) {
+                            throw new Error('等待配置应用完成超时');
+                        }
+                        await new Promise((resolve) => setTimeout(resolve, 50));
+                    }
+                },
+
+                async performProviderSwitch(name) {
+                    await this.waitForCodexApplyIdle();
                     this.currentProvider = name;
                     await this.loadModelsForProvider(name);
                     if (this.modelsSource === 'remote' && this.models.length > 0 && !this.models.includes(this.currentModel)) {
                         this.currentModel = this.models[0];
                     }
                     if (getProviderConfigModeMeta(this.configMode)) {
+                        await this.waitForCodexApplyIdle();
                         await this.applyCodexConfigDirect({ silent: true });
+                    }
+                },
+
+                async switchProvider(name) {
+                    const target = String(name || '').trim();
+                    if (!target) {
+                        return;
+                    }
+                    if (this.providerSwitchInProgress) {
+                        this.pendingProviderSwitch = target;
+                        return;
+                    }
+                    this.providerSwitchInProgress = true;
+                    let lastError = '';
+                    try {
+                        this.pendingProviderSwitch = '';
+                        const result = await runLatestOnlyQueue(target, {
+                            perform: async (queuedTarget) => {
+                                await this.performProviderSwitch(queuedTarget);
+                            },
+                            consumePending: () => {
+                                const queued = this.pendingProviderSwitch;
+                                this.pendingProviderSwitch = '';
+                                return queued;
+                            }
+                        });
+                        if (result && typeof result.lastError === 'string') {
+                            lastError = result.lastError;
+                        }
+                    } finally {
+                        this.providerSwitchInProgress = false;
+                        this.pendingProviderSwitch = '';
+                    }
+                    if (lastError) {
+                        this.showMessage(lastError, 'error');
                     }
                 },
 
@@ -1963,8 +2078,8 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     }
                 },
 
-                ...createSkillsMethods({ api }),
-
+                ...createSkillsMethods({ api }),
+
                 async openOpenclawAgentsEditor() {
                     this.setAgentsModalContext('openclaw');
                     this.agentsLoading = true;
