@@ -2100,7 +2100,6 @@ body::after {
     -webkit-box-orient: vertical;
     white-space: normal;
     overflow: hidden;
-    text-overflow: ellipsis;
     flex: 1;
     max-width: none;
 }
