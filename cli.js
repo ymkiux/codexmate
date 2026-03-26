@@ -5893,6 +5893,13 @@ function buildProviderSharePayload(params = {}) {
     const apiKey = typeof provider.preferred_auth_method === 'string'
         ? provider.preferred_auth_method
         : '';
+    const currentModels = readCurrentModels();
+    const savedModel = currentModels && typeof currentModels[name] === 'string'
+        ? currentModels[name].trim()
+        : '';
+    const activeProvider = typeof config.model_provider === 'string' ? config.model_provider.trim() : '';
+    const activeModel = typeof config.model === 'string' ? config.model.trim() : '';
+    const model = savedModel || (activeProvider === name ? activeModel : '');
 
     if (!baseUrl) {
         return { error: `提供商 ${name} 缺少 base_url` };
@@ -5902,7 +5909,8 @@ function buildProviderSharePayload(params = {}) {
         payload: {
             name,
             baseUrl,
-            apiKey
+            apiKey,
+            model
         }
     };
 }
