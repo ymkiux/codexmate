@@ -260,7 +260,7 @@ export function buildSessionListParams(options = {}) {
         query = '',
         roleFilter = 'all',
         timeRangePreset = 'all',
-        limit = 200
+        limit = 80
     } = options;
     const queryValue = isSessionQueryEnabled(source) ? query : '';
     return {
