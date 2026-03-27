@@ -1789,14 +1789,15 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         return;
                     }
                     const headerEl = scrollEl.querySelector('.session-preview-header');
-                    const headerHeight = headerEl ? Number(headerEl.offsetHeight || 0) : 0;
-                    const anchorTop = Number(scrollEl.scrollTop || 0) + headerHeight + 8;
+                    const headerHeight = headerEl ? Number(headerEl.getBoundingClientRect().height || 0) : 0;
+                    const scrollRect = scrollEl.getBoundingClientRect();
+                    const anchorY = scrollRect.top + headerHeight + 8;
                     let activeKey = nodes[0].key;
                     for (const node of nodes) {
                         const messageEl = this.sessionMessageRefMap[node.key];
                         if (!messageEl) continue;
-                        const messageTop = Number(messageEl.offsetTop || 0);
-                        if (messageTop <= anchorTop) {
+                        const messageRect = messageEl.getBoundingClientRect();
+                        if (messageRect.top <= anchorY) {
                             activeKey = node.key;
                             continue;
                         }
