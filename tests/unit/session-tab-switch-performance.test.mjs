@@ -53,6 +53,12 @@ function instantiateFunctionWithApi(funcSource, funcName, apiImpl) {
     return Function('api', `${funcSource}\nreturn ${funcName};`)(apiImpl);
 }
 
+function instantiateFunctionWithDeps(funcSource, funcName, deps = {}) {
+    const depNames = Object.keys(deps);
+    const depValues = depNames.map((name) => deps[name]);
+    return Function(...depNames, `${funcSource}\nreturn ${funcName};`)(...depValues);
+}
+
 function createSwitchMainTab() {
     const switchMainTabSource = extractMethodAsFunction(
         appSource,
@@ -66,7 +72,7 @@ function createLoadActiveSessionDetail(apiImpl) {
     const methodName = 'loadActiveSessionDetail';
     const methodBlock = extractBlockBySignature(
         appSource,
-        'async loadActiveSessionDetail() {'
+        'async loadActiveSessionDetail(options = {}) {'
     ).trim();
     if (!methodBlock.startsWith(`async ${methodName}(`)) {
         throw new Error(`Method mismatch for ${methodName}`);
@@ -80,6 +86,41 @@ function createLoadActiveSessionDetail(apiImpl) {
         methodName,
         apiImpl
     );
+}
+
+function createLoadSessions(apiImpl) {
+    const methodName = 'loadSessions';
+    const methodBlock = extractBlockBySignature(
+        appSource,
+        'async loadSessions() {'
+    ).trim();
+    if (!methodBlock.startsWith(`async ${methodName}(`)) {
+        throw new Error(`Method mismatch for ${methodName}`);
+    }
+    const funcSource = methodBlock.replace(
+        `async ${methodName}(`,
+        `async function ${methodName}(`
+    );
+    return instantiateFunctionWithDeps(funcSource, methodName, {
+        api: apiImpl,
+        buildSessionListParams: (params) => params
+    });
+}
+
+function createLoadMoreSessionMessages() {
+    const methodName = 'loadMoreSessionMessages';
+    const methodBlock = extractBlockBySignature(
+        appSource,
+        'async loadMoreSessionMessages(stepSize) {'
+    ).trim();
+    if (!methodBlock.startsWith(`async ${methodName}(`)) {
+        throw new Error(`Method mismatch for ${methodName}`);
+    }
+    const funcSource = methodBlock.replace(
+        `async ${methodName}(`,
+        `async function ${methodName}(`
+    );
+    return instantiateFunction(funcSource, methodName);
 }
 
 test('switchMainTab tears down session heavy render state when leaving sessions tab', () => {
@@ -236,4 +277,76 @@ test('loadActiveSessionDetail primes visible messages even when timeline is disa
     assert.strictEqual(calls.sync, 0);
     assert.strictEqual(vm.sessionDetailLoading, false);
     assert.strictEqual(vm.activeSessionDetailError, '');
+});
+
+test('loadSessions keeps sessionsLoadedOnce false when initial request fails', async () => {
+    const loadSessions = createLoadSessions(async () => ({ error: 'network failed' }));
+    const vm = {
+        sessionsLoading: false,
+        sessionsLoadedOnce: false,
+        activeSessionDetailError: '',
+        sessionFilterSource: 'all',
+        sessionPathFilter: '',
+        sessionQuery: '',
+        sessionRoleFilter: 'all',
+        sessionTimePreset: 'all',
+        sessionsList: [{ sessionId: 'old' }],
+        activeSession: { sessionId: 'old' },
+        activeSessionMessages: [{ text: 'old' }],
+        activeSessionDetailClipped: false,
+        sessionTimelineActiveKey: '',
+        sessionMessageRefMap: Object.create(null),
+        showMessage() {},
+        resetSessionDetailPagination() {},
+        resetSessionPreviewMessageRender() {},
+        cancelSessionTimelineSync() {},
+        syncSessionPathOptionsForSource() {},
+        extractPathOptionsFromSessions() {
+            return [];
+        },
+        getSessionExportKey(session) {
+            return session && session.sessionId ? session.sessionId : '';
+        },
+        async loadActiveSessionDetail() {},
+        loadSessionPathOptions() {
+            return Promise.resolve();
+        }
+    };
+
+    await loadSessions.call(vm);
+
+    assert.strictEqual(vm.sessionsLoadedOnce, false);
+    assert.strictEqual(vm.sessionsLoading, false);
+    assert.strictEqual(Array.isArray(vm.sessionsList), true);
+    assert.strictEqual(vm.sessionsList.length, 0);
+});
+
+test('loadMoreSessionMessages requests older messages when local window is exhausted and session is clipped', async () => {
+    const loadMoreSessionMessages = createLoadMoreSessionMessages();
+    const vm = {
+        mainTab: 'sessions',
+        sessionPreviewRenderEnabled: true,
+        activeSessionMessages: Array.from({ length: 80 }, (_, idx) => ({ id: idx })),
+        sessionPreviewVisibleCount: 80,
+        sessionPreviewLoadStep: 24,
+        sessionDetailLoading: false,
+        activeSessionDetailClipped: true,
+        activeSession: { messageCount: 200 },
+        sessionDetailMessageLimit: 80,
+        sessionDetailFetchStep: 80,
+        sessionDetailMessageLimitCap: 1000,
+        sessionPreviewPendingVisibleCount: 0,
+        fetchCount: 0,
+        async loadActiveSessionDetail(options) {
+            this.fetchCount += 1;
+            this.lastOptions = options;
+        }
+    };
+
+    await loadMoreSessionMessages.call(vm);
+
+    assert.strictEqual(vm.fetchCount, 1);
+    assert.strictEqual(vm.sessionDetailMessageLimit, 160);
+    assert.strictEqual(vm.sessionPreviewPendingVisibleCount, 104);
+    assert.deepStrictEqual(vm.lastOptions, { preserveVisibleCount: true });
 });
