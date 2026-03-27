@@ -1004,9 +1004,14 @@
                                             class="session-item-sub session-item-wrap"
                                             style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
                                             <span>已显示 {{ activeSessionVisibleMessages.length }} / {{ activeSessionMessages.length }} 条</span>
-                                            <button class="btn-session-refresh" @click="loadMoreSessionMessages()" :disabled="sessionDetailLoading">
-                                                加载更多（剩余 {{ sessionPreviewRemainingCount }}）
+                                            <button class="btn-session-refresh" @click="loadMoreSessionMessages()" :disabled="sessionDetailLoading || sessionPreviewLoadingMore">
+                                                {{ sessionPreviewLoadingMore ? '加载中...' : ('加载更多（剩余 ' + sessionPreviewRemainingCount + '）') }}
                                             </button>
+                                        </div>
+                                        <div
+                                            v-if="sessionPreviewLoadingMore"
+                                            class="session-item-sub session-item-wrap">
+                                            正在加载更早消息...
                                         </div>
                                         <div
                                             v-for="(msg, idx) in activeSessionVisibleMessages"
