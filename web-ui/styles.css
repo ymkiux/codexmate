@@ -2381,9 +2381,7 @@ body::after {
     background: rgba(255, 255, 255, 0.75);
     position: relative;
     box-shadow: 0 2px 6px rgba(31, 26, 23, 0.04);
-    content-visibility: auto;
     contain: layout style paint;
-    contain-intrinsic-size: 220px;
 }
 
 .session-msg.user {
@@ -3892,6 +3890,7 @@ textarea:focus-visible {
     .session-item {
         min-height: 75px;
         height: 75px;
+        contain-intrinsic-size: 75px;
         padding: 12px 14px;
     }
 
