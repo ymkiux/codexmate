@@ -2259,21 +2259,19 @@ function normalizeDiffText(input) {
 
 function buildAgentsDiff(params = {}) {
     const hasBaseContent = typeof params.baseContent === 'string';
-    const context = params.context === 'openclaw'
-        ? 'openclaw'
-        : (params.context === 'openclaw-workspace' ? 'openclaw-workspace' : 'codex');
+    const context = typeof params.context === 'string' ? params.context.trim() : 'codex';
     let readResult;
-    if (!hasBaseContent) {
-        if (context === 'openclaw') {
-            readResult = readOpenclawAgentsFile();
-        } else if (context === 'openclaw-workspace') {
-            readResult = readOpenclawWorkspaceFile(params);
-        } else {
-            readResult = readAgentsFile(params);
-        }
-        if (readResult && readResult.error) {
-            return { error: readResult.error };
-        }
+    if (context === 'openclaw') {
+        readResult = readOpenclawAgentsFile();
+    } else if (context === 'openclaw-workspace') {
+        readResult = readOpenclawWorkspaceFile(params);
+    } else if (context === 'codex') {
+        readResult = readAgentsFile(params);
+    } else {
+        return { error: `Unsupported agents diff context: ${context}` };
+    }
+    if (readResult && readResult.error) {
+        return { error: readResult.error };
     }
 
     const beforeText = normalizeDiffText(
