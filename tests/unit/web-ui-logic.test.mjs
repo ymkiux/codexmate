@@ -369,7 +369,7 @@ test('buildSessionListParams keeps query for enabled sources', () => {
     });
     assert.strictEqual(paramsCodex.query, 'test');
     assert.strictEqual(paramsCodex.source, 'codex');
-    assert.strictEqual(paramsCodex.limit, 80);
+    assert.strictEqual(paramsCodex.limit, 200);
 
     const paramsClaude = buildSessionListParams({
         source: 'claude',
@@ -379,7 +379,7 @@ test('buildSessionListParams keeps query for enabled sources', () => {
     assert.strictEqual(paramsClaude.query, 'claude code');
     assert.strictEqual(paramsClaude.source, 'claude');
     assert.strictEqual(paramsClaude.roleFilter, 'user');
-    assert.strictEqual(paramsClaude.limit, 80);
+    assert.strictEqual(paramsClaude.limit, 200);
 
     const paramsAll = buildSessionListParams({
         source: 'all',
@@ -389,7 +389,7 @@ test('buildSessionListParams keeps query for enabled sources', () => {
     assert.strictEqual(paramsAll.query, 'claudecode');
     assert.strictEqual(paramsAll.source, 'all');
     assert.strictEqual(paramsAll.timeRangePreset, '7d');
-    assert.strictEqual(paramsAll.limit, 80);
+    assert.strictEqual(paramsAll.limit, 200);
 });
 
 test('buildSessionListParams clears query for unsupported sources', () => {
@@ -403,7 +403,7 @@ test('buildSessionListParams clears query for unsupported sources', () => {
     assert.strictEqual(params.source, 'openai');
     assert.strictEqual(params.pathFilter, '/tmp');
     assert.strictEqual(params.roleFilter, 'assistant');
-    assert.strictEqual(params.limit, 80);
+    assert.strictEqual(params.limit, 200);
     assert.strictEqual(params.forceRefresh, true);
     assert.strictEqual(params.queryScope, 'content');
     assert.strictEqual(params.contentScanLimit, 50);
