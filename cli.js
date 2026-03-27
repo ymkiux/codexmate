@@ -38,6 +38,7 @@ const {
     writeJsonAtomic,
     formatTimestampForFileName
 } = require('./lib/cli-file-utils');
+const { buildLineDiff } = require('./lib/text-diff');
 const {
     extractModelNames,
     hasModelsListPayload,
@@ -2249,6 +2250,48 @@ function applyAgentsFile(params = {}) {
     } catch (e) {
         return { error: `写入 AGENTS.md 失败: ${e.message}` };
     }
+}
+
+function normalizeDiffText(input) {
+    const safe = typeof input === 'string' ? input : '';
+    return normalizeLineEnding(stripUtf8Bom(safe), '\n');
+}
+
+function buildAgentsDiff(params = {}) {
+    const hasBaseContent = typeof params.baseContent === 'string';
+    const context = params.context === 'openclaw'
+        ? 'openclaw'
+        : (params.context === 'openclaw-workspace' ? 'openclaw-workspace' : 'codex');
+    let readResult;
+    if (!hasBaseContent) {
+        if (context === 'openclaw') {
+            readResult = readOpenclawAgentsFile();
+        } else if (context === 'openclaw-workspace') {
+            readResult = readOpenclawWorkspaceFile(params);
+        } else {
+            readResult = readAgentsFile(params);
+        }
+        if (readResult && readResult.error) {
+            return { error: readResult.error };
+        }
+    }
+
+    const beforeText = normalizeDiffText(
+        hasBaseContent ? params.baseContent : (readResult && readResult.content ? readResult.content : '')
+    );
+    const afterText = normalizeDiffText(params.content);
+    const diff = buildLineDiff(beforeText, afterText);
+    const hasChanges = diff.stats.added > 0 || diff.stats.removed > 0;
+    return {
+        diff: {
+            ...diff,
+            hasChanges
+        },
+        path: readResult && readResult.path ? readResult.path : '',
+        exists: !!(readResult && readResult.exists),
+        context,
+        configError: readResult && readResult.configError ? readResult.configError : ''
+    };
 }
 
 function resolveOpenclawWorkspaceDir(config) {
@@ -8591,6 +8634,9 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             break;
                         case 'apply-agents-file':
                             result = applyAgentsFile(params || {});
+                            break;
+                        case 'preview-agents-diff':
+                            result = buildAgentsDiff(params || {});
                             break;
                         case 'list-codex-skills':
                             result = listCodexSkills();

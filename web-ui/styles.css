@@ -164,7 +164,7 @@ body.force-compact .card {
     align-items: flex-start;
     justify-content: flex-start;
     padding: 12px;
-    gap: 10px;
+    gap: 8px;
 }
 
 body.force-compact .card-leading {
@@ -2845,6 +2845,101 @@ body::after {
     color: #8d5b31;
     font-size: var(--font-size-caption);
     line-height: 1.4;
+}
+
+.agents-diff-summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: var(--font-size-caption);
+    color: var(--color-text-tertiary);
+}
+
+.agents-diff-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font-weight: var(--font-weight-secondary);
+}
+
+.agents-diff-stat.add {
+    color: #2b6a3b;
+    background: rgba(57, 181, 97, 0.12);
+    border-color: rgba(57, 181, 97, 0.2);
+}
+
+.agents-diff-stat.del {
+    color: #8a2f36;
+    background: rgba(220, 95, 108, 0.12);
+    border-color: rgba(220, 95, 108, 0.2);
+}
+
+
+.agents-diff-empty {
+    padding: 10px 12px;
+    font-size: var(--font-size-caption);
+    color: var(--color-text-tertiary);
+    border: 1px dashed var(--color-border-soft);
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.6);
+}
+
+.agents-diff-view {
+    border: 1px solid var(--color-border-soft);
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.7);
+    font-family: var(--font-family-mono);
+    font-size: 12px;
+    line-height: 1.55;
+    max-height: min(32vh, 280px);
+    overflow: auto;
+}
+
+
+.agents-diff-editor {
+    min-height: min(60vh, 520px);
+    max-height: min(65vh, 620px);
+}
+
+.agents-diff-line {
+    display: grid;
+    grid-template-columns: 16px 1fr;
+    gap: 8px;
+    padding: 2px 10px;
+    align-items: start;
+}
+
+.agents-diff-line + .agents-diff-line {
+    border-top: none;
+}
+
+.agents-diff-line.add {
+    background: rgba(57, 181, 97, 0.08);
+}
+
+.agents-diff-line.del {
+    background: rgba(220, 95, 108, 0.1);
+}
+
+.agents-diff-line.context {
+    background: transparent;
+}
+
+
+.agents-diff-line-sign {
+    text-align: center;
+    color: var(--color-text-tertiary);
+    min-height: 20px;
+}
+
+.agents-diff-line-text {
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--color-text-primary);
 }
 
 .form-input:disabled,

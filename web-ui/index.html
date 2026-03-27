@@ -1702,24 +1702,55 @@
                         </div>
                     </div>
 
+
                     <div class="form-group">
                         <label class="form-label">AGENTS.md 内容</label>
+                        <div v-if="agentsDiffVisible">
+                            <div class="agents-diff-summary">
+                                <span class="agents-diff-stat add">+{{ agentsDiffStats.added }}</span>
+                                <span class="agents-diff-stat del">-{{ agentsDiffStats.removed }}</span>
+                            </div>
+                            <div v-if="agentsDiffLoading" class="state-message">生成差异中...</div>
+                            <div v-else-if="agentsDiffError" class="state-message error">{{ agentsDiffError }}</div>
+                            <div v-else-if="!agentsDiffHasChanges" class="agents-diff-empty">未检测到改动</div>
+                            <div v-else class="agents-diff-view agents-diff-editor">
+                                <div
+                                    v-for="(line, index) in agentsDiffLines"
+                                    :key="line.key || (line.type + '-' + index)"
+                                    :class="['agents-diff-line', line.type]">
+                                    <span class="agents-diff-line-sign">
+                                        {{ line.type === 'add' ? '+' : (line.type === 'del' ? '-' : ' ') }}
+                                    </span>
+                                    <span class="agents-diff-line-text">{{ line.value }}</span>
+                                </div>
+                            </div>
+                        </div>
                         <textarea
+                            v-else
                             v-model="agentsContent"
                             class="form-input template-editor"
                             spellcheck="false"
                             :readonly="agentsLoading"
+                            @input="onAgentsContentInput"
                             placeholder="在这里编辑 AGENTS.md 内容"></textarea>
                         <div class="template-editor-warning">
                             {{ agentsModalHint }}
                         </div>
                     </div>
+
                 </div>
 
                 <div class="btn-group modal-editor-footer">
-                    <button class="btn btn-cancel" @click="closeAgentsModal">取消</button>
-                    <button class="btn btn-confirm" @click="applyAgentsContent" :disabled="agentsSaving || agentsLoading">
-                        {{ agentsSaving ? '保存中...' : '保存' }}
+                    <button class="btn btn-cancel" @click="closeAgentsModal" v-if="!agentsDiffVisible">取消</button>
+                    <button
+                        v-if="agentsDiffVisible"
+                        class="btn"
+                        @click="resetAgentsDiffState"
+                        :disabled="agentsSaving || agentsDiffLoading">
+                        返回编辑
+                    </button>
+                    <button class="btn btn-confirm" @click="applyAgentsContent" :disabled="agentsSaving || agentsLoading || agentsDiffLoading || (agentsDiffVisible && !agentsDiffHasChanges)">
+                        {{ agentsSaving ? (agentsDiffVisible ? '应用中...' : '确认中...') : (agentsDiffVisible ? '应用' : '确认') }}
                     </button>
                 </div>
             </div>
