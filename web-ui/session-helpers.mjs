@@ -107,6 +107,7 @@ export async function loadActiveSessionDetail(api, options = {}) {
         return;
     }
 
+    const currentActiveSession = this.activeSession;
     const requestSeq = ++this.sessionDetailRequestSeq;
     this.sessionDetailLoading = true;
     this.activeSessionDetailError = '';
@@ -126,6 +127,9 @@ export async function loadActiveSessionDetail(api, options = {}) {
         });
 
         if (requestSeq !== this.sessionDetailRequestSeq) {
+            return;
+        }
+        if (!this.activeSession || this.activeSession !== currentActiveSession) {
             return;
         }
 
@@ -148,19 +152,17 @@ export async function loadActiveSessionDetail(api, options = {}) {
         this.sessionDetailMessageLimit = Number.isFinite(responseLimitRaw)
             ? Math.max(1, Math.floor(responseLimitRaw))
             : messageLimit;
-        if (this.activeSession) {
-            if (res.sourceLabel) {
-                this.activeSession.sourceLabel = res.sourceLabel;
+        if (res.sourceLabel) {
+            this.activeSession.sourceLabel = res.sourceLabel;
+        }
+        if (res.sessionId) {
+            this.activeSession.sessionId = res.sessionId;
+            if (!this.activeSession.title) {
+                this.activeSession.title = res.sessionId;
             }
-            if (res.sessionId) {
-                this.activeSession.sessionId = res.sessionId;
-                if (!this.activeSession.title) {
-                    this.activeSession.title = res.sessionId;
-                }
-            }
-            if (res.filePath) {
-                this.activeSession.filePath = res.filePath;
-            }
+        }
+        if (res.filePath) {
+            this.activeSession.filePath = res.filePath;
         }
         if (res.updatedAt) {
             this.activeSession.updatedAt = res.updatedAt;
@@ -195,6 +197,9 @@ export async function loadActiveSessionDetail(api, options = {}) {
         });
     } catch (e) {
         if (requestSeq !== this.sessionDetailRequestSeq) {
+            return;
+        }
+        if (!this.activeSession || this.activeSession !== currentActiveSession) {
             return;
         }
         this.activeSessionMessages = [];

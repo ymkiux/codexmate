@@ -958,6 +958,7 @@
                                         <button
                                             class="btn-session-refresh"
                                             @click="toggleSessionTimeline"
+                                            :aria-pressed="sessionTimelineEnabled"
                                             :disabled="!activeSession">
                                             {{ sessionTimelineEnabled ? '关闭时间轴' : '开启时间轴' }}
                                         </button>
@@ -971,7 +972,7 @@
                                     </div>
                                 </div>
 
-                                <div v-if="sessionDetailLoading" class="session-preview-empty">
+                                <div v-if="sessionDetailLoading && !sessionPreviewLoadingMore" class="session-preview-empty">
                                     正在加载会话内容...
                                 </div>
 
