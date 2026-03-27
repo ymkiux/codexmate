@@ -885,7 +885,7 @@
                 </div>
 
                 <div v-else :class="['session-layout', { 'session-standalone': sessionStandalone }]">
-                    <div v-if="!sessionStandalone" class="session-list">
+                    <div v-if="!sessionStandalone && sessionListRenderEnabled" class="session-list">
                         <div
                             v-for="session in sessionsList"
                             :key="session.source + '-' + session.sessionId + '-' + session.filePath"
@@ -922,6 +922,7 @@
                             </div>
                         </div>
                     </div>
+                    <div v-else-if="!sessionStandalone" class="session-list session-list-placeholder"></div>
 
                     <div :class="['session-preview', { active: !!activeSession }]" :ref="setSessionPreviewContainerRef">
                         <template v-if="activeSession">
@@ -955,6 +956,13 @@
                                             {{ (activeSession && sessionExporting[getSessionExportKey(activeSession)]) ? '导出中...' : '导出记录' }}
                                         </button>
                                         <button
+                                            class="btn-session-refresh"
+                                            @click="toggleSessionTimeline"
+                                            :aria-pressed="sessionTimelineEnabled"
+                                            :disabled="!activeSession">
+                                            {{ sessionTimelineEnabled ? '关闭时间轴' : '开启时间轴' }}
+                                        </button>
+                                        <button
                                             v-if="!sessionStandalone"
                                             class="btn-session-open"
                                             @click="openSessionStandalone(activeSession)"
@@ -964,7 +972,7 @@
                                     </div>
                                 </div>
 
-                                <div v-if="sessionDetailLoading" class="session-preview-empty">
+                                <div v-if="sessionDetailLoading && !sessionPreviewLoadingMore" class="session-preview-empty">
                                     正在加载会话内容...
                                 </div>
 
@@ -976,16 +984,41 @@
                                     当前会话暂无可展示消息
                                 </div>
 
+                                <div v-else-if="sessionPreviewRenderEnabled && !activeSessionVisibleMessages.length" class="session-preview-empty">
+                                    <span>正在渲染会话内容...</span>
+                                    <button class="btn-session-refresh" @click="primeSessionPreviewMessageRender" :disabled="sessionDetailLoading">
+                                        重新渲染
+                                    </button>
+                                </div>
+
+                                <div v-else-if="!sessionPreviewRenderEnabled" class="session-preview-empty">
+                                    正在准备会话内容...
+                                </div>
+
                                 <div v-else class="session-preview-body">
                                     <div class="session-preview-messages">
                                         <div v-if="activeSessionDetailClipped" class="session-item-sub session-item-wrap">
                                             仅展示最近 {{ activeSessionMessages.length }} 条消息。
                                         </div>
                                         <div
-                                            v-for="(msg, idx) in activeSessionMessages"
+                                            v-if="canLoadMoreSessionMessages"
+                                            class="session-item-sub session-item-wrap"
+                                            style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                                            <span>已显示 {{ activeSessionVisibleMessages.length }} / {{ activeSessionMessages.length }} 条</span>
+                                            <button class="btn-session-refresh" @click="loadMoreSessionMessages()" :disabled="sessionDetailLoading || sessionPreviewLoadingMore">
+                                                {{ sessionPreviewLoadingMore ? '加载中...' : ('加载更多（剩余 ' + sessionPreviewRemainingCount + '）') }}
+                                            </button>
+                                        </div>
+                                        <div
+                                            v-if="sessionPreviewLoadingMore"
+                                            class="session-item-sub session-item-wrap">
+                                            正在加载更早消息...
+                                        </div>
+                                        <div
+                                            v-for="(msg, idx) in activeSessionVisibleMessages"
                                             :key="getRecordRenderKey(msg, idx)"
                                             :data-message-key="getRecordRenderKey(msg, idx)"
-                                            :ref="(el) => bindSessionMessageRef(getRecordRenderKey(msg, idx), el)"
+                                            :ref="sessionTimelineEnabled ? ((el) => bindSessionMessageRef(getRecordRenderKey(msg, idx), el)) : null"
                                             :class="['session-msg', msg.normalizedRole === 'user' ? 'user' : (msg.normalizedRole === 'system' ? 'system' : 'assistant')]">
                                             <div class="session-msg-header">
                                                 <div class="session-msg-meta">
@@ -998,7 +1031,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <aside v-if="sessionTimelineNodes.length" class="session-timeline" aria-label="会话时间轴">
+                            <aside v-if="sessionTimelineEnabled && sessionPreviewRenderEnabled && sessionTimelineNodes.length" class="session-timeline" aria-label="会话时间轴">
                                 <div class="session-timeline-track"></div>
                                 <button
                                     v-for="node in sessionTimelineNodes"
