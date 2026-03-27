@@ -33,6 +33,15 @@ test('buildLineDiff normalizes line endings', () => {
     assert.strictEqual(result.stats.removed, 0);
 });
 
+test('buildLineDiff ignores single trailing newline', () => {
+    const withTrailing = buildLineDiff('a\nb\n', 'a\nb\n');
+    const withoutTrailing = buildLineDiff('a\nb', 'a\nb');
+    assert.strictEqual(withTrailing.oldLineCount, 2);
+    assert.strictEqual(withTrailing.newLineCount, 2);
+    assert.strictEqual(withTrailing.lines.length, 2);
+    assert.strictEqual(withoutTrailing.lines.length, 2);
+});
+
 test('buildLineDiff tolerates non-string input', () => {
     const result = buildLineDiff(null, 123);
     assert.strictEqual(result.oldLineCount, 0);
