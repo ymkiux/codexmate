@@ -153,6 +153,10 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     activeSessionDetailClipped: false,
                     sessionDetailLoading: false,
                     sessionDetailRequestSeq: 0,
+                    sessionDetailInitialMessageLimit: 80,
+                    sessionDetailFetchStep: 80,
+                    sessionDetailMessageLimit: 80,
+                    sessionDetailMessageLimitCap: 1000,
                     sessionTimelineActiveKey: '',
                     sessionTimelineRafId: 0,
                     sessionTimelineLastSyncAt: 0,
@@ -169,6 +173,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     sessionPreviewVisibleCount: 0,
                     sessionPreviewInitialBatchSize: 12,
                     sessionPreviewLoadStep: 24,
+                    sessionPreviewPendingVisibleCount: 0,
                     sessionStandalone: false,
                     sessionStandaloneError: '',
                     sessionStandaloneText: '',
@@ -356,8 +361,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 this.loadAll();
             },
             beforeUnmount() {
-                this.cancelSessionTimelineSync();
-                this.resetSessionPreviewMessageRender();
+                this.teardownSessionTabRender();
                 this.disconnectSessionPreviewHeaderResizeObserver();
                 window.removeEventListener('resize', this.onWindowResize);
                 this.applyCompactLayoutClass(false);
@@ -889,6 +893,14 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this.sessionPreviewVisibleCount = 0;
                 },
 
+                resetSessionDetailPagination() {
+                    const initialLimit = Number.isFinite(this.sessionDetailInitialMessageLimit)
+                        ? Math.max(1, Math.floor(this.sessionDetailInitialMessageLimit))
+                        : 80;
+                    this.sessionDetailMessageLimit = initialLimit;
+                    this.sessionPreviewPendingVisibleCount = 0;
+                },
+
                 primeSessionPreviewMessageRender() {
                     this.sessionPreviewVisibleCount = 0;
                     if (this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {
@@ -904,7 +916,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this.sessionPreviewVisibleCount = Math.min(baseSize, total);
                 },
 
-                loadMoreSessionMessages(stepSize) {
+                async loadMoreSessionMessages(stepSize) {
                     if (this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {
                         return;
                     }
@@ -923,7 +935,50 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     const current = Number.isFinite(this.sessionPreviewVisibleCount)
                         ? Math.max(0, Math.floor(this.sessionPreviewVisibleCount))
                         : 0;
-                    this.sessionPreviewVisibleCount = Math.min(total, current + step);
+                    const targetVisible = current + step;
+                    if (targetVisible <= total) {
+                        this.sessionPreviewVisibleCount = Math.min(total, targetVisible);
+                        return;
+                    }
+
+                    this.sessionPreviewVisibleCount = total;
+                    if (this.sessionDetailLoading) {
+                        return;
+                    }
+
+                    const totalKnownRaw = Number(this.activeSession && this.activeSession.messageCount);
+                    const totalKnown = Number.isFinite(totalKnownRaw)
+                        ? Math.max(0, Math.floor(totalKnownRaw))
+                        : 0;
+                    const hasMoreOnDisk = this.activeSessionDetailClipped || (totalKnown > total);
+                    if (!hasMoreOnDisk) {
+                        return;
+                    }
+
+                    const currentLimitRaw = Number(this.sessionDetailMessageLimit);
+                    const currentLimit = Number.isFinite(currentLimitRaw)
+                        ? Math.max(1, Math.floor(currentLimitRaw))
+                        : Math.max(1, total);
+                    const fetchStep = Number.isFinite(this.sessionDetailFetchStep)
+                        ? Math.max(1, Math.floor(this.sessionDetailFetchStep))
+                        : 80;
+                    const limitCapRaw = Number(this.sessionDetailMessageLimitCap);
+                    const limitCap = Number.isFinite(limitCapRaw)
+                        ? Math.max(1, Math.floor(limitCapRaw))
+                        : 1000;
+
+                    let nextLimit = Math.max(currentLimit + fetchStep, targetVisible);
+                    if (totalKnown > 0) {
+                        nextLimit = Math.min(nextLimit, totalKnown);
+                    }
+                    nextLimit = Math.min(nextLimit, limitCap);
+                    if (nextLimit <= currentLimit) {
+                        return;
+                    }
+
+                    this.sessionPreviewPendingVisibleCount = targetVisible;
+                    this.sessionDetailMessageLimit = nextLimit;
+                    await this.loadActiveSessionDetail({ preserveVisibleCount: true });
                 },
 
                 teardownSessionTabRender() {
@@ -1829,6 +1884,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     if (this.sessionsLoading) return;
                     this.sessionsLoading = true;
                     this.activeSessionDetailError = '';
+                    let loadSucceeded = false;
                     const params = buildSessionListParams({
                         source: this.sessionFilterSource,
                         pathFilter: this.sessionPathFilter,
@@ -1843,12 +1899,14 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             this.sessionsList = [];
                             this.activeSession = null;
                             this.activeSessionMessages = [];
+                            this.resetSessionDetailPagination();
                             this.resetSessionPreviewMessageRender();
                             this.activeSessionDetailClipped = false;
                             this.cancelSessionTimelineSync();
                             this.sessionTimelineActiveKey = '';
                             this.sessionMessageRefMap = Object.create(null);
                         } else {
+                            loadSucceeded = true;
                             this.sessionsList = Array.isArray(res.sessions) ? res.sessions : [];
                             this.syncSessionPathOptionsForSource(
                                 this.sessionFilterSource,
@@ -1858,6 +1916,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             if (this.sessionsList.length === 0) {
                                 this.activeSession = null;
                                 this.activeSessionMessages = [];
+                                this.resetSessionDetailPagination();
                                 this.resetSessionPreviewMessageRender();
                                 this.activeSessionDetailClipped = false;
                                 this.cancelSessionTimelineSync();
@@ -1868,6 +1927,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                                 const matched = this.sessionsList.find(item => this.getSessionExportKey(item) === oldKey);
                                 this.activeSession = matched || this.sessionsList[0];
                                 this.activeSessionMessages = [];
+                                this.resetSessionDetailPagination();
                                 this.resetSessionPreviewMessageRender();
                                 this.activeSessionDetailError = '';
                                 this.activeSessionDetailClipped = false;
@@ -1882,6 +1942,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         this.sessionsList = [];
                         this.activeSession = null;
                         this.activeSessionMessages = [];
+                        this.resetSessionDetailPagination();
                         this.resetSessionPreviewMessageRender();
                         this.activeSessionDetailClipped = false;
                         this.cancelSessionTimelineSync();
@@ -1890,7 +1951,9 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         this.showMessage('加载会话失败', 'error');
                     } finally {
                         this.sessionsLoading = false;
-                        this.sessionsLoadedOnce = true;
+                        if (loadSucceeded) {
+                            this.sessionsLoadedOnce = true;
+                        }
                     }
                 },
 
@@ -1899,6 +1962,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     if (this.activeSession && this.getSessionExportKey(this.activeSession) === this.getSessionExportKey(session)) return;
                     this.activeSession = session;
                     this.activeSessionMessages = [];
+                    this.resetSessionDetailPagination();
                     this.resetSessionPreviewMessageRender();
                     this.activeSessionDetailError = '';
                     this.activeSessionDetailClipped = false;
@@ -1953,9 +2017,10 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     }
                 },
 
-                async loadActiveSessionDetail() {
+                async loadActiveSessionDetail(options = {}) {
                     if (!this.activeSession) {
                         this.activeSessionMessages = [];
+                        this.resetSessionDetailPagination();
                         this.resetSessionPreviewMessageRender();
                         this.activeSessionDetailError = '';
                         this.activeSessionDetailClipped = false;
@@ -1968,12 +2033,19 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     const requestSeq = ++this.sessionDetailRequestSeq;
                     this.sessionDetailLoading = true;
                     this.activeSessionDetailError = '';
+                    const fallbackLimit = Number.isFinite(this.sessionDetailInitialMessageLimit)
+                        ? Math.max(1, Math.floor(this.sessionDetailInitialMessageLimit))
+                        : 80;
+                    const rawLimit = Number(this.sessionDetailMessageLimit);
+                    const messageLimit = Number.isFinite(rawLimit)
+                        ? Math.max(1, Math.floor(rawLimit))
+                        : fallbackLimit;
                     try {
                         const res = await api('session-detail', {
                             source: this.activeSession.source,
                             sessionId: this.activeSession.sessionId,
                             filePath: this.activeSession.filePath,
-                            messageLimit: 80
+                            messageLimit
                         });
 
                         if (requestSeq !== this.sessionDetailRequestSeq) {
@@ -1995,6 +2067,10 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         const normalizedMessages = rawMessages.map((message) => Object.freeze(this.normalizeSessionMessage(message)));
                         this.activeSessionMessages = Object.freeze(normalizedMessages);
                         this.activeSessionDetailClipped = !!res.clipped;
+                        const responseLimitRaw = Number(res.messageLimit);
+                        this.sessionDetailMessageLimit = Number.isFinite(responseLimitRaw)
+                            ? Math.max(1, Math.floor(responseLimitRaw))
+                            : messageLimit;
                         if (this.activeSession) {
                             if (res.sourceLabel) {
                                 this.activeSession.sourceLabel = res.sourceLabel;
@@ -2019,8 +2095,18 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             this.syncActiveSessionMessageCount(res.totalMessages);
                         }
                         if (this.mainTab === 'sessions' && this.sessionPreviewRenderEnabled) {
-                            this.primeSessionPreviewMessageRender();
+                            const preserveVisibleCount = !!options.preserveVisibleCount;
+                            const pendingVisibleRaw = Number(this.sessionPreviewPendingVisibleCount);
+                            const pendingVisible = Number.isFinite(pendingVisibleRaw)
+                                ? Math.max(0, Math.floor(pendingVisibleRaw))
+                                : 0;
+                            if (preserveVisibleCount && pendingVisible > 0) {
+                                this.sessionPreviewVisibleCount = Math.min(pendingVisible, this.activeSessionMessages.length);
+                            } else {
+                                this.primeSessionPreviewMessageRender();
+                            }
                         }
+                        this.sessionPreviewPendingVisibleCount = 0;
                         this.$nextTick(() => {
                             if (this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {
                                 return;
@@ -2035,6 +2121,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             return;
                         }
                         this.activeSessionMessages = [];
+                        this.sessionPreviewPendingVisibleCount = 0;
                         this.resetSessionPreviewMessageRender();
                         this.activeSessionDetailClipped = false;
                         this.activeSessionDetailError = '加载会话内容失败: ' + e.message;
