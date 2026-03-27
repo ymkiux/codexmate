@@ -123,6 +123,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     skillsZipImporting: false,
                     skillsExporting: false,
                     sessionsList: [],
+                    sessionsLoadedOnce: false,
                     sessionsLoading: false,
                     sessionFilterSource: 'all',
                     sessionPathFilter: '',
@@ -154,11 +155,20 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     sessionDetailRequestSeq: 0,
                     sessionTimelineActiveKey: '',
                     sessionTimelineRafId: 0,
+                    sessionTimelineLastSyncAt: 0,
+                    sessionTimelineLastScrollTop: 0,
+                    sessionTimelineEnabled: false,
                     sessionMessageRefMap: Object.create(null),
                     sessionPreviewScrollEl: null,
                     sessionPreviewContainerEl: null,
                     sessionPreviewHeaderEl: null,
                     sessionPreviewHeaderResizeObserver: null,
+                    sessionListRenderEnabled: false,
+                    sessionPreviewRenderEnabled: false,
+                    sessionTabRenderTicket: 0,
+                    sessionPreviewVisibleCount: 0,
+                    sessionPreviewInitialBatchSize: 12,
+                    sessionPreviewLoadStep: 24,
                     sessionStandalone: false,
                     sessionStandaloneError: '',
                     sessionStandaloneText: '',
@@ -347,6 +357,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
             },
             beforeUnmount() {
                 this.cancelSessionTimelineSync();
+                this.resetSessionPreviewMessageRender();
                 this.disconnectSessionPreviewHeaderResizeObserver();
                 window.removeEventListener('resize', this.onWindowResize);
                 this.applyCompactLayoutClass(false);
@@ -360,8 +371,42 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 isSessionQueryEnabled() {
                     return isSessionQueryEnabled(this.sessionFilterSource);
                 },
+                activeSessionVisibleMessages() {
+                    if (this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {
+                        return [];
+                    }
+                    const list = Array.isArray(this.activeSessionMessages) ? this.activeSessionMessages : [];
+                    const rawCount = Number(this.sessionPreviewVisibleCount);
+                    const visibleCount = Number.isFinite(rawCount)
+                        ? Math.max(0, Math.floor(rawCount))
+                        : 0;
+                    if (visibleCount <= 0) {
+                        if (!list.length) return [];
+                        // Defensive fallback: avoid getting stuck in "正在渲染会话内容..."
+                        // when visible count has not been primed yet.
+                        return list.slice(0, Math.min(8, list.length));
+                    }
+                    if (visibleCount >= list.length) return list;
+                    return list.slice(0, visibleCount);
+                },
+                canLoadMoreSessionMessages() {
+                    if (this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {
+                        return false;
+                    }
+                    const total = Array.isArray(this.activeSessionMessages) ? this.activeSessionMessages.length : 0;
+                    const visible = Array.isArray(this.activeSessionVisibleMessages) ? this.activeSessionVisibleMessages.length : 0;
+                    return total > visible;
+                },
+                sessionPreviewRemainingCount() {
+                    const total = Array.isArray(this.activeSessionMessages) ? this.activeSessionMessages.length : 0;
+                    const visible = Array.isArray(this.activeSessionVisibleMessages) ? this.activeSessionVisibleMessages.length : 0;
+                    return Math.max(0, total - visible);
+                },
                 sessionTimelineNodes() {
-                    return buildSessionTimelineNodes(this.activeSessionMessages, {
+                    if (!this.sessionTimelineEnabled || this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {
+                        return [];
+                    }
+                    return buildSessionTimelineNodes(this.activeSessionVisibleMessages, {
                         getKey: (message, index) => this.getRecordRenderKey(message, index)
                     });
                 },
@@ -815,13 +860,109 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 },
 
                 switchMainTab(tab) {
+                    const previousTab = this.mainTab;
+                    if (previousTab === 'sessions' && tab !== 'sessions') {
+                        this.teardownSessionTabRender();
+                    }
                     this.mainTab = tab;
-                    if (tab === 'sessions' && this.sessionsList.length === 0) {
+                    if (tab === 'sessions' && !this.sessionsLoadedOnce) {
                         this.loadSessions();
+                    }
+                    if (tab === 'sessions') {
+                        this.prepareSessionTabRender();
                     }
                     if (tab === 'config' && this.configMode === 'claude') {
                         this.refreshClaudeModelContext();
                     }
+                },
+
+                scheduleAfterFrame(task) {
+                    const callback = typeof task === 'function' ? task : () => {};
+                    if (typeof requestAnimationFrame === 'function') {
+                        requestAnimationFrame(callback);
+                        return;
+                    }
+                    setTimeout(callback, 16);
+                },
+
+                resetSessionPreviewMessageRender() {
+                    this.sessionPreviewVisibleCount = 0;
+                },
+
+                primeSessionPreviewMessageRender() {
+                    this.sessionPreviewVisibleCount = 0;
+                    if (this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {
+                        return;
+                    }
+                    const total = Array.isArray(this.activeSessionMessages)
+                        ? this.activeSessionMessages.length
+                        : 0;
+                    if (total <= 0) return;
+                    const baseSize = Number.isFinite(this.sessionPreviewInitialBatchSize)
+                        ? Math.max(1, Math.floor(this.sessionPreviewInitialBatchSize))
+                        : 40;
+                    this.sessionPreviewVisibleCount = Math.min(baseSize, total);
+                },
+
+                loadMoreSessionMessages(stepSize) {
+                    if (this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {
+                        return;
+                    }
+                    const total = Array.isArray(this.activeSessionMessages)
+                        ? this.activeSessionMessages.length
+                        : 0;
+                    if (total <= 0) {
+                        this.sessionPreviewVisibleCount = 0;
+                        return;
+                    }
+                    const step = Number.isFinite(stepSize)
+                        ? Math.max(1, Math.floor(stepSize))
+                        : (Number.isFinite(this.sessionPreviewLoadStep)
+                            ? Math.max(1, Math.floor(this.sessionPreviewLoadStep))
+                            : 40);
+                    const current = Number.isFinite(this.sessionPreviewVisibleCount)
+                        ? Math.max(0, Math.floor(this.sessionPreviewVisibleCount))
+                        : 0;
+                    this.sessionPreviewVisibleCount = Math.min(total, current + step);
+                },
+
+                teardownSessionTabRender() {
+                    this.sessionTabRenderTicket += 1;
+                    this.sessionListRenderEnabled = false;
+                    this.sessionPreviewRenderEnabled = false;
+                    this.resetSessionPreviewMessageRender();
+                    this.cancelSessionTimelineSync();
+                    this.sessionTimelineLastSyncAt = 0;
+                    this.sessionTimelineLastScrollTop = 0;
+                },
+
+                prepareSessionTabRender() {
+                    const ticket = ++this.sessionTabRenderTicket;
+                    this.sessionListRenderEnabled = false;
+                    this.sessionPreviewRenderEnabled = false;
+                    this.resetSessionPreviewMessageRender();
+
+                    this.scheduleAfterFrame(() => {
+                        if (ticket !== this.sessionTabRenderTicket || this.mainTab !== 'sessions') {
+                            return;
+                        }
+                        this.sessionListRenderEnabled = true;
+
+                        this.scheduleAfterFrame(() => {
+                            if (ticket !== this.sessionTabRenderTicket || this.mainTab !== 'sessions') {
+                                return;
+                            }
+                            this.sessionPreviewRenderEnabled = true;
+                            this.$nextTick(() => {
+                                if (ticket !== this.sessionTabRenderTicket || this.mainTab !== 'sessions') {
+                                    return;
+                                }
+                                this.primeSessionPreviewMessageRender();
+                                this.updateSessionTimelineOffset();
+                                this.scheduleSessionTimelineSync();
+                            });
+                        });
+                    });
                 },
 
                 getSessionStandaloneContext() {
@@ -868,6 +1009,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
 
                     this.sessionStandalone = true;
                     this.mainTab = 'sessions';
+                    this.prepareSessionTabRender();
 
                     if (context.error || !context.params) {
                         this.sessionStandaloneError = `会话链接参数不完整：${context.error || '参数解析失败'}`;
@@ -1434,7 +1576,12 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 },
                 setSessionPreviewScrollRef(el) {
                     this.sessionPreviewScrollEl = el || null;
-                    if (this.sessionPreviewScrollEl) {
+                    if (
+                        this.sessionTimelineEnabled
+                        && this.sessionPreviewScrollEl
+                        && this.mainTab === 'sessions'
+                        && this.sessionPreviewRenderEnabled
+                    ) {
                         this.scheduleSessionTimelineSync();
                     } else {
                         this.cancelSessionTimelineSync();
@@ -1452,12 +1599,27 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     container.style.setProperty('--session-preview-header-offset', `${offset}px`);
                 },
                 bindSessionMessageRef(messageKey, el) {
+                    if (!this.sessionTimelineEnabled) return;
                     if (!messageKey) return;
                     if (el) {
                         this.sessionMessageRefMap[messageKey] = el;
                     } else {
                         delete this.sessionMessageRefMap[messageKey];
                     }
+                },
+                toggleSessionTimeline() {
+                    this.sessionTimelineEnabled = !this.sessionTimelineEnabled;
+                    if (!this.sessionTimelineEnabled) {
+                        this.cancelSessionTimelineSync();
+                        this.sessionTimelineActiveKey = '';
+                        this.sessionMessageRefMap = Object.create(null);
+                        return;
+                    }
+                    this.$nextTick(() => {
+                        if (!this.sessionTimelineEnabled) return;
+                        this.updateSessionTimelineOffset();
+                        this.scheduleSessionTimelineSync();
+                    });
                 },
                 cancelSessionTimelineSync() {
                     if (!this.sessionTimelineRafId) return;
@@ -1478,10 +1640,25 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this.syncSessionTimelineActiveFromScroll();
                 },
                 onSessionPreviewScroll() {
+                    if (!this.sessionTimelineEnabled || this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) return;
+                    const scrollEl = this.sessionPreviewScrollEl || this.$refs.sessionPreviewScroll;
+                    if (!scrollEl) return;
+                    const now = Date.now();
+                    const currentTop = Number(scrollEl.scrollTop || 0);
+                    const delta = Math.abs(currentTop - Number(this.sessionTimelineLastScrollTop || 0));
+                    const elapsed = now - Number(this.sessionTimelineLastSyncAt || 0);
+                    if (delta < 48 && elapsed < 120) {
+                        return;
+                    }
+                    this.sessionTimelineLastScrollTop = currentTop;
+                    this.sessionTimelineLastSyncAt = now;
                     this.scheduleSessionTimelineSync();
                 },
                 onWindowResize() {
                     this.updateCompactLayoutMode();
+                    if (!this.sessionTimelineEnabled || this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {
+                        return;
+                    }
                     this.updateSessionTimelineOffset();
                     this.scheduleSessionTimelineSync();
                 },
@@ -1535,34 +1712,47 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this.applyCompactLayoutClass(enabled);
                 },
                 syncSessionTimelineActiveFromScroll() {
+                    if (!this.sessionTimelineEnabled || this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {
+                        if (this.sessionTimelineActiveKey) {
+                            this.sessionTimelineActiveKey = '';
+                        }
+                        return;
+                    }
                     const nodes = Array.isArray(this.sessionTimelineNodes) ? this.sessionTimelineNodes : [];
                     if (!nodes.length) {
-                        this.sessionTimelineActiveKey = '';
+                        if (this.sessionTimelineActiveKey) {
+                            this.sessionTimelineActiveKey = '';
+                        }
                         return;
                     }
                     const scrollEl = this.sessionPreviewScrollEl || this.$refs.sessionPreviewScroll;
                     if (!scrollEl) {
-                        this.sessionTimelineActiveKey = nodes[0].key;
+                        const fallbackKey = nodes[0].key;
+                        if (this.sessionTimelineActiveKey !== fallbackKey) {
+                            this.sessionTimelineActiveKey = fallbackKey;
+                        }
                         return;
                     }
-                    const scrollRect = scrollEl.getBoundingClientRect();
                     const headerEl = scrollEl.querySelector('.session-preview-header');
-                    const headerHeight = headerEl ? headerEl.getBoundingClientRect().height : 0;
-                    const anchorLine = scrollRect.top + headerHeight + 8;
+                    const headerHeight = headerEl ? Number(headerEl.offsetHeight || 0) : 0;
+                    const anchorTop = Number(scrollEl.scrollTop || 0) + headerHeight + 8;
                     let activeKey = nodes[0].key;
                     for (const node of nodes) {
                         const messageEl = this.sessionMessageRefMap[node.key];
                         if (!messageEl) continue;
-                        const messageRect = messageEl.getBoundingClientRect();
-                        if (messageRect.top <= anchorLine) {
+                        const messageTop = Number(messageEl.offsetTop || 0);
+                        if (messageTop <= anchorTop) {
                             activeKey = node.key;
                             continue;
                         }
                         break;
                     }
-                    this.sessionTimelineActiveKey = activeKey;
+                    if (this.sessionTimelineActiveKey !== activeKey) {
+                        this.sessionTimelineActiveKey = activeKey;
+                    }
                 },
                 jumpToSessionTimelineNode(messageKey) {
+                    if (!this.sessionTimelineEnabled || this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) return;
                     if (!messageKey) return;
                     const scrollEl = this.sessionPreviewScrollEl || this.$refs.sessionPreviewScroll;
                     if (!scrollEl) return;
@@ -1653,6 +1843,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             this.sessionsList = [];
                             this.activeSession = null;
                             this.activeSessionMessages = [];
+                            this.resetSessionPreviewMessageRender();
                             this.activeSessionDetailClipped = false;
                             this.cancelSessionTimelineSync();
                             this.sessionTimelineActiveKey = '';
@@ -1667,6 +1858,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             if (this.sessionsList.length === 0) {
                                 this.activeSession = null;
                                 this.activeSessionMessages = [];
+                                this.resetSessionPreviewMessageRender();
                                 this.activeSessionDetailClipped = false;
                                 this.cancelSessionTimelineSync();
                                 this.sessionTimelineActiveKey = '';
@@ -1676,6 +1868,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                                 const matched = this.sessionsList.find(item => this.getSessionExportKey(item) === oldKey);
                                 this.activeSession = matched || this.sessionsList[0];
                                 this.activeSessionMessages = [];
+                                this.resetSessionPreviewMessageRender();
                                 this.activeSessionDetailError = '';
                                 this.activeSessionDetailClipped = false;
                                 this.cancelSessionTimelineSync();
@@ -1689,6 +1882,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         this.sessionsList = [];
                         this.activeSession = null;
                         this.activeSessionMessages = [];
+                        this.resetSessionPreviewMessageRender();
                         this.activeSessionDetailClipped = false;
                         this.cancelSessionTimelineSync();
                         this.sessionTimelineActiveKey = '';
@@ -1696,6 +1890,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         this.showMessage('加载会话失败', 'error');
                     } finally {
                         this.sessionsLoading = false;
+                        this.sessionsLoadedOnce = true;
                     }
                 },
 
@@ -1704,6 +1899,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     if (this.activeSession && this.getSessionExportKey(this.activeSession) === this.getSessionExportKey(session)) return;
                     this.activeSession = session;
                     this.activeSessionMessages = [];
+                    this.resetSessionPreviewMessageRender();
                     this.activeSessionDetailError = '';
                     this.activeSessionDetailClipped = false;
                     this.cancelSessionTimelineSync();
@@ -1760,6 +1956,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 async loadActiveSessionDetail() {
                     if (!this.activeSession) {
                         this.activeSessionMessages = [];
+                        this.resetSessionPreviewMessageRender();
                         this.activeSessionDetailError = '';
                         this.activeSessionDetailClipped = false;
                         this.cancelSessionTimelineSync();
@@ -1776,7 +1973,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             source: this.activeSession.source,
                             sessionId: this.activeSession.sessionId,
                             filePath: this.activeSession.filePath,
-                            messageLimit: 300
+                            messageLimit: 80
                         });
 
                         if (requestSeq !== this.sessionDetailRequestSeq) {
@@ -1785,6 +1982,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
 
                         if (res.error) {
                             this.activeSessionMessages = [];
+                            this.resetSessionPreviewMessageRender();
                             this.activeSessionDetailClipped = false;
                             this.activeSessionDetailError = res.error;
                             this.cancelSessionTimelineSync();
@@ -1794,7 +1992,8 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         }
 
                         const rawMessages = Array.isArray(res.messages) ? res.messages : [];
-                        this.activeSessionMessages = rawMessages.map((message) => this.normalizeSessionMessage(message));
+                        const normalizedMessages = rawMessages.map((message) => Object.freeze(this.normalizeSessionMessage(message)));
+                        this.activeSessionMessages = Object.freeze(normalizedMessages);
                         this.activeSessionDetailClipped = !!res.clipped;
                         if (this.activeSession) {
                             if (res.sourceLabel) {
@@ -1819,15 +2018,24 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         if (Number.isFinite(res.totalMessages)) {
                             this.syncActiveSessionMessageCount(res.totalMessages);
                         }
+                        if (this.mainTab === 'sessions' && this.sessionPreviewRenderEnabled) {
+                            this.primeSessionPreviewMessageRender();
+                        }
                         this.$nextTick(() => {
+                            if (this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {
+                                return;
+                            }
                             this.updateSessionTimelineOffset();
-                            this.scheduleSessionTimelineSync();
+                            if (this.sessionTimelineEnabled) {
+                                this.scheduleSessionTimelineSync();
+                            }
                         });
                     } catch (e) {
                         if (requestSeq !== this.sessionDetailRequestSeq) {
                             return;
                         }
                         this.activeSessionMessages = [];
+                        this.resetSessionPreviewMessageRender();
                         this.activeSessionDetailClipped = false;
                         this.activeSessionDetailError = '加载会话内容失败: ' + e.message;
                         this.cancelSessionTimelineSync();

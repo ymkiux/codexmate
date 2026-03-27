@@ -19,6 +19,7 @@ await import(pathToFileURL(path.join(__dirname, 'claude-settings-sync.test.mjs')
 await import(pathToFileURL(path.join(__dirname, 'unzip-ext.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'provider-share-command.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'codex-proxy-options.test.mjs')));
+await import(pathToFileURL(path.join(__dirname, 'session-tab-switch-performance.test.mjs')));
 
 let failures = 0;
 for (const { name, fn } of tests) {

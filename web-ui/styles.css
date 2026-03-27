@@ -2040,6 +2040,8 @@ body::after {
     position: relative;
     overflow: hidden;
     min-height: 102px;
+    content-visibility: auto;
+    contain-intrinsic-size: 102px;
 }
 
 .session-item-header {
@@ -2301,6 +2303,7 @@ body::after {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    contain: layout style;
 }
 
 .session-timeline {
@@ -2378,6 +2381,9 @@ body::after {
     background: rgba(255, 255, 255, 0.75);
     position: relative;
     box-shadow: 0 2px 6px rgba(31, 26, 23, 0.04);
+    content-visibility: auto;
+    contain: layout style paint;
+    contain-intrinsic-size: 220px;
 }
 
 .session-msg.user {
