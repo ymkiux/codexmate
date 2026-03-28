@@ -2257,22 +2257,7 @@ function normalizeDiffText(input) {
     return normalizeLineEnding(stripUtf8Bom(safe), '\n');
 }
 
-function countDiffLines(input) {
-    if (!input) return 0;
-    let text = input;
-    if (text.endsWith('\n')) {
-        text = text.slice(0, -1);
-    }
-    if (!text) return 0;
-    let count = 1;
-    for (let i = 0; i < text.length; i += 1) {
-        if (text[i] === '\n') count += 1;
-    }
-    return count;
-}
-
 function buildAgentsDiff(params = {}) {
-    const MAX_DIFF_LINES = 3000;
     const hasBaseContent = typeof params.baseContent === 'string';
     const contextRaw = typeof params.context === 'string' ? params.context.trim() : '';
     const context = contextRaw || 'codex';
@@ -2294,26 +2279,8 @@ function buildAgentsDiff(params = {}) {
         hasBaseContent ? params.baseContent : (readResult && readResult.content ? readResult.content : '')
     );
     const afterText = normalizeDiffText(params.content);
-    const beforeLineCount = countDiffLines(beforeText);
-    const afterLineCount = countDiffLines(afterText);
-    if (beforeLineCount > MAX_DIFF_LINES || afterLineCount > MAX_DIFF_LINES) {
-        return {
-            diff: {
-                lines: [],
-                stats: { added: 0, removed: 0, unchanged: 0 },
-                oldLineCount: beforeLineCount,
-                newLineCount: afterLineCount,
-                hasChanges: beforeText !== afterText,
-                truncated: true
-            },
-            path: readResult && readResult.path ? readResult.path : '',
-            exists: !!(readResult && readResult.exists),
-            context,
-            configError: readResult && readResult.configError ? readResult.configError : ''
-        };
-    }
     const diff = buildLineDiff(beforeText, afterText);
-    const hasChanges = diff.stats.added > 0 || diff.stats.removed > 0;
+    const hasChanges = diff.truncated ? beforeText !== afterText : (diff.stats.added > 0 || diff.stats.removed > 0);
     return {
         diff: {
             ...diff,
