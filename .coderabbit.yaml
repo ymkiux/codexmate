@@ -4,6 +4,7 @@ reviews:
   profile: "chill"
   review_details: true
   enable_prompt_for_ai_agents: true
+  request_changes_workflow: true
   auto_review:
     enabled: true
     drafts: false
