@@ -20,6 +20,7 @@ test('agents modal exposes diff preview hooks in template and script', () => {
     assert.match(template, /agentsDiffHasChanges/);
     assert.match(template, /agents-diff-hint/);
     assert.match(template, /agents-diff-save-alert/);
+    assert.match(template, /检测到未保存改动/);
     assert.match(template, /快捷键：Esc/);
     assert.match(template, /agentsDiffTruncated/);
     assert.match(template, /:readonly="agentsLoading"/);
@@ -31,8 +32,12 @@ test('agents modal exposes diff preview hooks in template and script', () => {
     assert.match(script, /prepareAgentsDiff\(/);
     assert.match(script, /resetAgentsDiffState\(/);
     assert.match(script, /handleGlobalKeydown\(/);
+    assert.match(script, /handleBeforeUnload\(/);
+    assert.match(script, /hasPendingAgentsDraft\(/);
     assert.match(script, /window\.addEventListener\('keydown', this\.handleGlobalKeydown\)/);
     assert.match(script, /window\.removeEventListener\('keydown', this\.handleGlobalKeydown\)/);
+    assert.match(script, /window\.addEventListener\('beforeunload', this\.handleBeforeUnload\)/);
+    assert.match(script, /window\.removeEventListener\('beforeunload', this\.handleBeforeUnload\)/);
     assert.match(script, /window\.confirm\(/);
 });
 

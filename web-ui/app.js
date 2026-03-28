@@ -345,6 +345,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 this.restoreSessionFilterCache();
                 window.addEventListener('resize', this.onWindowResize);
                 window.addEventListener('keydown', this.handleGlobalKeydown);
+                window.addEventListener('beforeunload', this.handleBeforeUnload);
                 const savedConfigs = localStorage.getItem('claudeConfigs');
                 if (savedConfigs) {
                     try {
@@ -385,6 +386,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 this.disconnectSessionPreviewHeaderResizeObserver();
                 window.removeEventListener('resize', this.onWindowResize);
                 window.removeEventListener('keydown', this.handleGlobalKeydown);
+                window.removeEventListener('beforeunload', this.handleBeforeUnload);
                 this.applyCompactLayoutClass(false);
                 this.sessionPreviewScrollEl = null;
                 this.sessionPreviewContainerEl = null;
@@ -2328,6 +2330,22 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     }
                     this.closeAgentsModal();
                 },
+                hasPendingAgentsDraft() {
+                    if (!this.showAgentsModal || this.agentsLoading || this.agentsSaving) {
+                        return false;
+                    }
+                    return this.hasAgentsContentChanged() || this.agentsDiffVisible;
+                },
+                handleBeforeUnload(event) {
+                    if (!this.hasPendingAgentsDraft()) {
+                        return;
+                    }
+                    if (event && typeof event.preventDefault === 'function') {
+                        event.preventDefault();
+                        event.returnValue = '';
+                    }
+                    return '';
+                },
                 hasAgentsContentChanged() {
                     const original = typeof this.agentsOriginalContent === 'string' ? this.agentsOriginalContent : '';
                     const current = typeof this.agentsContent === 'string' ? this.agentsContent : '';
@@ -2406,12 +2424,11 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 closeAgentsModal(options = {}) {
                     const force = !!(options && options.force);
                     const shouldConfirmClose = !force
-                        && !this.agentsLoading
-                        && (this.hasAgentsContentChanged() || this.agentsDiffVisible);
+                        && this.hasPendingAgentsDraft();
                     if (shouldConfirmClose) {
                         const prompt = this.agentsDiffVisible
                             ? '当前处于差异预览模式，改动尚未保存。确认放弃改动并关闭吗？'
-                            : '存在未保存改动，确认放弃改动并关闭吗？';
+                            : '存在未保存改动，确认放弃改动并关闭吗？（关闭页面或应用也会丢失改动）';
                         if (!window.confirm(prompt)) {
                             return;
                         }

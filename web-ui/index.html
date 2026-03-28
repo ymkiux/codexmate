@@ -1705,10 +1705,12 @@
 
                     <div class="form-group">
                         <label class="form-label">AGENTS.md 内容</label>
+                        <div
+                            v-if="!agentsLoading && (hasAgentsContentChanged() || agentsDiffVisible)"
+                            class="agents-diff-save-alert">
+                            {{ agentsDiffVisible ? '预览模式：当前改动尚未保存，只有点击“应用”后才会写入文件。' : '检测到未保存改动：关闭页面或应用前请先保存。' }}
+                        </div>
                         <div v-if="agentsDiffVisible">
-                            <div v-if="!agentsDiffLoading && !agentsDiffError" class="agents-diff-save-alert">
-                                预览模式：当前改动尚未保存，只有点击“应用”后才会写入文件。
-                            </div>
                             <div
                                 v-if="!agentsDiffLoading && !agentsDiffError && !agentsDiffTruncated && (agentsDiffStats.added || agentsDiffStats.removed)"
                                 class="agents-diff-summary">
