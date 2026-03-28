@@ -78,6 +78,9 @@ test('web ui script defines provider mode metadata for codex only', () => {
     assert.match(appScript, /switchState\.pendingTarget = targetTab;/);
     assert.match(appScript, /if \(ticket !== liveState\.ticket\) return;/);
     assert.match(appScript, /activeSessionExportKey\(\)/);
+    assert.match(appScript, /if \(this\.mainTab !== 'sessions' \|\| !this\.sessionPreviewRenderEnabled\) {/);
+    assert.match(appScript, /const scrollRect = scrollEl && typeof scrollEl\.getBoundingClientRect === 'function'/);
+    assert.match(appScript, /top = scrollTop \+ \(messageRect\.top - scrollRect\.top\);/);
     assert.match(appScript, /this\.getMainTabForNav\(\) !== 'sessions'/);
     assert.match(appScript, /scheduleIdleTask\(task,\s*timeoutMs = 160\)/);
     assert.match(appScript, /scheduleSessionTabDeferredTeardown\(task\)/);
