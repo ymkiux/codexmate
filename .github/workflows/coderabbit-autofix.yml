@@ -52,13 +52,17 @@ jobs:
             }
 
             const query = `
-              query($owner:String!, $name:String!, $number:Int!) {
+              query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
                 repository(owner:$owner, name:$name) {
                   pullRequest(number:$number) {
-                    reviewThreads(first:100) {
+                    reviewThreads(first:100, after:$cursor) {
                       nodes {
                         isResolved
                         isOutdated
+                      }
+                      pageInfo {
+                        hasNextPage
+                        endCursor
                       }
                     }
                   }
@@ -66,13 +70,22 @@ jobs:
               }
             `;
 
-            const result = await github.graphql(query, {
-              owner,
-              name: repo,
-              number: pr.number
-            });
-            const nodes = result.repository.pullRequest.reviewThreads.nodes || [];
-            const unresolvedCount = nodes.filter((node) => !node.isResolved && !node.isOutdated).length;
+            let unresolvedCount = 0;
+            let cursor = null;
+            let hasNextPage = true;
+            while (hasNextPage) {
+              const result = await github.graphql(query, {
+                owner,
+                name: repo,
+                number: pr.number,
+                cursor
+              });
+              const reviewThreads = result?.repository?.pullRequest?.reviewThreads;
+              const nodes = reviewThreads?.nodes || [];
+              unresolvedCount += nodes.filter((node) => !node.isResolved && !node.isOutdated).length;
+              hasNextPage = Boolean(reviewThreads?.pageInfo?.hasNextPage);
+              cursor = reviewThreads?.pageInfo?.endCursor ?? null;
+            }
 
             if (unresolvedCount <= 0) {
               core.info('No unresolved review threads found, skip autofix trigger.');
