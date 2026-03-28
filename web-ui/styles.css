@@ -2847,6 +2847,13 @@ body::after {
     line-height: 1.4;
 }
 
+
+.agents-diff-hint {
+    margin-top: 6px;
+    color: var(--color-text-tertiary);
+    font-size: var(--font-size-caption);
+}
+
 .agents-diff-summary {
     display: flex;
     align-items: center;

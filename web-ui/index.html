@@ -1736,13 +1736,15 @@
                             placeholder="在这里编辑 AGENTS.md 内容"></textarea>
                         <div class="template-editor-warning">
                             {{ agentsModalHint }}
+                            <div v-if="!agentsDiffVisible" class="agents-diff-hint">保存需两步：先点击“确认”预览差异，再点击“应用”保存。</div>
+                            <div v-else class="agents-diff-hint">当前为预览模式，可点击“应用”保存或“取消”退出。</div>
                         </div>
                     </div>
 
                 </div>
 
                 <div class="btn-group modal-editor-footer">
-                    <button class="btn btn-cancel" @click="closeAgentsModal" v-if="!agentsDiffVisible">取消</button>
+                    <button class="btn btn-cancel" @click="closeAgentsModal" :disabled="agentsSaving || agentsDiffLoading">取消</button>
                     <button
                         v-if="agentsDiffVisible"
                         class="btn"
