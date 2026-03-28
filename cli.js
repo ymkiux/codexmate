@@ -38,6 +38,7 @@ const {
     writeJsonAtomic,
     formatTimestampForFileName
 } = require('./lib/cli-file-utils');
+const { buildLineDiff } = require('./lib/text-diff');
 const {
     extractModelNames,
     hasModelsListPayload,
@@ -121,6 +122,7 @@ const MODELS_RESPONSE_MAX_BYTES = 1024 * 1024;
 const MAX_RECENT_CONFIGS = 3;
 const MAX_UPLOAD_SIZE = 200 * 1024 * 1024;
 const MAX_SKILLS_ZIP_UPLOAD_SIZE = 20 * 1024 * 1024;
+const MAX_API_BODY_SIZE = 4 * 1024 * 1024;
 const MAX_SKILLS_ZIP_ENTRY_COUNT = 2000;
 const MAX_SKILLS_ZIP_UNCOMPRESSED_BYTES = 512 * 1024 * 1024;
 const DEFAULT_EXTRACT_SUFFIXES = Object.freeze(['.json']);
@@ -2218,6 +2220,15 @@ function readAgentsFile(params = {}) {
         };
     }
 
+    if (params.metaOnly) {
+        return {
+            exists: true,
+            path: filePath,
+            content: '',
+            lineEnding: os.EOL === '\r\n' ? '\r\n' : '\n'
+        };
+    }
+
     try {
         const raw = fs.readFileSync(filePath, 'utf-8');
         return {
@@ -2249,6 +2260,48 @@ function applyAgentsFile(params = {}) {
     } catch (e) {
         return { error: `写入 AGENTS.md 失败: ${e.message}` };
     }
+}
+
+function normalizeDiffText(input) {
+    const safe = typeof input === 'string' ? input : '';
+    return normalizeLineEnding(stripUtf8Bom(safe), '\n');
+}
+
+function buildAgentsDiff(params = {}) {
+    const hasBaseContent = typeof params.baseContent === 'string';
+    const contextRaw = typeof params.context === 'string' ? params.context.trim() : '';
+    const context = contextRaw || 'codex';
+    const metaOnly = hasBaseContent;
+    let readResult;
+    if (context === 'openclaw') {
+        readResult = readOpenclawAgentsFile({ metaOnly });
+    } else if (context === 'openclaw-workspace') {
+        readResult = readOpenclawWorkspaceFile({ ...params, metaOnly });
+    } else if (context === 'codex') {
+        readResult = readAgentsFile({ ...params, metaOnly });
+    } else {
+        return { error: `Unsupported agents diff context: ${context}` };
+    }
+    if (readResult && readResult.error) {
+        return { error: readResult.error };
+    }
+
+    const beforeText = normalizeDiffText(
+        hasBaseContent ? params.baseContent : (readResult && readResult.content ? readResult.content : '')
+    );
+    const afterText = normalizeDiffText(params.content);
+    const diff = buildLineDiff(beforeText, afterText);
+    const hasChanges = diff.truncated ? beforeText !== afterText : (diff.stats.added > 0 || diff.stats.removed > 0);
+    return {
+        diff: {
+            ...diff,
+            hasChanges
+        },
+        path: readResult && readResult.path ? readResult.path : '',
+        exists: !!(readResult && readResult.exists),
+        context,
+        configError: readResult && readResult.configError ? readResult.configError : ''
+    };
 }
 
 function resolveOpenclawWorkspaceDir(config) {
@@ -2348,7 +2401,7 @@ function getOpenclawWorkspaceInfo() {
     };
 }
 
-function readOpenclawAgentsFile() {
+function readOpenclawAgentsFile(params = {}) {
     const workspaceInfo = getOpenclawWorkspaceInfo();
     const baseDir = workspaceInfo.workspaceDir;
     const filePath = path.join(baseDir, AGENTS_FILE_NAME);
@@ -2365,7 +2418,7 @@ function readOpenclawAgentsFile() {
         };
     }
 
-    const readResult = readAgentsFile({ baseDir });
+    const readResult = readAgentsFile({ baseDir, metaOnly: !!params.metaOnly });
     return {
         ...readResult,
         workspaceDir: baseDir,
@@ -2412,6 +2465,17 @@ function readOpenclawWorkspaceFile(params = {}) {
     if (!fs.existsSync(filePath)) {
         return {
             exists: false,
+            path: filePath,
+            content: '',
+            lineEnding: os.EOL === '\r\n' ? '\r\n' : '\n',
+            workspaceDir: baseDir,
+            configError: workspaceInfo.configError
+        };
+    }
+
+    if (params.metaOnly) {
+        return {
+            exists: true,
             path: filePath,
             content: '',
             lineEnding: os.EOL === '\r\n' ? '\r\n' : '\n',
@@ -8483,8 +8547,23 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
         }
         if (requestPath === '/api') {
             let body = '';
-            req.on('data', chunk => body += chunk);
+            let bodySize = 0;
+            let bodyTooLarge = false;
+            req.on('data', chunk => {
+                if (bodyTooLarge) return;
+                bodySize += chunk.length;
+                if (bodySize > MAX_API_BODY_SIZE) {
+                    bodyTooLarge = true;
+                    writeJsonResponse(res, 413, {
+                        error: `请求体过大（>${Math.floor(MAX_API_BODY_SIZE / 1024 / 1024)}MB）`
+                    });
+                    req.destroy();
+                    return;
+                }
+                body += chunk;
+            });
             req.on('end', async () => {
+                if (bodyTooLarge) return;
                 try {
                     const { action, params } = JSON.parse(body);
                     let result;
@@ -8591,6 +8670,9 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             break;
                         case 'apply-agents-file':
                             result = applyAgentsFile(params || {});
+                            break;
+                        case 'preview-agents-diff':
+                            result = buildAgentsDiff(params || {});
                             break;
                         case 'list-codex-skills':
                             result = listCodexSkills();

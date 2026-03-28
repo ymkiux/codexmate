@@ -111,6 +111,19 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     agentsLineEnding: '\n',
                     agentsLoading: false,
                     agentsSaving: false,
+                    agentsOriginalContent: '',
+                    agentsDiffVisible: false,
+                    agentsDiffLoading: false,
+                    agentsDiffError: '',
+                    agentsDiffLines: [],
+                    agentsDiffStats: {
+                        added: 0,
+                        removed: 0,
+                        unchanged: 0
+                    },
+                    agentsDiffTruncated: false,
+                    agentsDiffHasChangesValue: false,
+                    agentsDiffFingerprint: '',
                     agentsContext: 'codex',
                     agentsModalTitle: 'AGENTS.md 编辑器',
                     agentsModalHint: '保存后会写入目标 AGENTS.md（与 config.toml 同级）。',
@@ -331,6 +344,8 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 }
                 this.restoreSessionFilterCache();
                 window.addEventListener('resize', this.onWindowResize);
+                window.addEventListener('keydown', this.handleGlobalKeydown);
+                window.addEventListener('beforeunload', this.handleBeforeUnload);
                 const savedConfigs = localStorage.getItem('claudeConfigs');
                 if (savedConfigs) {
                     try {
@@ -370,6 +385,8 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 this.teardownSessionTabRender();
                 this.disconnectSessionPreviewHeaderResizeObserver();
                 window.removeEventListener('resize', this.onWindowResize);
+                window.removeEventListener('keydown', this.handleGlobalKeydown);
+                window.removeEventListener('beforeunload', this.handleBeforeUnload);
                 this.applyCompactLayoutClass(false);
                 this.sessionPreviewScrollEl = null;
                 this.sessionPreviewContainerEl = null;
@@ -431,6 +448,15 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         return '关键词检索（支持 Codex/Claude，例：claude code）';
                     }
                     return '当前来源暂不支持关键词检索';
+                },
+                agentsDiffHasChanges() {
+                    if (this.agentsDiffTruncated) {
+                        return !!this.agentsDiffHasChangesValue;
+                    }
+                    const stats = this.agentsDiffStats || {};
+                    const added = Number(stats.added || 0);
+                    const removed = Number(stats.removed || 0);
+                    return added > 0 || removed > 0;
                 },
                 claudeModelHasList() {
                     return Array.isArray(this.claudeModels) && this.claudeModels.length > 0;
@@ -2183,9 +2209,11 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             return;
                         }
                         this.agentsContent = res.content || '';
+                        this.agentsOriginalContent = this.agentsContent;
                         this.agentsPath = res.path || '';
                         this.agentsExists = !!res.exists;
                         this.agentsLineEnding = res.lineEnding === '\r\n' ? '\r\n' : '\n';
+                        this.resetAgentsDiffState();
                         this.showAgentsModal = true;
                     } catch (e) {
                         this.showMessage('加载文件失败', 'error');
@@ -2209,9 +2237,11 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             this.showMessage(`OpenClaw 配置解析失败，已使用默认 Workspace：${res.configError}`, 'error');
                         }
                         this.agentsContent = res.content || '';
+                        this.agentsOriginalContent = this.agentsContent;
                         this.agentsPath = res.path || '';
                         this.agentsExists = !!res.exists;
                         this.agentsLineEnding = res.lineEnding === '\r\n' ? '\r\n' : '\n';
+                        this.resetAgentsDiffState();
                         this.showAgentsModal = true;
                     } catch (e) {
                         this.showMessage('加载文件失败', 'error');
@@ -2238,9 +2268,11 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             this.showMessage(`OpenClaw 配置解析失败，已使用默认 Workspace：${res.configError}`, 'error');
                         }
                         this.agentsContent = res.content || '';
+                        this.agentsOriginalContent = this.agentsContent;
                         this.agentsPath = res.path || '';
                         this.agentsExists = !!res.exists;
                         this.agentsLineEnding = res.lineEnding === '\r\n' ? '\r\n' : '\n';
+                        this.resetAgentsDiffState();
                         this.showAgentsModal = true;
                     } catch (e) {
                         this.showMessage('加载文件失败', 'error');
@@ -2269,18 +2301,175 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this.agentsWorkspaceFileName = '';
                 },
 
-                closeAgentsModal() {
+                resetAgentsDiffState() {
+                    this.agentsDiffVisible = false;
+                    this.agentsDiffLoading = false;
+                    this.agentsDiffError = '';
+                    this.agentsDiffLines = [];
+                    this.agentsDiffStats = {
+                        added: 0,
+                        removed: 0,
+                        unchanged: 0
+                    };
+                    this.agentsDiffTruncated = false;
+                    this.agentsDiffHasChangesValue = false;
+                    this.agentsDiffFingerprint = '';
+                },
+                handleGlobalKeydown(event) {
+                    if (!event || event.key !== 'Escape' || !this.showAgentsModal) {
+                        return;
+                    }
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (this.agentsSaving || this.agentsDiffLoading) {
+                        return;
+                    }
+                    if (this.agentsDiffVisible) {
+                        this.resetAgentsDiffState();
+                        return;
+                    }
+                    this.closeAgentsModal();
+                },
+                hasPendingAgentsDraft() {
+                    if (!this.showAgentsModal || this.agentsLoading || this.agentsSaving) {
+                        return false;
+                    }
+                    return this.hasAgentsContentChanged() || this.agentsDiffVisible;
+                },
+                handleBeforeUnload(event) {
+                    if (!this.hasPendingAgentsDraft()) {
+                        return;
+                    }
+                    if (event && typeof event.preventDefault === 'function') {
+                        event.preventDefault();
+                        event.returnValue = '';
+                    }
+                    return '';
+                },
+                hasAgentsContentChanged() {
+                    const original = typeof this.agentsOriginalContent === 'string' ? this.agentsOriginalContent : '';
+                    const current = typeof this.agentsContent === 'string' ? this.agentsContent : '';
+                    return original !== current;
+                },
+                onAgentsContentInput() {
+                    if (this.agentsDiffVisible || this.agentsDiffLines.length) {
+                        this.resetAgentsDiffState();
+                    }
+                },
+                buildAgentsDiffFingerprint() {
+                    const context = this.agentsContext || 'codex';
+                    const fileName = context === 'openclaw-workspace'
+                        ? (this.agentsWorkspaceFileName || '')
+                        : '';
+                    const lineEnding = this.agentsLineEnding || '\n';
+                    const content = typeof this.agentsContent === 'string' ? this.agentsContent : '';
+                    const original = typeof this.agentsOriginalContent === 'string' ? this.agentsOriginalContent : '';
+                    return `${context}::${fileName}::${lineEnding}::${content.length}::${content}::${original.length}::${original}`;
+                },
+                async prepareAgentsDiff() {
+                    this.agentsDiffVisible = true;
+                    this.agentsDiffLoading = true;
+                    this.agentsDiffError = '';
+                    this.agentsDiffLines = [];
+                    this.agentsDiffStats = {
+                        added: 0,
+                        removed: 0,
+                        unchanged: 0
+                    };
+                    this.agentsDiffTruncated = false;
+                    this.agentsDiffHasChangesValue = false;
+                    try {
+                        const params = {
+                            baseContent: this.agentsOriginalContent,
+                            content: this.agentsContent,
+                            lineEnding: this.agentsLineEnding,
+                            context: this.agentsContext
+                        };
+                        if (this.agentsContext === 'openclaw-workspace') {
+                            params.fileName = this.agentsWorkspaceFileName;
+                        }
+                        const res = await api('preview-agents-diff', params);
+                        if (res.error) {
+                            this.agentsDiffError = res.error;
+                            return;
+                        }
+                        const diff = res.diff && typeof res.diff === 'object' ? res.diff : {};
+                        const rawLines = Array.isArray(diff.lines) ? diff.lines : [];
+                        this.agentsDiffLines = rawLines.filter(line => line && line.type);
+                        this.agentsDiffTruncated = !!diff.truncated;
+                        this.agentsDiffHasChangesValue = !!diff.hasChanges;
+                        if (diff.stats && typeof diff.stats === 'object') {
+                            this.agentsDiffStats = {
+                                added: Number(diff.stats.added || 0),
+                                removed: Number(diff.stats.removed || 0),
+                                unchanged: Number(diff.stats.unchanged || 0)
+                            };
+                        } else {
+                            const stats = { added: 0, removed: 0, unchanged: 0 };
+                            for (const line of this.agentsDiffLines) {
+                                if (line && line.type === 'add') stats.added += 1;
+                                else if (line && line.type === 'del') stats.removed += 1;
+                                else stats.unchanged += 1;
+                            }
+                            this.agentsDiffStats = stats;
+                        }
+                        this.agentsDiffFingerprint = this.buildAgentsDiffFingerprint();
+                    } catch (e) {
+                        this.agentsDiffError = '生成差异失败';
+                    } finally {
+                        this.agentsDiffLoading = false;
+                    }
+                },
+
+                closeAgentsModal(options = {}) {
+                    const force = !!(options && options.force);
+                    const shouldConfirmClose = !force
+                        && this.hasPendingAgentsDraft();
+                    if (shouldConfirmClose) {
+                        const prompt = this.agentsDiffVisible
+                            ? '当前处于差异预览模式，改动尚未保存。确认放弃改动并关闭吗？'
+                            : '存在未保存改动，确认放弃改动并关闭吗？（关闭页面或应用也会丢失改动）';
+                        if (!window.confirm(prompt)) {
+                            return;
+                        }
+                    }
                     this.showAgentsModal = false;
                     this.agentsContent = '';
+                    this.agentsOriginalContent = '';
                     this.agentsPath = '';
                     this.agentsExists = false;
                     this.agentsLineEnding = '\n';
                     this.agentsSaving = false;
                     this.agentsWorkspaceFileName = '';
+                    this.resetAgentsDiffState();
                     this.setAgentsModalContext('codex');
                 },
 
                 async applyAgentsContent() {
+                    if (!this.agentsDiffVisible) {
+                        if (!this.hasAgentsContentChanged()) {
+                            this.showMessage('未检测到改动', 'info');
+                            return;
+                        }
+                        await this.prepareAgentsDiff();
+                        return;
+                    }
+                    if (this.agentsDiffLoading) {
+                        return;
+                    }
+                    if (this.agentsDiffError) {
+                        this.showMessage(this.agentsDiffError, 'error');
+                        return;
+                    }
+                    const fingerprint = this.buildAgentsDiffFingerprint();
+                    if (this.agentsDiffFingerprint !== fingerprint) {
+                        await this.prepareAgentsDiff();
+                        return;
+                    }
+                    if (!this.agentsDiffHasChanges) {
+                        this.showMessage('未检测到改动', 'info');
+                        return;
+                    }
                     this.agentsSaving = true;
                     try {
                         let action = 'apply-agents-file';
@@ -2303,7 +2492,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             ? `工作区文件已保存${this.agentsWorkspaceFileName ? `: ${this.agentsWorkspaceFileName}` : ''}`
                             : (this.agentsContext === 'openclaw' ? 'OpenClaw AGENTS.md 已保存' : 'AGENTS.md 已保存');
                         this.showMessage(successLabel, 'success');
-                        this.closeAgentsModal();
+                        this.closeAgentsModal({ force: true });
                     } catch (e) {
                         this.showMessage('保存失败', 'error');
                     } finally {
