@@ -344,6 +344,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 }
                 this.restoreSessionFilterCache();
                 window.addEventListener('resize', this.onWindowResize);
+                window.addEventListener('keydown', this.handleGlobalKeydown);
                 const savedConfigs = localStorage.getItem('claudeConfigs');
                 if (savedConfigs) {
                     try {
@@ -383,6 +384,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 this.teardownSessionTabRender();
                 this.disconnectSessionPreviewHeaderResizeObserver();
                 window.removeEventListener('resize', this.onWindowResize);
+                window.removeEventListener('keydown', this.handleGlobalKeydown);
                 this.applyCompactLayoutClass(false);
                 this.sessionPreviewScrollEl = null;
                 this.sessionPreviewContainerEl = null;
@@ -2311,6 +2313,21 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this.agentsDiffHasChangesValue = false;
                     this.agentsDiffFingerprint = '';
                 },
+                handleGlobalKeydown(event) {
+                    if (!event || event.key !== 'Escape' || !this.showAgentsModal) {
+                        return;
+                    }
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (this.agentsSaving || this.agentsDiffLoading) {
+                        return;
+                    }
+                    if (this.agentsDiffVisible) {
+                        this.resetAgentsDiffState();
+                        return;
+                    }
+                    this.closeAgentsModal();
+                },
                 hasAgentsContentChanged() {
                     const original = typeof this.agentsOriginalContent === 'string' ? this.agentsOriginalContent : '';
                     const current = typeof this.agentsContent === 'string' ? this.agentsContent : '';
@@ -2386,7 +2403,19 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     }
                 },
 
-                closeAgentsModal() {
+                closeAgentsModal(options = {}) {
+                    const force = !!(options && options.force);
+                    const shouldConfirmClose = !force
+                        && !this.agentsLoading
+                        && (this.hasAgentsContentChanged() || this.agentsDiffVisible);
+                    if (shouldConfirmClose) {
+                        const prompt = this.agentsDiffVisible
+                            ? '当前处于差异预览模式，改动尚未保存。确认放弃改动并关闭吗？'
+                            : '存在未保存改动，确认放弃改动并关闭吗？';
+                        if (!window.confirm(prompt)) {
+                            return;
+                        }
+                    }
                     this.showAgentsModal = false;
                     this.agentsContent = '';
                     this.agentsOriginalContent = '';
@@ -2446,7 +2475,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             ? `工作区文件已保存${this.agentsWorkspaceFileName ? `: ${this.agentsWorkspaceFileName}` : ''}`
                             : (this.agentsContext === 'openclaw' ? 'OpenClaw AGENTS.md 已保存' : 'AGENTS.md 已保存');
                         this.showMessage(successLabel, 'success');
-                        this.closeAgentsModal();
+                        this.closeAgentsModal({ force: true });
                     } catch (e) {
                         this.showMessage('保存失败', 'error');
                     } finally {

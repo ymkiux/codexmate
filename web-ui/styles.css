@@ -2854,6 +2854,17 @@ body::after {
     font-size: var(--font-size-caption);
 }
 
+.agents-diff-save-alert {
+    margin-bottom: 8px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(238, 178, 90, 0.45);
+    background: rgba(255, 236, 204, 0.72);
+    color: #8d5b31;
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-secondary);
+}
+
 .agents-diff-summary {
     display: flex;
     align-items: center;

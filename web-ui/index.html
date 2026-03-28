@@ -1706,6 +1706,9 @@
                     <div class="form-group">
                         <label class="form-label">AGENTS.md 内容</label>
                         <div v-if="agentsDiffVisible">
+                            <div v-if="!agentsDiffLoading && !agentsDiffError" class="agents-diff-save-alert">
+                                预览模式：当前改动尚未保存，只有点击“应用”后才会写入文件。
+                            </div>
                             <div
                                 v-if="!agentsDiffLoading && !agentsDiffError && !agentsDiffTruncated && (agentsDiffStats.added || agentsDiffStats.removed)"
                                 class="agents-diff-summary">
@@ -1738,6 +1741,7 @@
                             placeholder="在这里编辑 AGENTS.md 内容"></textarea>
                         <div class="template-editor-warning">
                             {{ agentsModalHint }}
+                            <div class="agents-diff-hint">快捷键：Esc（差异预览时返回编辑，编辑时关闭窗口）。</div>
                             <div v-if="!agentsDiffVisible" class="agents-diff-hint">保存需两步：先点击“确认”预览差异，再点击“应用”保存。</div>
                             <div v-else-if="agentsDiffLoading || agentsSaving" class="agents-diff-hint">正在生成差异或应用中，操作暂不可用。</div>
                             <div v-else-if="agentsDiffError" class="agents-diff-hint">差异预览失败，请返回编辑后重试。</div>

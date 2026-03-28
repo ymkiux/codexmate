@@ -19,6 +19,8 @@ test('agents modal exposes diff preview hooks in template and script', () => {
     assert.match(template, /agents-diff-editor/);
     assert.match(template, /agentsDiffHasChanges/);
     assert.match(template, /agents-diff-hint/);
+    assert.match(template, /agents-diff-save-alert/);
+    assert.match(template, /快捷键：Esc/);
     assert.match(template, /agentsDiffTruncated/);
     assert.match(template, /:readonly="agentsLoading"/);
     assert.match(template, /agentsDiffVisible \? '应用'/);
@@ -28,6 +30,10 @@ test('agents modal exposes diff preview hooks in template and script', () => {
     assert.match(script, /agentsDiffVisible:\s*false/);
     assert.match(script, /prepareAgentsDiff\(/);
     assert.match(script, /resetAgentsDiffState\(/);
+    assert.match(script, /handleGlobalKeydown\(/);
+    assert.match(script, /window\.addEventListener\('keydown', this\.handleGlobalKeydown\)/);
+    assert.match(script, /window\.removeEventListener\('keydown', this\.handleGlobalKeydown\)/);
+    assert.match(script, /window\.confirm\(/);
 });
 
 test('agents diff preview avoids extra file reads and caps api payload size', () => {
