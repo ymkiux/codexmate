@@ -33,6 +33,9 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /data-config-mode=\"codex\"/);
     assert.match(html, /isMainTabNavActive\('settings'\)/);
     assert.match(html, /isConfigModeNavActive\('codex'\)/);
+    assert.doesNotMatch(html, /:aria-pressed=/);
+    assert.match(html, /:aria-selected="mainTab === 'sessions'"/);
+    assert.match(html, /:aria-selected="mainTab === 'config' && configMode === 'codex'"/);
     assert.match(html, /v-memo="\[activeSessionExportKey === getSessionExportKey\(session\)/);
     assert.match(html, /v-memo="\[msg\.text,\s*msg\.timestamp,\s*msg\.roleLabel,\s*msg\.normalizedRole\]"/);
     assert.match(html, /v-memo="\[sessionTimelineActiveKey === node\.key,\s*node\.safePercent,\s*node\.title\]"/);
@@ -65,6 +68,7 @@ test('web ui script defines provider mode metadata for codex only', () => {
     assert.match(appScript, /onConfigTabPointerDown\(mode\)/);
     assert.match(appScript, /onMainTabClick\(tab\)/);
     assert.match(appScript, /onConfigTabClick\(mode\)/);
+    assert.match(appScript, /if \(pointerType === 'touch'\) {/);
     assert.match(appScript, /node\.classList\.toggle\('nav-intent-active'/);
     assert.match(appScript, /node\.classList\.toggle\('nav-intent-inactive'/);
     assert.match(appScript, /node\.classList\.remove\('nav-intent-active'\)/);
@@ -81,6 +85,8 @@ test('web ui script defines provider mode metadata for codex only', () => {
     assert.match(appScript, /if \(this\.mainTab !== 'sessions' \|\| !this\.sessionPreviewRenderEnabled\) {/);
     assert.match(appScript, /const scrollRect = scrollEl && typeof scrollEl\.getBoundingClientRect === 'function'/);
     assert.match(appScript, /top = scrollTop \+ \(messageRect\.top - scrollRect\.top\);/);
+    assert.match(appScript, /if \(!current \|\| current\.ticket !== this\.sessionTabRenderTicket\) {/);
+    assert.match(appScript, /bindSessionMessageRef\(messageKey,\s*el,\s*ticket = this\.sessionTabRenderTicket\)/);
     assert.match(appScript, /this\.getMainTabForNav\(\) !== 'sessions'/);
     assert.match(appScript, /scheduleIdleTask\(task,\s*timeoutMs = 160\)/);
     assert.match(appScript, /scheduleSessionTabDeferredTeardown\(task\)/);
@@ -107,4 +113,11 @@ test('web ui script defines provider mode metadata for codex only', () => {
     assert.match(configModeComputed, /export const CONFIG_MODE_SET = new Set\(/);
     assert.match(configModeComputed, /isProviderConfigMode\(\)/);
     assert.match(configModeComputed, /activeProviderModelPlaceholder\(\)/);
+});
+
+test('session helper deferred claude refresh validates live tab and mode before running', () => {
+    const helperScript = readProjectFile('web-ui/session-helpers.mjs');
+    assert.match(helperScript, /const expectedTab = nextTab;/);
+    assert.match(helperScript, /const expectedConfigMode = this\.configMode;/);
+    assert.match(helperScript, /if \(this\.mainTab !== expectedTab \|\| this\.configMode !== expectedConfigMode\) return;/);
 });

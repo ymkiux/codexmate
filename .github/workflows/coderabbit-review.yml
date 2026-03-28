@@ -27,7 +27,7 @@ jobs:
           script: |
             const pr = context.payload.pull_request;
             const body = [
-              "@coderabbitai If the current suggestion is not adopted, will it lead to disruptive changes? Is there any user experience regression?",
+              "@coderabbitai review - If these changes are applied, will they cause disruptive behavior or user experience regressions?",
             ].join("\n");
 
             await github.rest.issues.createComment({

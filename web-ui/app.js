@@ -910,7 +910,12 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this.configMode = CONFIG_MODE_SET.has(normalizedMode) ? normalizedMode : 'codex';
                     if (this.mainTab === 'config') {
                         if (this.configMode === 'claude') {
+                            const expectedMainTab = 'config';
+                            const expectedConfigMode = 'claude';
                             const refresh = () => {
+                                if (this.mainTab !== expectedMainTab || this.configMode !== expectedConfigMode) {
+                                    return;
+                                }
                                 this.refreshClaudeModelContext();
                             };
                             if (typeof this.scheduleAfterFrame === 'function') {
@@ -1050,6 +1055,12 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this.applyImmediateNavIntent(normalizedTab);
                     const shouldHideSessionPanel = this.mainTab === 'sessions' && normalizedTab !== 'sessions';
                     this.setSessionPanelFastHidden(shouldHideSessionPanel);
+                    const pointerType = event && typeof event.pointerType === 'string'
+                        ? event.pointerType.trim().toLowerCase()
+                        : '';
+                    if (pointerType === 'touch') {
+                        return;
+                    }
                     this.recordPointerNavCommit('main', normalizedTab);
                     this.switchMainTab(normalizedTab);
                 },
@@ -1064,6 +1075,12 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this.applyImmediateNavIntent('config', normalizedMode);
                     const shouldHideSessionPanel = this.mainTab === 'sessions';
                     this.setSessionPanelFastHidden(shouldHideSessionPanel);
+                    const pointerType = event && typeof event.pointerType === 'string'
+                        ? event.pointerType.trim().toLowerCase()
+                        : '';
+                    if (pointerType === 'touch') {
+                        return;
+                    }
                     this.recordPointerNavCommit('config', normalizedMode);
                     this.switchConfigMode(normalizedMode);
                 },
@@ -2029,12 +2046,17 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 },
                 getSessionMessageRefBinder(messageKey) {
                     if (!this.isSessionTimelineNodeKey(messageKey)) return null;
-                    if (!this.sessionMessageRefBinderMap[messageKey]) {
-                        this.sessionMessageRefBinderMap[messageKey] = (el) => {
-                            this.bindSessionMessageRef(messageKey, el);
+                    const current = this.sessionMessageRefBinderMap[messageKey];
+                    if (!current || current.ticket !== this.sessionTabRenderTicket) {
+                        const ticket = this.sessionTabRenderTicket;
+                        this.sessionMessageRefBinderMap[messageKey] = {
+                            ticket,
+                            bind: (el) => {
+                                this.bindSessionMessageRef(messageKey, el, ticket);
+                            }
                         };
                     }
-                    return this.sessionMessageRefBinderMap[messageKey];
+                    return this.sessionMessageRefBinderMap[messageKey].bind;
                 },
                 updateSessionTimelineOffset() {
                     const container = this.sessionPreviewContainerEl || this.$refs.sessionPreviewContainer;
@@ -2046,9 +2068,10 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     const offset = headerHeight > 0 ? (headerHeight + 12) : 72;
                     container.style.setProperty('--session-preview-header-offset', `${offset}px`);
                 },
-                bindSessionMessageRef(messageKey, el) {
+                bindSessionMessageRef(messageKey, el, ticket = this.sessionTabRenderTicket) {
                     if (!this.sessionTimelineEnabled) return;
                     if (!messageKey) return;
+                    if (ticket !== this.sessionTabRenderTicket) return;
                     if (el) {
                         if (!this.isSessionTimelineNodeKey(messageKey)) return;
                         if (this.sessionMessageRefMap[messageKey] === el) return;
