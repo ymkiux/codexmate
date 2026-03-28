@@ -47,7 +47,10 @@ export function switchMainTab(tab) {
         this.prepareSessionTabRender();
     }
     if (nextTab === 'config' && this.configMode === 'claude') {
+        const expectedTab = nextTab;
+        const expectedConfigMode = this.configMode;
         const refresh = () => {
+            if (this.mainTab !== expectedTab || this.configMode !== expectedConfigMode) return;
             this.refreshClaudeModelContext();
         };
         if (typeof this.scheduleAfterFrame === 'function') {
