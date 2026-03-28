@@ -18,6 +18,7 @@ test('agents modal exposes diff preview hooks in template and script', () => {
     assert.match(template, /agents-diff/);
     assert.match(template, /agents-diff-editor/);
     assert.match(template, /agentsDiffHasChanges/);
+    assert.match(template, /agentsDiffTruncated/);
     assert.match(template, /:readonly="agentsLoading"/);
     assert.match(template, /v-if="!agentsDiffVisible"/);
     assert.match(template, /agentsDiffVisible \? '应用'/);

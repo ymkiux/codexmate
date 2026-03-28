@@ -121,6 +121,8 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         removed: 0,
                         unchanged: 0
                     },
+                    agentsDiffTruncated: false,
+                    agentsDiffHasChangesValue: false,
                     agentsDiffFingerprint: '',
                     agentsContext: 'codex',
                     agentsModalTitle: 'AGENTS.md 编辑器',
@@ -444,6 +446,9 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     return '当前来源暂不支持关键词检索';
                 },
                 agentsDiffHasChanges() {
+                    if (this.agentsDiffTruncated) {
+                        return !!this.agentsDiffHasChangesValue;
+                    }
                     const stats = this.agentsDiffStats || {};
                     const added = Number(stats.added || 0);
                     const removed = Number(stats.removed || 0);
@@ -2302,6 +2307,8 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         removed: 0,
                         unchanged: 0
                     };
+                    this.agentsDiffTruncated = false;
+                    this.agentsDiffHasChangesValue = false;
                     this.agentsDiffFingerprint = '';
                 },
                 hasAgentsContentChanged() {
@@ -2334,6 +2341,8 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         removed: 0,
                         unchanged: 0
                     };
+                    this.agentsDiffTruncated = false;
+                    this.agentsDiffHasChangesValue = false;
                     try {
                         const params = {
                             baseContent: this.agentsOriginalContent,
@@ -2352,6 +2361,8 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         const diff = res.diff && typeof res.diff === 'object' ? res.diff : {};
                         const rawLines = Array.isArray(diff.lines) ? diff.lines : [];
                         this.agentsDiffLines = rawLines.filter(line => line && line.type);
+                        this.agentsDiffTruncated = !!diff.truncated;
+                        this.agentsDiffHasChangesValue = !!diff.hasChanges;
                         if (diff.stats && typeof diff.stats === 'object') {
                             this.agentsDiffStats = {
                                 added: Number(diff.stats.added || 0),

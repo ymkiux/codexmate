@@ -1712,6 +1712,7 @@
                             </div>
                             <div v-if="agentsDiffLoading" class="state-message">生成差异中...</div>
                             <div v-else-if="agentsDiffError" class="state-message error">{{ agentsDiffError }}</div>
+                            <div v-else-if="agentsDiffTruncated" class="agents-diff-empty">内容过大，已跳过逐行差异预览</div>
                             <div v-else-if="!agentsDiffHasChanges" class="agents-diff-empty">未检测到改动</div>
                             <div v-else class="agents-diff-view agents-diff-editor">
                                 <div
