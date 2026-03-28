@@ -406,7 +406,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     return this.activeSession ? this.getSessionExportKey(this.activeSession) : '';
                 },
                 activeSessionVisibleMessages() {
-                    if (!this.sessionPreviewRenderEnabled) {
+                    if (this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {
                         return [];
                     }
                     const list = Array.isArray(this.activeSessionMessages) ? this.activeSessionMessages : [];
@@ -424,7 +424,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     return list.slice(0, visibleCount);
                 },
                 canLoadMoreSessionMessages() {
-                    if (!this.sessionPreviewRenderEnabled) {
+                    if (this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {
                         return false;
                     }
                     const total = Array.isArray(this.activeSessionMessages) ? this.activeSessionMessages.length : 0;
@@ -437,7 +437,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     return Math.max(0, total - visible);
                 },
                 sessionTimelineNodes() {
-                    if (!this.sessionPreviewRenderEnabled) {
+                    if (this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {
                         return [];
                     }
                     return buildSessionTimelineNodes(this.activeSessionVisibleMessages, {
@@ -1964,12 +1964,26 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         cache.dirty = false;
                         return cache.offsetByKey;
                     }
+                    const scrollEl = this.sessionPreviewScrollEl || this.$refs.sessionPreviewScroll;
+                    const scrollRect = scrollEl && typeof scrollEl.getBoundingClientRect === 'function'
+                        ? scrollEl.getBoundingClientRect()
+                        : null;
+                    const scrollTop = scrollEl ? Number(scrollEl.scrollTop || 0) : 0;
                     const nextOffsetByKey = Object.create(null);
                     for (const node of nodeList) {
                         if (!node || !node.key) continue;
                         const messageEl = this.sessionMessageRefMap[node.key];
                         if (!messageEl) continue;
-                        const top = Number(messageEl.offsetTop || 0);
+                        let top = Number.NaN;
+                        if (
+                            scrollRect
+                            && typeof messageEl.getBoundingClientRect === 'function'
+                        ) {
+                            const messageRect = messageEl.getBoundingClientRect();
+                            top = scrollTop + (messageRect.top - scrollRect.top);
+                        } else {
+                            top = Number(messageEl.offsetTop || 0);
+                        }
                         if (!Number.isFinite(top)) continue;
                         nextOffsetByKey[node.key] = top;
                     }
