@@ -29,3 +29,10 @@ test('agents modal exposes diff preview hooks in template and script', () => {
     assert.match(script, /prepareAgentsDiff\(/);
     assert.match(script, /resetAgentsDiffState\(/);
 });
+
+test('agents diff preview avoids extra file reads and caps api payload size', () => {
+    const cliSource = readProjectFile('cli.js');
+    assert.match(cliSource, /MAX_API_BODY_SIZE/);
+    assert.match(cliSource, /bodySize\s*>\s*MAX_API_BODY_SIZE/);
+    assert.match(cliSource, /buildAgentsDiff[\s\S]*metaOnly/);
+});
