@@ -42,6 +42,16 @@ test('buildLineDiff ignores single trailing newline', () => {
     assert.strictEqual(withoutTrailing.lines.length, 2);
 });
 
+test('buildLineDiff truncates large inputs', () => {
+    const lines = Array.from({ length: 3001 }, (_, index) => `line-${index}`);
+    const text = lines.join('\n');
+    const result = buildLineDiff(text, text);
+    assert.strictEqual(result.truncated, true);
+    assert.strictEqual(result.oldLineCount, 3001);
+    assert.strictEqual(result.newLineCount, 3001);
+    assert.strictEqual(result.lines.length, 0);
+});
+
 test('buildLineDiff tolerates non-string input', () => {
     const result = buildLineDiff(null, 123);
     assert.strictEqual(result.oldLineCount, 0);
