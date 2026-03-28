@@ -56,48 +56,56 @@
             <button class="top-tab"
                 id="tab-config-codex"
                 role="tab"
+                data-main-tab="config"
+                data-config-mode="codex"
                 :tabindex="mainTab === 'config' && configMode === 'codex' ? 0 : -1"
                 :aria-selected="mainTab === 'config' && configMode === 'codex'"
-                :aria-pressed="mainTab === 'config' && configMode === 'codex'"
                 aria-controls="panel-config-provider"
-                :class="{ active: mainTab === 'config' && configMode === 'codex' }"
-                @click="switchConfigMode('codex')">Codex 配置</button>
+                :class="{ active: isConfigModeNavActive('codex') }"
+                @pointerdown="onConfigTabPointerDown('codex', $event)"
+                @click="onConfigTabClick('codex', $event)">Codex 配置</button>
             <button class="top-tab"
                 id="tab-config-claude"
                 role="tab"
+                data-main-tab="config"
+                data-config-mode="claude"
                 :tabindex="mainTab === 'config' && configMode === 'claude' ? 0 : -1"
                 :aria-selected="mainTab === 'config' && configMode === 'claude'"
-                :aria-pressed="mainTab === 'config' && configMode === 'claude'"
                 aria-controls="panel-config-claude"
-                :class="{ active: mainTab === 'config' && configMode === 'claude' }"
-                @click="switchConfigMode('claude')">Claude Code 配置</button>
+                :class="{ active: isConfigModeNavActive('claude') }"
+                @pointerdown="onConfigTabPointerDown('claude', $event)"
+                @click="onConfigTabClick('claude', $event)">Claude Code 配置</button>
             <button class="top-tab"
                 id="tab-config-openclaw"
                 role="tab"
+                data-main-tab="config"
+                data-config-mode="openclaw"
                 :tabindex="mainTab === 'config' && configMode === 'openclaw' ? 0 : -1"
                 :aria-selected="mainTab === 'config' && configMode === 'openclaw'"
-                :aria-pressed="mainTab === 'config' && configMode === 'openclaw'"
                 aria-controls="panel-config-openclaw"
-                :class="{ active: mainTab === 'config' && configMode === 'openclaw' }"
-                @click="switchConfigMode('openclaw')">OpenClaw 配置</button>
+                :class="{ active: isConfigModeNavActive('openclaw') }"
+                @pointerdown="onConfigTabPointerDown('openclaw', $event)"
+                @click="onConfigTabClick('openclaw', $event)">OpenClaw 配置</button>
             <button class="top-tab"
                 id="tab-sessions"
                 role="tab"
+                data-main-tab="sessions"
                 :tabindex="mainTab === 'sessions' ? 0 : -1"
                 :aria-selected="mainTab === 'sessions'"
-                :aria-pressed="mainTab === 'sessions'"
                 aria-controls="panel-sessions"
-                :class="{ active: mainTab === 'sessions' }"
-                @click="switchMainTab('sessions')">会话浏览</button>
+                :class="{ active: isMainTabNavActive('sessions') }"
+                @pointerdown="onMainTabPointerDown('sessions', $event)"
+                @click="onMainTabClick('sessions', $event)">会话浏览</button>
             <button class="top-tab"
                 id="tab-settings"
                 role="tab"
+                data-main-tab="settings"
                 :tabindex="mainTab === 'settings' ? 0 : -1"
                 :aria-selected="mainTab === 'settings'"
-                :aria-pressed="mainTab === 'settings'"
                 aria-controls="panel-settings"
-                :class="{ active: mainTab === 'settings' }"
-                @click="switchMainTab('settings')">设置</button>
+                :class="{ active: isMainTabNavActive('settings') }"
+                @pointerdown="onMainTabPointerDown('settings', $event)"
+                @click="onMainTabClick('settings', $event)">设置</button>
         </div>
 
         <div :class="['app-shell', { standalone: sessionStandalone }]">
@@ -137,12 +145,14 @@
                     <button
                         role="tab"
                         id="side-tab-config-codex"
+                        data-main-tab="config"
+                        data-config-mode="codex"
                         aria-controls="panel-config-provider"
                         :tabindex="mainTab === 'config' && configMode === 'codex' ? 0 : -1"
                         :aria-selected="mainTab === 'config' && configMode === 'codex'"
-                        :aria-pressed="mainTab === 'config' && configMode === 'codex'"
-                        :class="['side-item', { active: mainTab === 'config' && configMode === 'codex' }]"
-                        @click="switchConfigMode('codex')">
+                        :class="['side-item', { active: isConfigModeNavActive('codex') }]"
+                        @pointerdown="onConfigTabPointerDown('codex', $event)"
+                        @click="onConfigTabClick('codex', $event)">
                         <div class="side-item-title">Codex 配置</div>
                         <div class="side-item-meta">
                             <span>提供商 / 模型</span>
@@ -152,12 +162,14 @@
                     <button
                         role="tab"
                         id="side-tab-config-claude"
+                        data-main-tab="config"
+                        data-config-mode="claude"
                         aria-controls="panel-config-claude"
                         :tabindex="mainTab === 'config' && configMode === 'claude' ? 0 : -1"
                         :aria-selected="mainTab === 'config' && configMode === 'claude'"
-                        :aria-pressed="mainTab === 'config' && configMode === 'claude'"
-                        :class="['side-item', { active: mainTab === 'config' && configMode === 'claude' }]"
-                        @click="switchConfigMode('claude')">
+                        :class="['side-item', { active: isConfigModeNavActive('claude') }]"
+                        @pointerdown="onConfigTabPointerDown('claude', $event)"
+                        @click="onConfigTabClick('claude', $event)">
                         <div class="side-item-title">Claude Code 配置</div>
                         <div class="side-item-meta">
                             <span>Base URL / Key</span>
@@ -167,12 +179,14 @@
                     <button
                         role="tab"
                         id="side-tab-config-openclaw"
+                        data-main-tab="config"
+                        data-config-mode="openclaw"
                         aria-controls="panel-config-openclaw"
                         :tabindex="mainTab === 'config' && configMode === 'openclaw' ? 0 : -1"
                         :aria-selected="mainTab === 'config' && configMode === 'openclaw'"
-                        :aria-pressed="mainTab === 'config' && configMode === 'openclaw'"
-                        :class="['side-item', { active: mainTab === 'config' && configMode === 'openclaw' }]"
-                        @click="switchConfigMode('openclaw')">
+                        :class="['side-item', { active: isConfigModeNavActive('openclaw') }]"
+                        @pointerdown="onConfigTabPointerDown('openclaw', $event)"
+                        @click="onConfigTabClick('openclaw', $event)">
                         <div class="side-item-title">OpenClaw 配置</div>
                         <div class="side-item-meta">
                             <span>JSON5 / Workspace</span>
@@ -186,12 +200,13 @@
                     <button
                         role="tab"
                         id="side-tab-sessions"
+                        data-main-tab="sessions"
                         aria-controls="panel-sessions"
                         :tabindex="mainTab === 'sessions' ? 0 : -1"
                         :aria-selected="mainTab === 'sessions'"
-                        :aria-pressed="mainTab === 'sessions'"
-                        :class="['side-item', { active: mainTab === 'sessions' }]"
-                        @click="switchMainTab('sessions')">
+                        :class="['side-item', { active: isMainTabNavActive('sessions') }]"
+                        @pointerdown="onMainTabPointerDown('sessions', $event)"
+                        @click="onMainTabClick('sessions', $event)">
                         <div class="side-item-title">会话浏览</div>
                         <div class="side-item-meta">
                             <span>快速预览 / 导出</span>
@@ -205,12 +220,13 @@
                     <button
                         role="tab"
                         id="side-tab-settings"
+                        data-main-tab="settings"
                         aria-controls="panel-settings"
                         :tabindex="mainTab === 'settings' ? 0 : -1"
                         :aria-selected="mainTab === 'settings'"
-                        :aria-pressed="mainTab === 'settings'"
-                        :class="['side-item', { active: mainTab === 'settings' }]"
-                        @click="switchMainTab('settings')">
+                        :class="['side-item', { active: isMainTabNavActive('settings') }]"
+                        @pointerdown="onMainTabPointerDown('settings', $event)"
+                        @click="onMainTabClick('settings', $event)">
                         <div class="side-item-title">设置</div>
                         <div class="side-item-meta">
                             <span>数据管理 / 下载</span>
@@ -298,13 +314,13 @@
                 </div>
 
                 <div v-if="false && mainTab === 'config' && !sessionStandalone" class="config-subtabs">
-                    <button :class="['config-subtab', { active: configMode === 'codex' }]" @click="switchConfigMode('codex')">
+                    <button :class="['config-subtab', { active: configMode === 'codex' }]" @click="onConfigTabClick('codex', $event)">
                         Codex 配置
                     </button>
-                    <button :class="['config-subtab', { active: configMode === 'claude' }]" @click="switchConfigMode('claude')">
+                    <button :class="['config-subtab', { active: configMode === 'claude' }]" @click="onConfigTabClick('claude', $event)">
                         Claude Code 配置
                     </button>
-                    <button :class="['config-subtab', { active: configMode === 'openclaw' }]" @click="switchConfigMode('openclaw')">
+                    <button :class="['config-subtab', { active: configMode === 'openclaw' }]" @click="onConfigTabClick('openclaw', $event)">
                         OpenClaw 配置
                     </button>
                 </div>
@@ -889,10 +905,11 @@
                         <div
                             v-for="session in sessionsList"
                             :key="session.source + '-' + session.sessionId + '-' + session.filePath"
+                            v-memo="[activeSessionExportKey === getSessionExportKey(session), session.messageCount, session.updatedAt, session.title, session.sourceLabel]"
                             :class="[
                                 'session-item',
                                 {
-                                    active: activeSession && getSessionExportKey(activeSession) === getSessionExportKey(session)
+                                    active: activeSessionExportKey === getSessionExportKey(session)
                                 }
                             ]"
                             @click="selectSession(session)">
@@ -956,13 +973,6 @@
                                             {{ (activeSession && sessionExporting[getSessionExportKey(activeSession)]) ? '导出中...' : '导出记录' }}
                                         </button>
                                         <button
-                                            class="btn-session-refresh"
-                                            @click="toggleSessionTimeline"
-                                            :aria-pressed="sessionTimelineEnabled"
-                                            :disabled="!activeSession">
-                                            {{ sessionTimelineEnabled ? '关闭时间轴' : '开启时间轴' }}
-                                        </button>
-                                        <button
                                             v-if="!sessionStandalone"
                                             class="btn-session-open"
                                             @click="openSessionStandalone(activeSession)"
@@ -1017,8 +1027,9 @@
                                         <div
                                             v-for="(msg, idx) in activeSessionVisibleMessages"
                                             :key="getRecordRenderKey(msg, idx)"
+                                            v-memo="[msg.text, msg.timestamp, msg.roleLabel, msg.normalizedRole]"
                                             :data-message-key="getRecordRenderKey(msg, idx)"
-                                            :ref="sessionTimelineEnabled ? ((el) => bindSessionMessageRef(getRecordRenderKey(msg, idx), el)) : null"
+                                            :ref="getSessionMessageRefBinder(getRecordRenderKey(msg, idx))"
                                             :class="['session-msg', msg.normalizedRole === 'user' ? 'user' : (msg.normalizedRole === 'system' ? 'system' : 'assistant')]">
                                             <div class="session-msg-header">
                                                 <div class="session-msg-meta">
@@ -1031,11 +1042,12 @@
                                     </div>
                                 </div>
                             </div>
-                            <aside v-if="sessionTimelineEnabled && sessionPreviewRenderEnabled && sessionTimelineNodes.length" class="session-timeline" aria-label="会话时间轴">
+                            <aside v-if="sessionPreviewRenderEnabled && sessionTimelineNodes.length" class="session-timeline" aria-label="会话时间轴">
                                 <div class="session-timeline-track"></div>
                                 <button
                                     v-for="node in sessionTimelineNodes"
                                     :key="'timeline-' + node.key"
+                                    v-memo="[sessionTimelineActiveKey === node.key, node.safePercent, node.title]"
                                     type="button"
                                     :class="['session-timeline-node', { active: sessionTimelineActiveKey === node.key }]"
                                     :aria-current="sessionTimelineActiveKey === node.key ? 'true' : null"

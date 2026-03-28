@@ -1,9 +1,11 @@
 import assert from 'assert';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const projectRoot = path.resolve(__dirname, '..', '..');
 
 const helpers = await import(pathToFileURL(path.join(__dirname, '..', '..', 'web-ui', 'session-helpers.mjs')));
 const {
@@ -12,6 +14,10 @@ const {
     loadActiveSessionDetail,
     loadMoreSessionMessages
 } = helpers;
+
+function readProjectFile(relativePath) {
+    return fs.readFileSync(path.join(projectRoot, relativePath), 'utf8');
+}
 
 test('switchMainTab tears down session heavy render state when leaving sessions tab', () => {
     const calls = {
@@ -98,6 +104,145 @@ test('switchMainTab keeps claude model context refresh behavior', () => {
     assert.strictEqual(refreshCount, 1);
 });
 
+test('switchMainTab defers session teardown when scheduler exists to keep tab selection responsive', () => {
+    let deferredTask = null;
+    let teardownCount = 0;
+    const vm = {
+        mainTab: 'sessions',
+        configMode: 'codex',
+        sessionsLoadedOnce: true,
+        scheduleAfterFrame(task) {
+            deferredTask = task;
+        },
+        teardownSessionTabRender() {
+            teardownCount += 1;
+        },
+        prepareSessionTabRender() {},
+        loadSessions() {},
+        refreshClaudeModelContext() {}
+    };
+
+    switchMainTab.call(vm, 'settings');
+
+    assert.strictEqual(vm.mainTab, 'settings');
+    assert.strictEqual(typeof deferredTask, 'function');
+    assert.strictEqual(teardownCount, 0);
+
+    deferredTask();
+    assert.strictEqual(teardownCount, 1);
+});
+
+test('switchMainTab prefers idle teardown scheduler when available', () => {
+    let idleTask = null;
+    let frameTask = null;
+    let teardownCount = 0;
+    const vm = {
+        mainTab: 'sessions',
+        configMode: 'codex',
+        sessionsLoadedOnce: true,
+        scheduleSessionTabDeferredTeardown(task) {
+            idleTask = task;
+        },
+        scheduleAfterFrame(task) {
+            frameTask = task;
+        },
+        teardownSessionTabRender() {
+            teardownCount += 1;
+        },
+        prepareSessionTabRender() {},
+        loadSessions() {},
+        refreshClaudeModelContext() {}
+    };
+
+    switchMainTab.call(vm, 'settings');
+
+    assert.strictEqual(vm.mainTab, 'settings');
+    assert.strictEqual(typeof idleTask, 'function');
+    assert.strictEqual(frameTask, null);
+    assert.strictEqual(teardownCount, 0);
+
+    idleTask();
+    assert.strictEqual(teardownCount, 1);
+});
+
+test('switchMainTab suspends session render only when deferred finalize executes', () => {
+    let idleTask = null;
+    let suspendCount = 0;
+    let finalizeCount = 0;
+    const vm = {
+        mainTab: 'sessions',
+        configMode: 'codex',
+        sessionsLoadedOnce: true,
+        scheduleSessionTabDeferredTeardown(task) {
+            idleTask = task;
+        },
+        suspendSessionTabRender() {
+            suspendCount += 1;
+        },
+        finalizeSessionTabTeardown() {
+            finalizeCount += 1;
+        },
+        teardownSessionTabRender() {
+            throw new Error('fallback teardown should not run when finalize method exists');
+        },
+        prepareSessionTabRender() {},
+        loadSessions() {},
+        refreshClaudeModelContext() {}
+    };
+
+    switchMainTab.call(vm, 'settings');
+
+    assert.strictEqual(vm.mainTab, 'settings');
+    assert.strictEqual(suspendCount, 0);
+    assert.strictEqual(finalizeCount, 0);
+    assert.strictEqual(typeof idleTask, 'function');
+
+    idleTask();
+    assert.strictEqual(suspendCount, 1);
+    assert.strictEqual(finalizeCount, 1);
+});
+
+test('deferred teardown is skipped when user quickly switches back to sessions', () => {
+    let deferredTask = null;
+    let teardownCount = 0;
+    const vm = {
+        mainTab: 'sessions',
+        configMode: 'codex',
+        sessionsLoadedOnce: true,
+        scheduleAfterFrame(task) {
+            deferredTask = task;
+        },
+        teardownSessionTabRender() {
+            teardownCount += 1;
+        },
+        prepareSessionTabRender() {},
+        loadSessions() {},
+        refreshClaudeModelContext() {}
+    };
+
+    switchMainTab.call(vm, 'settings');
+    assert.strictEqual(vm.mainTab, 'settings');
+    assert.strictEqual(typeof deferredTask, 'function');
+
+    vm.mainTab = 'sessions';
+    deferredTask();
+    assert.strictEqual(teardownCount, 0);
+});
+
+test('session timeline stays always-on and no longer exposes toggle handler', () => {
+    const appScript = readProjectFile('web-ui/app.js');
+    assert.match(appScript, /sessionTimelineEnabled:\s*true,/);
+    assert.doesNotMatch(appScript, /toggleSessionTimeline\(\)/);
+});
+
+test('session template removes timeline switch button and binds refs by timeline node keys', () => {
+    const template = readProjectFile('web-ui/index.html');
+    assert.doesNotMatch(template, /@click="toggleSessionTimeline"/);
+    assert.doesNotMatch(template, /开启时间轴|关闭时间轴/);
+    assert.match(template, /:ref="getSessionMessageRefBinder\(getRecordRenderKey\(msg,\s*idx\)\)"/);
+    assert.match(template, /<aside v-if="sessionPreviewRenderEnabled && sessionTimelineNodes.length" class="session-timeline"/);
+});
+
 test('loadActiveSessionDetail primes visible messages even when timeline is disabled', async () => {
     const vm = {
         activeSession: {
@@ -138,6 +283,10 @@ test('loadActiveSessionDetail primes visible messages even when timeline is disa
         scheduleSessionTimelineSync() {
             this._syncCount = (this._syncCount || 0) + 1;
         },
+        invalidateSessionTimelineMeasurementCache(resetOffset = false) {
+            this._invalidateCount = (this._invalidateCount || 0) + 1;
+            this._invalidateReset = !!resetOffset;
+        },
         cancelSessionTimelineSync() {},
         resetSessionPreviewMessageRender() {},
         resetSessionDetailPagination() {},
@@ -157,6 +306,8 @@ test('loadActiveSessionDetail primes visible messages even when timeline is disa
     assert.strictEqual(vm._primeCount, 1);
     assert.strictEqual(vm._offsetCount, 1);
     assert.strictEqual(vm._syncCount || 0, 0);
+    assert.strictEqual(vm._invalidateCount, 1);
+    assert.strictEqual(vm._invalidateReset, true);
     assert.strictEqual(vm.sessionDetailLoading, false);
     assert.strictEqual(vm.activeSessionDetailError, '');
 });
