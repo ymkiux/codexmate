@@ -122,6 +122,7 @@ const MODELS_RESPONSE_MAX_BYTES = 1024 * 1024;
 const MAX_RECENT_CONFIGS = 3;
 const MAX_UPLOAD_SIZE = 200 * 1024 * 1024;
 const MAX_SKILLS_ZIP_UPLOAD_SIZE = 20 * 1024 * 1024;
+const MAX_API_BODY_SIZE = 4 * 1024 * 1024;
 const MAX_SKILLS_ZIP_ENTRY_COUNT = 2000;
 const MAX_SKILLS_ZIP_UNCOMPRESSED_BYTES = 512 * 1024 * 1024;
 const DEFAULT_EXTRACT_SUFFIXES = Object.freeze(['.json']);
@@ -2219,6 +2220,15 @@ function readAgentsFile(params = {}) {
         };
     }
 
+    if (params.metaOnly) {
+        return {
+            exists: true,
+            path: filePath,
+            content: '',
+            lineEnding: os.EOL === '\r\n' ? '\r\n' : '\n'
+        };
+    }
+
     try {
         const raw = fs.readFileSync(filePath, 'utf-8');
         return {
@@ -2261,13 +2271,14 @@ function buildAgentsDiff(params = {}) {
     const hasBaseContent = typeof params.baseContent === 'string';
     const contextRaw = typeof params.context === 'string' ? params.context.trim() : '';
     const context = contextRaw || 'codex';
+    const metaOnly = hasBaseContent;
     let readResult;
     if (context === 'openclaw') {
-        readResult = readOpenclawAgentsFile();
+        readResult = readOpenclawAgentsFile({ metaOnly });
     } else if (context === 'openclaw-workspace') {
-        readResult = readOpenclawWorkspaceFile(params);
+        readResult = readOpenclawWorkspaceFile({ ...params, metaOnly });
     } else if (context === 'codex') {
-        readResult = readAgentsFile(params);
+        readResult = readAgentsFile({ ...params, metaOnly });
     } else {
         return { error: `Unsupported agents diff context: ${context}` };
     }
@@ -2390,7 +2401,7 @@ function getOpenclawWorkspaceInfo() {
     };
 }
 
-function readOpenclawAgentsFile() {
+function readOpenclawAgentsFile(params = {}) {
     const workspaceInfo = getOpenclawWorkspaceInfo();
     const baseDir = workspaceInfo.workspaceDir;
     const filePath = path.join(baseDir, AGENTS_FILE_NAME);
@@ -2407,7 +2418,7 @@ function readOpenclawAgentsFile() {
         };
     }
 
-    const readResult = readAgentsFile({ baseDir });
+    const readResult = readAgentsFile({ baseDir, metaOnly: !!params.metaOnly });
     return {
         ...readResult,
         workspaceDir: baseDir,
@@ -2454,6 +2465,17 @@ function readOpenclawWorkspaceFile(params = {}) {
     if (!fs.existsSync(filePath)) {
         return {
             exists: false,
+            path: filePath,
+            content: '',
+            lineEnding: os.EOL === '\r\n' ? '\r\n' : '\n',
+            workspaceDir: baseDir,
+            configError: workspaceInfo.configError
+        };
+    }
+
+    if (params.metaOnly) {
+        return {
+            exists: true,
             path: filePath,
             content: '',
             lineEnding: os.EOL === '\r\n' ? '\r\n' : '\n',
@@ -8525,8 +8547,23 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
         }
         if (requestPath === '/api') {
             let body = '';
-            req.on('data', chunk => body += chunk);
+            let bodySize = 0;
+            let bodyTooLarge = false;
+            req.on('data', chunk => {
+                if (bodyTooLarge) return;
+                bodySize += chunk.length;
+                if (bodySize > MAX_API_BODY_SIZE) {
+                    bodyTooLarge = true;
+                    writeJsonResponse(res, 413, {
+                        error: `请求体过大（>${Math.floor(MAX_API_BODY_SIZE / 1024 / 1024)}MB）`
+                    });
+                    req.destroy();
+                    return;
+                }
+                body += chunk;
+            });
             req.on('end', async () => {
+                if (bodyTooLarge) return;
                 try {
                     const { action, params } = JSON.parse(body);
                     let result;
