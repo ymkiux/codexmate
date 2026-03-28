@@ -1706,7 +1706,9 @@
                     <div class="form-group">
                         <label class="form-label">AGENTS.md 内容</label>
                         <div v-if="agentsDiffVisible">
-                            <div class="agents-diff-summary">
+                            <div
+                                v-if="!agentsDiffLoading && !agentsDiffError && !agentsDiffTruncated && (agentsDiffStats.added || agentsDiffStats.removed)"
+                                class="agents-diff-summary">
                                 <span class="agents-diff-stat add">+{{ agentsDiffStats.added }}</span>
                                 <span class="agents-diff-stat del">-{{ agentsDiffStats.removed }}</span>
                             </div>
@@ -1737,7 +1739,11 @@
                         <div class="template-editor-warning">
                             {{ agentsModalHint }}
                             <div v-if="!agentsDiffVisible" class="agents-diff-hint">保存需两步：先点击“确认”预览差异，再点击“应用”保存。</div>
-                            <div v-else class="agents-diff-hint">当前为预览模式，可点击“应用”保存或“取消”退出。</div>
+                            <div v-else-if="agentsDiffLoading || agentsSaving" class="agents-diff-hint">正在生成差异或应用中，操作暂不可用。</div>
+                            <div v-else-if="agentsDiffError" class="agents-diff-hint">差异预览失败，请返回编辑后重试。</div>
+                            <div v-else-if="!agentsDiffHasChanges" class="agents-diff-hint">未检测到改动，可返回编辑继续修改或取消退出。</div>
+                            <div v-else-if="agentsDiffTruncated" class="agents-diff-hint">内容过大，已跳过预览，可点击“应用”保存或“返回编辑”继续修改。</div>
+                            <div v-else class="agents-diff-hint">当前为预览模式，可点击“应用”保存或“返回编辑”继续修改。</div>
                         </div>
                     </div>
 
