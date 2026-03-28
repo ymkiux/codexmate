@@ -1,19 +1,63 @@
 ﻿import { buildSessionListParams } from './logic.mjs';
 
-export function switchMainTab(tab) {
-    const previousTab = this.mainTab;
-    if (previousTab === 'sessions' && tab !== 'sessions') {
-        this.teardownSessionTabRender();
+function clearSessionTimelineRefs(vm) {
+    if (typeof vm.clearSessionTimelineRefs === 'function') {
+        vm.clearSessionTimelineRefs();
+        return;
     }
-    this.mainTab = tab;
-    if (tab === 'sessions' && !this.sessionsLoadedOnce) {
+    vm.sessionMessageRefMap = Object.create(null);
+    if (vm && typeof vm === 'object' && Object.prototype.hasOwnProperty.call(vm, 'sessionMessageRefBinderMap')) {
+        vm.sessionMessageRefBinderMap = Object.create(null);
+    }
+}
+
+export function switchMainTab(tab) {
+    const nextTab = typeof tab === 'string' ? tab : '';
+    const previousTab = this.mainTab;
+    const leavingSessions = previousTab === 'sessions' && nextTab !== 'sessions';
+    this.mainTab = nextTab;
+
+    if (leavingSessions) {
+        const teardown = () => {
+            if (this.mainTab === 'sessions') return;
+            if (typeof this.finalizeSessionTabTeardown === 'function') {
+                if (typeof this.suspendSessionTabRender === 'function') {
+                    this.suspendSessionTabRender();
+                }
+                this.finalizeSessionTabTeardown();
+                return;
+            }
+            if (typeof this.teardownSessionTabRender === 'function') {
+                this.teardownSessionTabRender();
+            }
+        };
+        if (typeof this.scheduleSessionTabDeferredTeardown === 'function') {
+            this.scheduleSessionTabDeferredTeardown(teardown);
+        } else if (typeof this.scheduleAfterFrame === 'function') {
+            this.scheduleAfterFrame(teardown);
+        } else {
+            teardown();
+        }
+    }
+
+    if (nextTab === 'sessions' && !this.sessionsLoadedOnce) {
         this.loadSessions();
     }
-    if (tab === 'sessions') {
+    if (nextTab === 'sessions') {
         this.prepareSessionTabRender();
     }
-    if (tab === 'config' && this.configMode === 'claude') {
-        this.refreshClaudeModelContext();
+    if (nextTab === 'config' && this.configMode === 'claude') {
+        const expectedTab = nextTab;
+        const expectedConfigMode = this.configMode;
+        const refresh = () => {
+            if (this.mainTab !== expectedTab || this.configMode !== expectedConfigMode) return;
+            this.refreshClaudeModelContext();
+        };
+        if (typeof this.scheduleAfterFrame === 'function') {
+            this.scheduleAfterFrame(refresh);
+        } else {
+            refresh();
+        }
     }
 }
 
@@ -41,7 +85,7 @@ export async function loadSessions(api) {
             this.activeSessionDetailClipped = false;
             this.cancelSessionTimelineSync();
             this.sessionTimelineActiveKey = '';
-            this.sessionMessageRefMap = Object.create(null);
+            clearSessionTimelineRefs(this);
         } else {
             loadSucceeded = true;
             this.sessionsList = Array.isArray(res.sessions) ? res.sessions : [];
@@ -58,7 +102,7 @@ export async function loadSessions(api) {
                 this.activeSessionDetailClipped = false;
                 this.cancelSessionTimelineSync();
                 this.sessionTimelineActiveKey = '';
-                this.sessionMessageRefMap = Object.create(null);
+                clearSessionTimelineRefs(this);
             } else {
                 const oldKey = this.activeSession ? this.getSessionExportKey(this.activeSession) : '';
                 const matched = this.sessionsList.find(item => this.getSessionExportKey(item) === oldKey);
@@ -70,7 +114,7 @@ export async function loadSessions(api) {
                 this.activeSessionDetailClipped = false;
                 this.cancelSessionTimelineSync();
                 this.sessionTimelineActiveKey = '';
-                this.sessionMessageRefMap = Object.create(null);
+                clearSessionTimelineRefs(this);
                 await this.loadActiveSessionDetail();
             }
             void this.loadSessionPathOptions({ source: this.sessionFilterSource });
@@ -84,7 +128,7 @@ export async function loadSessions(api) {
         this.activeSessionDetailClipped = false;
         this.cancelSessionTimelineSync();
         this.sessionTimelineActiveKey = '';
-        this.sessionMessageRefMap = Object.create(null);
+        clearSessionTimelineRefs(this);
         this.showMessage('加载会话失败', 'error');
     } finally {
         this.sessionsLoading = false;
@@ -103,7 +147,7 @@ export async function loadActiveSessionDetail(api, options = {}) {
         this.activeSessionDetailClipped = false;
         this.cancelSessionTimelineSync();
         this.sessionTimelineActiveKey = '';
-        this.sessionMessageRefMap = Object.create(null);
+        clearSessionTimelineRefs(this);
         return;
     }
 
@@ -140,13 +184,16 @@ export async function loadActiveSessionDetail(api, options = {}) {
             this.activeSessionDetailError = res.error;
             this.cancelSessionTimelineSync();
             this.sessionTimelineActiveKey = '';
-            this.sessionMessageRefMap = Object.create(null);
+            clearSessionTimelineRefs(this);
             return;
         }
 
         const rawMessages = Array.isArray(res.messages) ? res.messages : [];
         const normalizedMessages = rawMessages.map((message) => Object.freeze(this.normalizeSessionMessage(message)));
         this.activeSessionMessages = Object.freeze(normalizedMessages);
+        if (typeof this.invalidateSessionTimelineMeasurementCache === 'function') {
+            this.invalidateSessionTimelineMeasurementCache(true);
+        }
         this.activeSessionDetailClipped = !!res.clipped;
         const responseLimitRaw = Number(res.messageLimit);
         this.sessionDetailMessageLimit = Number.isFinite(responseLimitRaw)
@@ -209,7 +256,7 @@ export async function loadActiveSessionDetail(api, options = {}) {
         this.activeSessionDetailError = '加载会话内容失败: ' + e.message;
         this.cancelSessionTimelineSync();
         this.sessionTimelineActiveKey = '';
-        this.sessionMessageRefMap = Object.create(null);
+        clearSessionTimelineRefs(this);
     } finally {
         if (requestSeq === this.sessionDetailRequestSeq) {
             this.sessionDetailLoading = false;

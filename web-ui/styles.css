@@ -466,7 +466,7 @@ body::after {
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 247, 240, 0.95) 100%);
     color: var(--color-text-secondary);
     cursor: pointer;
-    transition: all var(--transition-normal) var(--ease-spring);
+    transition: none;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -485,6 +485,21 @@ body::after {
     background: linear-gradient(135deg, rgba(201, 94, 75, 0.14), rgba(255, 255, 255, 0.96));
     color: var(--color-text-primary);
     box-shadow: var(--shadow-float);
+}
+
+.side-item.nav-intent-active {
+    border-color: var(--color-brand);
+    background: linear-gradient(135deg, rgba(201, 94, 75, 0.14), rgba(255, 255, 255, 0.96));
+    color: var(--color-text-primary);
+    box-shadow: var(--shadow-float);
+}
+
+.side-item.nav-intent-inactive,
+.side-item.active.nav-intent-inactive {
+    border-color: var(--color-border-soft);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 247, 240, 0.95) 100%);
+    color: var(--color-text-secondary);
+    box-shadow: var(--shadow-subtle);
 }
 
 .side-item-title {
@@ -959,7 +974,7 @@ body::after {
     color: var(--color-text-secondary);
     text-align: center;
     cursor: pointer;
-    transition: all var(--transition-normal) var(--ease-spring);
+    transition: none;
     box-shadow: var(--shadow-subtle);
 }
 
@@ -974,6 +989,25 @@ body::after {
     color: var(--color-text-primary);
     background: linear-gradient(135deg, rgba(201, 94, 75, 0.12), rgba(255, 255, 255, 0.95));
     box-shadow: 0 10px 24px rgba(27, 23, 20, 0.08);
+}
+
+.top-tab.nav-intent-active {
+    border-color: var(--color-brand);
+    color: var(--color-text-primary);
+    background: linear-gradient(135deg, rgba(201, 94, 75, 0.12), rgba(255, 255, 255, 0.95));
+    box-shadow: 0 10px 24px rgba(27, 23, 20, 0.08);
+}
+
+.top-tab.nav-intent-inactive,
+.top-tab.active.nav-intent-inactive {
+    border-color: rgba(216, 201, 184, 0.55);
+    color: var(--color-text-secondary);
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: var(--shadow-subtle);
+}
+
+#panel-sessions.session-panel-fast-hidden {
+    display: none !important;
 }
 
 .config-subtabs {
@@ -2343,21 +2377,22 @@ body::after {
     transform: translate(-50%, -50%);
     cursor: pointer;
     padding: 0;
-    transition: transform var(--transition-fast) var(--ease-spring), background-color var(--transition-fast) var(--ease-spring), border-color var(--transition-fast) var(--ease-spring), box-shadow var(--transition-fast) var(--ease-spring);
+    transition: none;
+    will-change: auto;
 }
 
 .session-timeline-node:hover {
-    transform: translate(-50%, -50%) scale(1.2);
+    transform: translate(-50%, -50%);
     border-color: rgba(201, 94, 75, 0.85);
     background: rgba(255, 255, 255, 1);
-    box-shadow: 0 0 0 3px rgba(201, 94, 75, 0.15);
+    box-shadow: none;
 }
 
 .session-timeline-node.active {
-    transform: translate(-50%, -50%) scale(1.2);
+    transform: translate(-50%, -50%);
     border-color: rgba(201, 94, 75, 0.95);
     background: rgba(201, 94, 75, 0.95);
-    box-shadow: 0 0 0 3px rgba(201, 94, 75, 0.2);
+    box-shadow: none;
 }
 
 .session-timeline-current {

@@ -179,8 +179,11 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     sessionTimelineRafId: 0,
                     sessionTimelineLastSyncAt: 0,
                     sessionTimelineLastScrollTop: 0,
-                    sessionTimelineEnabled: false,
+                    sessionTimelineLastAnchorY: 0,
+                    sessionTimelineLastDirection: 0,
+                    sessionTimelineEnabled: true,
                     sessionMessageRefMap: Object.create(null),
+                    sessionMessageRefBinderMap: Object.create(null),
                     sessionPreviewScrollEl: null,
                     sessionPreviewContainerEl: null,
                     sessionPreviewHeaderEl: null,
@@ -383,6 +386,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
             },
             beforeUnmount() {
                 this.teardownSessionTabRender();
+                this.cancelScheduledSessionTabDeferredTeardown();
                 this.disconnectSessionPreviewHeaderResizeObserver();
                 window.removeEventListener('resize', this.onWindowResize);
                 window.removeEventListener('keydown', this.handleGlobalKeydown);
@@ -391,12 +395,15 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 this.sessionPreviewScrollEl = null;
                 this.sessionPreviewContainerEl = null;
                 this.sessionPreviewHeaderEl = null;
-                this.sessionMessageRefMap = Object.create(null);
+                this.clearSessionTimelineRefs();
             },
 
             computed: {
                 isSessionQueryEnabled() {
                     return isSessionQueryEnabled(this.sessionFilterSource);
+                },
+                activeSessionExportKey() {
+                    return this.activeSession ? this.getSessionExportKey(this.activeSession) : '';
                 },
                 activeSessionVisibleMessages() {
                     if (this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {
@@ -430,12 +437,24 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     return Math.max(0, total - visible);
                 },
                 sessionTimelineNodes() {
-                    if (!this.sessionTimelineEnabled || this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {
+                    if (this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {
                         return [];
                     }
                     return buildSessionTimelineNodes(this.activeSessionVisibleMessages, {
                         getKey: (message, index) => this.getRecordRenderKey(message, index)
                     });
+                },
+                sessionTimelineNodeKeyMap() {
+                    const nodes = Array.isArray(this.sessionTimelineNodes) ? this.sessionTimelineNodes : [];
+                    if (!nodes.length) {
+                        return Object.create(null);
+                    }
+                    const map = Object.create(null);
+                    for (const node of nodes) {
+                        if (!node || !node.key) continue;
+                        map[node.key] = true;
+                    }
+                    return map;
                 },
                 sessionTimelineActiveTitle() {
                     if (!this.sessionTimelineActiveKey) return '';
@@ -888,15 +907,267 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     const normalizedMode = typeof mode === 'string'
                         ? mode.trim().toLowerCase()
                         : '';
-                    this.mainTab = 'config';
                     this.configMode = CONFIG_MODE_SET.has(normalizedMode) ? normalizedMode : 'codex';
-                    if (this.configMode === 'claude') {
-                        this.refreshClaudeModelContext();
+                    if (this.mainTab === 'config') {
+                        if (this.configMode === 'claude') {
+                            const expectedMainTab = 'config';
+                            const expectedConfigMode = 'claude';
+                            const refresh = () => {
+                                if (this.mainTab !== expectedMainTab || this.configMode !== expectedConfigMode) {
+                                    return;
+                                }
+                                this.refreshClaudeModelContext();
+                            };
+                            if (typeof this.scheduleAfterFrame === 'function') {
+                                this.scheduleAfterFrame(refresh);
+                            } else {
+                                refresh();
+                            }
+                        }
+                        this.scheduleAfterFrame(() => {
+                            this.clearMainTabSwitchIntent('config');
+                        });
+                        return;
                     }
+                    this.switchMainTab('config');
                 },
 
+                ensureMainTabSwitchState() {
+                    if (this.__mainTabSwitchState) {
+                        return this.__mainTabSwitchState;
+                    }
+                    this.__mainTabSwitchState = {
+                        intent: '',
+                        pendingTarget: '',
+                        ticket: 0
+                    };
+                    return this.__mainTabSwitchState;
+                },
+                ensureImmediateNavDomState() {
+                    if (typeof document === 'undefined') {
+                        return {
+                            navNodes: [],
+                            sessionPanelEl: null
+                        };
+                    }
+                    if (!this.__immediateNavDomState) {
+                        this.__immediateNavDomState = {
+                            navNodes: [],
+                            sessionPanelEl: null
+                        };
+                    }
+                    const state = this.__immediateNavDomState;
+                    const needsNavRefresh = !Array.isArray(state.navNodes)
+                        || !state.navNodes.length
+                        || state.navNodes.some((node) => !node || !node.isConnected);
+                    if (needsNavRefresh) {
+                        state.navNodes = Array.from(document.querySelectorAll('[data-main-tab]'));
+                    }
+                    if (!state.sessionPanelEl || !state.sessionPanelEl.isConnected) {
+                        state.sessionPanelEl = document.getElementById('panel-sessions');
+                    }
+                    return state;
+                },
+                setMainTabSwitchIntent(tab) {
+                    const normalizedTab = typeof tab === 'string'
+                        ? tab.trim().toLowerCase()
+                        : '';
+                    if (!normalizedTab) return;
+                    const state = this.ensureMainTabSwitchState();
+                    state.intent = normalizedTab;
+                },
+                applyImmediateNavIntent(tab, configMode = '') {
+                    if (typeof document === 'undefined') return;
+                    const normalizedTab = typeof tab === 'string' ? tab.trim().toLowerCase() : '';
+                    if (!normalizedTab) return;
+                    const normalizedMode = typeof configMode === 'string' ? configMode.trim().toLowerCase() : '';
+                    const domState = this.ensureImmediateNavDomState();
+                    const nodes = Array.isArray(domState.navNodes) ? domState.navNodes : [];
+                    for (const node of nodes) {
+                        if (!node || !node.classList) continue;
+                        const nodeTab = String(node.getAttribute('data-main-tab') || '').trim().toLowerCase();
+                        const nodeMode = String(node.getAttribute('data-config-mode') || '').trim().toLowerCase();
+                        let shouldActivate = nodeTab === normalizedTab;
+                        if (shouldActivate && normalizedTab === 'config') {
+                            shouldActivate = nodeMode ? nodeMode === normalizedMode : false;
+                        }
+                        node.classList.toggle('nav-intent-active', !!shouldActivate);
+                        node.classList.toggle('nav-intent-inactive', !shouldActivate);
+                    }
+                },
+                clearImmediateNavIntent() {
+                    if (typeof document === 'undefined') return;
+                    const domState = this.ensureImmediateNavDomState();
+                    const nodes = Array.isArray(domState.navNodes) ? domState.navNodes : [];
+                    for (const node of nodes) {
+                        if (!node || !node.classList) continue;
+                        node.classList.remove('nav-intent-active');
+                        node.classList.remove('nav-intent-inactive');
+                    }
+                },
+                setSessionPanelFastHidden(hidden) {
+                    if (typeof document === 'undefined') return;
+                    const domState = this.ensureImmediateNavDomState();
+                    const panel = domState.sessionPanelEl;
+                    if (!panel || !panel.classList) return;
+                    panel.classList.toggle('session-panel-fast-hidden', !!hidden);
+                },
+                isSessionPanelFastHidden() {
+                    if (typeof document === 'undefined') return false;
+                    const domState = this.ensureImmediateNavDomState();
+                    const panel = domState.sessionPanelEl;
+                    return !!(panel && panel.classList && panel.classList.contains('session-panel-fast-hidden'));
+                },
+                recordPointerNavCommit(kind, value) {
+                    const normalizedKind = typeof kind === 'string' ? kind.trim().toLowerCase() : '';
+                    const normalizedValue = typeof value === 'string' ? value.trim().toLowerCase() : '';
+                    if (!normalizedKind || !normalizedValue) {
+                        this.__pointerNavCommitState = null;
+                        return;
+                    }
+                    this.__pointerNavCommitState = {
+                        kind: normalizedKind,
+                        value: normalizedValue,
+                        at: Date.now()
+                    };
+                },
+                consumePointerNavCommit(kind, value) {
+                    const normalizedKind = typeof kind === 'string' ? kind.trim().toLowerCase() : '';
+                    const normalizedValue = typeof value === 'string' ? value.trim().toLowerCase() : '';
+                    const state = this.__pointerNavCommitState;
+                    this.__pointerNavCommitState = null;
+                    if (!state || !normalizedKind || !normalizedValue) {
+                        return false;
+                    }
+                    if (state.kind !== normalizedKind || state.value !== normalizedValue) {
+                        return false;
+                    }
+                    return (Date.now() - Number(state.at || 0)) <= 1000;
+                },
+                onMainTabPointerDown(tab) {
+                    const event = arguments.length > 1 ? arguments[1] : null;
+                    if (event && typeof event.button === 'number' && event.button !== 0) {
+                        return;
+                    }
+                    const normalizedTab = typeof tab === 'string' ? tab.trim().toLowerCase() : '';
+                    if (!normalizedTab) return;
+                    this.setMainTabSwitchIntent(normalizedTab);
+                    this.applyImmediateNavIntent(normalizedTab);
+                    const shouldHideSessionPanel = this.mainTab === 'sessions' && normalizedTab !== 'sessions';
+                    this.setSessionPanelFastHidden(shouldHideSessionPanel);
+                    const pointerType = event && typeof event.pointerType === 'string'
+                        ? event.pointerType.trim().toLowerCase()
+                        : '';
+                    if (pointerType === 'touch') {
+                        return;
+                    }
+                    this.recordPointerNavCommit('main', normalizedTab);
+                    this.switchMainTab(normalizedTab);
+                },
+                onConfigTabPointerDown(mode) {
+                    const event = arguments.length > 1 ? arguments[1] : null;
+                    if (event && typeof event.button === 'number' && event.button !== 0) {
+                        return;
+                    }
+                    const normalizedMode = typeof mode === 'string' ? mode.trim().toLowerCase() : '';
+                    if (!normalizedMode) return;
+                    this.setMainTabSwitchIntent('config');
+                    this.applyImmediateNavIntent('config', normalizedMode);
+                    const shouldHideSessionPanel = this.mainTab === 'sessions';
+                    this.setSessionPanelFastHidden(shouldHideSessionPanel);
+                    const pointerType = event && typeof event.pointerType === 'string'
+                        ? event.pointerType.trim().toLowerCase()
+                        : '';
+                    if (pointerType === 'touch') {
+                        return;
+                    }
+                    this.recordPointerNavCommit('config', normalizedMode);
+                    this.switchConfigMode(normalizedMode);
+                },
+                onMainTabClick(tab) {
+                    const normalizedTab = typeof tab === 'string' ? tab.trim().toLowerCase() : '';
+                    if (!normalizedTab) return;
+                    if (this.consumePointerNavCommit('main', normalizedTab)) return;
+                    this.switchMainTab(normalizedTab);
+                },
+                onConfigTabClick(mode) {
+                    const normalizedMode = typeof mode === 'string' ? mode.trim().toLowerCase() : '';
+                    if (!normalizedMode) return;
+                    if (this.consumePointerNavCommit('config', normalizedMode)) return;
+                    this.switchConfigMode(normalizedMode);
+                },
+                clearMainTabSwitchIntent(expectedTab = '') {
+                    const state = this.ensureMainTabSwitchState();
+                    if (expectedTab && state.intent && state.intent !== expectedTab) {
+                        return;
+                    }
+                    state.intent = '';
+                    state.pendingTarget = '';
+                    this.clearImmediateNavIntent();
+                    this.setSessionPanelFastHidden(false);
+                },
+                getMainTabForNav() {
+                    const state = this.ensureMainTabSwitchState();
+                    return state.intent || this.mainTab;
+                },
+                isMainTabNavActive(tab) {
+                    return this.getMainTabForNav() === tab;
+                },
+                isConfigModeNavActive(mode) {
+                    return this.isMainTabNavActive('config') && this.configMode === mode;
+                },
                 switchMainTab(tab) {
-                    return switchMainTabHelper.call(this, tab);
+                    const normalizedTab = typeof tab === 'string'
+                        ? tab.trim().toLowerCase()
+                        : '';
+                    const targetTab = normalizedTab || tab;
+                    if (!targetTab) return;
+                    if (targetTab === 'sessions') {
+                        this.cancelScheduledSessionTabDeferredTeardown();
+                    }
+
+                    this.setMainTabSwitchIntent(targetTab);
+                    if (targetTab === 'config') {
+                        this.applyImmediateNavIntent('config', this.configMode);
+                    } else {
+                        this.applyImmediateNavIntent(targetTab);
+                    }
+
+                    const previousTab = this.mainTab;
+                    const switchState = this.ensureMainTabSwitchState();
+                    if (targetTab === previousTab) {
+                        switchState.ticket += 1;
+                        switchState.pendingTarget = '';
+                        this.scheduleAfterFrame(() => {
+                            this.clearMainTabSwitchIntent(normalizedTab);
+                        });
+                        return;
+                    }
+                    const isLeavingSessions = previousTab === 'sessions' && targetTab !== 'sessions';
+                    const shouldDeferApply = isLeavingSessions;
+                    if (isLeavingSessions && !this.isSessionPanelFastHidden()) {
+                        this.setSessionPanelFastHidden(true);
+                    }
+                    if (!shouldDeferApply) {
+                        switchState.ticket += 1;
+                        switchState.pendingTarget = '';
+                        const result = switchMainTabHelper.call(this, targetTab);
+                        this.scheduleAfterFrame(() => {
+                            this.clearMainTabSwitchIntent(normalizedTab);
+                        });
+                        return result;
+                    }
+
+                    const ticket = ++switchState.ticket;
+                    switchState.pendingTarget = targetTab;
+                    this.scheduleAfterFrame(() => {
+                        const liveState = this.ensureMainTabSwitchState();
+                        if (ticket !== liveState.ticket) return;
+                        const pendingTarget = liveState.pendingTarget || targetTab;
+                        liveState.pendingTarget = '';
+                        switchMainTabHelper.call(this, pendingTarget);
+                        this.clearMainTabSwitchIntent(normalizedTab);
+                    });
                 },
 
                 scheduleAfterFrame(task) {
@@ -907,9 +1178,58 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     }
                     setTimeout(callback, 16);
                 },
+                scheduleIdleTask(task, timeoutMs = 160) {
+                    const callback = typeof task === 'function' ? task : () => {};
+                    const timeout = Number.isFinite(timeoutMs)
+                        ? Math.max(16, Math.floor(timeoutMs))
+                        : 160;
+                    if (typeof requestIdleCallback === 'function') {
+                        const id = requestIdleCallback(callback, { timeout });
+                        return {
+                            type: 'idle',
+                            id
+                        };
+                    }
+                    const id = setTimeout(callback, timeout);
+                    return {
+                        type: 'timeout',
+                        id
+                    };
+                },
+                cancelIdleTask(handle) {
+                    if (!handle || typeof handle !== 'object') return;
+                    const type = handle.type;
+                    const id = handle.id;
+                    if (type === 'idle') {
+                        if (typeof cancelIdleCallback === 'function') {
+                            cancelIdleCallback(id);
+                        } else {
+                            clearTimeout(id);
+                        }
+                        return;
+                    }
+                    if (type === 'timeout') {
+                        clearTimeout(id);
+                    }
+                },
+                scheduleSessionTabDeferredTeardown(task) {
+                    const callback = typeof task === 'function' ? task : () => {};
+                    this.cancelScheduledSessionTabDeferredTeardown();
+                    this.__sessionTabDeferredTeardownHandle = this.scheduleIdleTask(() => {
+                        this.__sessionTabDeferredTeardownHandle = null;
+                        callback();
+                    }, 180);
+                },
+                cancelScheduledSessionTabDeferredTeardown() {
+                    const handle = this.__sessionTabDeferredTeardownHandle || null;
+                    if (!handle) return;
+                    this.cancelIdleTask(handle);
+                    this.__sessionTabDeferredTeardownHandle = null;
+                },
 
                 resetSessionPreviewMessageRender() {
                     this.sessionPreviewVisibleCount = 0;
+                    this.invalidateSessionTimelineMeasurementCache();
                 },
 
                 resetSessionDetailPagination() {
@@ -922,6 +1242,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
 
                 primeSessionPreviewMessageRender() {
                     this.sessionPreviewVisibleCount = 0;
+                    this.invalidateSessionTimelineMeasurementCache();
                     if (this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {
                         return;
                     }
@@ -933,20 +1254,37 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         ? Math.max(1, Math.floor(this.sessionPreviewInitialBatchSize))
                         : 40;
                     this.sessionPreviewVisibleCount = Math.min(baseSize, total);
+                    this.invalidateSessionTimelineMeasurementCache();
                 },
 
                 async loadMoreSessionMessages(stepSize) {
                     return loadMoreSessionMessagesHelper.call(this, stepSize);
                 },
 
-                teardownSessionTabRender() {
+                suspendSessionTabRender() {
                     this.sessionTabRenderTicket += 1;
                     this.sessionListRenderEnabled = false;
                     this.sessionPreviewRenderEnabled = false;
-                    this.resetSessionPreviewMessageRender();
                     this.cancelSessionTimelineSync();
+                    this.sessionTimelineActiveKey = '';
                     this.sessionTimelineLastSyncAt = 0;
                     this.sessionTimelineLastScrollTop = 0;
+                    this.sessionTimelineLastAnchorY = 0;
+                    this.sessionTimelineLastDirection = 0;
+                    this.sessionPreviewScrollEl = null;
+                    this.sessionPreviewContainerEl = null;
+                    this.sessionPreviewHeaderEl = null;
+                },
+
+                finalizeSessionTabTeardown() {
+                    this.resetSessionPreviewMessageRender();
+                    this.sessionPreviewPendingVisibleCount = 0;
+                    this.clearSessionTimelineRefs();
+                },
+
+                teardownSessionTabRender() {
+                    this.suspendSessionTabRender();
+                    this.finalizeSessionTabTeardown();
                 },
 
                 prepareSessionTabRender() {
@@ -1042,7 +1380,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this.activeSessionDetailClipped = false;
                     this.cancelSessionTimelineSync();
                     this.sessionTimelineActiveKey = '';
-                    this.sessionMessageRefMap = Object.create(null);
+                    this.clearSessionTimelineRefs();
                     this.sessionStandaloneError = '';
                     this.sessionStandaloneText = '';
                     this.sessionStandaloneTitle = this.activeSession.title || '会话';
@@ -1589,17 +1927,136 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 },
                 setSessionPreviewScrollRef(el) {
                     this.sessionPreviewScrollEl = el || null;
-                    if (
-                        this.sessionTimelineEnabled
-                        && this.sessionPreviewScrollEl
+                    this.invalidateSessionTimelineMeasurementCache();
+                    const shouldSync = !!(
+                        this.sessionPreviewScrollEl
                         && this.mainTab === 'sessions'
+                        && this.getMainTabForNav() === 'sessions'
                         && this.sessionPreviewRenderEnabled
-                    ) {
-                        this.scheduleSessionTimelineSync();
-                    } else {
+                        && this.sessionTimelineNodes.length
+                    );
+                    if (!shouldSync) {
                         this.cancelSessionTimelineSync();
+                        this.updateSessionTimelineOffset();
+                        return;
                     }
+                    const boundScrollEl = this.sessionPreviewScrollEl;
+                    this.$nextTick(() => {
+                        if (this.sessionPreviewScrollEl !== boundScrollEl) return;
+                        if (this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) return;
+                        if (!this.sessionTimelineNodes.length) return;
+                        this.scheduleSessionTimelineSync();
+                    });
                     this.updateSessionTimelineOffset();
+                },
+                clearSessionTimelineRefs() {
+                    this.sessionMessageRefMap = Object.create(null);
+                    this.sessionMessageRefBinderMap = Object.create(null);
+                    this.sessionTimelineLastAnchorY = 0;
+                    this.sessionTimelineLastDirection = 0;
+                    this.invalidateSessionTimelineMeasurementCache(true);
+                },
+                ensureSessionTimelineMeasurementCache() {
+                    if (this.__sessionTimelineMeasurementCache) {
+                        return this.__sessionTimelineMeasurementCache;
+                    }
+                    this.__sessionTimelineMeasurementCache = {
+                        offsetByKey: Object.create(null),
+                        dirty: true
+                    };
+                    return this.__sessionTimelineMeasurementCache;
+                },
+                invalidateSessionTimelineMeasurementCache(resetOffset = false) {
+                    const cache = this.ensureSessionTimelineMeasurementCache();
+                    if (resetOffset) {
+                        cache.offsetByKey = Object.create(null);
+                    }
+                    cache.dirty = true;
+                },
+                refreshSessionTimelineMeasurementCache(nodes = null) {
+                    const cache = this.ensureSessionTimelineMeasurementCache();
+                    const nodeList = Array.isArray(nodes) ? nodes : (Array.isArray(this.sessionTimelineNodes) ? this.sessionTimelineNodes : []);
+                    if (!nodeList.length) {
+                        cache.offsetByKey = Object.create(null);
+                        cache.dirty = false;
+                        return cache.offsetByKey;
+                    }
+                    const scrollEl = this.sessionPreviewScrollEl || this.$refs.sessionPreviewScroll;
+                    const scrollRect = scrollEl && typeof scrollEl.getBoundingClientRect === 'function'
+                        ? scrollEl.getBoundingClientRect()
+                        : null;
+                    const scrollTop = scrollEl ? Number(scrollEl.scrollTop || 0) : 0;
+                    const nextOffsetByKey = Object.create(null);
+                    for (const node of nodeList) {
+                        if (!node || !node.key) continue;
+                        const messageEl = this.sessionMessageRefMap[node.key];
+                        if (!messageEl) continue;
+                        let top = Number.NaN;
+                        if (
+                            scrollRect
+                            && typeof messageEl.getBoundingClientRect === 'function'
+                        ) {
+                            const messageRect = messageEl.getBoundingClientRect();
+                            top = scrollTop + (messageRect.top - scrollRect.top);
+                        } else {
+                            top = Number(messageEl.offsetTop || 0);
+                        }
+                        if (!Number.isFinite(top)) continue;
+                        nextOffsetByKey[node.key] = top;
+                    }
+                    cache.offsetByKey = nextOffsetByKey;
+                    cache.dirty = false;
+                    return cache.offsetByKey;
+                },
+                getCachedSessionTimelineMeasuredNodes(nodes) {
+                    const nodeList = Array.isArray(nodes) ? nodes : [];
+                    if (!nodeList.length) {
+                        return [];
+                    }
+                    const cache = this.ensureSessionTimelineMeasurementCache();
+                    if (cache.dirty) {
+                        this.refreshSessionTimelineMeasurementCache(nodeList);
+                    }
+                    const offsetByKey = cache.offsetByKey || Object.create(null);
+                    const measuredNodes = [];
+                    for (const node of nodeList) {
+                        if (!node || !node.key) continue;
+                        const top = Number(offsetByKey[node.key]);
+                        if (!Number.isFinite(top)) continue;
+                        measuredNodes.push({
+                            key: node.key,
+                            top
+                        });
+                    }
+                    if (measuredNodes.length >= nodeList.length) {
+                        return measuredNodes;
+                    }
+                    const refreshedOffsetByKey = this.refreshSessionTimelineMeasurementCache(nodeList);
+                    const refreshedNodes = [];
+                    for (const node of nodeList) {
+                        if (!node || !node.key) continue;
+                        const top = Number(refreshedOffsetByKey[node.key]);
+                        if (!Number.isFinite(top)) continue;
+                        refreshedNodes.push({
+                            key: node.key,
+                            top
+                        });
+                    }
+                    return refreshedNodes;
+                },
+                getSessionMessageRefBinder(messageKey) {
+                    if (!this.isSessionTimelineNodeKey(messageKey)) return null;
+                    const current = this.sessionMessageRefBinderMap[messageKey];
+                    if (!current || current.ticket !== this.sessionTabRenderTicket) {
+                        const ticket = this.sessionTabRenderTicket;
+                        this.sessionMessageRefBinderMap[messageKey] = {
+                            ticket,
+                            bind: (el) => {
+                                this.bindSessionMessageRef(messageKey, el, ticket);
+                            }
+                        };
+                    }
+                    return this.sessionMessageRefBinderMap[messageKey].bind;
                 },
                 updateSessionTimelineOffset() {
                     const container = this.sessionPreviewContainerEl || this.$refs.sessionPreviewContainer;
@@ -1611,28 +2068,40 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     const offset = headerHeight > 0 ? (headerHeight + 12) : 72;
                     container.style.setProperty('--session-preview-header-offset', `${offset}px`);
                 },
-                bindSessionMessageRef(messageKey, el) {
+                bindSessionMessageRef(messageKey, el, ticket = this.sessionTabRenderTicket) {
                     if (!this.sessionTimelineEnabled) return;
                     if (!messageKey) return;
+                    if (ticket !== this.sessionTabRenderTicket) return;
                     if (el) {
+                        if (!this.isSessionTimelineNodeKey(messageKey)) return;
+                        if (this.sessionMessageRefMap[messageKey] === el) return;
                         this.sessionMessageRefMap[messageKey] = el;
+                        this.invalidateSessionTimelineMeasurementCache();
                     } else {
+                        if (!this.sessionMessageRefMap[messageKey]) return;
                         delete this.sessionMessageRefMap[messageKey];
+                        this.invalidateSessionTimelineMeasurementCache();
                     }
                 },
-                toggleSessionTimeline() {
-                    this.sessionTimelineEnabled = !this.sessionTimelineEnabled;
-                    if (!this.sessionTimelineEnabled) {
-                        this.cancelSessionTimelineSync();
-                        this.sessionTimelineActiveKey = '';
-                        this.sessionMessageRefMap = Object.create(null);
-                        return;
+                isSessionTimelineNodeKey(messageKey) {
+                    if (!messageKey) return false;
+                    return !!(this.sessionTimelineNodeKeyMap && this.sessionTimelineNodeKeyMap[messageKey]);
+                },
+                pruneSessionMessageRefs() {
+                    const nodeKeyMap = this.sessionTimelineNodeKeyMap || Object.create(null);
+                    let removed = false;
+                    for (const key of Object.keys(this.sessionMessageRefMap)) {
+                        if (nodeKeyMap[key]) continue;
+                        delete this.sessionMessageRefMap[key];
+                        removed = true;
                     }
-                    this.$nextTick(() => {
-                        if (!this.sessionTimelineEnabled) return;
-                        this.updateSessionTimelineOffset();
-                        this.scheduleSessionTimelineSync();
-                    });
+                    for (const key of Object.keys(this.sessionMessageRefBinderMap)) {
+                        if (nodeKeyMap[key]) continue;
+                        delete this.sessionMessageRefBinderMap[key];
+                    }
+                    if (removed) {
+                        this.invalidateSessionTimelineMeasurementCache();
+                    }
                 },
                 cancelSessionTimelineSync() {
                     if (!this.sessionTimelineRafId) return;
@@ -1653,7 +2122,13 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this.syncSessionTimelineActiveFromScroll();
                 },
                 onSessionPreviewScroll() {
-                    if (!this.sessionTimelineEnabled || this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) return;
+                    if (
+                        !this.sessionTimelineEnabled
+                        || this.mainTab !== 'sessions'
+                        || this.getMainTabForNav() !== 'sessions'
+                        || !this.sessionPreviewRenderEnabled
+                    ) return;
+                    if (!this.sessionTimelineNodes.length) return;
                     const scrollEl = this.sessionPreviewScrollEl || this.$refs.sessionPreviewScroll;
                     if (!scrollEl) return;
                     const now = Date.now();
@@ -1669,10 +2144,17 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 },
                 onWindowResize() {
                     this.updateCompactLayoutMode();
-                    if (!this.sessionTimelineEnabled || this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {
+                    if (
+                        !this.sessionTimelineEnabled
+                        || this.mainTab !== 'sessions'
+                        || this.getMainTabForNav() !== 'sessions'
+                        || !this.sessionPreviewRenderEnabled
+                    ) {
                         return;
                     }
+                    if (!this.sessionTimelineNodes.length) return;
                     this.updateSessionTimelineOffset();
+                    this.invalidateSessionTimelineMeasurementCache();
                     this.scheduleSessionTimelineSync();
                 },
                 shouldForceCompactLayout() {
@@ -1725,7 +2207,12 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this.applyCompactLayoutClass(enabled);
                 },
                 syncSessionTimelineActiveFromScroll() {
-                    if (!this.sessionTimelineEnabled || this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {
+                    if (
+                        !this.sessionTimelineEnabled
+                        || this.mainTab !== 'sessions'
+                        || this.getMainTabForNav() !== 'sessions'
+                        || !this.sessionPreviewRenderEnabled
+                    ) {
                         if (this.sessionTimelineActiveKey) {
                             this.sessionTimelineActiveKey = '';
                         }
@@ -1738,29 +2225,67 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         }
                         return;
                     }
+                    this.pruneSessionMessageRefs();
                     const scrollEl = this.sessionPreviewScrollEl || this.$refs.sessionPreviewScroll;
                     if (!scrollEl) {
-                        const fallbackKey = nodes[0].key;
-                        if (this.sessionTimelineActiveKey !== fallbackKey) {
-                            this.sessionTimelineActiveKey = fallbackKey;
+                        if (!this.isSessionTimelineNodeKey(this.sessionTimelineActiveKey)) {
+                            const fallbackKey = nodes[0].key;
+                            if (this.sessionTimelineActiveKey !== fallbackKey) {
+                                this.sessionTimelineActiveKey = fallbackKey;
+                            }
                         }
                         return;
                     }
                     const headerEl = scrollEl.querySelector('.session-preview-header');
-                    const headerHeight = headerEl ? Number(headerEl.getBoundingClientRect().height || 0) : 0;
-                    const scrollRect = scrollEl.getBoundingClientRect();
-                    const anchorY = scrollRect.top + headerHeight + 8;
-                    let activeKey = nodes[0].key;
-                    for (const node of nodes) {
-                        const messageEl = this.sessionMessageRefMap[node.key];
-                        if (!messageEl) continue;
-                        const messageRect = messageEl.getBoundingClientRect();
-                        if (messageRect.top <= anchorY) {
-                            activeKey = node.key;
-                            continue;
-                        }
-                        break;
+                    const stickyOffset = headerEl ? (headerEl.offsetHeight + 8) : 8;
+                    const rawAnchorY = Number(scrollEl.scrollTop || 0) + stickyOffset;
+                    const previousAnchorY = Number(this.sessionTimelineLastAnchorY || 0);
+                    let direction = rawAnchorY - previousAnchorY;
+                    if (Math.abs(direction) < 1) {
+                        direction = Number(this.sessionTimelineLastDirection || 0);
+                    } else {
+                        this.sessionTimelineLastDirection = direction > 0 ? 1 : -1;
                     }
+                    this.sessionTimelineLastAnchorY = rawAnchorY;
+                    const hysteresisPx = 18;
+                    const hysteresis = direction > 0 ? -hysteresisPx : (direction < 0 ? hysteresisPx : 0);
+                    const anchorY = rawAnchorY + hysteresis;
+                    const measuredNodes = this.getCachedSessionTimelineMeasuredNodes(nodes);
+                    if (!measuredNodes.length) {
+                        if (!this.isSessionTimelineNodeKey(this.sessionTimelineActiveKey)) {
+                            this.sessionTimelineActiveKey = nodes[0].key;
+                        }
+                        return;
+                    }
+                    let low = 0;
+                    let high = measuredNodes.length - 1;
+                    let candidateIndex = 0;
+                    while (low <= high) {
+                        const mid = Math.floor((low + high) / 2);
+                        if (measuredNodes[mid].top <= anchorY) {
+                            candidateIndex = mid;
+                            low = mid + 1;
+                        } else {
+                            high = mid - 1;
+                        }
+                    }
+                    let currentIndex = -1;
+                    if (this.sessionTimelineActiveKey) {
+                        for (let i = 0; i < measuredNodes.length; i += 1) {
+                            if (measuredNodes[i].key === this.sessionTimelineActiveKey) {
+                                currentIndex = i;
+                                break;
+                            }
+                        }
+                    }
+                    if (currentIndex >= 0) {
+                        if (direction > 0 && candidateIndex < currentIndex) {
+                            candidateIndex = currentIndex;
+                        } else if (direction < 0 && candidateIndex > currentIndex) {
+                            candidateIndex = currentIndex;
+                        }
+                    }
+                    const activeKey = measuredNodes[candidateIndex].key;
                     if (this.sessionTimelineActiveKey !== activeKey) {
                         this.sessionTimelineActiveKey = activeKey;
                     }
@@ -1768,6 +2293,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 jumpToSessionTimelineNode(messageKey) {
                     if (!this.sessionTimelineEnabled || this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) return;
                     if (!messageKey) return;
+                    if (!this.isSessionTimelineNodeKey(messageKey)) return;
                     const scrollEl = this.sessionPreviewScrollEl || this.$refs.sessionPreviewScroll;
                     if (!scrollEl) return;
                     const messageEl = this.sessionMessageRefMap[messageKey];
@@ -1854,7 +2380,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this.activeSessionDetailClipped = false;
                     this.cancelSessionTimelineSync();
                     this.sessionTimelineActiveKey = '';
-                    this.sessionMessageRefMap = Object.create(null);
+                    this.clearSessionTimelineRefs();
                     await this.loadActiveSessionDetail();
                 },
 
