@@ -17,7 +17,8 @@ test('coderabbit autofix workflow skips fork pull requests and uses github-scrip
     assert.match(workflow, /uses:\s+actions\/github-script@v8/);
 });
 
-test('coderabbit review workflow uses github-script v8', () => {
+test('coderabbit review workflow uses github-script v8 and sends the re-review command', () => {
     const workflow = readProjectFile('.github/workflows/coderabbit-review.yml');
     assert.match(workflow, /uses:\s+actions\/github-script@v8/);
+    assert.match(workflow, /@coderabbitai re-review ！Stop making breaking changes, do a proper review！/);
 });

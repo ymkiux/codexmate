@@ -27,7 +27,7 @@ jobs:
           script: |
             const pr = context.payload.pull_request;
             const body = [
-              "@coderabbitai review",
+              "@coderabbitai re-review ！Stop making breaking changes, do a proper review！",
             ].join("\n");
 
             await github.rest.issues.createComment({
