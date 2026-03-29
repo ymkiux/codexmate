@@ -11,10 +11,11 @@ function readProjectFile(relativePath) {
     return fs.readFileSync(path.join(projectRoot, relativePath), 'utf8');
 }
 
-test('coderabbit autofix workflow skips fork pull requests and uses github-script v8', () => {
-    const workflow = readProjectFile('.github/workflows/coderabbit-autofix.yml');
-    assert.match(workflow, /github\.event\.pull_request\.head\.repo\.fork == false/);
-    assert.match(workflow, /uses:\s+actions\/github-script@v8/);
+test('coderabbit autofix workflow is removed', () => {
+    assert.strictEqual(
+        fs.existsSync(path.join(projectRoot, '.github', 'workflows', 'coderabbit-autofix.yml')),
+        false
+    );
 });
 
 test('coderabbit review workflow uses github-script v8 and sends the re-review command', () => {
