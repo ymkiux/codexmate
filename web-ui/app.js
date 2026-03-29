@@ -4,6 +4,8 @@
     normalizeClaudeSettingsEnv,
     matchClaudeConfigFromSettings,
     findDuplicateClaudeConfigName,
+    buildAgentsDiffPreview,
+    buildAgentsDiffPreviewRequest,
     formatLatency,
     buildSpeedTestIssue,
     isSessionQueryEnabled,
@@ -2905,41 +2907,56 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this.agentsDiffTruncated = false;
                     this.agentsDiffHasChangesValue = false;
                     try {
-                        const params = {
+                        const applyPreviewState = (diff) => {
+                            const normalizedDiff = diff && typeof diff === 'object' ? diff : {};
+                            const rawLines = Array.isArray(normalizedDiff.lines) ? normalizedDiff.lines : [];
+                            this.agentsDiffLines = rawLines.filter(line => line && line.type);
+                            this.agentsDiffTruncated = !!normalizedDiff.truncated;
+                            this.agentsDiffHasChangesValue = !!normalizedDiff.hasChanges;
+                            if (normalizedDiff.stats && typeof normalizedDiff.stats === 'object') {
+                                this.agentsDiffStats = {
+                                    added: Number(normalizedDiff.stats.added || 0),
+                                    removed: Number(normalizedDiff.stats.removed || 0),
+                                    unchanged: Number(normalizedDiff.stats.unchanged || 0)
+                                };
+                            } else {
+                                const stats = { added: 0, removed: 0, unchanged: 0 };
+                                for (const line of this.agentsDiffLines) {
+                                    if (line && line.type === 'add') stats.added += 1;
+                                    else if (line && line.type === 'del') stats.removed += 1;
+                                    else stats.unchanged += 1;
+                                }
+                                this.agentsDiffStats = stats;
+                            }
+                            this.agentsDiffFingerprint = this.buildAgentsDiffFingerprint();
+                        };
+                        const previewRequest = buildAgentsDiffPreviewRequest({
                             baseContent: this.agentsOriginalContent,
                             content: this.agentsContent,
                             lineEnding: this.agentsLineEnding,
-                            context: this.agentsContext
-                        };
-                        if (this.agentsContext === 'openclaw-workspace') {
-                            params.fileName = this.agentsWorkspaceFileName;
+                            context: this.agentsContext,
+                            fileName: this.agentsWorkspaceFileName
+                        });
+                        if (previewRequest.exceedsBodyLimit) {
+                            applyPreviewState(buildAgentsDiffPreview({
+                                baseContent: this.agentsOriginalContent,
+                                content: this.agentsContent
+                            }));
+                            return;
                         }
-                        const res = await api('preview-agents-diff', params);
+                        const res = await api('preview-agents-diff', previewRequest.params);
                         if (res.error) {
+                            if (String(res.error).includes('请求体过大')) {
+                                applyPreviewState(buildAgentsDiffPreview({
+                                    baseContent: this.agentsOriginalContent,
+                                    content: this.agentsContent
+                                }));
+                                return;
+                            }
                             this.agentsDiffError = res.error;
                             return;
                         }
-                        const diff = res.diff && typeof res.diff === 'object' ? res.diff : {};
-                        const rawLines = Array.isArray(diff.lines) ? diff.lines : [];
-                        this.agentsDiffLines = rawLines.filter(line => line && line.type);
-                        this.agentsDiffTruncated = !!diff.truncated;
-                        this.agentsDiffHasChangesValue = !!diff.hasChanges;
-                        if (diff.stats && typeof diff.stats === 'object') {
-                            this.agentsDiffStats = {
-                                added: Number(diff.stats.added || 0),
-                                removed: Number(diff.stats.removed || 0),
-                                unchanged: Number(diff.stats.unchanged || 0)
-                            };
-                        } else {
-                            const stats = { added: 0, removed: 0, unchanged: 0 };
-                            for (const line of this.agentsDiffLines) {
-                                if (line && line.type === 'add') stats.added += 1;
-                                else if (line && line.type === 'del') stats.removed += 1;
-                                else stats.unchanged += 1;
-                            }
-                            this.agentsDiffStats = stats;
-                        }
-                        this.agentsDiffFingerprint = this.buildAgentsDiffFingerprint();
+                        applyPreviewState(res.diff);
                     } catch (e) {
                         this.agentsDiffError = '生成差异失败';
                     } finally {

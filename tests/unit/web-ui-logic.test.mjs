@@ -12,6 +12,9 @@ const {
     normalizeClaudeSettingsEnv,
     matchClaudeConfigFromSettings,
     findDuplicateClaudeConfigName,
+    buildAgentsDiffPreview,
+    buildAgentsDiffPreviewRequest,
+    DEFAULT_API_BODY_LIMIT_BYTES,
     formatLatency,
     buildSpeedTestIssue,
     isSessionQueryEnabled,
@@ -132,6 +135,81 @@ test('findDuplicateClaudeConfigName returns empty when no match', () => {
     const configs = { only: { apiKey: 'k', baseUrl: 'u', model: 'm' } };
     const another = { apiKey: 'k', baseUrl: 'u', model: 'm-2' };
     assert.strictEqual(findDuplicateClaudeConfigName(configs, another), '');
+});
+
+test('buildAgentsDiffPreviewRequest keeps baseContent when request body fits', () => {
+    const result = buildAgentsDiffPreviewRequest({
+        context: 'codex',
+        content: 'updated',
+        baseContent: 'original',
+        lineEnding: '\n'
+    });
+
+    assert.strictEqual(result.omittedBaseContent, false);
+    assert.strictEqual(result.exceedsBodyLimit, false);
+    assert.strictEqual(result.params.context, 'codex');
+    assert.strictEqual(result.params.content, 'updated');
+    assert.strictEqual(result.params.baseContent, 'original');
+});
+
+test('buildAgentsDiffPreviewRequest drops baseContent first when request body would exceed limit', () => {
+    const largeChunk = 'A'.repeat(Math.floor(DEFAULT_API_BODY_LIMIT_BYTES * 0.75));
+    const result = buildAgentsDiffPreviewRequest({
+        context: 'openclaw-workspace',
+        fileName: 'AGENTS.md',
+        content: largeChunk,
+        baseContent: largeChunk,
+        lineEnding: '\n'
+    });
+
+    assert.strictEqual(result.omittedBaseContent, true);
+    assert.strictEqual(result.exceedsBodyLimit, false);
+    assert.strictEqual(result.params.context, 'openclaw-workspace');
+    assert.strictEqual(result.params.fileName, 'AGENTS.md');
+    assert.strictEqual(result.params.content, largeChunk);
+    assert.ok(!Object.prototype.hasOwnProperty.call(result.params, 'baseContent'));
+});
+
+test('buildAgentsDiffPreviewRequest reports when even trimmed preview request exceeds limit', () => {
+    const oversized = 'A'.repeat(DEFAULT_API_BODY_LIMIT_BYTES + 1024);
+    const result = buildAgentsDiffPreviewRequest({
+        context: 'codex',
+        content: oversized,
+        baseContent: 'ignored'
+    });
+
+    assert.strictEqual(result.omittedBaseContent, true);
+    assert.strictEqual(result.exceedsBodyLimit, true);
+    assert.ok(!Object.prototype.hasOwnProperty.call(result.params, 'baseContent'));
+});
+
+test('buildAgentsDiffPreview still returns a diff for oversized preview payloads', () => {
+    const largeChunk = 'A'.repeat(Math.floor(DEFAULT_API_BODY_LIMIT_BYTES * 0.75));
+    const diff = buildAgentsDiffPreview({
+        baseContent: largeChunk,
+        content: `${largeChunk}!`
+    });
+
+    assert.strictEqual(diff.truncated, false);
+    assert.strictEqual(diff.hasChanges, true);
+    assert.strictEqual(diff.stats.added, 1);
+    assert.strictEqual(diff.stats.removed, 1);
+});
+
+test('buildAgentsDiffPreview still exposes diff points for files over 3000 lines', () => {
+    const beforeLines = Array.from({ length: 3200 }, (_, index) => `section-${index}`);
+    const afterLines = beforeLines.slice();
+    afterLines.splice(1500, 0, 'section-1500-inserted');
+    const diff = buildAgentsDiffPreview({
+        baseContent: beforeLines.join('\n'),
+        content: afterLines.join('\n')
+    });
+
+    assert.strictEqual(diff.truncated, false);
+    assert.strictEqual(diff.hasChanges, true);
+    assert.strictEqual(diff.stats.added, 1);
+    assert.strictEqual(diff.stats.removed, 0);
+    assert.ok(diff.lines.some(line => line.type === 'add' && line.value === 'section-1500-inserted'));
 });
 
 test('formatLatency formats success and errors', () => {
