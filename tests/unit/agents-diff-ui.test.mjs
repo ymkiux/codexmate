@@ -46,4 +46,9 @@ test('agents diff preview avoids extra file reads and caps api payload size', ()
     assert.match(cliSource, /MAX_API_BODY_SIZE/);
     assert.match(cliSource, /bodySize\s*>\s*MAX_API_BODY_SIZE/);
     assert.match(cliSource, /buildAgentsDiff[\s\S]*metaOnly/);
+
+    const appSource = readProjectFile('web-ui/app.js');
+    assert.match(appSource, /buildAgentsDiffPreviewRequest\(/);
+    assert.match(appSource, /previewRequest\.exceedsBodyLimit/);
+    assert.match(appSource, /applyPreviewState\(buildAgentsDiffPreview\(/);
 });

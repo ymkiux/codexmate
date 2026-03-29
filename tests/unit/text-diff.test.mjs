@@ -1,4 +1,4 @@
-import assert from 'assert';
+﻿import assert from 'assert';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
@@ -42,14 +42,19 @@ test('buildLineDiff ignores single trailing newline', () => {
     assert.strictEqual(withoutTrailing.lines.length, 2);
 });
 
-test('buildLineDiff truncates large inputs', () => {
-    const lines = Array.from({ length: 3001 }, (_, index) => `line-${index}`);
-    const text = lines.join('\n');
-    const result = buildLineDiff(text, text);
-    assert.strictEqual(result.truncated, true);
-    assert.strictEqual(result.oldLineCount, 3001);
-    assert.strictEqual(result.newLineCount, 3001);
-    assert.strictEqual(result.lines.length, 0);
+test('buildLineDiff still surfaces diff points for large inputs', () => {
+    const beforeLines = Array.from({ length: 3200 }, (_, index) => `line-${index}`);
+    const afterLines = beforeLines.slice();
+    afterLines.splice(1600, 1, 'line-1600-updated');
+    const result = buildLineDiff(beforeLines.join('\n'), afterLines.join('\n'));
+
+    assert.strictEqual(result.truncated, false);
+    assert.strictEqual(result.oldLineCount, 3200);
+    assert.strictEqual(result.newLineCount, 3200);
+    assert.strictEqual(result.stats.added, 1);
+    assert.strictEqual(result.stats.removed, 1);
+    assert.ok(result.lines.some(line => line.type === 'del' && line.value === 'line-1600'));
+    assert.ok(result.lines.some(line => line.type === 'add' && line.value === 'line-1600-updated'));
 });
 
 test('buildLineDiff tolerates non-string input', () => {
