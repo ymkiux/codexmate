@@ -9077,6 +9077,36 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
     return { server, stop };
 }
 
+// #region restartWebUiServerAfterFrontendChange
+async function restartWebUiServerAfterFrontendChange({
+    serverHandle,
+    serverOptions,
+    createServer = createWebServer,
+    delayMs = 3000,
+    wait = setTimeout,
+    logger = console
+}) {
+    logger.log('  正在停止旧服务...');
+    try {
+        await serverHandle.stop();
+        logger.log('  旧服务已停止');
+    } catch (e) {
+        logger.warn('! 停止旧服务失败:', e.message || e);
+    }
+
+    await new Promise((resolve) => wait(resolve, delayMs));
+
+    try {
+        const nextServerHandle = createServer(serverOptions);
+        logger.log('✓ 已重启 Web UI 服务\n');
+        return nextServerHandle;
+    } catch (e) {
+        logger.error('! 重启失败:', e.message || e);
+        return serverHandle;
+    }
+}
+// #endregion restartWebUiServerAfterFrontendChange
+
 // 打开 Web UI
 function cmdStart(options = {}) {
     const webDir = path.join(__dirname, 'web-ui');
@@ -9125,27 +9155,17 @@ function cmdStart(options = {}) {
         async (info) => {
             const fileLabel = info && info.filename ? info.filename : (info && info.target ? path.basename(info.target) : 'unknown');
             console.log(`\n~ 侦测到前端变更 (${fileLabel})，重启中...`);
-            console.log('  正在停止旧服务...');
-            try {
-                await serverHandle.stop();
-                console.log('  旧服务已停止');
-            } catch (e) {
-                console.warn('! 停止旧服务失败:', e.message || e);
-            }
-            await new Promise((resolve) => setTimeout(resolve, 80));
-            try {
-                serverHandle = createWebServer({
+            serverHandle = await restartWebUiServerAfterFrontendChange({
+                serverHandle,
+                serverOptions: {
                     htmlPath,
                     assetsDir,
                     webDir,
                     host,
                     port,
                     openBrowser: false
-                });
-                console.log('✓ 已重启 Web UI 服务\n');
-            } catch (e) {
-                console.error('! 重启失败:', e.message || e);
-            }
+                }
+            });
         }
     );
 
