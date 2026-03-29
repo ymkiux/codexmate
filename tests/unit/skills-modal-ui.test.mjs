@@ -31,6 +31,9 @@ test('skills modal script is modularized and exposes computed/methods from skill
     assert.match(appScript, /createSkillsMethods/);
     assert.match(appScript, /\.\.\.createSkillsComputed\(\)/);
     assert.match(appScript, /\.\.\.createSkillsMethods\(\{ api \}\)/);
+    assert.match(appScript, /showConfirmDialog:\s*false/);
+    assert.match(appScript, /requestConfirmDialog\(/);
+    assert.match(appScript, /resolveConfirmDialog\(/);
 
     assert.match(skillsComputed, /skillsConfiguredCount\(\)/);
     assert.match(skillsComputed, /skillsMissingSkillFileCount\(\)/);
@@ -43,6 +46,8 @@ test('skills modal script is modularized and exposes computed/methods from skill
     assert.match(skillsMethods, /skillsExporting/);
     assert.match(skillsMethods, /importSkillsFromZipFile/);
     assert.match(skillsMethods, /exportSelectedSkills\(\)/);
+    assert.match(skillsMethods, /requestConfirmDialog\(/);
+    assert.doesNotMatch(skillsMethods, /window\.confirm\(/);
 });
 
 test('skills modal styles define summary and panel layout hooks', () => {
@@ -55,4 +60,6 @@ test('skills modal styles define summary and panel layout hooks', () => {
     assert.match(styles, /\.skill-item-path/);
     assert.match(styles, /\.skill-list::\-webkit-scrollbar/);
     assert.match(styles, /\.skill-list::\-webkit-scrollbar-thumb/);
+    assert.match(styles, /\.confirm-dialog/);
+    assert.match(styles, /\.confirm-dialog-message/);
 });
