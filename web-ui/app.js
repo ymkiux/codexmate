@@ -136,6 +136,13 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     showAgentsModal: false,
                     showSkillsModal: false,
                     showInstallModal: false,
+                    showConfirmDialog: false,
+                    confirmDialogTitle: '',
+                    confirmDialogMessage: '',
+                    confirmDialogConfirmText: '确认',
+                    confirmDialogCancelText: '取消',
+                    confirmDialogDanger: false,
+                    confirmDialogResolver: null,
                     configTemplateContent: '',
                     configTemplateApplying: false,
                     codexApplying: false,
@@ -2877,7 +2884,16 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this._agentsDiffPreviewRequestToken = null;
                 },
                 handleGlobalKeydown(event) {
-                    if (!event || event.key !== 'Escape' || !this.showAgentsModal) {
+                    if (!event || event.key !== 'Escape') {
+                        return;
+                    }
+                    if (this.showConfirmDialog) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        this.resolveConfirmDialog(false);
+                        return;
+                    }
+                    if (!this.showAgentsModal) {
                         return;
                     }
                     event.preventDefault();
@@ -2911,6 +2927,44 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     const original = typeof this.agentsOriginalContent === 'string' ? this.agentsOriginalContent : '';
                     const current = typeof this.agentsContent === 'string' ? this.agentsContent : '';
                     return original !== current;
+                },
+                requestConfirmDialog(options = {}) {
+                    if (typeof this.confirmDialogResolver === 'function') {
+                        this.confirmDialogResolver(false);
+                    }
+                    this.confirmDialogTitle = typeof options.title === 'string' && options.title.trim()
+                        ? options.title.trim()
+                        : '请确认操作';
+                    this.confirmDialogMessage = typeof options.message === 'string' ? options.message : '';
+                    this.confirmDialogConfirmText = typeof options.confirmText === 'string' && options.confirmText.trim()
+                        ? options.confirmText.trim()
+                        : '确认';
+                    this.confirmDialogCancelText = typeof options.cancelText === 'string' && options.cancelText.trim()
+                        ? options.cancelText.trim()
+                        : '取消';
+                    this.confirmDialogDanger = !!options.danger;
+                    this.showConfirmDialog = true;
+                    return new Promise((resolve) => {
+                        this.confirmDialogResolver = resolve;
+                    });
+                },
+                resolveConfirmDialog(confirmed) {
+                    const resolver = typeof this.confirmDialogResolver === 'function'
+                        ? this.confirmDialogResolver
+                        : null;
+                    this.showConfirmDialog = false;
+                    this.confirmDialogTitle = '';
+                    this.confirmDialogMessage = '';
+                    this.confirmDialogConfirmText = '确认';
+                    this.confirmDialogCancelText = '取消';
+                    this.confirmDialogDanger = false;
+                    this.confirmDialogResolver = null;
+                    if (resolver) {
+                        resolver(!!confirmed);
+                    }
+                },
+                closeConfirmDialog() {
+                    this.resolveConfirmDialog(false);
                 },
                 onAgentsContentInput() {
                     if (this.agentsDiffVisible || this.agentsDiffLines.length) {
@@ -3024,15 +3078,22 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     }
                 },
 
-                closeAgentsModal(options = {}) {
+                async closeAgentsModal(options = {}) {
                     const force = !!(options && options.force);
                     const shouldConfirmClose = !force
                         && this.hasPendingAgentsDraft();
                     if (shouldConfirmClose) {
-                        const prompt = this.agentsDiffVisible
+                        const message = this.agentsDiffVisible
                             ? '当前处于差异预览模式，改动尚未保存。确认放弃改动并关闭吗？'
                             : '存在未保存改动，确认放弃改动并关闭吗？（关闭页面或应用也会丢失改动）';
-                        if (!window.confirm(prompt)) {
+                        const confirmed = await this.requestConfirmDialog({
+                            title: '放弃未保存改动',
+                            message,
+                            confirmText: '放弃并关闭',
+                            cancelText: '继续编辑',
+                            danger: true
+                        });
+                        if (!confirmed) {
                             return;
                         }
                     }
@@ -3455,12 +3516,18 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this.refreshClaudeModelContext();
                 },
 
-                deleteClaudeConfig(name) {
+                async deleteClaudeConfig(name) {
                     if (Object.keys(this.claudeConfigs).length <= 1) {
                         return this.showMessage('至少保留一项', 'error');
                     }
-
-                    if (!confirm(`确定删除配置 "${name}"?`)) return;
+                    const confirmed = await this.requestConfirmDialog({
+                        title: '删除 Claude 配置',
+                        message: `确定删除配置 "${name}"?`,
+                        confirmText: '删除',
+                        cancelText: '取消',
+                        danger: true
+                    });
+                    if (!confirmed) return;
 
                     delete this.claudeConfigs[name];
                     if (this.currentClaudeConfig === name) {
@@ -4546,11 +4613,18 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     }
                 },
 
-                deleteOpenclawConfig(name) {
+                async deleteOpenclawConfig(name) {
                     if (Object.keys(this.openclawConfigs).length <= 1) {
                         return this.showMessage('至少保留一项', 'error');
                     }
-                    if (!confirm(`确定删除配置 "${name}"?`)) return;
+                    const confirmed = await this.requestConfirmDialog({
+                        title: '删除 OpenClaw 配置',
+                        message: `确定删除配置 "${name}"?`,
+                        confirmText: '删除',
+                        cancelText: '取消',
+                        danger: true
+                    });
+                    if (!confirmed) return;
                     delete this.openclawConfigs[name];
                     if (this.currentOpenclawConfig === name) {
                         this.currentOpenclawConfig = Object.keys(this.openclawConfigs)[0];

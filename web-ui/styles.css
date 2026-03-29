@@ -2671,6 +2671,22 @@ body::after {
     letter-spacing: -0.01em;
 }
 
+.confirm-dialog {
+    max-width: 460px;
+}
+
+.confirm-dialog-message {
+    font-size: var(--font-size-body);
+    line-height: 1.7;
+    color: var(--color-text-secondary);
+    white-space: pre-wrap;
+}
+
+.confirm-dialog-actions {
+    margin-top: var(--spacing-lg);
+    justify-content: flex-end;
+}
+
 .install-list {
     display: flex;
     flex-direction: column;
