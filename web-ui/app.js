@@ -6,6 +6,8 @@
     findDuplicateClaudeConfigName,
     buildAgentsDiffPreview,
     buildAgentsDiffPreviewRequest,
+    isAgentsDiffPreviewPayloadTooLarge,
+    shouldApplyAgentsDiffPreviewResponse,
     formatLatency,
     buildSpeedTestIssue,
     isSessionQueryEnabled,
@@ -62,13 +64,43 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
   }
 }`;
 
-            async function api(action, params = {}) {
-                const res = await fetch(`${API_BASE}/api`, {
+            async function postApi(action, params = {}) {
+                return await fetch(`${API_BASE}/api`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action, params })
                 });
+            }
+
+            async function api(action, params = {}) {
+                const res = await postApi(action, params);
                 return await res.json();
+            }
+
+            async function apiWithMeta(action, params = {}) {
+                const res = await postApi(action, params);
+                const contentType = String(res.headers.get('content-type') || '').toLowerCase();
+                if (contentType.includes('application/json')) {
+                    try {
+                        const payload = await res.json();
+                        if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+                            return { ...payload, ok: res.ok, status: res.status };
+                        }
+                        return { ok: res.ok, status: res.status, data: payload };
+                    } catch (error) {
+                        if (res.status === 413) {
+                            return { ok: false, status: 413, errorCode: 'payload-too-large' };
+                        }
+                        throw error;
+                    }
+                }
+                const error = await res.text();
+                return {
+                    ok: res.ok,
+                    status: res.status,
+                    error,
+                    errorCode: res.status === 413 ? 'payload-too-large' : ''
+                };
             }
 
             const app = createApp({
@@ -2842,6 +2874,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this.agentsDiffTruncated = false;
                     this.agentsDiffHasChangesValue = false;
                     this.agentsDiffFingerprint = '';
+                    this._agentsDiffPreviewRequestToken = null;
                 },
                 handleGlobalKeydown(event) {
                     if (!event || event.key !== 'Escape' || !this.showAgentsModal) {
@@ -2895,6 +2928,9 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     return `${context}::${fileName}::${lineEnding}::${content.length}::${content}::${original.length}::${original}`;
                 },
                 async prepareAgentsDiff() {
+                    const requestFingerprint = this.buildAgentsDiffFingerprint();
+                    const requestToken = Symbol('agents-diff-preview');
+                    this._agentsDiffPreviewRequestToken = requestToken;
                     this.agentsDiffVisible = true;
                     this.agentsDiffLoading = true;
                     this.agentsDiffError = '';
@@ -2907,7 +2943,17 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this.agentsDiffTruncated = false;
                     this.agentsDiffHasChangesValue = false;
                     try {
+                        const shouldApplyPreviewState = () => shouldApplyAgentsDiffPreviewResponse({
+                            isVisible: this.agentsDiffVisible,
+                            requestToken,
+                            activeRequestToken: this._agentsDiffPreviewRequestToken,
+                            requestFingerprint,
+                            currentFingerprint: this.buildAgentsDiffFingerprint()
+                        });
                         const applyPreviewState = (diff) => {
+                            if (!shouldApplyPreviewState()) {
+                                return false;
+                            }
                             const normalizedDiff = diff && typeof diff === 'object' ? diff : {};
                             const rawLines = Array.isArray(normalizedDiff.lines) ? normalizedDiff.lines : [];
                             this.agentsDiffLines = rawLines.filter(line => line && line.type);
@@ -2928,7 +2974,8 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                                 }
                                 this.agentsDiffStats = stats;
                             }
-                            this.agentsDiffFingerprint = this.buildAgentsDiffFingerprint();
+                            this.agentsDiffFingerprint = requestFingerprint;
+                            return true;
                         };
                         const previewRequest = buildAgentsDiffPreviewRequest({
                             baseContent: this.agentsOriginalContent,
@@ -2944,9 +2991,12 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             }));
                             return;
                         }
-                        const res = await api('preview-agents-diff', previewRequest.params);
+                        const res = await apiWithMeta('preview-agents-diff', previewRequest.params);
+                        if (!shouldApplyPreviewState()) {
+                            return;
+                        }
                         if (res.error) {
-                            if (String(res.error).includes('请求体过大')) {
+                            if (isAgentsDiffPreviewPayloadTooLarge(res)) {
                                 applyPreviewState(buildAgentsDiffPreview({
                                     baseContent: this.agentsOriginalContent,
                                     content: this.agentsContent
@@ -2958,9 +3008,19 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         }
                         applyPreviewState(res.diff);
                     } catch (e) {
-                        this.agentsDiffError = '生成差异失败';
+                        if (shouldApplyAgentsDiffPreviewResponse({
+                            isVisible: this.agentsDiffVisible,
+                            requestToken,
+                            activeRequestToken: this._agentsDiffPreviewRequestToken,
+                            requestFingerprint,
+                            currentFingerprint: this.buildAgentsDiffFingerprint()
+                        })) {
+                            this.agentsDiffError = '生成差异失败';
+                        }
                     } finally {
-                        this.agentsDiffLoading = false;
+                        if (this._agentsDiffPreviewRequestToken === requestToken) {
+                            this.agentsDiffLoading = false;
+                        }
                     }
                 },
 
