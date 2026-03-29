@@ -9077,6 +9077,69 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
     return { server, stop };
 }
 
+// Region markers are used by unit tests that extract these helpers directly.
+// #region createSerializedWebUiRestartHandler
+function createSerializedWebUiRestartHandler(runRestart) {
+    let restartQueued = false;
+    let latestRestartInfo = null;
+    let restartInFlight = null;
+
+    const drainRestartQueue = async () => {
+        try {
+            while (restartQueued) {
+                restartQueued = false;
+                await runRestart(latestRestartInfo);
+            }
+        } finally {
+            restartInFlight = null;
+            if (restartQueued) {
+                restartInFlight = drainRestartQueue();
+                return restartInFlight;
+            }
+        }
+    };
+
+    return (info) => {
+        latestRestartInfo = info;
+        restartQueued = true;
+        if (!restartInFlight) {
+            restartInFlight = drainRestartQueue();
+        }
+        return restartInFlight;
+    };
+}
+// #endregion createSerializedWebUiRestartHandler
+
+// #region restartWebUiServerAfterFrontendChange
+async function restartWebUiServerAfterFrontendChange({
+    serverHandle,
+    serverOptions,
+    createServer = createWebServer,
+    delayMs = 3000,
+    wait = setTimeout,
+    logger = console
+}) {
+    logger.log('  正在停止旧服务...');
+    try {
+        await serverHandle.stop();
+        logger.log('  旧服务已停止');
+    } catch (e) {
+        logger.warn('! 停止旧服务失败:', e.message || e);
+    }
+
+    await new Promise((resolve) => wait(resolve, delayMs));
+
+    try {
+        const nextServerHandle = await createServer(serverOptions);
+        logger.log('✓ 已重启 Web UI 服务\n');
+        return nextServerHandle;
+    } catch (e) {
+        logger.error('! 重启失败:', e.message || e);
+        return serverHandle;
+    }
+}
+// #endregion restartWebUiServerAfterFrontendChange
+
 // 打开 Web UI
 function cmdStart(options = {}) {
     const webDir = path.join(__dirname, 'web-ui');
@@ -9120,32 +9183,28 @@ function cmdStart(options = {}) {
         });
     }
 
-    const stopWatch = watchPathsForRestart(
-        [webDir, legacyHtmlPath],
-        async (info) => {
+    const requestWebUiRestart = createSerializedWebUiRestartHandler(async (info) => {
             const fileLabel = info && info.filename ? info.filename : (info && info.target ? path.basename(info.target) : 'unknown');
             console.log(`\n~ 侦测到前端变更 (${fileLabel})，重启中...`);
-            console.log('  正在停止旧服务...');
-            try {
-                await serverHandle.stop();
-                console.log('  旧服务已停止');
-            } catch (e) {
-                console.warn('! 停止旧服务失败:', e.message || e);
-            }
-            await new Promise((resolve) => setTimeout(resolve, 80));
-            try {
-                serverHandle = createWebServer({
+            serverHandle = await restartWebUiServerAfterFrontendChange({
+                serverHandle,
+                serverOptions: {
                     htmlPath,
                     assetsDir,
                     webDir,
                     host,
                     port,
                     openBrowser: false
-                });
-                console.log('✓ 已重启 Web UI 服务\n');
-            } catch (e) {
-                console.error('! 重启失败:', e.message || e);
-            }
+                }
+            });
+        });
+
+    const stopWatch = watchPathsForRestart(
+        [webDir, legacyHtmlPath],
+        (info) => {
+            void requestWebUiRestart(info).catch((err) => {
+                console.error('! 重启 Web UI 失败:', err && err.message ? err.message : err);
+            });
         }
     );
 
