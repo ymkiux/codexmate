@@ -23,6 +23,7 @@ await import(pathToFileURL(path.join(__dirname, 'provider-share-command.test.mjs
 await import(pathToFileURL(path.join(__dirname, 'codex-proxy-options.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'coderabbit-workflows.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'session-tab-switch-performance.test.mjs')));
+await import(pathToFileURL(path.join(__dirname, 'web-ui-restart.test.mjs')));
 
 let failures = 0;
 for (const { name, fn } of tests) {
