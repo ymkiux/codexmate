@@ -308,7 +308,13 @@
                 this.showMessage('请先选择要删除的 skill', 'error');
                 return;
             }
-            const confirmed = window.confirm(`确认删除 ${selected.length} 个 skill 吗？此操作不可撤销。`);
+            const confirmed = await this.requestConfirmDialog({
+                title: '删除 Skills',
+                message: `确认删除 ${selected.length} 个 skill 吗？此操作不可撤销。`,
+                confirmText: '删除',
+                cancelText: '取消',
+                danger: true
+            });
             if (!confirmed) {
                 return;
             }
