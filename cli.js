@@ -9077,6 +9077,38 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
     return { server, stop };
 }
 
+// Region markers are used by unit tests that extract these helpers directly.
+// #region createSerializedWebUiRestartHandler
+function createSerializedWebUiRestartHandler(runRestart) {
+    let restartQueued = false;
+    let latestRestartInfo = null;
+    let restartInFlight = null;
+
+    const drainRestartQueue = async () => {
+        try {
+            while (restartQueued) {
+                restartQueued = false;
+                await runRestart(latestRestartInfo);
+            }
+        } finally {
+            restartInFlight = null;
+            if (restartQueued) {
+                restartInFlight = drainRestartQueue();
+            }
+        }
+    };
+
+    return (info) => {
+        latestRestartInfo = info;
+        restartQueued = true;
+        if (!restartInFlight) {
+            restartInFlight = drainRestartQueue();
+        }
+        return restartInFlight;
+    };
+}
+// #endregion createSerializedWebUiRestartHandler
+
 // #region restartWebUiServerAfterFrontendChange
 async function restartWebUiServerAfterFrontendChange({
     serverHandle,
@@ -9150,9 +9182,7 @@ function cmdStart(options = {}) {
         });
     }
 
-    const stopWatch = watchPathsForRestart(
-        [webDir, legacyHtmlPath],
-        async (info) => {
+    const requestWebUiRestart = createSerializedWebUiRestartHandler(async (info) => {
             const fileLabel = info && info.filename ? info.filename : (info && info.target ? path.basename(info.target) : 'unknown');
             console.log(`\n~ 侦测到前端变更 (${fileLabel})，重启中...`);
             serverHandle = await restartWebUiServerAfterFrontendChange({
@@ -9165,6 +9195,14 @@ function cmdStart(options = {}) {
                     port,
                     openBrowser: false
                 }
+            });
+        });
+
+    const stopWatch = watchPathsForRestart(
+        [webDir, legacyHtmlPath],
+        (info) => {
+            void requestWebUiRestart(info).catch((err) => {
+                console.error('! 重启 Web UI 失败:', err && err.message ? err.message : err);
             });
         }
     );

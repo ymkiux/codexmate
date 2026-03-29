@@ -37,6 +37,14 @@ const restartWebUiServerAfterFrontendChangeSrc = extractByRegion(
     cliContent,
     'restartWebUiServerAfterFrontendChange'
 );
+const createSerializedWebUiRestartHandlerSrc = extractByRegion(
+    cliContent,
+    'createSerializedWebUiRestartHandler'
+);
+const createSerializedWebUiRestartHandler = instantiateFunction(
+    createSerializedWebUiRestartHandlerSrc,
+    'createSerializedWebUiRestartHandler'
+);
 const restartWebUiServerAfterFrontendChange = instantiateFunction(
     restartWebUiServerAfterFrontendChangeSrc,
     'restartWebUiServerAfterFrontendChange'
@@ -45,14 +53,20 @@ const restartWebUiServerAfterFrontendChange = instantiateFunction(
 test('restartWebUiServerAfterFrontendChange waits 3 seconds after stop before restart', async () => {
     const events = [];
     const nextServerHandle = { stop: async () => {} };
+    let resolveStop = null;
+    const stopDone = new Promise((resolve) => {
+        resolveStop = resolve;
+    });
     const currentServerHandle = {
-        stop: async () => {
+        stop: () => {
             events.push('stop:start');
-            events.push('stop:done');
+            return stopDone.then(() => {
+                events.push('stop:done');
+            });
         }
     };
 
-    const result = await restartWebUiServerAfterFrontendChange({
+    const pending = restartWebUiServerAfterFrontendChange({
         serverHandle: currentServerHandle,
         serverOptions: {
             htmlPath: '/tmp/index.html',
@@ -86,11 +100,54 @@ test('restartWebUiServerAfterFrontendChange waits 3 seconds after stop before re
         }
     });
 
+    assert.deepStrictEqual(events, ['stop:start']);
+    resolveStop();
+    const result = await pending;
+
     assert.strictEqual(result, nextServerHandle);
     assert.deepStrictEqual(events, [
         'stop:start',
         'stop:done',
         'wait:3000',
         'create'
+    ]);
+});
+
+test('createSerializedWebUiRestartHandler coalesces overlapping restarts to the latest change', async () => {
+    const events = [];
+    let restartCount = 0;
+    let releaseFirstRestart = null;
+    const firstRestartDone = new Promise((resolve) => {
+        releaseFirstRestart = resolve;
+    });
+
+    const requestRestart = createSerializedWebUiRestartHandler(async (info) => {
+        restartCount += 1;
+        const label = info && info.filename ? info.filename : 'unknown';
+        events.push(`start:${label}`);
+        if (restartCount === 1) {
+            await firstRestartDone;
+        }
+        events.push(`done:${label}`);
+    });
+
+    const first = requestRestart({ filename: 'first.js' });
+    const second = requestRestart({ filename: 'second.js' });
+    const third = requestRestart({ filename: 'third.js' });
+
+    await Promise.resolve();
+
+    assert.strictEqual(first, second);
+    assert.strictEqual(second, third);
+    assert.deepStrictEqual(events, ['start:first.js']);
+
+    releaseFirstRestart();
+    await first;
+
+    assert.deepStrictEqual(events, [
+        'start:first.js',
+        'done:first.js',
+        'start:third.js',
+        'done:third.js'
     ]);
 });
