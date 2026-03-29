@@ -1,5 +1,7 @@
 ﻿// 逻辑纯函数：供 Web UI 与单元测试共享
 export const DEFAULT_API_BODY_LIMIT_BYTES = 4 * 1024 * 1024;
+const LARGE_DIFF_LINE_LIMIT = 3000;
+const LARGE_DIFF_SYNC_LOOKAHEAD = 64;
 
 function measureUtf8ByteLength(input) {
     const text = typeof input === 'string' ? input : String(input ?? '');
@@ -145,9 +147,10 @@ function buildExactDiffLines(beforeLines, afterLines) {
     return lines;
 }
 
-function findNextSyncPoint(beforeLines, afterLines, beforeIndex, afterIndex, lookahead = 64) {
-    const maxBeforeOffset = Math.min(lookahead, beforeLines.length - beforeIndex - 1);
-    const maxAfterOffset = Math.min(lookahead, afterLines.length - afterIndex - 1);
+function findSyncPointInWindow(beforeLines, afterLines, beforeIndex, afterIndex, maxBeforeOffset, maxAfterOffset) {
+    if (maxBeforeOffset <= 0 && maxAfterOffset <= 0) {
+        return null;
+    }
 
     for (let offset = 1; offset <= maxAfterOffset; offset += 1) {
         if (beforeLines[beforeIndex] === afterLines[afterIndex + offset]) {
@@ -173,6 +176,38 @@ function findNextSyncPoint(beforeLines, afterLines, beforeIndex, afterIndex, loo
                 };
             }
         }
+    }
+    return null;
+}
+
+function findNextSyncPoint(beforeLines, afterLines, beforeIndex, afterIndex, lookahead = LARGE_DIFF_SYNC_LOOKAHEAD) {
+    const remainingBefore = Math.max(0, beforeLines.length - beforeIndex - 1);
+    const remainingAfter = Math.max(0, afterLines.length - afterIndex - 1);
+    const maxWindow = Math.max(remainingBefore, remainingAfter);
+    if (maxWindow <= 0) {
+        return null;
+    }
+
+    const initialWindow = Number.isFinite(lookahead)
+        ? Math.max(1, Math.floor(lookahead))
+        : LARGE_DIFF_SYNC_LOOKAHEAD;
+    let window = Math.min(maxWindow, initialWindow);
+    while (window > 0) {
+        const syncPoint = findSyncPointInWindow(
+            beforeLines,
+            afterLines,
+            beforeIndex,
+            afterIndex,
+            Math.min(window, remainingBefore),
+            Math.min(window, remainingAfter)
+        );
+        if (syncPoint) {
+            return syncPoint;
+        }
+        if (window >= maxWindow) {
+            return null;
+        }
+        window = Math.min(maxWindow, window * 2);
     }
     return null;
 }
@@ -262,8 +297,7 @@ function buildLargeDiffLines(beforeLines, afterLines) {
 export function buildLineDiff(beforeText, afterText) {
     const beforeLines = splitDiffLines(beforeText);
     const afterLines = splitDiffLines(afterText);
-    const lineLimit = 3000;
-    const result = (beforeLines.length > lineLimit || afterLines.length > lineLimit)
+    const result = (beforeLines.length > LARGE_DIFF_LINE_LIMIT || afterLines.length > LARGE_DIFF_LINE_LIMIT)
         ? buildLargeDiffLines(beforeLines, afterLines)
         : {
             lines: buildExactDiffLines(beforeLines, afterLines),
@@ -333,6 +367,26 @@ export function buildAgentsDiffPreviewRequest(options = {}) {
         omittedBaseContent: true,
         exceedsBodyLimit: buildApiRequestByteLength('preview-agents-diff', params) > maxRequestBytes
     };
+}
+
+export function isAgentsDiffPreviewPayloadTooLarge(result = {}) {
+    const status = Number(result && result.status);
+    const errorCode = result && typeof result.errorCode === 'string' ? result.errorCode : '';
+    return status === 413 || errorCode === 'payload-too-large';
+}
+
+export function shouldApplyAgentsDiffPreviewResponse(options = {}) {
+    const requestToken = options && options.requestToken;
+    const activeRequestToken = options && options.activeRequestToken;
+    if (!requestToken || requestToken !== activeRequestToken) {
+        return false;
+    }
+    if (!options || !options.isVisible) {
+        return false;
+    }
+    const requestFingerprint = typeof options.requestFingerprint === 'string' ? options.requestFingerprint : '';
+    const currentFingerprint = typeof options.currentFingerprint === 'string' ? options.currentFingerprint : '';
+    return requestFingerprint === currentFingerprint;
 }
 
 export function normalizeClaudeValue(value) {

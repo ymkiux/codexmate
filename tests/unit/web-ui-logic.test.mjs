@@ -14,6 +14,8 @@ const {
     findDuplicateClaudeConfigName,
     buildAgentsDiffPreview,
     buildAgentsDiffPreviewRequest,
+    isAgentsDiffPreviewPayloadTooLarge,
+    shouldApplyAgentsDiffPreviewResponse,
     DEFAULT_API_BODY_LIMIT_BYTES,
     formatLatency,
     buildSpeedTestIssue,
@@ -196,10 +198,22 @@ test('buildAgentsDiffPreview still returns a diff for oversized preview payloads
     assert.strictEqual(diff.stats.removed, 1);
 });
 
-test('buildAgentsDiffPreview still exposes diff points for files over 3000 lines', () => {
+test('buildAgentsDiffPreview ignores a leading BOM to match shared diff normalization', () => {
+    const diff = buildAgentsDiffPreview({
+        baseContent: '\uFEFFalpha\nbeta',
+        content: 'alpha\nbeta'
+    });
+
+    assert.strictEqual(diff.hasChanges, false);
+    assert.strictEqual(diff.stats.added, 0);
+    assert.strictEqual(diff.stats.removed, 0);
+});
+
+test('buildAgentsDiffPreview still exposes diff points for large block insertions', () => {
     const beforeLines = Array.from({ length: 3200 }, (_, index) => `section-${index}`);
     const afterLines = beforeLines.slice();
-    afterLines.splice(1500, 0, 'section-1500-inserted');
+    const insertedBlock = Array.from({ length: 66 }, (_, index) => `section-1500-inserted-${index}`);
+    afterLines.splice(1500, 0, ...insertedBlock);
     const diff = buildAgentsDiffPreview({
         baseContent: beforeLines.join('\n'),
         content: afterLines.join('\n')
@@ -207,9 +221,49 @@ test('buildAgentsDiffPreview still exposes diff points for files over 3000 lines
 
     assert.strictEqual(diff.truncated, false);
     assert.strictEqual(diff.hasChanges, true);
-    assert.strictEqual(diff.stats.added, 1);
+    assert.strictEqual(diff.stats.added, 66);
     assert.strictEqual(diff.stats.removed, 0);
-    assert.ok(diff.lines.some(line => line.type === 'add' && line.value === 'section-1500-inserted'));
+    assert.ok(diff.lines.some(line => line.type === 'context' && line.value === 'section-1499'));
+    assert.ok(diff.lines.some(line => line.type === 'context' && line.value === 'section-1500'));
+    assert.ok(diff.lines.some(line => line.type === 'add' && line.value === 'section-1500-inserted-0'));
+    assert.ok(diff.lines.some(line => line.type === 'add' && line.value === 'section-1500-inserted-65'));
+});
+
+test('isAgentsDiffPreviewPayloadTooLarge keys off transport status instead of localized text', () => {
+    assert.strictEqual(isAgentsDiffPreviewPayloadTooLarge({ status: 413 }), true);
+    assert.strictEqual(isAgentsDiffPreviewPayloadTooLarge({ status: 500, error: '请求体过大' }), false);
+    assert.strictEqual(isAgentsDiffPreviewPayloadTooLarge({ errorCode: 'payload-too-large' }), true);
+});
+
+test('shouldApplyAgentsDiffPreviewResponse only accepts the current visible request snapshot', () => {
+    assert.strictEqual(shouldApplyAgentsDiffPreviewResponse({
+        isVisible: true,
+        requestToken: 'req-1',
+        activeRequestToken: 'req-1',
+        requestFingerprint: 'fp-1',
+        currentFingerprint: 'fp-1'
+    }), true);
+    assert.strictEqual(shouldApplyAgentsDiffPreviewResponse({
+        isVisible: false,
+        requestToken: 'req-1',
+        activeRequestToken: 'req-1',
+        requestFingerprint: 'fp-1',
+        currentFingerprint: 'fp-1'
+    }), false);
+    assert.strictEqual(shouldApplyAgentsDiffPreviewResponse({
+        isVisible: true,
+        requestToken: 'req-1',
+        activeRequestToken: 'req-2',
+        requestFingerprint: 'fp-1',
+        currentFingerprint: 'fp-1'
+    }), false);
+    assert.strictEqual(shouldApplyAgentsDiffPreviewResponse({
+        isVisible: true,
+        requestToken: 'req-1',
+        activeRequestToken: 'req-1',
+        requestFingerprint: 'fp-1',
+        currentFingerprint: 'fp-2'
+    }), false);
 });
 
 test('formatLatency formats success and errors', () => {
