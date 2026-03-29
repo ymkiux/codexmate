@@ -9094,6 +9094,7 @@ function createSerializedWebUiRestartHandler(runRestart) {
             restartInFlight = null;
             if (restartQueued) {
                 restartInFlight = drainRestartQueue();
+                return restartInFlight;
             }
         }
     };
@@ -9129,7 +9130,7 @@ async function restartWebUiServerAfterFrontendChange({
     await new Promise((resolve) => wait(resolve, delayMs));
 
     try {
-        const nextServerHandle = createServer(serverOptions);
+        const nextServerHandle = await createServer(serverOptions);
         logger.log('✓ 已重启 Web UI 服务\n');
         return nextServerHandle;
     } catch (e) {

@@ -54,8 +54,12 @@ test('restartWebUiServerAfterFrontendChange waits 3 seconds after stop before re
     const events = [];
     const nextServerHandle = { stop: async () => {} };
     let resolveStop = null;
+    let resolveDelay = null;
     const stopDone = new Promise((resolve) => {
         resolveStop = resolve;
+    });
+    const delayDone = new Promise((resolve) => {
+        resolveDelay = resolve;
     });
     const currentServerHandle = {
         stop: () => {
@@ -90,8 +94,9 @@ test('restartWebUiServerAfterFrontendChange waits 3 seconds after stop before re
         },
         wait: (callback, ms) => {
             events.push(`wait:${ms}`);
-            callback();
-            return 1;
+            return delayDone.then(() => {
+                callback();
+            });
         },
         logger: {
             log: () => {},
@@ -102,6 +107,10 @@ test('restartWebUiServerAfterFrontendChange waits 3 seconds after stop before re
 
     assert.deepStrictEqual(events, ['stop:start']);
     resolveStop();
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.deepStrictEqual(events, ['stop:start', 'stop:done', 'wait:3000']);
+    resolveDelay();
     const result = await pending;
 
     assert.strictEqual(result, nextServerHandle);
@@ -111,6 +120,40 @@ test('restartWebUiServerAfterFrontendChange waits 3 seconds after stop before re
         'wait:3000',
         'create'
     ]);
+});
+
+test('restartWebUiServerAfterFrontendChange catches async createServer failures', async () => {
+    const currentServerHandle = { stop: async () => {} };
+    const loggedErrors = [];
+
+    const result = await restartWebUiServerAfterFrontendChange({
+        serverHandle: currentServerHandle,
+        serverOptions: {
+            htmlPath: '/tmp/index.html',
+            assetsDir: '/tmp/res',
+            webDir: '/tmp/web-ui',
+            host: '127.0.0.1',
+            port: 3737,
+            openBrowser: false
+        },
+        createServer: async () => {
+            throw new Error('async create failed');
+        },
+        wait: (callback) => {
+            callback();
+            return 1;
+        },
+        logger: {
+            log: () => {},
+            warn: () => {},
+            error: (...args) => {
+                loggedErrors.push(args);
+            }
+        }
+    });
+
+    assert.strictEqual(result, currentServerHandle);
+    assert.deepStrictEqual(loggedErrors, [['! 重启失败:', 'async create failed']]);
 });
 
 test('createSerializedWebUiRestartHandler coalesces overlapping restarts to the latest change', async () => {
@@ -149,5 +192,42 @@ test('createSerializedWebUiRestartHandler coalesces overlapping restarts to the 
         'done:first.js',
         'start:third.js',
         'done:third.js'
+    ]);
+});
+
+test('createSerializedWebUiRestartHandler chains queued callers to the retry after a failure', async () => {
+    const events = [];
+    let restartCount = 0;
+    let rejectFirstRestart = null;
+    const firstRestartDone = new Promise((_, reject) => {
+        rejectFirstRestart = reject;
+    });
+
+    const requestRestart = createSerializedWebUiRestartHandler(async (info) => {
+        restartCount += 1;
+        const label = info && info.filename ? info.filename : 'unknown';
+        events.push(`start:${label}`);
+        if (restartCount === 1) {
+            await firstRestartDone;
+            return;
+        }
+        events.push(`done:${label}`);
+    });
+
+    const first = requestRestart({ filename: 'first.js' });
+    const second = requestRestart({ filename: 'second.js' });
+
+    await Promise.resolve();
+
+    assert.strictEqual(first, second);
+    assert.deepStrictEqual(events, ['start:first.js']);
+
+    rejectFirstRestart(new Error('first restart failed'));
+    await first;
+
+    assert.deepStrictEqual(events, [
+        'start:first.js',
+        'start:second.js',
+        'done:second.js'
     ]);
 });
