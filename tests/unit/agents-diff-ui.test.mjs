@@ -28,6 +28,10 @@ test('agents modal exposes diff preview hooks in template and script', () => {
     assert.match(template, /应用中\.\.\./);
     assert.match(template, /showConfirmDialog/);
     assert.match(template, /confirm-dialog/);
+    assert.match(template, /aria-describedby="confirm-dialog-message"/);
+    assert.match(template, /:aria-labelledby="confirmDialogTitle \? 'confirm-dialog-title' : null"/);
+    assert.match(template, /id="confirm-dialog-title"/);
+    assert.match(template, /id="confirm-dialog-message"/);
 
     const script = readProjectFile('web-ui/app.js');
     assert.match(script, /agentsDiffVisible:\s*false/);
