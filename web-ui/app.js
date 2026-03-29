@@ -4,6 +4,10 @@
     normalizeClaudeSettingsEnv,
     matchClaudeConfigFromSettings,
     findDuplicateClaudeConfigName,
+    buildAgentsDiffPreview,
+    buildAgentsDiffPreviewRequest,
+    isAgentsDiffPreviewPayloadTooLarge,
+    shouldApplyAgentsDiffPreviewResponse,
     formatLatency,
     buildSpeedTestIssue,
     isSessionQueryEnabled,
@@ -60,13 +64,43 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
   }
 }`;
 
-            async function api(action, params = {}) {
-                const res = await fetch(`${API_BASE}/api`, {
+            async function postApi(action, params = {}) {
+                return await fetch(`${API_BASE}/api`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action, params })
                 });
+            }
+
+            async function api(action, params = {}) {
+                const res = await postApi(action, params);
                 return await res.json();
+            }
+
+            async function apiWithMeta(action, params = {}) {
+                const res = await postApi(action, params);
+                const contentType = String(res.headers.get('content-type') || '').toLowerCase();
+                if (contentType.includes('application/json')) {
+                    try {
+                        const payload = await res.json();
+                        if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+                            return { ...payload, ok: res.ok, status: res.status };
+                        }
+                        return { ok: res.ok, status: res.status, data: payload };
+                    } catch (error) {
+                        if (res.status === 413) {
+                            return { ok: false, status: 413, errorCode: 'payload-too-large' };
+                        }
+                        throw error;
+                    }
+                }
+                const error = await res.text();
+                return {
+                    ok: res.ok,
+                    status: res.status,
+                    error,
+                    errorCode: res.status === 413 ? 'payload-too-large' : ''
+                };
             }
 
             const app = createApp({
@@ -102,6 +136,13 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     showAgentsModal: false,
                     showSkillsModal: false,
                     showInstallModal: false,
+                    showConfirmDialog: false,
+                    confirmDialogTitle: '',
+                    confirmDialogMessage: '',
+                    confirmDialogConfirmText: '确认',
+                    confirmDialogCancelText: '取消',
+                    confirmDialogDanger: false,
+                    confirmDialogResolver: null,
                     configTemplateContent: '',
                     configTemplateApplying: false,
                     codexApplying: false,
@@ -2840,9 +2881,19 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this.agentsDiffTruncated = false;
                     this.agentsDiffHasChangesValue = false;
                     this.agentsDiffFingerprint = '';
+                    this._agentsDiffPreviewRequestToken = null;
                 },
                 handleGlobalKeydown(event) {
-                    if (!event || event.key !== 'Escape' || !this.showAgentsModal) {
+                    if (!event || event.key !== 'Escape') {
+                        return;
+                    }
+                    if (this.showConfirmDialog) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        this.resolveConfirmDialog(false);
+                        return;
+                    }
+                    if (!this.showAgentsModal) {
                         return;
                     }
                     event.preventDefault();
@@ -2877,6 +2928,44 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     const current = typeof this.agentsContent === 'string' ? this.agentsContent : '';
                     return original !== current;
                 },
+                requestConfirmDialog(options = {}) {
+                    if (typeof this.confirmDialogResolver === 'function') {
+                        this.confirmDialogResolver(false);
+                    }
+                    this.confirmDialogTitle = typeof options.title === 'string' && options.title.trim()
+                        ? options.title.trim()
+                        : '请确认操作';
+                    this.confirmDialogMessage = typeof options.message === 'string' ? options.message : '';
+                    this.confirmDialogConfirmText = typeof options.confirmText === 'string' && options.confirmText.trim()
+                        ? options.confirmText.trim()
+                        : '确认';
+                    this.confirmDialogCancelText = typeof options.cancelText === 'string' && options.cancelText.trim()
+                        ? options.cancelText.trim()
+                        : '取消';
+                    this.confirmDialogDanger = !!options.danger;
+                    this.showConfirmDialog = true;
+                    return new Promise((resolve) => {
+                        this.confirmDialogResolver = resolve;
+                    });
+                },
+                resolveConfirmDialog(confirmed) {
+                    const resolver = typeof this.confirmDialogResolver === 'function'
+                        ? this.confirmDialogResolver
+                        : null;
+                    this.showConfirmDialog = false;
+                    this.confirmDialogTitle = '';
+                    this.confirmDialogMessage = '';
+                    this.confirmDialogConfirmText = '确认';
+                    this.confirmDialogCancelText = '取消';
+                    this.confirmDialogDanger = false;
+                    this.confirmDialogResolver = null;
+                    if (resolver) {
+                        resolver(!!confirmed);
+                    }
+                },
+                closeConfirmDialog() {
+                    this.resolveConfirmDialog(false);
+                },
                 onAgentsContentInput() {
                     if (this.agentsDiffVisible || this.agentsDiffLines.length) {
                         this.resetAgentsDiffState();
@@ -2893,6 +2982,9 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     return `${context}::${fileName}::${lineEnding}::${content.length}::${content}::${original.length}::${original}`;
                 },
                 async prepareAgentsDiff() {
+                    const requestFingerprint = this.buildAgentsDiffFingerprint();
+                    const requestToken = Symbol('agents-diff-preview');
+                    this._agentsDiffPreviewRequestToken = requestToken;
                     this.agentsDiffVisible = true;
                     this.agentsDiffLoading = true;
                     this.agentsDiffError = '';
@@ -2905,57 +2997,103 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this.agentsDiffTruncated = false;
                     this.agentsDiffHasChangesValue = false;
                     try {
-                        const params = {
+                        const shouldApplyPreviewState = () => shouldApplyAgentsDiffPreviewResponse({
+                            isVisible: this.agentsDiffVisible,
+                            requestToken,
+                            activeRequestToken: this._agentsDiffPreviewRequestToken,
+                            requestFingerprint,
+                            currentFingerprint: this.buildAgentsDiffFingerprint()
+                        });
+                        const applyPreviewState = (diff) => {
+                            if (!shouldApplyPreviewState()) {
+                                return false;
+                            }
+                            const normalizedDiff = diff && typeof diff === 'object' ? diff : {};
+                            const rawLines = Array.isArray(normalizedDiff.lines) ? normalizedDiff.lines : [];
+                            this.agentsDiffLines = rawLines.filter(line => line && line.type);
+                            this.agentsDiffTruncated = !!normalizedDiff.truncated;
+                            this.agentsDiffHasChangesValue = !!normalizedDiff.hasChanges;
+                            if (normalizedDiff.stats && typeof normalizedDiff.stats === 'object') {
+                                this.agentsDiffStats = {
+                                    added: Number(normalizedDiff.stats.added || 0),
+                                    removed: Number(normalizedDiff.stats.removed || 0),
+                                    unchanged: Number(normalizedDiff.stats.unchanged || 0)
+                                };
+                            } else {
+                                const stats = { added: 0, removed: 0, unchanged: 0 };
+                                for (const line of this.agentsDiffLines) {
+                                    if (line && line.type === 'add') stats.added += 1;
+                                    else if (line && line.type === 'del') stats.removed += 1;
+                                    else stats.unchanged += 1;
+                                }
+                                this.agentsDiffStats = stats;
+                            }
+                            this.agentsDiffFingerprint = requestFingerprint;
+                            return true;
+                        };
+                        const previewRequest = buildAgentsDiffPreviewRequest({
                             baseContent: this.agentsOriginalContent,
                             content: this.agentsContent,
                             lineEnding: this.agentsLineEnding,
-                            context: this.agentsContext
-                        };
-                        if (this.agentsContext === 'openclaw-workspace') {
-                            params.fileName = this.agentsWorkspaceFileName;
+                            context: this.agentsContext,
+                            fileName: this.agentsWorkspaceFileName
+                        });
+                        if (previewRequest.exceedsBodyLimit) {
+                            applyPreviewState(buildAgentsDiffPreview({
+                                baseContent: this.agentsOriginalContent,
+                                content: this.agentsContent
+                            }));
+                            return;
                         }
-                        const res = await api('preview-agents-diff', params);
+                        const res = await apiWithMeta('preview-agents-diff', previewRequest.params);
+                        if (!shouldApplyPreviewState()) {
+                            return;
+                        }
                         if (res.error) {
+                            if (isAgentsDiffPreviewPayloadTooLarge(res)) {
+                                applyPreviewState(buildAgentsDiffPreview({
+                                    baseContent: this.agentsOriginalContent,
+                                    content: this.agentsContent
+                                }));
+                                return;
+                            }
                             this.agentsDiffError = res.error;
                             return;
                         }
-                        const diff = res.diff && typeof res.diff === 'object' ? res.diff : {};
-                        const rawLines = Array.isArray(diff.lines) ? diff.lines : [];
-                        this.agentsDiffLines = rawLines.filter(line => line && line.type);
-                        this.agentsDiffTruncated = !!diff.truncated;
-                        this.agentsDiffHasChangesValue = !!diff.hasChanges;
-                        if (diff.stats && typeof diff.stats === 'object') {
-                            this.agentsDiffStats = {
-                                added: Number(diff.stats.added || 0),
-                                removed: Number(diff.stats.removed || 0),
-                                unchanged: Number(diff.stats.unchanged || 0)
-                            };
-                        } else {
-                            const stats = { added: 0, removed: 0, unchanged: 0 };
-                            for (const line of this.agentsDiffLines) {
-                                if (line && line.type === 'add') stats.added += 1;
-                                else if (line && line.type === 'del') stats.removed += 1;
-                                else stats.unchanged += 1;
-                            }
-                            this.agentsDiffStats = stats;
-                        }
-                        this.agentsDiffFingerprint = this.buildAgentsDiffFingerprint();
+                        applyPreviewState(res.diff);
                     } catch (e) {
-                        this.agentsDiffError = '生成差异失败';
+                        if (shouldApplyAgentsDiffPreviewResponse({
+                            isVisible: this.agentsDiffVisible,
+                            requestToken,
+                            activeRequestToken: this._agentsDiffPreviewRequestToken,
+                            requestFingerprint,
+                            currentFingerprint: this.buildAgentsDiffFingerprint()
+                        })) {
+                            this.agentsDiffError = '生成差异失败';
+                        }
                     } finally {
-                        this.agentsDiffLoading = false;
+                        if (this._agentsDiffPreviewRequestToken === requestToken) {
+                            this.agentsDiffLoading = false;
+                        }
                     }
                 },
 
-                closeAgentsModal(options = {}) {
+                async closeAgentsModal(options = {}) {
                     const force = !!(options && options.force);
                     const shouldConfirmClose = !force
                         && this.hasPendingAgentsDraft();
                     if (shouldConfirmClose) {
-                        const prompt = this.agentsDiffVisible
+                        const message = this.agentsDiffVisible
                             ? '当前处于差异预览模式，改动尚未保存。确认放弃改动并关闭吗？'
                             : '存在未保存改动，确认放弃改动并关闭吗？（关闭页面或应用也会丢失改动）';
-                        if (!window.confirm(prompt)) {
+                        const confirmed = await this.requestConfirmDialog({
+                            title: '放弃未保存改动',
+                            message,
+                            confirmText: '放弃并关闭',
+                            cancelText: '继续编辑',
+                            danger: true
+                        });
+                        if (!confirmed) {
                             return;
                         }
                     }
@@ -3378,12 +3516,18 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this.refreshClaudeModelContext();
                 },
 
-                deleteClaudeConfig(name) {
+                async deleteClaudeConfig(name) {
                     if (Object.keys(this.claudeConfigs).length <= 1) {
                         return this.showMessage('至少保留一项', 'error');
                     }
-
-                    if (!confirm(`确定删除配置 "${name}"?`)) return;
+                    const confirmed = await this.requestConfirmDialog({
+                        title: '删除 Claude 配置',
+                        message: `确定删除配置 "${name}"?`,
+                        confirmText: '删除',
+                        cancelText: '取消',
+                        danger: true
+                    });
+                    if (!confirmed) return;
 
                     delete this.claudeConfigs[name];
                     if (this.currentClaudeConfig === name) {
@@ -4469,11 +4613,18 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     }
                 },
 
-                deleteOpenclawConfig(name) {
+                async deleteOpenclawConfig(name) {
                     if (Object.keys(this.openclawConfigs).length <= 1) {
                         return this.showMessage('至少保留一项', 'error');
                     }
-                    if (!confirm(`确定删除配置 "${name}"?`)) return;
+                    const confirmed = await this.requestConfirmDialog({
+                        title: '删除 OpenClaw 配置',
+                        message: `确定删除配置 "${name}"?`,
+                        confirmText: '删除',
+                        cancelText: '取消',
+                        danger: true
+                    });
+                    if (!confirmed) return;
                     delete this.openclawConfigs[name];
                     if (this.currentOpenclawConfig === name) {
                         this.currentOpenclawConfig = Object.keys(this.openclawConfigs)[0];

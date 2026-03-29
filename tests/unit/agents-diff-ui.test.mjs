@@ -26,6 +26,12 @@ test('agents modal exposes diff preview hooks in template and script', () => {
     assert.match(template, /:readonly="agentsLoading"/);
     assert.match(template, /agentsDiffVisible \? '应用'/);
     assert.match(template, /应用中\.\.\./);
+    assert.match(template, /showConfirmDialog/);
+    assert.match(template, /confirm-dialog/);
+    assert.match(template, /aria-describedby="confirm-dialog-message"/);
+    assert.match(template, /:aria-labelledby="confirmDialogTitle \? 'confirm-dialog-title' : null"/);
+    assert.match(template, /id="confirm-dialog-title"/);
+    assert.match(template, /id="confirm-dialog-message"/);
 
     const script = readProjectFile('web-ui/app.js');
     assert.match(script, /agentsDiffVisible:\s*false/);
@@ -38,7 +44,10 @@ test('agents modal exposes diff preview hooks in template and script', () => {
     assert.match(script, /window\.removeEventListener\('keydown', this\.handleGlobalKeydown\)/);
     assert.match(script, /window\.addEventListener\('beforeunload', this\.handleBeforeUnload\)/);
     assert.match(script, /window\.removeEventListener\('beforeunload', this\.handleBeforeUnload\)/);
-    assert.match(script, /window\.confirm\(/);
+    assert.match(script, /requestConfirmDialog\(/);
+    assert.match(script, /resolveConfirmDialog\(/);
+    assert.match(script, /放弃并关闭/);
+    assert.doesNotMatch(script, /window\.confirm\(/);
 });
 
 test('agents diff preview avoids extra file reads and caps api payload size', () => {
@@ -46,4 +55,9 @@ test('agents diff preview avoids extra file reads and caps api payload size', ()
     assert.match(cliSource, /MAX_API_BODY_SIZE/);
     assert.match(cliSource, /bodySize\s*>\s*MAX_API_BODY_SIZE/);
     assert.match(cliSource, /buildAgentsDiff[\s\S]*metaOnly/);
+
+    const appSource = readProjectFile('web-ui/app.js');
+    assert.match(appSource, /buildAgentsDiffPreviewRequest\(/);
+    assert.match(appSource, /previewRequest\.exceedsBodyLimit/);
+    assert.match(appSource, /applyPreviewState\(buildAgentsDiffPreview\(/);
 });

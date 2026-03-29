@@ -12,6 +12,11 @@ const {
     normalizeClaudeSettingsEnv,
     matchClaudeConfigFromSettings,
     findDuplicateClaudeConfigName,
+    buildAgentsDiffPreview,
+    buildAgentsDiffPreviewRequest,
+    isAgentsDiffPreviewPayloadTooLarge,
+    shouldApplyAgentsDiffPreviewResponse,
+    DEFAULT_API_BODY_LIMIT_BYTES,
     formatLatency,
     buildSpeedTestIssue,
     isSessionQueryEnabled,
@@ -132,6 +137,133 @@ test('findDuplicateClaudeConfigName returns empty when no match', () => {
     const configs = { only: { apiKey: 'k', baseUrl: 'u', model: 'm' } };
     const another = { apiKey: 'k', baseUrl: 'u', model: 'm-2' };
     assert.strictEqual(findDuplicateClaudeConfigName(configs, another), '');
+});
+
+test('buildAgentsDiffPreviewRequest keeps baseContent when request body fits', () => {
+    const result = buildAgentsDiffPreviewRequest({
+        context: 'codex',
+        content: 'updated',
+        baseContent: 'original',
+        lineEnding: '\n'
+    });
+
+    assert.strictEqual(result.omittedBaseContent, false);
+    assert.strictEqual(result.exceedsBodyLimit, false);
+    assert.strictEqual(result.params.context, 'codex');
+    assert.strictEqual(result.params.content, 'updated');
+    assert.strictEqual(result.params.baseContent, 'original');
+});
+
+test('buildAgentsDiffPreviewRequest drops baseContent first when request body would exceed limit', () => {
+    const largeChunk = 'A'.repeat(Math.floor(DEFAULT_API_BODY_LIMIT_BYTES * 0.75));
+    const result = buildAgentsDiffPreviewRequest({
+        context: 'openclaw-workspace',
+        fileName: 'AGENTS.md',
+        content: largeChunk,
+        baseContent: largeChunk,
+        lineEnding: '\n'
+    });
+
+    assert.strictEqual(result.omittedBaseContent, true);
+    assert.strictEqual(result.exceedsBodyLimit, false);
+    assert.strictEqual(result.params.context, 'openclaw-workspace');
+    assert.strictEqual(result.params.fileName, 'AGENTS.md');
+    assert.strictEqual(result.params.content, largeChunk);
+    assert.ok(!Object.prototype.hasOwnProperty.call(result.params, 'baseContent'));
+});
+
+test('buildAgentsDiffPreviewRequest reports when even trimmed preview request exceeds limit', () => {
+    const oversized = 'A'.repeat(DEFAULT_API_BODY_LIMIT_BYTES + 1024);
+    const result = buildAgentsDiffPreviewRequest({
+        context: 'codex',
+        content: oversized,
+        baseContent: 'ignored'
+    });
+
+    assert.strictEqual(result.omittedBaseContent, true);
+    assert.strictEqual(result.exceedsBodyLimit, true);
+    assert.ok(!Object.prototype.hasOwnProperty.call(result.params, 'baseContent'));
+});
+
+test('buildAgentsDiffPreview still returns a diff for oversized preview payloads', () => {
+    const largeChunk = 'A'.repeat(Math.floor(DEFAULT_API_BODY_LIMIT_BYTES * 0.75));
+    const diff = buildAgentsDiffPreview({
+        baseContent: largeChunk,
+        content: `${largeChunk}!`
+    });
+
+    assert.strictEqual(diff.truncated, false);
+    assert.strictEqual(diff.hasChanges, true);
+    assert.strictEqual(diff.stats.added, 1);
+    assert.strictEqual(diff.stats.removed, 1);
+});
+
+test('buildAgentsDiffPreview ignores a leading BOM to match shared diff normalization', () => {
+    const diff = buildAgentsDiffPreview({
+        baseContent: '\uFEFFalpha\nbeta',
+        content: 'alpha\nbeta'
+    });
+
+    assert.strictEqual(diff.hasChanges, false);
+    assert.strictEqual(diff.stats.added, 0);
+    assert.strictEqual(diff.stats.removed, 0);
+});
+
+test('buildAgentsDiffPreview still exposes diff points for large block insertions', () => {
+    const beforeLines = Array.from({ length: 3200 }, (_, index) => `section-${index}`);
+    const afterLines = beforeLines.slice();
+    const insertedBlock = Array.from({ length: 66 }, (_, index) => `section-1500-inserted-${index}`);
+    afterLines.splice(1500, 0, ...insertedBlock);
+    const diff = buildAgentsDiffPreview({
+        baseContent: beforeLines.join('\n'),
+        content: afterLines.join('\n')
+    });
+
+    assert.strictEqual(diff.truncated, false);
+    assert.strictEqual(diff.hasChanges, true);
+    assert.strictEqual(diff.stats.added, 66);
+    assert.strictEqual(diff.stats.removed, 0);
+    assert.ok(diff.lines.some(line => line.type === 'context' && line.value === 'section-1499'));
+    assert.ok(diff.lines.some(line => line.type === 'context' && line.value === 'section-1500'));
+    assert.ok(diff.lines.some(line => line.type === 'add' && line.value === 'section-1500-inserted-0'));
+    assert.ok(diff.lines.some(line => line.type === 'add' && line.value === 'section-1500-inserted-65'));
+});
+
+test('isAgentsDiffPreviewPayloadTooLarge keys off transport status instead of localized text', () => {
+    assert.strictEqual(isAgentsDiffPreviewPayloadTooLarge({ status: 413 }), true);
+    assert.strictEqual(isAgentsDiffPreviewPayloadTooLarge({ status: 500, error: '请求体过大' }), false);
+    assert.strictEqual(isAgentsDiffPreviewPayloadTooLarge({ errorCode: 'payload-too-large' }), true);
+});
+
+test('shouldApplyAgentsDiffPreviewResponse only accepts the current visible request snapshot', () => {
+    assert.strictEqual(shouldApplyAgentsDiffPreviewResponse({
+        isVisible: true,
+        requestToken: 'req-1',
+        activeRequestToken: 'req-1',
+        requestFingerprint: 'fp-1',
+        currentFingerprint: 'fp-1'
+    }), true);
+    assert.strictEqual(shouldApplyAgentsDiffPreviewResponse({
+        isVisible: false,
+        requestToken: 'req-1',
+        activeRequestToken: 'req-1',
+        requestFingerprint: 'fp-1',
+        currentFingerprint: 'fp-1'
+    }), false);
+    assert.strictEqual(shouldApplyAgentsDiffPreviewResponse({
+        isVisible: true,
+        requestToken: 'req-1',
+        activeRequestToken: 'req-2',
+        requestFingerprint: 'fp-1',
+        currentFingerprint: 'fp-1'
+    }), false);
+    assert.strictEqual(shouldApplyAgentsDiffPreviewResponse({
+        isVisible: true,
+        requestToken: 'req-1',
+        activeRequestToken: 'req-1',
+        requestFingerprint: 'fp-1',
+        currentFingerprint: 'fp-2'
+    }), false);
 });
 
 test('formatLatency formats success and errors', () => {
