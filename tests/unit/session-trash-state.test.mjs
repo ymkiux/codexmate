@@ -392,20 +392,22 @@ test('loadSessionTrashCount ignores stale responses after a newer trash request 
 
     const context = {
         sessionTrashCountLoading: false,
-        sessionTrashRequestToken: 0,
+        sessionTrashCountRequestToken: 0,
+        sessionTrashListRequestToken: 0,
         sessionTrashTotalCount: 3,
         sessionTrashCountLoadedOnce: false,
         sessionTrashItems: [],
-        issueSessionTrashRequestToken() {
-            this.sessionTrashRequestToken += 1;
-            return this.sessionTrashRequestToken;
+        issueSessionTrashCountRequestToken() {
+            this.sessionTrashCountRequestToken += 1;
+            return this.sessionTrashCountRequestToken;
         },
         invalidateSessionTrashRequests() {
-            this.sessionTrashRequestToken += 1;
-            return this.sessionTrashRequestToken;
+            this.sessionTrashCountRequestToken += 1;
+            this.sessionTrashListRequestToken += 1;
+            return this.sessionTrashListRequestToken;
         },
-        isLatestSessionTrashRequestToken(token) {
-            return Number(token) === Number(this.sessionTrashRequestToken);
+        isLatestSessionTrashCountRequestToken(token) {
+            return Number(token) === Number(this.sessionTrashCountRequestToken);
         },
         normalizeSessionTrashTotalCount(totalCount, fallbackItems = this.sessionTrashItems) {
             const fallbackCount = Array.isArray(fallbackItems) ? fallbackItems.length : 0;
@@ -448,19 +450,19 @@ test('loadSessionTrashCount trusts a lower authoritative backend totalCount duri
     const context = {
         sessionTrashCountLoading: false,
         sessionTrashCountPendingOptions: null,
-        sessionTrashRequestToken: 0,
+        sessionTrashCountRequestToken: 0,
         sessionTrashTotalCount: 10,
         sessionTrashCountLoadedOnce: false,
         sessionTrashItems: [
             { trashId: 'trash-1' },
             { trashId: 'trash-2' }
         ],
-        issueSessionTrashRequestToken() {
-            this.sessionTrashRequestToken += 1;
-            return this.sessionTrashRequestToken;
+        issueSessionTrashCountRequestToken() {
+            this.sessionTrashCountRequestToken += 1;
+            return this.sessionTrashCountRequestToken;
         },
-        isLatestSessionTrashRequestToken(token) {
-            return Number(token) === Number(this.sessionTrashRequestToken);
+        isLatestSessionTrashCountRequestToken(token) {
+            return Number(token) === Number(this.sessionTrashCountRequestToken);
         },
         normalizeSessionTrashTotalCount,
         showMessage() {
@@ -475,13 +477,104 @@ test('loadSessionTrashCount trusts a lower authoritative backend totalCount duri
     assert.strictEqual(context.sessionTrashCountLoading, false);
 });
 
-test('session trash template keeps source badges on neutral session-source styling', () => {
-    const trashPanelMatch = indexHtmlSource.match(/id="settings-panel-trash"[\s\S]*?<\/section>/);
-    assert(trashPanelMatch, 'trash panel template should exist');
+test('session trash template keeps source badges neutral and shares the busy guard between actions', () => {
+    const trashMeta = indexHtmlSource.match(
+        /<div class="trash-item-meta session-item-meta">[\s\S]*?<span class="session-source">{{ item\.sourceLabel }}<\/span>[\s\S]*?<\/div>/
+    );
+    assert(trashMeta, 'trash item source badge should exist');
+    assert.doesNotMatch(trashMeta[0], /item\.source === 'claude' \? 'configured' : 'empty'/);
 
-    const trashPanel = trashPanelMatch[0];
-    assert.match(trashPanel, /<span class="session-source">{{ item\.sourceLabel }}<\/span>/);
-    assert.doesNotMatch(trashPanel, /item\.source === 'claude' \? 'configured' : 'empty'/);
+    const busyBindings = indexHtmlSource.match(/:disabled="sessionTrashLoading \|\| sessionTrashClearing \|\| isSessionTrashActionBusy\(item\)"/g);
+    assert.strictEqual(busyBindings && busyBindings.length, 2);
+});
+
+test('loadSessionTrash and loadSessionTrashCount keep independent stale-response tokens', async () => {
+    let resolveCount = null;
+    let resolveList = null;
+    const api = async (action, params = {}) => await new Promise((resolve) => {
+        if (action !== 'list-session-trash') {
+            throw new Error(`unexpected action: ${action}`);
+        }
+        if (params.countOnly === true) {
+            resolveCount = resolve;
+            return;
+        }
+        resolveList = resolve;
+    });
+    const loadSessionTrashCount = instantiateFunction(
+        extractMethodAsFunction(appSource, 'loadSessionTrashCount'),
+        'loadSessionTrashCount',
+        { api }
+    );
+    const loadSessionTrash = instantiateFunction(
+        extractMethodAsFunction(appSource, 'loadSessionTrash'),
+        'loadSessionTrash',
+        {
+            SESSION_TRASH_LIST_LIMIT: 50,
+            api
+        }
+    );
+
+    const context = {
+        sessionTrashItems: [],
+        sessionTrashTotalCount: 0,
+        sessionTrashCountLoadedOnce: false,
+        sessionTrashLoadedOnce: false,
+        sessionTrashLastLoadFailed: false,
+        sessionTrashCountRequestToken: 0,
+        sessionTrashListRequestToken: 0,
+        sessionTrashCountLoading: false,
+        sessionTrashLoading: false,
+        sessionTrashCountPendingOptions: null,
+        sessionTrashPendingOptions: null,
+        issueSessionTrashCountRequestToken() {
+            this.sessionTrashCountRequestToken += 1;
+            return this.sessionTrashCountRequestToken;
+        },
+        issueSessionTrashListRequestToken() {
+            this.sessionTrashListRequestToken += 1;
+            return this.sessionTrashListRequestToken;
+        },
+        isLatestSessionTrashCountRequestToken(token) {
+            return token === this.sessionTrashCountRequestToken;
+        },
+        isLatestSessionTrashListRequestToken(token) {
+            return token === this.sessionTrashListRequestToken;
+        },
+        normalizeSessionTrashTotalCount(totalCount, fallbackItems = this.sessionTrashItems) {
+            const fallbackCount = Array.isArray(fallbackItems) ? fallbackItems.length : 0;
+            const numericTotal = Number(totalCount);
+            if (!Number.isFinite(numericTotal) || numericTotal < 0) {
+                return fallbackCount;
+            }
+            return Math.max(fallbackCount, Math.floor(numericTotal));
+        },
+        resetSessionTrashVisibleCount() {
+            this.sessionTrashVisibleCount = 50;
+        },
+        showMessage() {
+            throw new Error('independent requests should not surface a toast');
+        }
+    };
+
+    const listPromise = loadSessionTrash.call(context, { forceRefresh: true });
+    const countPromise = loadSessionTrashCount.call(context, { silent: true });
+
+    resolveList({
+        totalCount: 2,
+        items: [{ trashId: 'trash-1', sessionId: 'session-1' }]
+    });
+    resolveCount({
+        totalCount: 2,
+        items: []
+    });
+
+    await Promise.all([listPromise, countPromise]);
+
+    assert.strictEqual(context.sessionTrashLoadedOnce, true);
+    assert.strictEqual(context.sessionTrashCountLoadedOnce, true);
+    assert.strictEqual(context.sessionTrashTotalCount, 2);
+    assert.deepStrictEqual(context.sessionTrashItems, [{ trashId: 'trash-1', sessionId: 'session-1' }]);
 });
 
 test('getSessionTrashViewState returns retry when badge count exists but list has never loaded', () => {
@@ -540,14 +633,14 @@ test('loadSessionTrash marks latest failures as retryable and clears the failure
         sessionTrashCountLoadedOnce: false,
         sessionTrashLoadedOnce: false,
         sessionTrashLastLoadFailed: false,
-        sessionTrashRequestToken: 0,
+        sessionTrashListRequestToken: 0,
         sessionTrashLoading: false,
-        issueSessionTrashRequestToken() {
-            this.sessionTrashRequestToken += 1;
-            return this.sessionTrashRequestToken;
+        issueSessionTrashListRequestToken() {
+            this.sessionTrashListRequestToken += 1;
+            return this.sessionTrashListRequestToken;
         },
-        isLatestSessionTrashRequestToken(requestToken) {
-            return requestToken === this.sessionTrashRequestToken;
+        isLatestSessionTrashListRequestToken(requestToken) {
+            return requestToken === this.sessionTrashListRequestToken;
         },
         normalizeSessionTrashTotalCount(totalCount, fallbackItems = this.sessionTrashItems) {
             const fallbackCount = Array.isArray(fallbackItems) ? fallbackItems.length : 0;
@@ -725,12 +818,14 @@ test('deleteSession increments trash badge count when only total count has been 
         sessionTrashCountLoadedOnce: true,
         sessionTrashTotalCount: 5,
         sessionTrashItems: [],
-        sessionTrashRequestToken: 0,
+        sessionTrashCountRequestToken: 0,
+        sessionTrashListRequestToken: 0,
         isDeleteAvailable: () => true,
         getSessionExportKey: () => 'codex:session-1',
         invalidateSessionTrashRequests() {
-            this.sessionTrashRequestToken += 1;
-            return this.sessionTrashRequestToken;
+            this.sessionTrashCountRequestToken += 1;
+            this.sessionTrashListRequestToken += 1;
+            return this.sessionTrashListRequestToken;
         },
         normalizeSessionTrashTotalCount(totalCount, fallbackItems = this.sessionTrashItems) {
             const fallbackCount = Array.isArray(fallbackItems) ? fallbackItems.length : 0;
@@ -784,12 +879,14 @@ test('deleteSession prefers authoritative trash totalCount from the backend resp
         sessionTrashCountLoadedOnce: true,
         sessionTrashTotalCount: 5,
         sessionTrashItems: [],
-        sessionTrashRequestToken: 0,
+        sessionTrashCountRequestToken: 0,
+        sessionTrashListRequestToken: 0,
         isDeleteAvailable: () => true,
         getSessionExportKey: () => 'codex:session-1',
         invalidateSessionTrashRequests() {
-            this.sessionTrashRequestToken += 1;
-            return this.sessionTrashRequestToken;
+            this.sessionTrashCountRequestToken += 1;
+            this.sessionTrashListRequestToken += 1;
+            return this.sessionTrashListRequestToken;
         },
         normalizeSessionTrashTotalCount(totalCount, fallbackItems = this.sessionTrashItems) {
             const fallbackCount = Array.isArray(fallbackItems) ? fallbackItems.length : 0;
@@ -866,19 +963,21 @@ test('loadSessionTrash replays the latest queued refresh after an in-flight requ
         sessionTrashCountLoadedOnce: false,
         sessionTrashLoadedOnce: false,
         sessionTrashLastLoadFailed: false,
-        sessionTrashRequestToken: 0,
+        sessionTrashCountRequestToken: 0,
+        sessionTrashListRequestToken: 0,
         sessionTrashLoading: false,
         sessionTrashPendingOptions: null,
-        issueSessionTrashRequestToken() {
-            this.sessionTrashRequestToken += 1;
-            return this.sessionTrashRequestToken;
+        issueSessionTrashListRequestToken() {
+            this.sessionTrashListRequestToken += 1;
+            return this.sessionTrashListRequestToken;
         },
         invalidateSessionTrashRequests() {
-            this.sessionTrashRequestToken += 1;
-            return this.sessionTrashRequestToken;
+            this.sessionTrashCountRequestToken += 1;
+            this.sessionTrashListRequestToken += 1;
+            return this.sessionTrashListRequestToken;
         },
-        isLatestSessionTrashRequestToken(requestToken) {
-            return requestToken === this.sessionTrashRequestToken;
+        isLatestSessionTrashListRequestToken(requestToken) {
+            return requestToken === this.sessionTrashListRequestToken;
         },
         normalizeSessionTrashTotalCount(totalCount, fallbackItems = this.sessionTrashItems) {
             const fallbackCount = Array.isArray(fallbackItems) ? fallbackItems.length : 0;
@@ -923,4 +1022,60 @@ test('loadSessionTrash replays the latest queued refresh after an in-flight requ
     assert.strictEqual(context.sessionTrashCountLoadedOnce, true);
     assert.strictEqual(context.sessionTrashTotalCount, 2);
     assert.deepStrictEqual(context.sessionTrashItems, [{ trashId: 'fresh-trash' }]);
+});
+
+test('session trash restore and purge share the same per-item busy guard', async () => {
+    const apiCalls = [];
+    const restoreSessionTrash = instantiateFunction(
+        extractMethodAsFunction(appSource, 'restoreSessionTrash'),
+        'restoreSessionTrash',
+        {
+            api: async (action) => {
+                apiCalls.push(action);
+                return { success: true };
+            }
+        }
+    );
+    const purgeSessionTrash = instantiateFunction(
+        extractMethodAsFunction(appSource, 'purgeSessionTrash'),
+        'purgeSessionTrash',
+        {
+            api: async (action) => {
+                apiCalls.push(action);
+                return { success: true };
+            }
+        }
+    );
+
+    let confirmCalls = 0;
+    const context = {
+        sessionTrashClearing: false,
+        sessionTrashLoading: false,
+        sessionTrashRestoring: { 'trash-1': true },
+        sessionTrashPurging: {},
+        getSessionTrashActionKey(item) {
+            return item && item.trashId;
+        },
+        isSessionTrashActionBusy(item) {
+            const key = typeof item === 'string' ? item : this.getSessionTrashActionKey(item);
+            return !!(key && (this.sessionTrashRestoring[key] || this.sessionTrashPurging[key]));
+        },
+        async requestConfirmDialog() {
+            confirmCalls += 1;
+            return true;
+        },
+        showMessage() {
+            throw new Error('busy-guard short-circuit should not toast');
+        },
+        async loadSessionTrash() {
+            throw new Error('busy-guard short-circuit should not reload');
+        },
+        sessionsLoadedOnce: false
+    };
+
+    await restoreSessionTrash.call(context, { trashId: 'trash-1' });
+    await purgeSessionTrash.call(context, { trashId: 'trash-1' });
+
+    assert.deepStrictEqual(apiCalls, []);
+    assert.strictEqual(confirmCalls, 0);
 });

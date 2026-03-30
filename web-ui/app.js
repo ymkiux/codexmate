@@ -362,7 +362,8 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     sessionTrashCountLoadedOnce: false,
                     sessionTrashLoadedOnce: false,
                     sessionTrashLastLoadFailed: false,
-                    sessionTrashRequestToken: 0,
+                    sessionTrashCountRequestToken: 0,
+                    sessionTrashListRequestToken: 0,
                     sessionTrashCountPendingOptions: null,
                     sessionTrashPendingOptions: null,
                     sessionTrashCountLoading: false,
@@ -1933,21 +1934,35 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     return hasVisibleItems ? 'list' : 'retry';
                 },
 
-                issueSessionTrashRequestToken() {
-                    const currentToken = Number(this.sessionTrashRequestToken);
+                issueSessionTrashCountRequestToken() {
+                    const currentToken = Number(this.sessionTrashCountRequestToken);
                     const nextToken = Number.isFinite(currentToken) && currentToken >= 0
                         ? Math.floor(currentToken) + 1
                         : 1;
-                    this.sessionTrashRequestToken = nextToken;
+                    this.sessionTrashCountRequestToken = nextToken;
+                    return nextToken;
+                },
+
+                issueSessionTrashListRequestToken() {
+                    const currentToken = Number(this.sessionTrashListRequestToken);
+                    const nextToken = Number.isFinite(currentToken) && currentToken >= 0
+                        ? Math.floor(currentToken) + 1
+                        : 1;
+                    this.sessionTrashListRequestToken = nextToken;
                     return nextToken;
                 },
 
                 invalidateSessionTrashRequests() {
-                    return this.issueSessionTrashRequestToken();
+                    this.issueSessionTrashCountRequestToken();
+                    return this.issueSessionTrashListRequestToken();
                 },
 
-                isLatestSessionTrashRequestToken(token) {
-                    return Number(token) === Number(this.sessionTrashRequestToken);
+                isLatestSessionTrashCountRequestToken(token) {
+                    return Number(token) === Number(this.sessionTrashCountRequestToken);
+                },
+
+                isLatestSessionTrashListRequestToken(token) {
+                    return Number(token) === Number(this.sessionTrashListRequestToken);
                 },
 
                 resetSessionTrashVisibleCount() {
@@ -2038,11 +2053,11 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         };
                         return;
                     }
-                    const requestToken = this.issueSessionTrashRequestToken();
+                    const requestToken = this.issueSessionTrashCountRequestToken();
                     this.sessionTrashCountLoading = true;
                     try {
                         const res = await api('list-session-trash', { countOnly: true });
-                        if (!this.isLatestSessionTrashRequestToken(requestToken)) {
+                        if (!this.isLatestSessionTrashCountRequestToken(requestToken)) {
                             return;
                         }
                         if (res.error) {
@@ -2057,7 +2072,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         );
                         this.sessionTrashCountLoadedOnce = true;
                     } catch (e) {
-                        if (this.isLatestSessionTrashRequestToken(requestToken) && options.silent !== true) {
+                        if (this.isLatestSessionTrashCountRequestToken(requestToken) && options.silent !== true) {
                             this.showMessage('加载回收站数量失败', 'error');
                         }
                     } finally {
@@ -2074,6 +2089,11 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     return item && typeof item.trashId === 'string' ? item.trashId : '';
                 },
 
+                isSessionTrashActionBusy(item) {
+                    const key = typeof item === 'string' ? item : this.getSessionTrashActionKey(item);
+                    return !!(key && (this.sessionTrashRestoring[key] || this.sessionTrashPurging[key]));
+                },
+
                 async loadSessionTrash(options = {}) {
                     if (this.sessionTrashLoading) {
                         this.sessionTrashPendingOptions = {
@@ -2082,7 +2102,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         };
                         return;
                     }
-                    const requestToken = this.issueSessionTrashRequestToken();
+                    const requestToken = this.issueSessionTrashListRequestToken();
                     this.sessionTrashLoading = true;
                     this.sessionTrashLastLoadFailed = false;
                     let loadSucceeded = false;
@@ -2091,7 +2111,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             limit: SESSION_TRASH_LIST_LIMIT,
                             forceRefresh: !!options.forceRefresh
                         });
-                        if (!this.isLatestSessionTrashRequestToken(requestToken)) {
+                        if (!this.isLatestSessionTrashListRequestToken(requestToken)) {
                             return;
                         }
                         if (res.error) {
@@ -2107,7 +2127,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         this.sessionTrashLastLoadFailed = false;
                         loadSucceeded = true;
                     } catch (e) {
-                        if (this.isLatestSessionTrashRequestToken(requestToken)) {
+                        if (this.isLatestSessionTrashListRequestToken(requestToken)) {
                             this.sessionTrashLastLoadFailed = true;
                             this.showMessage('加载回收站失败', 'error');
                         }
@@ -2126,7 +2146,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
 
                 async restoreSessionTrash(item) {
                     const key = this.getSessionTrashActionKey(item);
-                    if (!key || this.sessionTrashRestoring[key] || this.sessionTrashClearing) {
+                    if (!key || this.isSessionTrashActionBusy(key) || this.sessionTrashClearing) {
                         return;
                     }
                     this.sessionTrashRestoring[key] = true;
@@ -2150,7 +2170,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
 
                 async purgeSessionTrash(item) {
                     const key = this.getSessionTrashActionKey(item);
-                    if (!key || this.sessionTrashPurging[key] || this.sessionTrashClearing) {
+                    if (!key || this.isSessionTrashActionBusy(key) || this.sessionTrashClearing) {
                         return;
                     }
                     const confirmed = await this.requestConfirmDialog({
