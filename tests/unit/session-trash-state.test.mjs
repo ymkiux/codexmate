@@ -1623,7 +1623,9 @@ test('deleteSession increments trash badge count when only total count has been 
         sessionTrashCountRequestToken: 0,
         sessionTrashListRequestToken: 0,
         isDeleteAvailable: () => true,
-        getSessionExportKey: () => 'codex:session-1',
+        getSessionExportKey(session) {
+            return `${session.source}:${session.sessionId}:${session.filePath}`;
+        },
         invalidateSessionTrashRequests() {
             this.sessionTrashCountRequestToken += 1;
             this.sessionTrashListRequestToken += 1;
@@ -1644,8 +1646,8 @@ test('deleteSession increments trash badge count when only total count has been 
             throw new Error('list hydration path should not run when only count is loaded');
         },
         removeSessionPinCalls: [],
-        removeSessionPin(sessionId) {
-            this.removeSessionPinCalls.push(sessionId);
+        removeSessionPin(session) {
+            this.removeSessionPinCalls.push(session);
         },
         async removeSessionFromCurrentList() {
             removed = true;
@@ -1662,7 +1664,7 @@ test('deleteSession increments trash badge count when only total count has been 
     });
 
     assert.strictEqual(context.sessionTrashTotalCount, 6);
-    assert.strictEqual(context.sessionDeleting['codex:session-1'], false);
+    assert.strictEqual(context.sessionDeleting['codex:session-1:/tmp/session-1.jsonl'], false);
     assert.strictEqual(removed, true);
     assert.deepStrictEqual(context.removeSessionPinCalls, [{
         source: 'codex',
@@ -1693,7 +1695,9 @@ test('deleteSession prefers authoritative trash totalCount from the backend resp
         sessionTrashCountRequestToken: 0,
         sessionTrashListRequestToken: 0,
         isDeleteAvailable: () => true,
-        getSessionExportKey: () => 'codex:session-1',
+        getSessionExportKey(session) {
+            return `${session.source}:${session.sessionId}:${session.filePath}`;
+        },
         invalidateSessionTrashRequests() {
             this.sessionTrashCountRequestToken += 1;
             this.sessionTrashListRequestToken += 1;
@@ -1714,8 +1718,8 @@ test('deleteSession prefers authoritative trash totalCount from the backend resp
             throw new Error('loaded-list branch should not run in count-only test');
         },
         removeSessionPinCalls: [],
-        removeSessionPin(sessionId) {
-            this.removeSessionPinCalls.push(sessionId);
+        removeSessionPin(session) {
+            this.removeSessionPinCalls.push(session);
         },
         async removeSessionFromCurrentList() {},
         showMessage() {}

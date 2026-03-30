@@ -2051,6 +2051,13 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         return;
                     }
                     const activeKey = this.activeSession ? this.getSessionExportKey(this.activeSession) : '';
+                    const renderedList = Array.isArray(this.sortedSessionsList) ? this.sortedSessionsList : [];
+                    const renderedIndex = renderedList.findIndex((item) => this.getSessionExportKey(item) === sessionKey);
+                    let nextActiveKey = '';
+                    if (activeKey === sessionKey && renderedIndex >= 0) {
+                        const fallbackSession = renderedList[renderedIndex - 1] || renderedList[renderedIndex + 1] || null;
+                        nextActiveKey = fallbackSession ? this.getSessionExportKey(fallbackSession) : '';
+                    }
                     currentList.splice(removedIndex, 1);
                     this.sessionsList = currentList;
                     this.syncSessionPathOptionsForSource(
@@ -2065,8 +2072,8 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         this.clearActiveSessionState();
                         return;
                     }
-                    const nextIndex = Math.min(removedIndex, currentList.length - 1);
-                    const nextSession = currentList[nextIndex];
+                    const nextSession = currentList.find((item) => this.getSessionExportKey(item) === nextActiveKey)
+                        || currentList[Math.min(removedIndex, currentList.length - 1)];
                     if (!nextSession) {
                         this.clearActiveSessionState();
                         return;

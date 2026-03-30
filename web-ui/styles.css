@@ -4208,7 +4208,7 @@ textarea:focus-visible {
 }
 
 @media (max-width: 540px) {
-    .session-item-pin {
+    .session-item-copy.session-item-pin {
         width: 44px;
         height: 44px;
         min-width: 44px;
@@ -4217,8 +4217,8 @@ textarea:focus-visible {
         transform: none;
     }
 
-    .session-item-pin svg,
-    .session-item-pin .pin-icon {
+    .session-item-copy.session-item-pin svg,
+    .session-item-copy.session-item-pin .pin-icon {
         width: 16px;
         height: 16px;
     }
