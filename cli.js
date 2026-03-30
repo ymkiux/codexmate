@@ -6188,14 +6188,16 @@ async function restoreSessionTrashItem(params = {}) {
         }
         writeSessionTrashEntries(remainingEntries);
     } catch (e) {
-        if (entry.source === 'claude' && claudeIndexPath && fs.existsSync(claudeIndexPath)) {
-            try {
-                removeClaudeSessionIndexEntry(claudeIndexPath, targetFilePath, entry.sessionId);
-            } catch (_) {}
-        }
+        let rollbackSucceeded = false;
         if (fs.existsSync(targetFilePath) && !fs.existsSync(trashFilePath)) {
             try {
                 moveFileSync(targetFilePath, trashFilePath);
+                rollbackSucceeded = true;
+            } catch (_) {}
+        }
+        if (rollbackSucceeded && entry.source === 'claude' && claudeIndexPath && fs.existsSync(claudeIndexPath)) {
+            try {
+                removeClaudeSessionIndexEntry(claudeIndexPath, targetFilePath, entry.sessionId);
             } catch (_) {}
         }
         return { error: `恢复会话失败: ${e.message}` };

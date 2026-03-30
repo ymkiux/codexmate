@@ -1,4 +1,4 @@
-import assert from 'assert';
+﻿import assert from 'assert';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -933,6 +933,174 @@ test('restoreSessionTrashItem removes the restored entry from the latest trash i
     assert.deepStrictEqual(writtenEntries, [
         { trashId: 'trash-2', source: 'codex', sessionId: 'session-2', originalFilePath: '/tmp/session-2.jsonl' }
     ]);
+});
+
+test('restoreSessionTrashItem rolls back a Claude restore before removing the index entry on persistence failure', async () => {
+    const restoreSessionTrashItemSource = extractFunctionBySignature(
+        cliSource,
+        'async function restoreSessionTrashItem(params = {}) {',
+        'restoreSessionTrashItem'
+    );
+    let readCount = 0;
+    let fileInTrash = true;
+    let fileInTarget = false;
+    const calls = [];
+    const persistError = new Error('persist failed');
+    const restoreSessionTrashItem = instantiateFunction(restoreSessionTrashItemSource, 'restoreSessionTrashItem', {
+        readSessionTrashEntries(options = {}) {
+            readCount += 1;
+            if (readCount === 1) {
+                assert.strictEqual(options.cleanup, undefined);
+                return [
+                    { trashId: 'trash-1', source: 'claude', sessionId: 'session-1', originalFilePath: '/tmp/session-1.jsonl' }
+                ];
+            }
+            assert.strictEqual(options.cleanup, false);
+            return [
+                { trashId: 'trash-2', source: 'codex', sessionId: 'session-2', originalFilePath: '/tmp/session-2.jsonl' },
+                { trashId: 'trash-1', source: 'claude', sessionId: 'session-1', originalFilePath: '/tmp/session-1.jsonl' }
+            ];
+        },
+        resolveSessionTrashEntryExactMessageCount: async (entry) => ({
+            ...entry,
+            source: 'claude',
+            originalFilePath: '/tmp/session-1.jsonl'
+        }),
+        resolveSessionTrashFilePath: () => '/tmp/trash-1.jsonl',
+        resolveSessionRestoreTarget: () => '/tmp/session-1.jsonl',
+        moveFileSync(sourcePath, targetPath) {
+            calls.push(['moveFileSync', sourcePath, targetPath]);
+            if (sourcePath === '/tmp/trash-1.jsonl' && targetPath === '/tmp/session-1.jsonl') {
+                fileInTrash = false;
+                fileInTarget = true;
+                return;
+            }
+            if (sourcePath === '/tmp/session-1.jsonl' && targetPath === '/tmp/trash-1.jsonl') {
+                fileInTarget = false;
+                fileInTrash = true;
+            }
+        },
+        resolveClaudeSessionRestoreIndexPath() {
+            return '/tmp/sessions-index.json';
+        },
+        upsertClaudeSessionIndexEntry(indexPath, targetPath, restoredEntry) {
+            calls.push(['upsertClaudeSessionIndexEntry', indexPath, targetPath, restoredEntry.sessionId]);
+        },
+        removeClaudeSessionIndexEntry(indexPath, targetPath, sessionId) {
+            calls.push(['removeClaudeSessionIndexEntry', indexPath, targetPath, sessionId]);
+        },
+        writeSessionTrashEntries() {
+            throw persistError;
+        },
+        invalidateSessionListCache() {
+            throw new Error('cache invalidation should not run on failed restore');
+        },
+        fs: {
+            existsSync(targetPath) {
+                if (targetPath === '/tmp/trash-1.jsonl') {
+                    return fileInTrash;
+                }
+                if (targetPath === '/tmp/session-1.jsonl') {
+                    return fileInTarget;
+                }
+                return targetPath === '/tmp/sessions-index.json';
+            }
+        }
+    });
+
+    const result = await restoreSessionTrashItem({ trashId: 'trash-1' });
+
+    assert.deepStrictEqual(calls, [
+        ['moveFileSync', '/tmp/trash-1.jsonl', '/tmp/session-1.jsonl'],
+        ['upsertClaudeSessionIndexEntry', '/tmp/sessions-index.json', '/tmp/session-1.jsonl', 'session-1'],
+        ['moveFileSync', '/tmp/session-1.jsonl', '/tmp/trash-1.jsonl'],
+        ['removeClaudeSessionIndexEntry', '/tmp/sessions-index.json', '/tmp/session-1.jsonl', 'session-1']
+    ]);
+    assert.deepStrictEqual(result, { error: `恢复会话失败: ${persistError.message}` });
+});
+
+test('restoreSessionTrashItem keeps the Claude index entry when rollback move fails', async () => {
+    const restoreSessionTrashItemSource = extractFunctionBySignature(
+        cliSource,
+        'async function restoreSessionTrashItem(params = {}) {',
+        'restoreSessionTrashItem'
+    );
+    let readCount = 0;
+    let fileInTrash = true;
+    let fileInTarget = false;
+    let removeCalls = 0;
+    const calls = [];
+    const persistError = new Error('persist failed');
+    const rollbackError = new Error('rollback failed');
+    const restoreSessionTrashItem = instantiateFunction(restoreSessionTrashItemSource, 'restoreSessionTrashItem', {
+        readSessionTrashEntries(options = {}) {
+            readCount += 1;
+            if (readCount === 1) {
+                assert.strictEqual(options.cleanup, undefined);
+                return [
+                    { trashId: 'trash-1', source: 'claude', sessionId: 'session-1', originalFilePath: '/tmp/session-1.jsonl' }
+                ];
+            }
+            assert.strictEqual(options.cleanup, false);
+            return [
+                { trashId: 'trash-1', source: 'claude', sessionId: 'session-1', originalFilePath: '/tmp/session-1.jsonl' }
+            ];
+        },
+        resolveSessionTrashEntryExactMessageCount: async (entry) => ({
+            ...entry,
+            source: 'claude',
+            originalFilePath: '/tmp/session-1.jsonl'
+        }),
+        resolveSessionTrashFilePath: () => '/tmp/trash-1.jsonl',
+        resolveSessionRestoreTarget: () => '/tmp/session-1.jsonl',
+        moveFileSync(sourcePath, targetPath) {
+            calls.push(['moveFileSync', sourcePath, targetPath]);
+            if (sourcePath === '/tmp/trash-1.jsonl' && targetPath === '/tmp/session-1.jsonl') {
+                fileInTrash = false;
+                fileInTarget = true;
+                return;
+            }
+            if (sourcePath === '/tmp/session-1.jsonl' && targetPath === '/tmp/trash-1.jsonl') {
+                throw rollbackError;
+            }
+        },
+        resolveClaudeSessionRestoreIndexPath() {
+            return '/tmp/sessions-index.json';
+        },
+        upsertClaudeSessionIndexEntry(indexPath, targetPath, restoredEntry) {
+            calls.push(['upsertClaudeSessionIndexEntry', indexPath, targetPath, restoredEntry.sessionId]);
+        },
+        removeClaudeSessionIndexEntry() {
+            removeCalls += 1;
+        },
+        writeSessionTrashEntries() {
+            throw persistError;
+        },
+        invalidateSessionListCache() {
+            throw new Error('cache invalidation should not run on failed restore');
+        },
+        fs: {
+            existsSync(targetPath) {
+                if (targetPath === '/tmp/trash-1.jsonl') {
+                    return fileInTrash;
+                }
+                if (targetPath === '/tmp/session-1.jsonl') {
+                    return fileInTarget;
+                }
+                return targetPath === '/tmp/sessions-index.json';
+            }
+        }
+    });
+
+    const result = await restoreSessionTrashItem({ trashId: 'trash-1' });
+
+    assert.deepStrictEqual(calls, [
+        ['moveFileSync', '/tmp/trash-1.jsonl', '/tmp/session-1.jsonl'],
+        ['upsertClaudeSessionIndexEntry', '/tmp/sessions-index.json', '/tmp/session-1.jsonl', 'session-1'],
+        ['moveFileSync', '/tmp/session-1.jsonl', '/tmp/trash-1.jsonl']
+    ]);
+    assert.strictEqual(removeCalls, 0);
+    assert.deepStrictEqual(result, { error: `恢复会话失败: ${persistError.message}` });
 });
 
 test('moveFileSync rolls back the copied target when cross-device unlink fails', () => {
