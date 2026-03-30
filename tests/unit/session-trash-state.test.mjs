@@ -429,6 +429,50 @@ test('loadSessionTrashCount ignores stale responses after a newer trash request 
     assert.strictEqual(context.sessionTrashCountLoading, false);
 });
 
+test('loadSessionTrashCount trusts a lower authoritative backend totalCount during count-only refresh', async () => {
+    const normalizeSessionTrashTotalCountSource = extractMethodAsFunction(appSource, 'normalizeSessionTrashTotalCount');
+    const normalizeSessionTrashTotalCount = instantiateFunction(
+        normalizeSessionTrashTotalCountSource,
+        'normalizeSessionTrashTotalCount'
+    );
+    const loadSessionTrashCountSource = extractMethodAsFunction(appSource, 'loadSessionTrashCount');
+    const loadSessionTrashCount = instantiateFunction(loadSessionTrashCountSource, 'loadSessionTrashCount', {
+        api: async () => ({
+            totalCount: 0,
+            items: []
+        })
+    });
+
+    const context = {
+        sessionTrashCountLoading: false,
+        sessionTrashCountPendingOptions: null,
+        sessionTrashRequestToken: 0,
+        sessionTrashTotalCount: 10,
+        sessionTrashCountLoadedOnce: false,
+        sessionTrashItems: [
+            { trashId: 'trash-1' },
+            { trashId: 'trash-2' }
+        ],
+        issueSessionTrashRequestToken() {
+            this.sessionTrashRequestToken += 1;
+            return this.sessionTrashRequestToken;
+        },
+        isLatestSessionTrashRequestToken(token) {
+            return Number(token) === Number(this.sessionTrashRequestToken);
+        },
+        normalizeSessionTrashTotalCount,
+        showMessage() {
+            throw new Error('successful count-only refresh should not surface a toast');
+        }
+    };
+
+    await loadSessionTrashCount.call(context, { silent: true });
+
+    assert.strictEqual(context.sessionTrashTotalCount, 0);
+    assert.strictEqual(context.sessionTrashCountLoadedOnce, true);
+    assert.strictEqual(context.sessionTrashCountLoading, false);
+});
+
 test('getSessionTrashViewState returns retry when badge count exists but list has never loaded', () => {
     const getSessionTrashViewStateSource = extractMethodAsFunction(appSource, 'getSessionTrashViewState');
     const getSessionTrashViewState = instantiateFunction(getSessionTrashViewStateSource, 'getSessionTrashViewState');
