@@ -1,4 +1,6 @@
 const { spawnSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 const { assert } = require('./helpers');
 
 function encodeFrame(payload) {
@@ -72,7 +74,7 @@ function runMcpExchange(node, cliPath, env, args, requests) {
 }
 
 module.exports = async function testMcp(ctx) {
-    const { env, node, cliPath } = ctx;
+    const { env, node, cliPath, api, longSessionId, longMessageCount, tmpHome } = ctx;
 
     const readOnlyRequests = [
         { jsonrpc: '2.0', id: 1, method: 'initialize', params: {} },
@@ -84,7 +86,7 @@ module.exports = async function testMcp(ctx) {
             method: 'tools/call',
             params: {
                 name: 'codexmate.session.list',
-                arguments: { source: 'CODEX', forceRefresh: true, limit: 20 }
+                arguments: { source: 'CODEX', forceRefresh: true, limit: 100 }
             }
         },
         {
@@ -175,6 +177,8 @@ module.exports = async function testMcp(ctx) {
 
     const sessionResource = readOnlyById.get(3).result || {};
     assert(Array.isArray(sessionResource.contents), 'mcp resources/read should return contents');
+    const sessionResourcePayload = JSON.parse((sessionResource.contents[0] || {}).text || '{}');
+    assert(Array.isArray(sessionResourcePayload.sessions), 'mcp sessions resource should contain sessions array');
     const workflowResource = readOnlyById.get(6).result || {};
     assert(Array.isArray(workflowResource.contents), 'mcp workflows resource should return contents');
     const workflowResourcePayload = JSON.parse((workflowResource.contents[0] || {}).text || '{}');
@@ -192,6 +196,27 @@ module.exports = async function testMcp(ctx) {
         sessionListPayload.sessions.every((item) => item && item.source === 'codex'),
         'mcp session.list should not include claude sessions when source=CODEX'
     );
+
+    const httpCodexSessions = await api('list-sessions', { source: 'codex', forceRefresh: true, limit: 100 });
+    const httpCodexById = new Map((httpCodexSessions.sessions || []).map((item) => [item.sessionId, item]));
+    for (const item of sessionListPayload.sessions) {
+        const httpItem = httpCodexById.get(item.sessionId);
+        assert(httpItem, `http list-sessions missing MCP codex session ${item.sessionId}`);
+        assert(item.messageCount === httpItem.messageCount, `mcp session.list messageCount drifted for ${item.sessionId}`);
+    }
+    const mcpLongSession = sessionListPayload.sessions.find((item) => item && item.sessionId === longSessionId);
+    assert(mcpLongSession && mcpLongSession.messageCount === longMessageCount, 'mcp session.list should expose exact long-session messageCount');
+
+    const httpAllSessions = await api('list-sessions', { source: 'all', forceRefresh: true, limit: sessionResourcePayload.sessions.length || 120 });
+    const httpAllByKey = new Map((httpAllSessions.sessions || []).map((item) => [`${item.source}:${item.sessionId}`, item]));
+    for (const item of sessionResourcePayload.sessions) {
+        const key = `${item.source}:${item.sessionId}`;
+        const httpItem = httpAllByKey.get(key);
+        assert(httpItem, `http list-sessions missing MCP resource session ${key}`);
+        assert(item.messageCount === httpItem.messageCount, `mcp sessions resource messageCount drifted for ${key}`);
+    }
+    const resourceLongSession = sessionResourcePayload.sessions.find((item) => item && item.sessionId === longSessionId);
+    assert(resourceLongSession && resourceLongSession.messageCount === longMessageCount, 'mcp sessions resource should expose exact long-session messageCount');
 
     const claudeSettingsPayload = ((readOnlyById.get(5).result || {}).structuredContent) || {};
     assert(claudeSettingsPayload.redacted === true, 'mcp claude.settings.get should mark payload as redacted');
@@ -232,9 +257,64 @@ module.exports = async function testMcp(ctx) {
     assert(Array.isArray(workflowRunsPayload.runs), 'mcp workflow-runs resource should contain runs array');
     assert(workflowRunsPayload.runs.length > 0, 'mcp workflow-runs resource should include run records');
 
+    const mcpSessionsDir = path.join(tmpHome, '.codex', 'sessions');
+    const mcpTrashSessionId = 'mcp-trash-file-alias-e2e';
+    const mcpTrashSessionPath = path.join(mcpSessionsDir, `${mcpTrashSessionId}.jsonl`);
+    fs.writeFileSync(mcpTrashSessionPath, [
+        JSON.stringify({
+            type: 'session_meta',
+            payload: { id: mcpTrashSessionId, cwd: '/tmp/mcp-trash-file-alias' },
+            timestamp: '2025-03-30T00:00:00.000Z'
+        }),
+        JSON.stringify({
+            type: 'response_item',
+            payload: { type: 'message', role: 'user', content: 'trash me through mcp file alias' },
+            timestamp: '2025-03-30T00:00:01.000Z'
+        })
+    ].join('\n') + '\n', 'utf-8');
+
+    const mcpDeleteSessionId = 'mcp-delete-file-alias-e2e';
+    const mcpDeleteSessionPath = path.join(mcpSessionsDir, `${mcpDeleteSessionId}.jsonl`);
+    fs.writeFileSync(mcpDeleteSessionPath, [
+        JSON.stringify({
+            type: 'session_meta',
+            payload: { id: mcpDeleteSessionId, cwd: '/tmp/mcp-delete-file-alias' },
+            timestamp: '2025-03-30T00:00:00.000Z'
+        }),
+        JSON.stringify({
+            type: 'response_item',
+            payload: { type: 'message', role: 'user', content: 'delete me through mcp file alias' },
+            timestamp: '2025-03-30T00:00:01.000Z'
+        })
+    ].join('\n') + '\n', 'utf-8');
+
     const writeEnabledRequests = [
         { jsonrpc: '2.0', id: 11, method: 'initialize', params: {} },
-        { jsonrpc: '2.0', id: 12, method: 'tools/list', params: {} }
+        { jsonrpc: '2.0', id: 12, method: 'tools/list', params: {} },
+        {
+            jsonrpc: '2.0',
+            id: 13,
+            method: 'tools/call',
+            params: {
+                name: 'codexmate.session.trash',
+                arguments: {
+                    source: 'codex',
+                    file: mcpTrashSessionPath
+                }
+            }
+        },
+        {
+            jsonrpc: '2.0',
+            id: 14,
+            method: 'tools/call',
+            params: {
+                name: 'codexmate.session.delete',
+                arguments: {
+                    source: 'codex',
+                    file: mcpDeleteSessionPath
+                }
+            }
+        }
     ];
     const writeEnabledResponses = runMcpExchange(node, cliPath, {
         ...env,
@@ -246,4 +326,38 @@ module.exports = async function testMcp(ctx) {
         : [];
     const writeToolNames = new Set(writeTools.map((item) => item && item.name).filter(Boolean));
     assert(writeToolNames.has('codexmate.provider.add'), 'mcp write mode should expose codexmate.provider.add');
+
+    const sessionTrashTool = writeTools.find((item) => item && item.name === 'codexmate.session.trash');
+    assert(sessionTrashTool, 'mcp write mode should expose codexmate.session.trash');
+    const sessionTrashProperties = ((sessionTrashTool || {}).inputSchema || {}).properties || {};
+    assert(sessionTrashProperties.filePath, 'codexmate.session.trash should expose filePath in schema');
+    assert(sessionTrashProperties.file, 'codexmate.session.trash should keep file alias in schema');
+
+    const sessionDeleteTool = writeTools.find((item) => item && item.name === 'codexmate.session.delete');
+    assert(sessionDeleteTool, 'mcp write mode should expose codexmate.session.delete');
+    const sessionDeleteProperties = ((sessionDeleteTool || {}).inputSchema || {}).properties || {};
+    assert(sessionDeleteProperties.filePath, 'codexmate.session.delete should expose filePath in schema');
+    assert(sessionDeleteProperties.file, 'codexmate.session.delete should keep file alias in schema');
+    assert(!sessionDeleteProperties.recordLineIndex, 'codexmate.session.delete should not expose recordLineIndex');
+    assert(!sessionDeleteProperties.recordLineIndices, 'codexmate.session.delete should not expose recordLineIndices');
+
+    const mcpTrashPayload = ((writeById.get(13).result || {}).structuredContent) || {};
+    assert(mcpTrashPayload.success === true, 'mcp session.trash should accept file alias');
+    assert(mcpTrashPayload.trashed === true, 'mcp session.trash should move the whole session into trash');
+    assert(mcpTrashPayload.filePath === mcpTrashSessionPath, 'mcp session.trash should return the resolved filePath');
+    assert(typeof mcpTrashPayload.trashId === 'string' && mcpTrashPayload.trashId, 'mcp session.trash should return trashId');
+    assert(!fs.existsSync(mcpTrashSessionPath), 'mcp session.trash should move the source file out of the sessions directory');
+
+    const trashList = await api('list-session-trash', { limit: 100, forceRefresh: true });
+    const mcpTrashItem = (trashList.items || []).find((item) => item && item.trashId === mcpTrashPayload.trashId);
+    assert(mcpTrashItem && mcpTrashItem.sessionId === mcpTrashSessionId, 'mcp session.trash should create a visible trash entry');
+
+    const purgeTrashResult = await api('purge-session-trash', { trashId: mcpTrashPayload.trashId });
+    assert(purgeTrashResult.success === true, 'mcp-created trash entry should be purgeable');
+
+    const mcpDeletePayload = ((writeById.get(14).result || {}).structuredContent) || {};
+    assert(mcpDeletePayload.success === true, 'mcp session.delete should accept file alias');
+    assert(mcpDeletePayload.deleted === true, 'mcp session.delete should keep permanent delete semantics');
+    assert(mcpDeletePayload.filePath === mcpDeleteSessionPath, 'mcp session.delete should return the resolved filePath');
+    assert(!fs.existsSync(mcpDeleteSessionPath), 'mcp session.delete should remove the source file');
 };

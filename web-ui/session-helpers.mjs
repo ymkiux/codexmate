@@ -46,6 +46,20 @@ export function switchMainTab(tab) {
     if (nextTab === 'sessions') {
         this.prepareSessionTabRender();
     }
+    const shouldLoadTrashListOnSettingsEnter = nextTab === 'settings'
+        && this.settingsTab === 'trash'
+        && typeof this.loadSessionTrash === 'function';
+    if (shouldLoadTrashListOnSettingsEnter) {
+        this.loadSessionTrash({
+            forceRefresh: this.settingsTab === 'trash' && !!this.sessionTrashLoadedOnce
+        });
+    }
+    const shouldPrimeTrashCountOnSettingsEnter = nextTab === 'settings'
+        && this.settingsTab !== 'trash'
+        && typeof this.loadSessionTrashCount === 'function';
+    if (shouldPrimeTrashCountOnSettingsEnter) {
+        this.loadSessionTrashCount({ silent: true });
+    }
     if (nextTab === 'config' && this.configMode === 'claude') {
         const expectedTab = nextTab;
         const expectedConfigMode = this.configMode;
