@@ -1046,6 +1046,25 @@ body::after {
     box-shadow: var(--shadow-card);
 }
 
+.settings-subtabs {
+    margin-bottom: var(--spacing-sm);
+}
+
+.settings-tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    margin-left: 6px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: rgba(210, 107, 90, 0.14);
+    color: var(--color-text-secondary);
+    font-size: 11px;
+    line-height: 1;
+}
+
 .content-wrapper {
     background: rgba(255, 255, 255, 0.94);
     border: 1px solid rgba(216, 201, 184, 0.35);
@@ -1482,6 +1501,22 @@ body::after {
     margin-bottom: var(--spacing-xs);
 }
 
+.settings-tab-header {
+    align-items: flex-start;
+}
+
+.settings-tab-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.settings-tab-actions .btn-tool,
+.settings-tab-actions .btn-tool-compact {
+    width: auto;
+}
+
 .selector-title {
     font-size: var(--font-size-caption);
     font-weight: var(--font-weight-secondary);
@@ -1856,11 +1891,11 @@ body::after {
 
 .session-source {
     font-size: var(--font-size-caption);
-    color: var(--color-brand);
-    border: 1px solid rgba(210, 107, 90, 0.25);
+    color: var(--color-text-tertiary);
+    border: 1px solid var(--color-border-soft);
     border-radius: 999px;
     padding: 2px 8px;
-    background: rgba(210, 107, 90, 0.08);
+    background: var(--color-surface-alt);
     white-space: nowrap;
 }
 
@@ -1879,6 +1914,12 @@ body::after {
     line-height: 1;
     box-shadow: 0 4px 10px rgba(208, 88, 58, 0.16);
     flex-shrink: 0;
+}
+
+.trash-list-footer {
+    display: flex;
+    justify-content: center;
+    margin-top: var(--spacing-sm);
 }
 
 .btn-session-export,
@@ -1984,6 +2025,110 @@ body::after {
     margin: 0 auto 10px;
     background: rgba(210, 107, 90, 0.12);
     box-shadow: inset 0 0 0 6px rgba(255, 255, 255, 0.7);
+}
+
+.trash-list {
+    display: grid;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.trash-item.session-item {
+    min-height: auto;
+    height: auto;
+    cursor: default;
+    content-visibility: visible;
+    contain-intrinsic-size: auto;
+}
+
+.trash-item.session-item:hover,
+.trash-item.session-item:active {
+    transform: none;
+    border-color: var(--color-border-soft);
+    background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.92) 100%);
+    box-shadow: var(--shadow-subtle);
+}
+
+.trash-item.session-item::before {
+    background: linear-gradient(180deg, rgba(70, 86, 110, 0.26), rgba(70, 86, 110, 0.08));
+}
+
+.trash-item-main {
+    min-width: 0;
+    flex: 1;
+}
+
+.trash-item-mainline {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.trash-item-title {
+    flex: 1;
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-secondary);
+    color: var(--color-text-primary);
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    white-space: normal;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+}
+
+.trash-item-meta {
+    margin-top: 6px;
+}
+
+.trash-item-side {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    flex-shrink: 0;
+    min-width: 132px;
+}
+
+.trash-item-actions {
+    display: flex;
+    align-self: flex-end;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.trash-item-time {
+    width: 100%;
+    text-align: right;
+    white-space: nowrap;
+    color: var(--color-text-tertiary);
+}
+
+.trash-item-path {
+    margin-top: 8px;
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 8px;
+    align-items: start;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.trash-item-label {
+    display: inline-block;
+    color: var(--color-text-secondary);
+    font-weight: var(--font-weight-secondary);
+}
+
+.trash-item-path span:last-child {
+    min-width: 0;
+    word-break: break-word;
+}
+
+.trash-item .session-count-badge {
+    margin-top: 2px;
 }
 
 .session-layout {
@@ -2587,6 +2732,44 @@ body::after {
 
     .session-toolbar-group.session-toolbar-actions .btn-tool {
         width: 100%;
+    }
+
+    .trash-item-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .trash-item-mainline {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+
+    .trash-item-side {
+        width: 100%;
+        min-width: 0;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .trash-item-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        justify-content: flex-start;
+        width: 100%;
+    }
+
+    .trash-item-actions .btn-mini {
+        width: 100%;
+        min-height: 40px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .trash-item-time {
+        text-align: right;
     }
 }
 
@@ -4103,6 +4286,79 @@ textarea:focus-visible {
         margin-bottom: 0;
         gap: 4px;
         align-items: center;
+    }
+
+    .trash-item.session-item {
+        min-height: auto;
+        height: auto;
+        contain-intrinsic-size: auto;
+    }
+
+    .trash-item-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .trash-item-mainline {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+
+    .trash-item-side {
+        width: 100%;
+        min-width: 0;
+        align-items: stretch;
+        gap: 10px;
+        padding-top: 8px;
+        border-top: 1px dashed rgba(216, 201, 184, 0.55);
+    }
+
+    .trash-item-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        justify-content: flex-start;
+        width: 100%;
+    }
+
+    .trash-item-actions .btn-mini {
+        width: 100%;
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .trash-item .session-count-badge {
+        align-self: flex-start;
+        margin-top: 0;
+    }
+
+    .trash-item-title {
+        -webkit-line-clamp: 3;
+        max-height: none;
+        white-space: normal;
+        text-overflow: clip;
+        overflow: hidden;
+    }
+
+    .trash-item-meta {
+        margin-top: 6px;
+        margin-bottom: 0;
+        gap: 6px;
+        align-items: center;
+    }
+
+    .trash-item-time {
+        padding-top: 2px;
+        line-height: 1.35;
+        text-align: right;
+    }
+
+    .trash-item-path {
+        grid-template-columns: 1fr;
+        gap: 4px;
     }
 
     .card {

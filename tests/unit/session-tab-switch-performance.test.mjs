@@ -104,6 +104,29 @@ test('switchMainTab keeps claude model context refresh behavior', () => {
     assert.strictEqual(refreshCount, 1);
 });
 
+test('switchMainTab primes trash badge count and invalidates the cached trash list when entering settings before trash tab is opened', () => {
+    const calls = [];
+    const vm = {
+        mainTab: 'sessions',
+        settingsTab: 'backup',
+        sessionTrashLoadedOnce: true,
+        configMode: 'codex',
+        teardownSessionTabRender() {},
+        prepareSessionTabRender() {},
+        loadSessions() {},
+        loadSessionTrashCount(options) {
+            calls.push(options);
+        },
+        refreshClaudeModelContext() {}
+    };
+
+    switchMainTab.call(vm, 'settings');
+
+    assert.strictEqual(vm.mainTab, 'settings');
+    assert.strictEqual(vm.sessionTrashLoadedOnce, false);
+    assert.deepStrictEqual(calls, [{ silent: true }]);
+});
+
 test('switchMainTab defers session teardown when scheduler exists to keep tab selection responsive', () => {
     let deferredTask = null;
     let teardownCount = 0;
