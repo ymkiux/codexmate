@@ -904,13 +904,14 @@
                 <div v-else :class="['session-layout', { 'session-standalone': sessionStandalone }]">
                     <div v-if="!sessionStandalone && sessionListRenderEnabled" class="session-list">
                         <div
-                            v-for="session in sessionsList"
+                            v-for="session in sortedSessionsList"
                             :key="session.source + '-' + session.sessionId + '-' + session.filePath"
-                            v-memo="[activeSessionExportKey === getSessionExportKey(session), session.messageCount, session.updatedAt, session.title, session.sourceLabel]"
+                            v-memo="[activeSessionExportKey === getSessionExportKey(session), session.messageCount, session.updatedAt, session.title, session.sourceLabel, isSessionPinned(session)]"
                             :class="[
                                 'session-item',
                                 {
-                                    active: activeSessionExportKey === getSessionExportKey(session)
+                                    active: activeSessionExportKey === getSessionExportKey(session),
+                                    pinned: isSessionPinned(session)
                                 }
                             ]"
                             @click="selectSession(session)">
@@ -920,6 +921,20 @@
                                     <span class="session-count-badge">{{ session.messageCount ?? 0 }}</span>
                                 </div>
                                 <div class="session-item-actions">
+                                    <button
+                                        class="session-item-copy session-item-pin"
+                                        @click.stop="toggleSessionPin(session)"
+                                        :disabled="sessionsLoading"
+                                        :aria-label="isSessionPinned(session) ? '取消置顶' : '置顶'"
+                                        :title="isSessionPinned(session) ? '取消置顶' : '置顶'"
+                                        :aria-pressed="isSessionPinned(session)">
+                                        <svg v-if="isSessionPinned(session)" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.6">
+                                            <path d="M12 22s8-6 8-12a8 8 0 1 0-16 0c0 6 8 12 8 12z"></path>
+                                        </svg>
+                                        <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                                            <path d="M12 22s8-6 8-12a8 8 0 1 0-16 0c0 6 8 12 8 12z"></path>
+                                        </svg>
+                                    </button>
                                     <button
                                         v-if="isResumeCommandAvailable(session)"
                                         class="session-item-copy"
