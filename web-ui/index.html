@@ -1104,7 +1104,7 @@
                     </div>
 
                     <div
-                        v-if="settingsTab === 'backup'"
+                        v-show="settingsTab === 'backup'"
                         id="settings-panel-backup"
                         role="tabpanel"
                         aria-labelledby="settings-tab-backup">
@@ -1145,7 +1145,7 @@
                     </div>
 
                     <div
-                        v-else
+                        v-show="settingsTab === 'trash'"
                         id="settings-panel-trash"
                         role="tabpanel"
                         aria-labelledby="settings-tab-trash">

@@ -1,4 +1,4 @@
-import assert from 'assert';
+﻿import assert from 'assert';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -45,7 +45,10 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /id="settings-tab-trash"[\s\S]*tabindex="0"/);
     assert.match(html, /id="settings-panel-backup"/);
     assert.match(html, /id="settings-panel-trash"/);
+    assert.match(html, /<div[\s\S]*v-show="settingsTab === 'backup'"[\s\S]*id="settings-panel-backup"[\s\S]*aria-labelledby="settings-tab-backup">/);
+    assert.match(html, /<div[\s\S]*v-show="settingsTab === 'trash'"[\s\S]*id="settings-panel-trash"[\s\S]*aria-labelledby="settings-tab-trash">/);
     assert.match(html, /role="tabpanel"/);
+    assert.doesNotMatch(html, /v-if="settingsTab === 'backup'"/);
     assert.match(html, /class="trash-item session-item session-card"/);
     assert.match(html, /class="trash-item-mainline"/);
     assert.match(html, /class="trash-item-side"/);
@@ -188,14 +191,22 @@ test('session helper deferred claude refresh validates live tab and mode before 
 
 test('trash item styles stay aligned with session card layout and keep mobile usability', () => {
     const styles = readProjectFile('web-ui/styles.css');
+    const mobile520Start = styles.indexOf('@media (max-width: 520px)');
+    const mobile540Start = styles.indexOf('@media (max-width: 540px)');
+
+    assert.notStrictEqual(mobile520Start, -1, '520px media block should exist');
+    assert(mobile540Start > mobile520Start, '540px media block should appear after 520px block');
+
+    const mobile520Block = styles.slice(mobile520Start, mobile540Start);
+
     assert.match(styles, /\.session-source\s*\{/);
     assert.match(styles, /\.trash-item\.session-item\s*\{[\s\S]*height:\s*auto;/);
     assert.match(styles, /\.trash-item-title\s*\{[\s\S]*-webkit-line-clamp:\s*2;/);
     assert.match(styles, /\.trash-item-side\s*\{[\s\S]*min-width:\s*132px;/);
     assert.match(styles, /\.trash-item-path\s*\{[\s\S]*grid-template-columns:\s*48px\s+minmax\(0,\s*1fr\);/);
-    assert.match(styles, /@media \(max-width: 520px\)\s*\{[\s\S]*\.trash-item-header\s*\{[\s\S]*flex-direction:\s*column;/);
-    assert.match(styles, /@media \(max-width: 520px\)\s*\{[\s\S]*\.trash-item-actions\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
-    assert.match(styles, /@media \(max-width: 520px\)\s*\{[\s\S]*\.trash-item-actions \.btn-mini\s*\{[\s\S]*min-height:\s*40px;/);
+    assert.match(mobile520Block, /\.trash-item-header\s*\{[\s\S]*flex-direction:\s*column;/);
+    assert.match(mobile520Block, /\.trash-item-actions\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
+    assert.match(mobile520Block, /\.trash-item-actions \.btn-mini\s*\{[\s\S]*min-height:\s*40px;/);
     assert.match(styles, /@media \(max-width: 540px\)\s*\{[\s\S]*\.trash-item\.session-item\s*\{[\s\S]*height:\s*auto;/);
     assert.match(styles, /@media \(max-width: 540px\)\s*\{[\s\S]*\.trash-item-header\s*\{[\s\S]*flex-direction:\s*column;/);
     assert.match(styles, /@media \(max-width: 540px\)\s*\{[\s\S]*\.trash-item-mainline\s*\{[\s\S]*flex-direction:\s*column;/);
@@ -203,4 +214,14 @@ test('trash item styles stay aligned with session card layout and keep mobile us
     assert.match(styles, /@media \(max-width: 540px\)\s*\{[\s\S]*\.trash-item-actions \.btn-mini\s*\{[\s\S]*min-height:\s*44px;/);
     assert.match(styles, /@media \(max-width: 540px\)\s*\{[\s\S]*\.trash-item \.session-count-badge\s*\{[\s\S]*align-self:\s*flex-start;/);
     assert.match(styles, /@media \(max-width: 540px\)\s*\{[\s\S]*\.trash-item-title\s*\{[\s\S]*-webkit-line-clamp:\s*3;/);
+});
+
+test('settings tab header actions keep compact tool buttons inline on wider screens', () => {
+    const styles = readProjectFile('web-ui/styles.css');
+
+    assert.match(styles, /\.settings-tab-actions\s*\{[\s\S]*display:\s*flex;/);
+    assert.match(
+        styles,
+        /\.settings-tab-actions \.btn-tool,\s*\.settings-tab-actions \.btn-tool-compact\s*\{[\s\S]*width:\s*auto;/
+    );
 });
