@@ -339,6 +339,8 @@ module.exports = async function testMcp(ctx) {
     const sessionTrashProperties = ((sessionTrashTool || {}).inputSchema || {}).properties || {};
     assert(sessionTrashProperties.filePath, 'codexmate.session.trash should expose filePath in schema');
     assert(sessionTrashProperties.file, 'codexmate.session.trash should keep file alias in schema');
+    assert(!sessionTrashProperties.recordLineIndex, 'codexmate.session.trash should not expose recordLineIndex');
+    assert(!sessionTrashProperties.recordLineIndices, 'codexmate.session.trash should not expose recordLineIndices');
 
     const sessionDeleteTool = writeTools.find((item) => item && item.name === 'codexmate.session.delete');
     assert(sessionDeleteTool, 'mcp write mode should expose codexmate.session.delete');
@@ -367,4 +369,12 @@ module.exports = async function testMcp(ctx) {
     assert(mcpDeletePayload.deleted === true, 'mcp session.delete should keep permanent delete semantics');
     assert(mcpDeletePayload.filePath === mcpDeleteSessionPath, 'mcp session.delete should return the resolved filePath');
     assert(!fs.existsSync(mcpDeleteSessionPath), 'mcp session.delete should remove the source file');
+
+    const deleteTrashList = await api('list-session-trash', { limit: 100, forceRefresh: true });
+    const deleteTrashItem = (deleteTrashList.items || []).find((item) => item && (
+        item.originalFilePath === mcpDeleteSessionPath ||
+        item.filePath === mcpDeleteSessionPath ||
+        item.sessionId === mcpDeleteSessionId
+    ));
+    assert(!deleteTrashItem, 'mcp session.delete should not create a trash entry');
 };

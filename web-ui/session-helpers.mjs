@@ -51,7 +51,7 @@ export function switchMainTab(tab) {
         && typeof this.loadSessionTrash === 'function';
     if (shouldLoadTrashListOnSettingsEnter) {
         this.loadSessionTrash({
-            forceRefresh: this.settingsTab === 'trash' && !!this.sessionTrashLoadedOnce
+            forceRefresh: !!this.sessionTrashLoadedOnce
         });
     }
     const shouldPrimeTrashCountOnSettingsEnter = nextTab === 'settings'
