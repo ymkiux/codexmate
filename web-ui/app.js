@@ -2431,6 +2431,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     try {
                         const parsed = JSON.parse(cached);
                         this.sessionPinnedMap = this.normalizeSessionPinnedMap(parsed);
+                        this.pruneSessionPinnedMap();
                     } catch (_) {
                         this.sessionPinnedMap = {};
                         localStorage.removeItem('codexmateSessionPinnedMap');
@@ -2441,6 +2442,30 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         ? this.sessionPinnedMap
                         : {};
                     localStorage.setItem('codexmateSessionPinnedMap', JSON.stringify(payload));
+                },
+                pruneSessionPinnedMap(sessions = this.sessionsList) {
+                    const current = (this.sessionPinnedMap && typeof this.sessionPinnedMap === 'object')
+                        ? this.sessionPinnedMap
+                        : {};
+                    const list = Array.isArray(sessions) ? sessions : [];
+                    if (Object.keys(current).length === 0) {
+                        return;
+                    }
+                    const validKeys = new Set(list.map((session) => this.getSessionExportKey(session)).filter(Boolean));
+                    const next = {};
+                    let changed = false;
+                    for (const [key, value] of Object.entries(current)) {
+                        if (!validKeys.has(key)) {
+                            changed = true;
+                            continue;
+                        }
+                        next[key] = value;
+                    }
+                    if (!changed) {
+                        return;
+                    }
+                    this.sessionPinnedMap = next;
+                    this.persistSessionPinnedMap();
                 },
                 getSessionPinTimestamp(session) {
                     if (!session) return 0;
@@ -2971,7 +2996,9 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 },
 
                 async loadSessions() {
-                    return loadSessionsHelper.call(this, api);
+                    const result = await loadSessionsHelper.call(this, api);
+                    this.pruneSessionPinnedMap();
+                    return result;
                 },
 
                 async selectSession(session) {
