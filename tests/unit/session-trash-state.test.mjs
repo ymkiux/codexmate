@@ -783,6 +783,94 @@ test('restoreSessionTrashItem removes the restored entry from the latest trash i
     ]);
 });
 
+test('moveFileSync rolls back the copied target when cross-device unlink fails', () => {
+    const moveFileSyncSource = extractFunctionBySignature(
+        cliSource,
+        'function moveFileSync(sourcePath, targetPath) {',
+        'moveFileSync'
+    );
+    const calls = [];
+    const unlinkError = new Error('source unlink failed');
+    const moveFileSync = instantiateFunction(moveFileSyncSource, 'moveFileSync', {
+        ensureDir(targetDir) {
+            calls.push(['ensureDir', targetDir]);
+        },
+        path: {
+            dirname() {
+                return '/tmp/target-dir';
+            }
+        },
+        fs: {
+            renameSync() {
+                const error = new Error('cross-device rename');
+                error.code = 'EXDEV';
+                throw error;
+            },
+            copyFileSync(sourcePath, targetPath) {
+                calls.push(['copyFileSync', sourcePath, targetPath]);
+            },
+            unlinkSync(targetPath) {
+                calls.push(['unlinkSync', targetPath]);
+                if (targetPath === '/tmp/source.jsonl') {
+                    throw unlinkError;
+                }
+            }
+        }
+    });
+
+    assert.throws(
+        () => moveFileSync('/tmp/source.jsonl', '/tmp/target.jsonl'),
+        (error) => error === unlinkError
+    );
+    assert.deepStrictEqual(calls, [
+        ['ensureDir', '/tmp/target-dir'],
+        ['copyFileSync', '/tmp/source.jsonl', '/tmp/target.jsonl'],
+        ['unlinkSync', '/tmp/source.jsonl'],
+        ['unlinkSync', '/tmp/target.jsonl']
+    ]);
+});
+
+test('purgeSessionTrashItems persists remaining entries before returning an unlink error', async () => {
+    const purgeSessionTrashItemsSource = extractFunctionBySignature(
+        cliSource,
+        'async function purgeSessionTrashItems(params = {}) {',
+        'purgeSessionTrashItems'
+    );
+    const entries = [
+        { trashId: 'trash-1', source: 'codex', sessionId: 'session-1' },
+        { trashId: 'trash-2', source: 'codex', sessionId: 'session-2' },
+        { trashId: 'trash-3', source: 'claude', sessionId: 'session-3' }
+    ];
+    let writtenEntries = null;
+    const purgeError = new Error('trash file busy');
+    const purgeSessionTrashItems = instantiateFunction(purgeSessionTrashItemsSource, 'purgeSessionTrashItems', {
+        readSessionTrashEntries() {
+            return entries;
+        },
+        resolveSessionTrashFilePath(entry) {
+            return `/tmp/${entry.trashId}.jsonl`;
+        },
+        writeSessionTrashEntries(nextEntries) {
+            writtenEntries = nextEntries;
+        },
+        fs: {
+            existsSync() {
+                return true;
+            },
+            unlinkSync(targetPath) {
+                if (targetPath === '/tmp/trash-2.jsonl') {
+                    throw purgeError;
+                }
+            }
+        }
+    });
+
+    const result = await purgeSessionTrashItems({ trashIds: ['trash-1', 'trash-2'] });
+
+    assert.deepStrictEqual(writtenEntries, [entries[1], entries[2]]);
+    assert.deepStrictEqual(result, { error: `彻底删除失败: ${purgeError.message}` });
+});
+
 test('getSessionFileArg prefers filePath and falls back to file', () => {
     const getSessionFileArgSource = extractFunctionBySignature(
         cliSource,
