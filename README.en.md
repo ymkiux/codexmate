@@ -61,25 +61,46 @@ It works on local files directly and does not require cloud hosting.
 ## Architecture
 
 ```mermaid
-flowchart LR
-    A[CLI: codexmate] --> B[Local config files]
-    A --> C[Local Web UI]
-    C --> D[Built-in HTTP API]
-    D --> B
-    D --> E[Session indexing/export]
-    A --> F[MCP stdio server]
-
-    subgraph Local Files
-      B1[~/.codex/config.toml]
-      B2[~/.claude/settings.json]
-      B3[~/.openclaw/openclaw.json]
-      B4[sessions/*.jsonl]
+flowchart TB
+    subgraph Interfaces["Entry Surfaces"]
+      CLI["CLI"]
+      WEB["Web UI"]
+      MCP["MCP Client"]
+      OAI["Codex / OpenAI Client"]
     end
 
-    B --> B1
-    B --> B2
-    B --> B3
-    E --> B4
+    subgraph Runtime["Codex Mate Runtime"]
+      ENTRY["cli.js Entry"]
+      API["Local HTTP API"]
+      MCPS["MCP stdio Server"]
+      PROXY["Built-in Proxy"]
+      SERVICES["Config / Sessions / Skills / Workflow"]
+      CORE["File IO / Network / Diff / Session Utils"]
+    end
+
+    subgraph Data["Local Files"]
+      CODEX["~/.codex"]
+      CLAUDE["~/.claude"]
+      OPENCLAW["~/.openclaw"]
+      STATE["sessions / trash / workflow runs"]
+    end
+
+    CLI --> ENTRY
+    WEB -->|GET / + POST /api| API
+    MCP -->|stdio JSON-RPC| MCPS
+    OAI -->|HTTP /v1| PROXY
+
+    ENTRY --> SERVICES
+    API --> SERVICES
+    MCPS --> SERVICES
+    PROXY --> CORE
+
+    SERVICES --> CORE
+
+    CORE --> CODEX
+    CORE --> CLAUDE
+    CORE --> OPENCLAW
+    CORE --> STATE
 ```
 
 ## Quick Start
