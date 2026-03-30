@@ -10,8 +10,6 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D14.0.0-green.svg)](https://nodejs.org)
 
-Current Release: `v0.0.18`
-
 [Quick Start](#quick-start) · [Commands](#command-reference) · [Web UI](#web-ui) · [MCP](#mcp) · [中文](README.md)
 
 </div>
@@ -124,14 +122,13 @@ Default listen address is `127.0.0.1:3737`, and browser auto-open is enabled by 
 git clone https://github.com/SakuraByteCore/codexmate.git
 cd codexmate
 npm install
-npm link
-codexmate run
+npm start run
 ```
 
 ### Tests / CI (service only)
 
 ```bash
-codexmate run --no-browser
+npm start run --no-browser
 ```
 
 > Convention: automated tests validate service and API behavior only, without opening browser pages.
