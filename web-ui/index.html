@@ -1158,7 +1158,7 @@
                                     <button class="btn-tool btn-tool-compact" @click="loadSessionTrash({ forceRefresh: true })" :disabled="sessionTrashLoading || sessionTrashClearing">
                                         {{ sessionTrashLoading ? '刷新中...' : '刷新列表' }}
                                     </button>
-                                    <button class="btn-tool btn-tool-compact" @click="clearSessionTrash" :disabled="sessionTrashClearing || sessionTrashLoading || sessionTrashCount === 0">
+                                    <button class="btn-tool btn-tool-compact" @click="clearSessionTrash" :disabled="sessionTrashClearing || sessionTrashLoading || !(Number(sessionTrashCount) > 0)">
                                         {{ sessionTrashClearing ? '清空中...' : '清空回收站' }}
                                     </button>
                                 </div>

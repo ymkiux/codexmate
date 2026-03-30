@@ -3923,7 +3923,8 @@ async function countConversationMessagesInFile(filePath, source) {
 
             const role = normalizeRole(message.role);
             const text = typeof message.text === 'string' ? message.text : '';
-            if (leadingSystem && (role === 'system' || isBootstrapLikeText(text))) {
+            const hasText = text.length > 0;
+            if (leadingSystem && (role === 'system' || (hasText && isBootstrapLikeText(text)))) {
                 continue;
             }
 
@@ -5926,6 +5927,14 @@ function buildSessionTrashEntry(summary, options = {}) {
         ? Math.max(0, Math.floor(Number(summary.messageCount)))
         : fallbackMessageCount;
     const messageCountMtimeMs = getFileMtimeMs(options.trashFilePath);
+    const normalizedClaudeKeywords = claudeIndexEntry && Array.isArray(claudeIndexEntry.keywords)
+        ? normalizeKeywords(claudeIndexEntry.keywords)
+        : [];
+    const normalizedClaudeCapabilities = claudeIndexEntry
+        ? normalizeCapabilities(claudeIndexEntry.capabilities)
+        : {};
+    const normalizedSummaryKeywords = normalizeKeywords(summary.keywords);
+    const normalizedSummaryCapabilities = normalizeCapabilities(summary.capabilities);
     return {
         trashId: options.trashId,
         trashFileName: options.trashFileName,
@@ -5943,12 +5952,10 @@ function buildSessionTrashEntry(summary, options = {}) {
         provider: (claudeIndexEntry && typeof claudeIndexEntry.provider === 'string' && claudeIndexEntry.provider.trim())
             ? claudeIndexEntry.provider.trim()
             : (summary.provider || (source === 'claude' ? 'claude' : 'codex')),
-        keywords: (claudeIndexEntry && Array.isArray(claudeIndexEntry.keywords))
-            ? normalizeKeywords(claudeIndexEntry.keywords)
-            : normalizeKeywords(summary.keywords),
-        capabilities: claudeIndexEntry
-            ? normalizeCapabilities(claudeIndexEntry.capabilities)
-            : normalizeCapabilities(summary.capabilities),
+        keywords: normalizedClaudeKeywords.length > 0 ? normalizedClaudeKeywords : normalizedSummaryKeywords,
+        capabilities: Object.keys(normalizedClaudeCapabilities).length > 0
+            ? normalizedClaudeCapabilities
+            : normalizedSummaryCapabilities,
         claudeIndexPath: typeof options.claudeIndexPath === 'string' ? options.claudeIndexPath : '',
         claudeIndexEntry
     };
@@ -6250,9 +6257,9 @@ async function purgeSessionTrashItems(params = {}) {
             try {
                 fs.unlinkSync(trashFilePath);
             } catch (e) {
-                purgeError = e;
-                remaining.push(...entries.slice(index));
-                break;
+                if (!purgeError) purgeError = e;
+                remaining.push(entry);
+                continue;
             }
         }
         purged.push({
@@ -6326,8 +6333,9 @@ async function trashSessionData(params = {}) {
         });
         const entries = readSessionTrashEntries({ cleanup: false });
         const totalCount = entries.length + 1;
-        writeSessionTrashEntries([entry, ...entries]);
-        summary.totalCount = totalCount;
+        const nextEntries = [entry, ...entries].slice(0, MAX_SESSION_TRASH_LIST_SIZE);
+        writeSessionTrashEntries(nextEntries);
+        summary.totalCount = Math.min(totalCount, MAX_SESSION_TRASH_LIST_SIZE);
     } catch (e) {
         let rollbackSucceeded = false;
         if (fs.existsSync(trashFilePath) && !fs.existsSync(filePath)) {

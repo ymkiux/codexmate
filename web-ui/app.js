@@ -1836,6 +1836,13 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                                     : (this.normalizeSessionTrashTotalCount(this.sessionTrashTotalCount, this.sessionTrashItems) + 1),
                                 this.sessionTrashItems
                             );
+                        } else {
+                            this.sessionTrashTotalCount = this.normalizeSessionTrashTotalCount(
+                                res && res.totalCount !== undefined
+                                    ? res.totalCount
+                                    : (this.normalizeSessionTrashTotalCount(this.sessionTrashTotalCount, this.sessionTrashItems) + 1),
+                                this.sessionTrashItems
+                            );
                         }
                         await this.removeSessionFromCurrentList(session);
                     } catch (e) {
@@ -1893,6 +1900,18 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         ? Math.max(existing.length, Math.floor(previousTotalCount))
                         : existing.length;
                     this.sessionTrashItems = nextItems;
+                    const previousVisibleCount = Number(this.sessionTrashVisibleCount);
+                    const normalizedPreviousVisibleCount = Number.isFinite(previousVisibleCount) && previousVisibleCount > 0
+                        ? Math.floor(previousVisibleCount)
+                        : SESSION_TRASH_PAGE_SIZE;
+                    const wasFullyExpanded = normalizedPreviousVisibleCount >= existing.length
+                        || normalizedPreviousVisibleCount >= normalizedPreviousTotal;
+                    if (wasFullyExpanded) {
+                        this.sessionTrashVisibleCount = Math.min(
+                            normalizedPreviousVisibleCount + 1,
+                            nextItems.length || (normalizedPreviousVisibleCount + 1)
+                        );
+                    }
                     const fallbackTotalCount = filtered.length === existing.length
                         ? normalizedPreviousTotal + 1
                         : normalizedPreviousTotal;
@@ -2157,6 +2176,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             return;
                         }
                         this.showMessage('会话已恢复', 'success');
+                        this.invalidateSessionTrashRequests();
                         await this.loadSessionTrash({ forceRefresh: true });
                         if (this.sessionsLoadedOnce) {
                             await this.loadSessions();
@@ -2191,6 +2211,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             return;
                         }
                         this.showMessage('已彻底删除', 'success');
+                        this.invalidateSessionTrashRequests();
                         await this.loadSessionTrash({ forceRefresh: true });
                     } catch (e) {
                         this.showMessage('彻底删除失败', 'error');
@@ -2200,7 +2221,8 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 },
 
                 async clearSessionTrash() {
-                    if (this.sessionTrashClearing || this.sessionTrashCount === 0) {
+                    const normalizedCount = Number(this.sessionTrashCount);
+                    if (this.sessionTrashClearing || !Number.isFinite(normalizedCount) || normalizedCount <= 0) {
                         return;
                     }
                     const confirmed = await this.requestConfirmDialog({
@@ -2221,6 +2243,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             return;
                         }
                         this.showMessage('回收站已清空', 'success');
+                        this.invalidateSessionTrashRequests();
                         await this.loadSessionTrash({ forceRefresh: true });
                     } catch (e) {
                         this.showMessage('清空回收站失败', 'error');
@@ -5588,4 +5611,4 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
 
         app.mount('#app');
     });
-    
+

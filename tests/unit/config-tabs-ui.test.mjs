@@ -68,7 +68,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /v-memo="\[activeSessionExportKey === getSessionExportKey\(session\)/);
     assert.match(html, /v-memo="\[msg\.text,\s*msg\.timestamp,\s*msg\.roleLabel,\s*msg\.normalizedRole\]"/);
     assert.match(html, /v-memo="\[sessionTimelineActiveKey === node\.key,\s*node\.safePercent,\s*node\.title\]"/);
-    assert.match(html, /<button[\s\S]*@click="copyProviderShareCommand\(provider\)"[\s\S]*disabled[\s\S]*title="分享导入命令（暂时禁用）"[\s\S]*aria-label="Share import command"[\s\S]*>/);
+    assert.match(html, /<button[^>]*@click="copyProviderShareCommand\(provider\)"[^>]*disabled[^>]*title="分享导入命令（暂时禁用）"[^>]*aria-label="Share import command"[^>]*>/);
     assert.match(html, /<button class="card-action-btn"[^>]*@click="copyClaudeShareCommand\(name\)"[^>]*disabled[^>]*>/);
 });
 

@@ -1891,11 +1891,11 @@ body::after {
 
 .session-source {
     font-size: var(--font-size-caption);
-    color: var(--color-brand);
-    border: 1px solid rgba(210, 107, 90, 0.25);
+    color: var(--color-text-tertiary);
+    border: 1px solid var(--color-border-soft);
     border-radius: 999px;
     padding: 2px 8px;
-    background: rgba(210, 107, 90, 0.08);
+    background: var(--color-surface-alt);
     white-space: nowrap;
 }
 
@@ -2034,7 +2034,7 @@ body::after {
 }
 
 .trash-item.session-item {
-    min-height: 0;
+    min-height: auto;
     height: auto;
     cursor: default;
     content-visibility: visible;
@@ -4289,7 +4289,7 @@ textarea:focus-visible {
     }
 
     .trash-item.session-item {
-        min-height: 0;
+        min-height: auto;
         height: auto;
         contain-intrinsic-size: auto;
     }
