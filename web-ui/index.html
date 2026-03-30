@@ -585,10 +585,11 @@
                                 <button
                                     v-if="!provider.readOnly"
                                     class="card-action-btn"
-                                    :class="{ loading: providerShareLoading[provider.name], disabled: !shouldAllowProviderShare(provider) }"
-                                    :disabled="!shouldAllowProviderShare(provider)"
+                                    :class="{ loading: providerShareLoading[provider.name] }"
+                                    disabled
                                     @click="copyProviderShareCommand(provider)"
-                                    :title="shouldAllowProviderShare(provider) ? '分享导入命令' : '本地入口不可分享'">
+                                    title="分享导入命令（暂时禁用）"
+                                    aria-label="Share import command">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/>
                                         <path d="M16 6l-4-4-4 4"/>
@@ -964,7 +965,7 @@
                                             class="btn-session-delete"
                                             @click="deleteSession(activeSession)"
                                             :disabled="!activeSession || sessionsLoading || sessionDeleting[getSessionExportKey(activeSession)]">
-                                            {{ (activeSession && sessionDeleting[getSessionExportKey(activeSession)]) ? '删除中...' : '删除会话' }}
+                                            {{ (activeSession && sessionDeleting[getSessionExportKey(activeSession)]) ? '移入中...' : '移入回收站' }}
                                         </button>
                                         <button
                                             class="btn-session-export"
@@ -1078,40 +1079,119 @@
                     id="panel-settings"
                     role="tabpanel"
                     :aria-labelledby="'tab-settings'">
-                    <div class="selector-section">
-                        <div class="selector-header">
-                            <span class="selector-title">Claude 配置</span>
-                        </div>
-                        <button class="btn-tool" @click="downloadClaudeDirectory" :disabled="claudeDownloadLoading">
-                            {{ claudeDownloadLoading ? ('备份中 ' + claudeDownloadProgress + '%') : '一键备份 ~/.claude' }}
+                    <div class="config-subtabs settings-subtabs" role="tablist" aria-label="设置子标签">
+                        <button
+                            :class="['config-subtab', { active: settingsTab === 'backup' }]"
+                            @click="onSettingsTabClick('backup')">
+                            备份与导入
                         </button>
-                        <button class="btn-tool" @click="triggerClaudeImport" :disabled="claudeImportLoading">
-                            {{ claudeImportLoading ? '导入中...' : '导入 ~/.claude 备份' }}
+                        <button
+                            :class="['config-subtab', { active: settingsTab === 'trash' }]"
+                            @click="onSettingsTabClick('trash')">
+                            回收站
+                            <span class="settings-tab-badge">{{ sessionTrashCount }}</span>
                         </button>
-                        <input
-                            ref="claudeImportInput"
-                            class="sr-only"
-                            type="file"
-                            accept=".zip"
-                            @change="handleClaudeImportChange">
                     </div>
-                    <div class="selector-section">
-                        <div class="selector-header">
-                            <span class="selector-title">Codex 配置</span>
+
+                    <template v-if="settingsTab === 'backup'">
+                        <div class="selector-section">
+                            <div class="selector-header">
+                                <span class="selector-title">Claude 配置</span>
+                            </div>
+                            <button class="btn-tool" @click="downloadClaudeDirectory" :disabled="claudeDownloadLoading">
+                                {{ claudeDownloadLoading ? ('备份中 ' + claudeDownloadProgress + '%') : '一键备份 ~/.claude' }}
+                            </button>
+                            <button class="btn-tool" @click="triggerClaudeImport" :disabled="claudeImportLoading">
+                                {{ claudeImportLoading ? '导入中...' : '导入 ~/.claude 备份' }}
+                            </button>
+                            <input
+                                ref="claudeImportInput"
+                                class="sr-only"
+                                type="file"
+                                accept=".zip"
+                                @change="handleClaudeImportChange">
                         </div>
-                        <button class="btn-tool" @click="downloadCodexDirectory" :disabled="codexDownloadLoading">
-                            {{ codexDownloadLoading ? ('备份中 ' + codexDownloadProgress + '%') : '一键备份 ~/.codex' }}
-                        </button>
-                        <button class="btn-tool" @click="triggerCodexImport" :disabled="codexImportLoading">
-                            {{ codexImportLoading ? '导入中...' : '导入 ~/.codex 备份' }}
-                        </button>
-                        <input
-                            ref="codexImportInput"
-                            class="sr-only"
-                            type="file"
-                            accept=".zip"
-                            @change="handleCodexImportChange">
-                    </div>
+                        <div class="selector-section">
+                            <div class="selector-header">
+                                <span class="selector-title">Codex 配置</span>
+                            </div>
+                            <button class="btn-tool" @click="downloadCodexDirectory" :disabled="codexDownloadLoading">
+                                {{ codexDownloadLoading ? ('备份中 ' + codexDownloadProgress + '%') : '一键备份 ~/.codex' }}
+                            </button>
+                            <button class="btn-tool" @click="triggerCodexImport" :disabled="codexImportLoading">
+                                {{ codexImportLoading ? '导入中...' : '导入 ~/.codex 备份' }}
+                            </button>
+                            <input
+                                ref="codexImportInput"
+                                class="sr-only"
+                                type="file"
+                                accept=".zip"
+                                @change="handleCodexImportChange">
+                        </div>
+                    </template>
+
+                    <template v-else>
+                        <div class="selector-section">
+                            <div class="selector-header settings-tab-header">
+                                <div>
+                                    <span class="selector-title">会话回收站</span>
+                                    <div class="config-template-hint">会话浏览中的删除操作会先移到这里，可恢复或彻底删除。</div>
+                                </div>
+                                <div class="settings-tab-actions">
+                                    <button class="btn-tool btn-tool-compact" @click="loadSessionTrash({ forceRefresh: true })" :disabled="sessionTrashLoading || sessionTrashClearing">
+                                        {{ sessionTrashLoading ? '刷新中...' : '刷新列表' }}
+                                    </button>
+                                    <button class="btn-tool btn-tool-compact" @click="clearSessionTrash" :disabled="sessionTrashClearing || sessionTrashLoading || sessionTrashCount === 0">
+                                        {{ sessionTrashClearing ? '清空中...' : '清空回收站' }}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div v-if="getSessionTrashViewState() === 'loading'" class="session-empty">
+                                正在加载回收站...
+                            </div>
+                            <div v-else-if="getSessionTrashViewState() === 'empty'" class="session-empty">
+                                回收站为空
+                            </div>
+                            <div v-else-if="getSessionTrashViewState() === 'retry'" class="session-empty">
+                                回收站列表加载失败，请刷新重试
+                            </div>
+                            <div v-else class="trash-list">
+                                <div v-for="item in sessionTrashItems" :key="item.trashId" class="trash-item session-item session-card">
+                                    <div class="trash-item-header session-item-header">
+                                        <div class="trash-item-main">
+                                            <div class="trash-item-mainline">
+                                                <div class="trash-item-title">{{ item.title || item.sessionId }}</div>
+                                                <span class="session-count-badge">{{ item.messageCount ?? 0 }}</span>
+                                            </div>
+                                            <div class="trash-item-meta session-item-meta">
+                                                <span :class="['pill', item.source === 'claude' ? 'configured' : 'empty']">{{ item.sourceLabel }}</span>
+                                            </div>
+                                        </div>
+                                        <div class="trash-item-side">
+                                            <div class="trash-item-actions session-item-actions">
+                                                <button class="btn-mini" @click="restoreSessionTrash(item)" :disabled="sessionTrashLoading || sessionTrashClearing || sessionTrashRestoring[getSessionTrashActionKey(item)]">
+                                                    {{ sessionTrashRestoring[getSessionTrashActionKey(item)] ? '恢复中...' : '恢复' }}
+                                                </button>
+                                                <button class="btn-mini delete" @click="purgeSessionTrash(item)" :disabled="sessionTrashLoading || sessionTrashClearing || sessionTrashPurging[getSessionTrashActionKey(item)]">
+                                                    {{ sessionTrashPurging[getSessionTrashActionKey(item)] ? '删除中...' : '彻底删除' }}
+                                                </button>
+                                            </div>
+                                            <div class="trash-item-time session-item-time">{{ item.deletedAt || item.updatedAt || 'unknown time' }}</div>
+                                        </div>
+                                    </div>
+                                    <div v-if="item.cwd" class="trash-item-path session-item-sub session-item-wrap">
+                                        <span class="trash-item-label">工作区</span>
+                                        <span>{{ item.cwd }}</span>
+                                    </div>
+                                    <div class="trash-item-path session-item-sub session-item-wrap">
+                                        <span class="trash-item-label">原文件</span>
+                                        <span>{{ item.originalFilePath }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
                 </div>
 
             <!-- 加载状态 -->
