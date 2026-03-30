@@ -3916,13 +3916,26 @@ async function countConversationMessagesInFile(filePath, source) {
                 continue;
             }
 
-            const message = extractMessageFromRecord(record, source);
-            if (!message) {
+            let role = '';
+            let text = '';
+            if (source === 'codex') {
+                if (record.type === 'response_item' && record.payload && record.payload.type === 'message') {
+                    role = normalizeRole(record.payload.role);
+                    text = extractMessageText(record.payload.content);
+                }
+            } else {
+                role = normalizeRole(record.type);
+                if (role === 'assistant' || role === 'user' || role === 'system') {
+                    const content = record.message ? record.message.content : '';
+                    text = extractMessageText(content);
+                } else {
+                    role = '';
+                }
+            }
+            if (!role) {
                 continue;
             }
 
-            const role = normalizeRole(message.role);
-            const text = typeof message.text === 'string' ? message.text : '';
             const hasText = text.length > 0;
             if (leadingSystem && (role === 'system' || (hasText && isBootstrapLikeText(text)))) {
                 continue;
@@ -6396,8 +6409,10 @@ async function deleteSessionData(params = {}) {
     }
 
     const sessionId = params.sessionId || path.basename(filePath, '.jsonl');
+    let fileDeleted = false;
     try {
         fs.unlinkSync(filePath);
+        fileDeleted = true;
     } catch (e) {
         return { error: `删除会话失败: ${e.message}` };
     }
@@ -6405,7 +6420,14 @@ async function deleteSessionData(params = {}) {
     if (source === 'claude') {
         const indexPath = findClaudeSessionIndexPath(filePath);
         if (indexPath) {
-            removeClaudeSessionIndexEntry(indexPath, filePath, sessionId);
+            try {
+                removeClaudeSessionIndexEntry(indexPath, filePath, sessionId);
+            } catch (e) {
+                console.warn('删除会话索引失败:', e && e.message ? e.message : e);
+                if (!fileDeleted) {
+                    return { error: `删除会话失败: ${e.message || e}` };
+                }
+            }
         }
     }
 
@@ -6855,7 +6877,8 @@ async function readSessionDetail(params = {}) {
         return { error: 'Session file not found' };
     }
 
-    const rawLimit = Number(params.messageLimit);
+    const rawMaxMessages = Number(params.maxMessages);
+    const rawLimit = Number.isFinite(rawMaxMessages) ? rawMaxMessages : Number(params.messageLimit);
     const messageLimit = Number.isFinite(rawLimit)
         ? Math.max(1, Math.min(rawLimit, MAX_SESSION_DETAIL_MESSAGES))
         : DEFAULT_SESSION_DETAIL_MESSAGES;
