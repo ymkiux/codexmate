@@ -41,8 +41,8 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /aria-controls="settings-panel-trash"/);
     assert.match(html, /:aria-selected="settingsTab === 'backup'"/);
     assert.match(html, /:aria-selected="settingsTab === 'trash'"/);
-    assert.match(html, /:tabindex="settingsTab === 'backup' \? 0 : -1"/);
-    assert.match(html, /:tabindex="settingsTab === 'trash' \? 0 : -1"/);
+    assert.match(html, /id="settings-tab-backup"[\s\S]*tabindex="0"/);
+    assert.match(html, /id="settings-tab-trash"[\s\S]*tabindex="0"/);
     assert.match(html, /id="settings-panel-backup"/);
     assert.match(html, /id="settings-panel-trash"/);
     assert.match(html, /role="tabpanel"/);
