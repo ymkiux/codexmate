@@ -1187,10 +1187,10 @@
                                         </div>
                                         <div class="trash-item-side">
                                             <div class="trash-item-actions session-item-actions">
-                                                <button class="btn-mini" @click="restoreSessionTrash(item)" :disabled="sessionTrashLoading || sessionTrashClearing || sessionTrashRestoring[getSessionTrashActionKey(item)]">
+                                                <button class="btn-mini" @click="restoreSessionTrash(item)" :disabled="sessionTrashLoading || sessionTrashClearing || isSessionTrashActionBusy(item)">
                                                     {{ sessionTrashRestoring[getSessionTrashActionKey(item)] ? '恢复中...' : '恢复' }}
                                                 </button>
-                                                <button class="btn-mini delete" @click="purgeSessionTrash(item)" :disabled="sessionTrashLoading || sessionTrashClearing || sessionTrashPurging[getSessionTrashActionKey(item)]">
+                                                <button class="btn-mini delete" @click="purgeSessionTrash(item)" :disabled="sessionTrashLoading || sessionTrashClearing || isSessionTrashActionBusy(item)">
                                                     {{ sessionTrashPurging[getSessionTrashActionKey(item)] ? '删除中...' : '彻底删除' }}
                                                 </button>
                                             </div>
