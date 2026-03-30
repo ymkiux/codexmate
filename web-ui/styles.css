@@ -2088,7 +2088,7 @@ body::after {
 
 .trash-item-actions {
     display: flex;
-    align-self: flex-start;
+    align-self: flex-end;
     justify-content: flex-end;
     flex-wrap: wrap;
     gap: 8px;

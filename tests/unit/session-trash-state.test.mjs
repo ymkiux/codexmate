@@ -9,9 +9,11 @@ const __dirname = path.dirname(__filename);
 const appPath = path.join(__dirname, '..', '..', 'web-ui', 'app.js');
 const cliPath = path.join(__dirname, '..', '..', 'cli.js');
 const indexHtmlPath = path.join(__dirname, '..', '..', 'web-ui', 'index.html');
+const stylesPath = path.join(__dirname, '..', '..', 'web-ui', 'styles.css');
 const appSource = fs.readFileSync(appPath, 'utf-8');
 const cliSource = fs.readFileSync(cliPath, 'utf-8');
 const indexHtmlSource = fs.readFileSync(indexHtmlPath, 'utf-8');
+const stylesSource = fs.readFileSync(stylesPath, 'utf-8');
 
 function escapeRegExp(value) {
     return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -330,6 +332,74 @@ test('removeClaudeSessionIndexEntry keeps differently cased paths distinct on ca
     assert.strictEqual(writePayload, null);
 });
 
+test('removeClaudeSessionIndexEntry prefers normalized fullPath over stale sessionId when file path is known', () => {
+    let writePayload = null;
+    const removeClaudeSessionIndexEntrySource = extractFunctionBySignature(
+        cliSource,
+        'function removeClaudeSessionIndexEntry(indexPath, sessionFilePath, sessionId) {',
+        'removeClaudeSessionIndexEntry'
+    );
+    const removeClaudeSessionIndexEntry = instantiateFunction(
+        removeClaudeSessionIndexEntrySource,
+        'removeClaudeSessionIndexEntry',
+        {
+            fs: {
+                existsSync: () => true
+            },
+            readJsonFile() {
+                return {
+                    entries: [
+                        {
+                            sessionId: 'stale-id',
+                            fullPath: '/tmp/other.jsonl',
+                            note: 'keep-by-path'
+                        },
+                        {
+                            sessionId: 'fresh-id',
+                            fullPath: '/tmp/session.jsonl',
+                            note: 'remove-by-path'
+                        }
+                    ]
+                };
+            },
+            writeJsonAtomic(indexPath, payload) {
+                writePayload = { indexPath, payload };
+            },
+            expandHomePath(value) {
+                return value;
+            },
+            normalizePathForCompare(targetPath, options = {}) {
+                const resolved = path.resolve(targetPath);
+                return options.ignoreCase ? resolved.toLowerCase() : resolved;
+            },
+            path,
+            process: { platform: 'linux' },
+            JSON
+        }
+    );
+
+    const result = removeClaudeSessionIndexEntry('/tmp/sessions-index.json', '/tmp/session.jsonl', 'stale-id');
+
+    assert.deepStrictEqual(result, {
+        removed: true,
+        entry: {
+            sessionId: 'fresh-id',
+            fullPath: '/tmp/session.jsonl',
+            note: 'remove-by-path'
+        }
+    });
+    assert.deepStrictEqual(writePayload, {
+        indexPath: '/tmp/sessions-index.json',
+        payload: {
+            entries: [{
+                sessionId: 'stale-id',
+                fullPath: '/tmp/other.jsonl',
+                note: 'keep-by-path'
+            }]
+        }
+    });
+});
+
 test('upsertClaudeSessionIndexEntry keeps differently cased paths distinct on case-sensitive platforms', () => {
     let writtenIndex = null;
     const upsertClaudeSessionIndexEntrySource = extractFunctionBySignature(
@@ -379,6 +449,80 @@ test('upsertClaudeSessionIndexEntry keeps differently cased paths distinct on ca
     assert.strictEqual(writtenIndex.payload.entries.length, 2);
     assert.strictEqual(writtenIndex.payload.entries[0].sessionId, 'new-entry');
     assert.strictEqual(writtenIndex.payload.entries[1].sessionId, 'case-sensitive-entry');
+});
+
+test('upsertClaudeSessionIndexEntry prefers normalized fullPath over stale sessionId when file path is known', () => {
+    let writtenIndex = null;
+    const upsertClaudeSessionIndexEntrySource = extractFunctionBySignature(
+        cliSource,
+        'function upsertClaudeSessionIndexEntry(indexPath, sessionFilePath, entry) {',
+        'upsertClaudeSessionIndexEntry'
+    );
+    const upsertClaudeSessionIndexEntry = instantiateFunction(
+        upsertClaudeSessionIndexEntrySource,
+        'upsertClaudeSessionIndexEntry',
+        {
+            readJsonFile() {
+                return {
+                    entries: [
+                        {
+                            sessionId: 'stale-id',
+                            fullPath: '/tmp/other.jsonl',
+                            note: 'keep-by-path'
+                        },
+                        {
+                            sessionId: 'fresh-id',
+                            fullPath: '/tmp/session.jsonl',
+                            note: 'replace-by-path'
+                        }
+                    ]
+                };
+            },
+            normalizePathForCompare(targetPath, options = {}) {
+                const resolved = path.resolve(targetPath);
+                return options.ignoreCase ? resolved.toLowerCase() : resolved;
+            },
+            normalizeSessionTrashEntry(entry) {
+                return entry;
+            },
+            buildClaudeSessionIndexEntry(entry, sessionFilePath) {
+                return {
+                    sessionId: entry.sessionId,
+                    fullPath: sessionFilePath,
+                    note: 'new-entry'
+                };
+            },
+            expandHomePath(value) {
+                return value;
+            },
+            writeJsonAtomic(indexPath, payload) {
+                writtenIndex = { indexPath, payload };
+            },
+            path,
+            process: { platform: 'linux' }
+        }
+    );
+
+    upsertClaudeSessionIndexEntry('/tmp/sessions-index.json', '/tmp/session.jsonl', { sessionId: 'stale-id' });
+
+    assert.deepStrictEqual(writtenIndex, {
+        indexPath: '/tmp/sessions-index.json',
+        payload: {
+            entries: [
+                {
+                    sessionId: 'stale-id',
+                    fullPath: '/tmp/session.jsonl',
+                    note: 'new-entry'
+                },
+                {
+                    sessionId: 'stale-id',
+                    fullPath: '/tmp/other.jsonl',
+                    note: 'keep-by-path'
+                }
+            ],
+            originalPath: '/tmp'
+        }
+    });
 });
 
 test('loadSessionTrashCount ignores stale responses after a newer trash request invalidates them', async () => {
@@ -486,6 +630,14 @@ test('session trash template keeps source badges neutral and shares the busy gua
 
     const busyBindings = indexHtmlSource.match(/:disabled="sessionTrashLoading \|\| sessionTrashClearing \|\| isSessionTrashActionBusy\(item\)"/g);
     assert.strictEqual(busyBindings && busyBindings.length, 2);
+});
+
+test('session trash desktop actions keep the action block right-aligned', () => {
+    const actionsRule = stylesSource.match(/\.trash-item-actions\s*\{[\s\S]*?\}/);
+    assert(actionsRule, 'trash item actions rule should exist');
+    assert.match(actionsRule[0], /align-self:\s*flex-end;/);
+    assert.match(actionsRule[0], /justify-content:\s*flex-end;/);
+    assert.doesNotMatch(actionsRule[0], /align-self:\s*flex-start;/);
 });
 
 test('loadSessionTrash and loadSessionTrashCount keep independent stale-response tokens', async () => {
