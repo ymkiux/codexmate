@@ -8,8 +8,10 @@ const __dirname = path.dirname(__filename);
 
 const appPath = path.join(__dirname, '..', '..', 'web-ui', 'app.js');
 const cliPath = path.join(__dirname, '..', '..', 'cli.js');
+const indexHtmlPath = path.join(__dirname, '..', '..', 'web-ui', 'index.html');
 const appSource = fs.readFileSync(appPath, 'utf-8');
 const cliSource = fs.readFileSync(cliPath, 'utf-8');
+const indexHtmlSource = fs.readFileSync(indexHtmlPath, 'utf-8');
 
 function escapeRegExp(value) {
     return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -471,6 +473,15 @@ test('loadSessionTrashCount trusts a lower authoritative backend totalCount duri
     assert.strictEqual(context.sessionTrashTotalCount, 0);
     assert.strictEqual(context.sessionTrashCountLoadedOnce, true);
     assert.strictEqual(context.sessionTrashCountLoading, false);
+});
+
+test('session trash template keeps source badges on neutral session-source styling', () => {
+    const trashPanelMatch = indexHtmlSource.match(/id="settings-panel-trash"[\s\S]*?<\/section>/);
+    assert(trashPanelMatch, 'trash panel template should exist');
+
+    const trashPanel = trashPanelMatch[0];
+    assert.match(trashPanel, /<span class="session-source">{{ item\.sourceLabel }}<\/span>/);
+    assert.doesNotMatch(trashPanel, /item\.source === 'claude' \? 'configured' : 'empty'/);
 });
 
 test('getSessionTrashViewState returns retry when badge count exists but list has never loaded', () => {
