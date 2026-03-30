@@ -1909,7 +1909,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     if (!Number.isFinite(numericTotal) || numericTotal < 0) {
                         return fallbackCount;
                     }
-                    return Math.max(fallbackCount, Math.floor(numericTotal));
+                    return Math.floor(numericTotal);
                 },
 
                 getSessionTrashViewState() {
