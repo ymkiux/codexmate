@@ -6329,7 +6329,14 @@ async function trashSessionData(params = {}) {
         writeSessionTrashEntries([entry, ...entries]);
         summary.totalCount = totalCount;
     } catch (e) {
-        if (source === 'claude' && claudeIndexPath && removedClaudeIndexEntry) {
+        let rollbackSucceeded = false;
+        if (fs.existsSync(trashFilePath) && !fs.existsSync(filePath)) {
+            try {
+                moveFileSync(trashFilePath, filePath);
+                rollbackSucceeded = true;
+            } catch (_) {}
+        }
+        if (rollbackSucceeded && source === 'claude' && claudeIndexPath && removedClaudeIndexEntry) {
             try {
                 upsertClaudeSessionIndexEntry(claudeIndexPath, filePath, {
                     source,
@@ -6345,11 +6352,6 @@ async function trashSessionData(params = {}) {
                     trashId,
                     trashFileName
                 });
-            } catch (_) {}
-        }
-        if (fs.existsSync(trashFilePath) && !fs.existsSync(filePath)) {
-            try {
-                moveFileSync(trashFilePath, filePath);
             } catch (_) {}
         }
         return { error: `移入回收站失败: ${e.message}` };
