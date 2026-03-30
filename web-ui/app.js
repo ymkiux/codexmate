@@ -2431,7 +2431,6 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     try {
                         const parsed = JSON.parse(cached);
                         this.sessionPinnedMap = this.normalizeSessionPinnedMap(parsed);
-                        this.pruneSessionPinnedMap();
                     } catch (_) {
                         this.sessionPinnedMap = {};
                         localStorage.removeItem('codexmateSessionPinnedMap');
@@ -2443,12 +2442,33 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         : {};
                     localStorage.setItem('codexmateSessionPinnedMap', JSON.stringify(payload));
                 },
+                shouldPruneSessionPinnedMap(sessions = this.sessionsList) {
+                    if (!Array.isArray(sessions) || sessions.length === 0) {
+                        return false;
+                    }
+                    if (this.sessionFilterSource !== 'all') {
+                        return false;
+                    }
+                    if (this.sessionPathFilter) {
+                        return false;
+                    }
+                    if (this.sessionQuery && isSessionQueryEnabled(this.sessionFilterSource)) {
+                        return false;
+                    }
+                    if (this.sessionRoleFilter && this.sessionRoleFilter !== 'all') {
+                        return false;
+                    }
+                    if (this.sessionTimePreset && this.sessionTimePreset !== 'all') {
+                        return false;
+                    }
+                    return true;
+                },
                 pruneSessionPinnedMap(sessions = this.sessionsList) {
                     const current = (this.sessionPinnedMap && typeof this.sessionPinnedMap === 'object')
                         ? this.sessionPinnedMap
                         : {};
                     const list = Array.isArray(sessions) ? sessions : [];
-                    if (Object.keys(current).length === 0) {
+                    if (Object.keys(current).length === 0 || !this.shouldPruneSessionPinnedMap(list)) {
                         return;
                     }
                     const validKeys = new Set(list.map((session) => this.getSessionExportKey(session)).filter(Boolean));
@@ -2997,7 +3017,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
 
                 async loadSessions() {
                     const result = await loadSessionsHelper.call(this, api);
-                    this.pruneSessionPinnedMap();
+                    this.pruneSessionPinnedMap(this.sessionsList);
                     return result;
                 },
 
@@ -5716,6 +5736,40 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             return;
                         }
                         const res = await api('proxy-apply-provider', { switchToProxy: true });
+                        if (res && res.error) {
+                            this.showMessage(res.error, 'error');
+                            return;
+                        }
+                        await this.loadAll();
+                        this.showMessage('本地代理 provider 已写入并切换', 'success');
+                    } catch (e) {
+                        this.showMessage('应用代理 provider 失败', 'error');
+                    } finally {
+                        this.proxyApplying = false;
+                    }
+                },
+
+                showMessage(text, type) {
+                    this.message = text;
+                    this.messageType = type || 'info';
+                    setTimeout(() => {
+                        this.message = '';
+                    }, 3000);
+                }
+            }
+        });
+
+        app.mount('#app');
+    });
+
+      }
+            }
+        });
+
+        app.mount('#app');
+    });
+
+      const res = await api('proxy-apply-provider', { switchToProxy: true });
                         if (res && res.error) {
                             this.showMessage(res.error, 'error');
                             return;
