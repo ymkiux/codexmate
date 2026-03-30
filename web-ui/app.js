@@ -5769,37 +5769,4 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
         app.mount('#app');
     });
 
-      }
-            }
-        });
-
-        app.mount('#app');
-    });
-
-      const res = await api('proxy-apply-provider', { switchToProxy: true });
-                        if (res && res.error) {
-                            this.showMessage(res.error, 'error');
-                            return;
-                        }
-                        await this.loadAll();
-                        this.showMessage('本地代理 provider 已写入并切换', 'success');
-                    } catch (e) {
-                        this.showMessage('应用代理 provider 失败', 'error');
-                    } finally {
-                        this.proxyApplying = false;
-                    }
-                },
-
-                showMessage(text, type) {
-                    this.message = text;
-                    this.messageType = type || 'info';
-                    setTimeout(() => {
-                        this.message = '';
-                    }, 3000);
-                }
-            }
-        });
-
-        app.mount('#app');
-    });
 
