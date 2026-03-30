@@ -47,6 +47,7 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 
 **会话管理**
 - 同页查看 Codex 与 Claude 会话
+- 支持本地会话置顶，置顶状态持久化保存并优先排序显示
 - 关键词搜索、来源筛选、cwd 路径筛选
 - 会话导出 Markdown
 - 会话与消息级删除（支持批量）
@@ -164,6 +165,7 @@ codexmate codex --model gpt-5.3-codex --follow-up "步骤1" --follow-up "步骤2
 
 ### 会话模式
 - Codex + Claude 会话统一列表
+- 支持本地会话置顶、持久化保存与置顶优先排序
 - 搜索、筛选、导出、删除、批量清理
 
 ## MCP
