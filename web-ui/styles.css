@@ -2267,6 +2267,16 @@ body::after {
     box-shadow: 0 6px 16px rgba(210, 107, 90, 0.12);
 }
 
+.session-item.pinned {
+    border-color: rgba(208, 88, 58, 0.42);
+    background: linear-gradient(to bottom, rgba(210, 107, 90, 0.12) 0%, rgba(255, 251, 247, 0.98) 100%);
+    box-shadow: 0 8px 18px rgba(210, 107, 90, 0.10);
+}
+
+.session-item.pinned::before {
+    background: linear-gradient(180deg, rgba(201, 94, 75, 0.8), rgba(201, 94, 75, 0.32));
+}
+
 .session-item.active::before {
     background: linear-gradient(180deg, rgba(201, 94, 75, 0.9), rgba(201, 94, 75, 0.4));
 }
@@ -2323,6 +2333,26 @@ body::after {
 .session-item-copy svg {
     width: 16px;
     height: 16px;
+}
+
+.session-item-pin {
+    border-color: rgba(208, 88, 58, 0.24);
+}
+
+.session-item-pin .pin-icon,
+.session-item-pin svg {
+    color: rgba(208, 88, 58, 0.78);
+}
+
+.session-item.pinned .session-item-pin {
+    background: rgba(208, 88, 58, 0.16);
+    border-color: rgba(208, 88, 58, 0.46);
+    box-shadow: inset 0 0 0 1px rgba(208, 88, 58, 0.08);
+}
+
+.session-item.pinned .session-item-pin .pin-icon,
+.session-item.pinned .session-item-pin svg {
+    color: var(--color-brand-dark);
 }
 
 .session-item-sub.session-item-snippet,
@@ -4178,6 +4208,21 @@ textarea:focus-visible {
 }
 
 @media (max-width: 540px) {
+    .session-item-copy.session-item-pin {
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        min-height: 44px;
+        padding: 10px;
+        transform: none;
+    }
+
+    .session-item-copy.session-item-pin svg,
+    .session-item-copy.session-item-pin .pin-icon {
+        width: 16px;
+        height: 16px;
+    }
+
     body {
         padding: var(--spacing-md) var(--spacing-sm);
     }
