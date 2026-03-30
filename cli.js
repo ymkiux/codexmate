@@ -6471,7 +6471,7 @@ async function cloneCodexSession(params = {}) {
         return { error: '仅支持 Codex 会话克隆' };
     }
 
-    const filePath = resolveSessionFilePath(source, params.filePath, params.sessionId);
+    const filePath = resolveSessionFilePath(source, getSessionFileArg(params), params.sessionId);
     if (!filePath) {
         return { error: 'Session file not found' };
     }
@@ -6850,7 +6850,7 @@ async function readSessionDetail(params = {}) {
         return { error: 'Invalid source' };
     }
 
-    const filePath = resolveSessionFilePath(source, params.filePath, params.sessionId);
+    const filePath = resolveSessionFilePath(source, getSessionFileArg(params), params.sessionId);
     if (!filePath) {
         return { error: 'Session file not found' };
     }
@@ -6890,7 +6890,7 @@ async function readSessionPlain(params = {}) {
         return { error: 'Invalid source' };
     }
 
-    const filePath = resolveSessionFilePath(source, params.filePath, params.sessionId);
+    const filePath = resolveSessionFilePath(source, getSessionFileArg(params), params.sessionId);
     if (!filePath) {
         return { error: 'Session file not found' };
     }
@@ -6936,7 +6936,7 @@ async function exportSessionData(params = {}) {
     }
 
     const maxMessages = resolveMaxMessagesValue(params.maxMessages, MAX_EXPORT_MESSAGES);
-    const filePath = resolveSessionFilePath(source, params.filePath, params.sessionId);
+    const filePath = resolveSessionFilePath(source, getSessionFileArg(params), params.sessionId);
     if (!filePath) {
         return { error: 'Session file not found' };
     }
