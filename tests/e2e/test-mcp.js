@@ -265,6 +265,7 @@ module.exports = async function testMcp(ctx) {
     assert(workflowRunsPayload.runs.length > 0, 'mcp workflow-runs resource should include run records');
 
     const mcpSessionsDir = path.join(tmpHome, '.codex', 'sessions');
+    fs.mkdirSync(mcpSessionsDir, { recursive: true });
     const mcpTrashSessionId = 'mcp-trash-file-alias-e2e';
     const mcpTrashSessionPath = path.join(mcpSessionsDir, `${mcpTrashSessionId}.jsonl`);
     fs.writeFileSync(mcpTrashSessionPath, [
