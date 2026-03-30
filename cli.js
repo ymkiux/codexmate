@@ -6375,6 +6375,9 @@ async function trashSessionData(params = {}) {
                 });
             } catch (_) {}
         }
+        if (!rollbackSucceeded && fs.existsSync(trashFilePath)) {
+            try { fs.unlinkSync(trashFilePath); } catch (_) {}
+        }
         return { error: `移入回收站失败: ${e.message}` };
     }
 
