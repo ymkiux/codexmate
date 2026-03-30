@@ -52,7 +52,8 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
             const API_BASE = (location && location.origin && location.origin !== 'null')
                 ? location.origin
                 : 'http://localhost:3737';
-            const SESSION_TRASH_LIST_LIMIT = 200;
+            const SESSION_TRASH_LIST_LIMIT = 500;
+            const SESSION_TRASH_PAGE_SIZE = 200;
             const DEFAULT_OPENCLAW_TEMPLATE = `{
   // OpenClaw config (JSON5)
   agent: {
@@ -356,11 +357,14 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     codexDownloadTimer: null,
                     settingsTab: 'backup',
                     sessionTrashItems: [],
+                    sessionTrashVisibleCount: SESSION_TRASH_PAGE_SIZE,
                     sessionTrashTotalCount: 0,
                     sessionTrashCountLoadedOnce: false,
                     sessionTrashLoadedOnce: false,
                     sessionTrashLastLoadFailed: false,
                     sessionTrashRequestToken: 0,
+                    sessionTrashCountPendingOptions: null,
+                    sessionTrashPendingOptions: null,
                     sessionTrashCountLoading: false,
                     sessionTrashLoading: false,
                     sessionTrashRestoring: {},
@@ -569,6 +573,22 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 },
                 installRegistryPreview() {
                     return this.resolveInstallRegistryUrl(this.installRegistryPreset, this.installRegistryCustom);
+                },
+                visibleSessionTrashItems() {
+                    const items = Array.isArray(this.sessionTrashItems) ? this.sessionTrashItems : [];
+                    const visibleCount = Number(this.sessionTrashVisibleCount);
+                    const safeVisibleCount = Number.isFinite(visibleCount) && visibleCount > 0
+                        ? Math.floor(visibleCount)
+                        : SESSION_TRASH_PAGE_SIZE;
+                    return items.slice(0, safeVisibleCount);
+                },
+                sessionTrashHasMoreItems() {
+                    const totalItems = Array.isArray(this.sessionTrashItems) ? this.sessionTrashItems.length : 0;
+                    return this.visibleSessionTrashItems.length < totalItems;
+                },
+                sessionTrashHiddenCount() {
+                    const totalItems = Array.isArray(this.sessionTrashItems) ? this.sessionTrashItems.length : 0;
+                    return Math.max(0, totalItems - this.visibleSessionTrashItems.length);
                 },
                 sessionTrashCount() {
                     const totalCount = Number(this.sessionTrashTotalCount);
@@ -1805,10 +1825,14 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         this.invalidateSessionTrashRequests();
                         this.showMessage('已移入回收站', 'success');
                         if (this.sessionTrashLoadedOnce) {
-                            this.prependSessionTrashItem(this.buildSessionTrashItemFromSession(session, res));
+                            this.prependSessionTrashItem(this.buildSessionTrashItemFromSession(session, res), {
+                                totalCount: res && res.totalCount !== undefined ? res.totalCount : undefined
+                            });
                         } else if (this.sessionTrashCountLoadedOnce) {
                             this.sessionTrashTotalCount = this.normalizeSessionTrashTotalCount(
-                                this.normalizeSessionTrashTotalCount(this.sessionTrashTotalCount, this.sessionTrashItems) + 1,
+                                res && res.totalCount !== undefined
+                                    ? res.totalCount
+                                    : (this.normalizeSessionTrashTotalCount(this.sessionTrashTotalCount, this.sessionTrashItems) + 1),
                                 this.sessionTrashItems
                             );
                         }
@@ -1856,7 +1880,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     };
                 },
 
-                prependSessionTrashItem(item) {
+                prependSessionTrashItem(item, options = {}) {
                     if (!item || !item.trashId) {
                         return;
                     }
@@ -1868,9 +1892,15 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         ? Math.max(existing.length, Math.floor(previousTotalCount))
                         : existing.length;
                     this.sessionTrashItems = nextItems;
-                    this.sessionTrashTotalCount = filtered.length === existing.length
+                    const fallbackTotalCount = filtered.length === existing.length
                         ? normalizedPreviousTotal + 1
                         : normalizedPreviousTotal;
+                    this.sessionTrashTotalCount = this.normalizeSessionTrashTotalCount(
+                        options && options.totalCount !== undefined
+                            ? options.totalCount
+                            : fallbackTotalCount,
+                        nextItems
+                    );
                 },
 
                 normalizeSessionTrashTotalCount(totalCount, fallbackItems = this.sessionTrashItems) {
@@ -1918,6 +1948,20 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
 
                 isLatestSessionTrashRequestToken(token) {
                     return Number(token) === Number(this.sessionTrashRequestToken);
+                },
+
+                resetSessionTrashVisibleCount() {
+                    const totalItems = Array.isArray(this.sessionTrashItems) ? this.sessionTrashItems.length : 0;
+                    this.sessionTrashVisibleCount = Math.min(totalItems, SESSION_TRASH_PAGE_SIZE) || SESSION_TRASH_PAGE_SIZE;
+                },
+
+                loadMoreSessionTrashItems() {
+                    const totalItems = Array.isArray(this.sessionTrashItems) ? this.sessionTrashItems.length : 0;
+                    const visibleCount = Number(this.sessionTrashVisibleCount);
+                    const safeVisibleCount = Number.isFinite(visibleCount) && visibleCount > 0
+                        ? Math.floor(visibleCount)
+                        : SESSION_TRASH_PAGE_SIZE;
+                    this.sessionTrashVisibleCount = Math.min(totalItems, safeVisibleCount + SESSION_TRASH_PAGE_SIZE);
                 },
 
                 clearActiveSessionState() {
@@ -1988,6 +2032,10 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
 
                 async loadSessionTrashCount(options = {}) {
                     if (this.sessionTrashCountLoading) {
+                        this.sessionTrashCountPendingOptions = {
+                            ...(this.sessionTrashCountPendingOptions || {}),
+                            ...(options || {})
+                        };
                         return;
                     }
                     const requestToken = this.issueSessionTrashRequestToken();
@@ -2014,6 +2062,11 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         }
                     } finally {
                         this.sessionTrashCountLoading = false;
+                        const pendingOptions = this.sessionTrashCountPendingOptions;
+                        this.sessionTrashCountPendingOptions = null;
+                        if (pendingOptions) {
+                            await this.loadSessionTrashCount(pendingOptions);
+                        }
                     }
                 },
 
@@ -2023,6 +2076,10 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
 
                 async loadSessionTrash(options = {}) {
                     if (this.sessionTrashLoading) {
+                        this.sessionTrashPendingOptions = {
+                            ...(this.sessionTrashPendingOptions || {}),
+                            ...(options || {})
+                        };
                         return;
                     }
                     const requestToken = this.issueSessionTrashRequestToken();
@@ -2044,6 +2101,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         }
                         const nextItems = Array.isArray(res.items) ? res.items : [];
                         this.sessionTrashItems = nextItems;
+                        this.resetSessionTrashVisibleCount();
                         this.sessionTrashTotalCount = this.normalizeSessionTrashTotalCount(res.totalCount, nextItems);
                         this.sessionTrashCountLoadedOnce = true;
                         this.sessionTrashLastLoadFailed = false;
@@ -2057,6 +2115,11 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         this.sessionTrashLoading = false;
                         if (loadSucceeded) {
                             this.sessionTrashLoadedOnce = true;
+                        }
+                        const pendingOptions = this.sessionTrashPendingOptions;
+                        this.sessionTrashPendingOptions = null;
+                        if (pendingOptions) {
+                            await this.loadSessionTrash(pendingOptions);
                         }
                     }
                 },

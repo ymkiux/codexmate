@@ -1911,6 +1911,12 @@ body::after {
     flex-shrink: 0;
 }
 
+.trash-list-footer {
+    display: flex;
+    justify-content: center;
+    margin-top: var(--spacing-sm);
+}
+
 .btn-session-export,
 .btn-session-open,
 .btn-session-clone,

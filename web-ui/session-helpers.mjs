@@ -58,6 +58,7 @@ export function switchMainTab(tab) {
         && this.settingsTab !== 'trash'
         && typeof this.loadSessionTrashCount === 'function';
     if (shouldPrimeTrashCountOnSettingsEnter) {
+        this.sessionTrashLoadedOnce = false;
         this.loadSessionTrashCount({ silent: true });
     }
     if (nextTab === 'config' && this.configMode === 'claude') {

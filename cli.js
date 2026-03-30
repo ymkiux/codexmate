@@ -5703,8 +5703,10 @@ function removeClaudeSessionIndexEntry(indexPath, sessionFilePath, sessionId) {
     if (!index || !Array.isArray(index.entries)) {
         return { removed: false, entry: null };
     }
-    const resolvedFile = sessionFilePath ? path.resolve(sessionFilePath) : '';
-    const resolvedLower = resolvedFile ? resolvedFile.toLowerCase() : '';
+    const ignoreCase = process.platform === 'win32';
+    const resolvedFile = sessionFilePath
+        ? normalizePathForCompare(sessionFilePath, { ignoreCase })
+        : '';
     let removedEntry = null;
     const filtered = index.entries.filter((entry) => {
         if (!entry || typeof entry !== 'object') {
@@ -5719,8 +5721,10 @@ function removeClaudeSessionIndexEntry(indexPath, sessionFilePath, sessionId) {
         }
         if (entry.fullPath) {
             const expanded = expandHomePath(entry.fullPath);
-            const entryPath = expanded ? path.resolve(expanded) : '';
-            if (entryPath && resolvedLower && entryPath.toLowerCase() === resolvedLower) {
+            const entryPath = expanded
+                ? normalizePathForCompare(expanded, { ignoreCase })
+                : '';
+            if (entryPath && resolvedFile && entryPath === resolvedFile) {
                 if (!removedEntry) {
                     removedEntry = entry;
                 }
@@ -5990,6 +5994,14 @@ function buildClaudeSessionIndexEntry(entry, sessionFilePath) {
     const stored = normalized && normalized.claudeIndexEntry && typeof normalized.claudeIndexEntry === 'object'
         ? JSON.parse(JSON.stringify(normalized.claudeIndexEntry))
         : {};
+    const storedCapabilities = stored && stored.capabilities && typeof stored.capabilities === 'object' && !Array.isArray(stored.capabilities)
+        ? stored.capabilities
+        : null;
+    const storedKeywords = Array.isArray(stored && stored.keywords)
+        ? stored.keywords
+        : null;
+    const normalizedMessageCount = Number(normalized && normalized.messageCount);
+    const storedMessageCount = Number(stored && stored.messageCount);
     let modifiedAt = '';
     try {
         modifiedAt = fs.statSync(sessionFilePath).mtime.toISOString();
@@ -6014,11 +6026,23 @@ function buildClaudeSessionIndexEntry(entry, sessionFilePath) {
         provider: (stored && typeof stored.provider === 'string' && stored.provider.trim())
             ? stored.provider.trim()
             : (normalized.provider || 'claude'),
-        capabilities: normalizeCapabilities(stored ? stored.capabilities : normalized.capabilities),
-        keywords: normalizeKeywords(stored ? stored.keywords : normalized.keywords),
-        messageCount: Number.isFinite(Number(stored && stored.messageCount))
-            ? Math.max(0, Number(stored.messageCount))
-            : buildClaudeStoredIndexMessageCount(normalized.messageCount)
+        capabilities: normalizeCapabilities(
+            storedCapabilities && Object.keys(storedCapabilities).length > 0
+                ? storedCapabilities
+                : normalized.capabilities
+        ),
+        keywords: normalizeKeywords(
+            storedKeywords && storedKeywords.length > 0
+                ? storedKeywords
+                : normalized.keywords
+        ),
+        messageCount: Number.isFinite(normalizedMessageCount)
+            ? buildClaudeStoredIndexMessageCount(normalizedMessageCount)
+            : (
+                Number.isFinite(storedMessageCount)
+                    ? Math.max(0, Math.floor(storedMessageCount))
+                    : buildClaudeStoredIndexMessageCount(normalized && normalized.messageCount)
+            )
     };
 }
 
@@ -6031,7 +6055,8 @@ function upsertClaudeSessionIndexEntry(indexPath, sessionFilePath, entry) {
         ? parsed
         : {};
     const entries = Array.isArray(index.entries) ? index.entries : [];
-    const resolvedFile = path.resolve(sessionFilePath).toLowerCase();
+    const ignoreCase = process.platform === 'win32';
+    const resolvedFile = normalizePathForCompare(sessionFilePath, { ignoreCase });
     const normalizedEntry = normalizeSessionTrashEntry(entry);
     const filtered = entries.filter((item) => {
         if (!item || typeof item !== 'object') {
@@ -6043,7 +6068,9 @@ function upsertClaudeSessionIndexEntry(indexPath, sessionFilePath, entry) {
         }
         if (typeof item.fullPath === 'string' && item.fullPath) {
             const expanded = expandHomePath(item.fullPath);
-            const itemPath = expanded ? path.resolve(expanded).toLowerCase() : '';
+            const itemPath = expanded
+                ? normalizePathForCompare(expanded, { ignoreCase })
+                : '';
             if (itemPath && itemPath === resolvedFile) {
                 return false;
             }
@@ -6098,7 +6125,8 @@ async function listSessionTrashItems(params = {}) {
         }
     }
     if (updatedEntriesById.size > 0) {
-        writeSessionTrashEntries(allEntries.map((entry) => updatedEntriesById.get(entry.trashId) || entry));
+        const latestEntries = readSessionTrashEntries({ cleanup: false });
+        writeSessionTrashEntries(latestEntries.map((entry) => updatedEntriesById.get(entry.trashId) || entry));
     }
     return {
         totalCount,
@@ -6138,9 +6166,14 @@ async function restoreSessionTrashItem(params = {}) {
         return { error: '原始会话路径已存在同名文件，请先手动处理冲突' };
     }
 
-    const remainingEntries = entries.filter((item) => item.trashId !== trashId);
     let claudeIndexPath = '';
     try {
+        const latestEntries = readSessionTrashEntries({ cleanup: false });
+        const latestEntry = latestEntries.find((item) => item && item.trashId === trashId);
+        if (!latestEntry) {
+            return { error: '回收站记录不存在' };
+        }
+        const remainingEntries = latestEntries.filter((item) => item.trashId !== trashId);
         moveFileSync(trashFilePath, targetFilePath);
         if (hydratedEntry.source === 'claude') {
             claudeIndexPath = resolveClaudeSessionRestoreIndexPath(hydratedEntry, targetFilePath);
@@ -6275,7 +6308,9 @@ async function trashSessionData(params = {}) {
             claudeIndexEntry: removedClaudeIndexEntry
         });
         const entries = readSessionTrashEntries({ cleanup: false });
+        const totalCount = entries.length + 1;
         writeSessionTrashEntries([entry, ...entries]);
+        summary.totalCount = totalCount;
     } catch (e) {
         if (source === 'claude' && claudeIndexPath && removedClaudeIndexEntry) {
             try {
@@ -6313,6 +6348,9 @@ async function trashSessionData(params = {}) {
         trashed: true,
         trashId,
         deletedAt,
+        totalCount: Number.isFinite(Number(summary && summary.totalCount))
+            ? Math.max(0, Math.floor(Number(summary.totalCount)))
+            : undefined,
         messageCount: Number.isFinite(Number(summary && summary.messageCount))
             ? Math.max(0, Math.floor(Number(summary.messageCount)))
             : 0

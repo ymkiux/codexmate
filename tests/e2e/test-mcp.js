@@ -198,19 +198,26 @@ module.exports = async function testMcp(ctx) {
     );
 
     const httpCodexSessions = await api('list-sessions', { source: 'codex', forceRefresh: true, limit: 100 });
-    const httpCodexById = new Map((httpCodexSessions.sessions || []).map((item) => [item.sessionId, item]));
+    const httpCodexByKey = new Map((httpCodexSessions.sessions || []).map((item) => [
+        `${item.source}:${item.sessionId}:${item.filePath}`,
+        item
+    ]));
     for (const item of sessionListPayload.sessions) {
-        const httpItem = httpCodexById.get(item.sessionId);
-        assert(httpItem, `http list-sessions missing MCP codex session ${item.sessionId}`);
+        const key = `${item.source}:${item.sessionId}:${item.filePath}`;
+        const httpItem = httpCodexByKey.get(key);
+        assert(httpItem, `http list-sessions missing MCP codex session ${key}`);
         assert(item.messageCount === httpItem.messageCount, `mcp session.list messageCount drifted for ${item.sessionId}`);
     }
     const mcpLongSession = sessionListPayload.sessions.find((item) => item && item.sessionId === longSessionId);
     assert(mcpLongSession && mcpLongSession.messageCount === longMessageCount, 'mcp session.list should expose exact long-session messageCount');
 
     const httpAllSessions = await api('list-sessions', { source: 'all', forceRefresh: true, limit: sessionResourcePayload.sessions.length || 120 });
-    const httpAllByKey = new Map((httpAllSessions.sessions || []).map((item) => [`${item.source}:${item.sessionId}`, item]));
+    const httpAllByKey = new Map((httpAllSessions.sessions || []).map((item) => [
+        `${item.source}:${item.sessionId}:${item.filePath}`,
+        item
+    ]));
     for (const item of sessionResourcePayload.sessions) {
-        const key = `${item.source}:${item.sessionId}`;
+        const key = `${item.source}:${item.sessionId}:${item.filePath}`;
         const httpItem = httpAllByKey.get(key);
         assert(httpItem, `http list-sessions missing MCP resource session ${key}`);
         assert(item.messageCount === httpItem.messageCount, `mcp sessions resource messageCount drifted for ${key}`);
