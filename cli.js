@@ -5758,7 +5758,14 @@ function moveFileSync(sourcePath, targetPath) {
     }
 
     fs.copyFileSync(sourcePath, targetPath);
-    fs.unlinkSync(sourcePath);
+    try {
+        fs.unlinkSync(sourcePath);
+    } catch (error) {
+        try {
+            fs.unlinkSync(targetPath);
+        } catch (_) {}
+        throw error;
+    }
 }
 
 function buildSessionSummaryFallback(source, filePath, sessionId = '') {
@@ -6229,7 +6236,9 @@ async function purgeSessionTrashItems(params = {}) {
 
     const purged = [];
     const remaining = [];
-    for (const entry of entries) {
+    let purgeError = null;
+    for (let index = 0; index < entries.length; index += 1) {
+        const entry = entries[index];
         if (!targetIds.has(entry.trashId)) {
             remaining.push(entry);
             continue;
@@ -6239,7 +6248,9 @@ async function purgeSessionTrashItems(params = {}) {
             try {
                 fs.unlinkSync(trashFilePath);
             } catch (e) {
-                return { error: `彻底删除失败: ${e.message}` };
+                purgeError = e;
+                remaining.push(...entries.slice(index));
+                break;
             }
         }
         purged.push({
@@ -6253,6 +6264,10 @@ async function purgeSessionTrashItems(params = {}) {
         writeSessionTrashEntries(remaining);
     } catch (e) {
         return { error: `回收站索引更新失败: ${e.message}` };
+    }
+
+    if (purgeError) {
+        return { error: `彻底删除失败: ${purgeError.message}` };
     }
 
     return {
