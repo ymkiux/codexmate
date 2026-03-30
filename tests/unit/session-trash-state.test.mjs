@@ -1623,7 +1623,9 @@ test('deleteSession increments trash badge count when only total count has been 
         sessionTrashCountRequestToken: 0,
         sessionTrashListRequestToken: 0,
         isDeleteAvailable: () => true,
-        getSessionExportKey: () => 'codex:session-1',
+        getSessionExportKey(session) {
+            return `${session.source}:${session.sessionId}:${session.filePath}`;
+        },
         invalidateSessionTrashRequests() {
             this.sessionTrashCountRequestToken += 1;
             this.sessionTrashListRequestToken += 1;
@@ -1643,6 +1645,10 @@ test('deleteSession increments trash badge count when only total count has been 
         buildSessionTrashItemFromSession() {
             throw new Error('list hydration path should not run when only count is loaded');
         },
+        removeSessionPinCalls: [],
+        removeSessionPin(session) {
+            this.removeSessionPinCalls.push(session);
+        },
         async removeSessionFromCurrentList() {
             removed = true;
         },
@@ -1658,8 +1664,13 @@ test('deleteSession increments trash badge count when only total count has been 
     });
 
     assert.strictEqual(context.sessionTrashTotalCount, 6);
-    assert.strictEqual(context.sessionDeleting['codex:session-1'], false);
+    assert.strictEqual(context.sessionDeleting['codex:session-1:/tmp/session-1.jsonl'], false);
     assert.strictEqual(removed, true);
+    assert.deepStrictEqual(context.removeSessionPinCalls, [{
+        source: 'codex',
+        sessionId: 'session-1',
+        filePath: '/tmp/session-1.jsonl'
+    }]);
     assert.strictEqual(requestedAction, 'trash-session');
     assert.deepStrictEqual(messages, [{ message: '已移入回收站', tone: 'success' }]);
 });
@@ -1684,7 +1695,9 @@ test('deleteSession prefers authoritative trash totalCount from the backend resp
         sessionTrashCountRequestToken: 0,
         sessionTrashListRequestToken: 0,
         isDeleteAvailable: () => true,
-        getSessionExportKey: () => 'codex:session-1',
+        getSessionExportKey(session) {
+            return `${session.source}:${session.sessionId}:${session.filePath}`;
+        },
         invalidateSessionTrashRequests() {
             this.sessionTrashCountRequestToken += 1;
             this.sessionTrashListRequestToken += 1;
@@ -1704,6 +1717,10 @@ test('deleteSession prefers authoritative trash totalCount from the backend resp
         buildSessionTrashItemFromSession() {
             throw new Error('loaded-list branch should not run in count-only test');
         },
+        removeSessionPinCalls: [],
+        removeSessionPin(session) {
+            this.removeSessionPinCalls.push(session);
+        },
         async removeSessionFromCurrentList() {},
         showMessage() {}
     };
@@ -1715,6 +1732,11 @@ test('deleteSession prefers authoritative trash totalCount from the backend resp
     });
 
     assert.strictEqual(context.sessionTrashTotalCount, 500);
+    assert.deepStrictEqual(context.removeSessionPinCalls, [{
+        source: 'codex',
+        sessionId: 'session-1',
+        filePath: '/tmp/session-1.jsonl'
+    }]);
 });
 
 test('prependSessionTrashItem prefers authoritative trash totalCount when provided', () => {
@@ -1746,6 +1768,140 @@ test('prependSessionTrashItem prefers authoritative trash totalCount when provid
 
     assert.deepStrictEqual(context.sessionTrashItems.map((item) => item.trashId), ['trash-new', 'trash-older']);
     assert.strictEqual(context.sessionTrashTotalCount, 500);
+});
+
+test('pruneSessionPinnedMap removes stale pinned session keys after an unfiltered full session load', () => {
+    const pruneSessionPinnedMap = instantiateFunction(
+        extractMethodAsFunction(appSource, 'pruneSessionPinnedMap'),
+        'pruneSessionPinnedMap',
+        { isSessionQueryEnabled: () => true }
+    );
+
+    let persisted = 0;
+    const context = {
+        sessionPinnedMap: {
+            'codex:keep': 111,
+            'codex:stale': 222
+        },
+        sessionsList: [
+            { key: 'codex:keep' }
+        ],
+        sessionFilterSource: 'all',
+        sessionPathFilter: '',
+        sessionQuery: '',
+        sessionRoleFilter: 'all',
+        sessionTimePreset: 'all',
+        getSessionExportKey(session) {
+            return session && session.key;
+        },
+        persistSessionPinnedMap() {
+            persisted += 1;
+        },
+        shouldPruneSessionPinnedMap: instantiateFunction(
+            extractMethodAsFunction(appSource, 'shouldPruneSessionPinnedMap'),
+            'shouldPruneSessionPinnedMap',
+            { isSessionQueryEnabled: () => true }
+        )
+    };
+
+    pruneSessionPinnedMap.call(context);
+
+    assert.deepStrictEqual(context.sessionPinnedMap, { 'codex:keep': 111 });
+    assert.strictEqual(persisted, 1);
+});
+
+test('pruneSessionPinnedMap skips pruning when the visible session list is filtered', () => {
+    const pruneSessionPinnedMap = instantiateFunction(
+        extractMethodAsFunction(appSource, 'pruneSessionPinnedMap'),
+        'pruneSessionPinnedMap',
+        { isSessionQueryEnabled: () => true }
+    );
+
+    let persisted = 0;
+    const context = {
+        sessionPinnedMap: {
+            'codex:keep': 111,
+            'codex:hidden': 222
+        },
+        sessionsList: [
+            { key: 'codex:keep' }
+        ],
+        sessionFilterSource: 'codex',
+        sessionPathFilter: '',
+        sessionQuery: '',
+        sessionRoleFilter: 'all',
+        sessionTimePreset: 'all',
+        getSessionExportKey(session) {
+            return session && session.key;
+        },
+        persistSessionPinnedMap() {
+            persisted += 1;
+        },
+        shouldPruneSessionPinnedMap: instantiateFunction(
+            extractMethodAsFunction(appSource, 'shouldPruneSessionPinnedMap'),
+            'shouldPruneSessionPinnedMap',
+            { isSessionQueryEnabled: () => true }
+        )
+    };
+
+    pruneSessionPinnedMap.call(context);
+
+    assert.deepStrictEqual(context.sessionPinnedMap, {
+        'codex:keep': 111,
+        'codex:hidden': 222
+    });
+    assert.strictEqual(persisted, 0);
+});
+
+test('restoreSessionPinnedMap normalizes cache without pruning stale entries before sessions load', () => {
+    const restoreSessionPinnedMap = instantiateFunction(
+        extractMethodAsFunction(appSource, 'restoreSessionPinnedMap'),
+        'restoreSessionPinnedMap',
+        {
+            localStorage: {
+                getItem(key) {
+                    assert.strictEqual(key, 'codexmateSessionPinnedMap');
+                    return JSON.stringify({
+                        'codex:keep': 123,
+                        'codex:stale': 456,
+                        'codex:bad': -1
+                    });
+                },
+                removeItem() {
+                    throw new Error('removeItem should not be called for valid cached JSON');
+                }
+            }
+        }
+    );
+
+    const context = {
+        sessionPinnedMap: {},
+        sessionsList: [{ key: 'codex:keep' }],
+        normalizeSessionPinnedMap(raw) {
+            const next = {};
+            for (const [key, value] of Object.entries(raw || {})) {
+                const numeric = Number(value);
+                if (key && Number.isFinite(numeric) && numeric > 0) {
+                    next[key] = Math.floor(numeric);
+                }
+            }
+            return next;
+        },
+        getSessionExportKey(session) {
+            return session && session.key;
+        },
+        persistSessionPinnedMap() {
+            this.persistedSnapshot = { ...this.sessionPinnedMap };
+        }
+    };
+
+    restoreSessionPinnedMap.call(context);
+
+    assert.deepStrictEqual(context.sessionPinnedMap, {
+        'codex:keep': 123,
+        'codex:stale': 456
+    });
+    assert.strictEqual(context.persistedSnapshot, undefined);
 });
 
 test('loadSessionTrash replays the latest queued refresh after an in-flight request is invalidated', async () => {

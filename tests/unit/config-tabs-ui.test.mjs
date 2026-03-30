@@ -62,7 +62,9 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /data-config-mode=\"codex\"/);
     assert.match(html, /isMainTabNavActive\('settings'\)/);
     assert.match(html, /isConfigModeNavActive\('codex'\)/);
-    assert.doesNotMatch(html, /:aria-pressed=/);
+    assert.match(html, /:aria-pressed="isSessionPinned\(session\)"/);
+    assert.match(html, /class="session-item-copy session-item-pin"/);
+    assert.match(html, /class="pin-icon"/);
     assert.match(html, /:aria-selected="mainTab === 'sessions'"/);
     assert.match(html, /:aria-selected="mainTab === 'config' && configMode === 'codex'"/);
     assert.match(html, /v-memo="\[activeSessionExportKey === getSessionExportKey\(session\)/);

@@ -47,6 +47,7 @@ It works on local files directly and does not require cloud hosting.
 
 **Session Management**
 - Unified Codex + Claude session list
+- Local session pinning with persistent pinned state and pinned-first ordering
 - Keyword/source/cwd filters
 - Markdown export
 - Session-level and message-level delete (supports batch)
@@ -164,6 +165,7 @@ codexmate codex --model gpt-5.3-codex --follow-up "step1" --follow-up "step2"
 
 ### Sessions Mode
 - Unified Codex + Claude sessions
+- Local pin/unpin with persistent storage and pinned-first ordering
 - Search, filter, export, delete, batch cleanup
 
 ## MCP

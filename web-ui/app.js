@@ -183,6 +183,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     skillsImporting: false,
                     skillsZipImporting: false,
                     skillsExporting: false,
+                    sessionPinnedMap: {},
                     sessionsList: [],
                     sessionsLoadedOnce: false,
                     sessionsLoading: false,
@@ -405,6 +406,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this.sessionResumeWithYolo = true;
                 }
                 this.restoreSessionFilterCache();
+                this.restoreSessionPinnedMap();
                 window.addEventListener('resize', this.onWindowResize);
                 window.addEventListener('keydown', this.handleGlobalKeydown);
                 window.addEventListener('beforeunload', this.handleBeforeUnload);
@@ -463,6 +465,33 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 },
                 activeSessionExportKey() {
                     return this.activeSession ? this.getSessionExportKey(this.activeSession) : '';
+                },
+                sortedSessionsList() {
+                    const list = Array.isArray(this.sessionsList) ? this.sessionsList : [];
+                    if (list.length === 0) return [];
+                    const pinnedMap = (this.sessionPinnedMap && typeof this.sessionPinnedMap === 'object')
+                        ? this.sessionPinnedMap
+                        : {};
+                    let hasPinned = false;
+                    const decorated = list.map((session, index) => {
+                        const key = session ? this.getSessionExportKey(session) : '';
+                        const rawPinnedAt = key ? pinnedMap[key] : 0;
+                        const pinnedAt = Number.isFinite(Number(rawPinnedAt))
+                            ? Math.floor(Number(rawPinnedAt))
+                            : 0;
+                        const isPinned = pinnedAt > 0;
+                        if (isPinned) {
+                            hasPinned = true;
+                        }
+                        return { session, index, pinnedAt, isPinned };
+                    });
+                    if (!hasPinned) return list;
+                    decorated.sort((a, b) => {
+                        if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+                        if (a.isPinned && a.pinnedAt !== b.pinnedAt) return b.pinnedAt - a.pinnedAt;
+                        return a.index - b.index;
+                    });
+                    return decorated.map(item => item.session);
                 },
                 activeSessionVisibleMessages() {
                     if (this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {
@@ -1823,6 +1852,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             this.showMessage(res.error, 'error');
                             return;
                         }
+                        this.removeSessionPin(session);
                         this.invalidateSessionTrashRequests();
                         this.showMessage('已移入回收站', 'success');
                         if (this.sessionTrashLoadedOnce) {
@@ -2021,6 +2051,13 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         return;
                     }
                     const activeKey = this.activeSession ? this.getSessionExportKey(this.activeSession) : '';
+                    const renderedList = Array.isArray(this.sortedSessionsList) ? this.sortedSessionsList : [];
+                    const renderedIndex = renderedList.findIndex((item) => this.getSessionExportKey(item) === sessionKey);
+                    let nextActiveKey = '';
+                    if (activeKey === sessionKey && renderedIndex >= 0) {
+                        const fallbackSession = renderedList[renderedIndex - 1] || renderedList[renderedIndex + 1] || null;
+                        nextActiveKey = fallbackSession ? this.getSessionExportKey(fallbackSession) : '';
+                    }
                     currentList.splice(removedIndex, 1);
                     this.sessionsList = currentList;
                     this.syncSessionPathOptionsForSource(
@@ -2035,8 +2072,8 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         this.clearActiveSessionState();
                         return;
                     }
-                    const nextIndex = Math.min(removedIndex, currentList.length - 1);
-                    const nextSession = currentList[nextIndex];
+                    const nextSession = currentList.find((item) => this.getSessionExportKey(item) === nextActiveKey)
+                        || currentList[Math.min(removedIndex, currentList.length - 1)];
                     if (!nextSession) {
                         this.clearActiveSessionState();
                         return;
@@ -2378,6 +2415,124 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     } else {
                         localStorage.removeItem('codexmateSessionPathFilter');
                     }
+                },
+                normalizeSessionPinnedMap(raw) {
+                    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+                        return {};
+                    }
+                    const next = {};
+                    for (const [key, value] of Object.entries(raw)) {
+                        if (!key) continue;
+                        const numeric = Number(value);
+                        if (!Number.isFinite(numeric) || numeric <= 0) continue;
+                        next[key] = Math.floor(numeric);
+                    }
+                    return next;
+                },
+                restoreSessionPinnedMap() {
+                    const cached = localStorage.getItem('codexmateSessionPinnedMap');
+                    if (!cached) {
+                        this.sessionPinnedMap = {};
+                        return;
+                    }
+                    try {
+                        const parsed = JSON.parse(cached);
+                        this.sessionPinnedMap = this.normalizeSessionPinnedMap(parsed);
+                    } catch (_) {
+                        this.sessionPinnedMap = {};
+                        localStorage.removeItem('codexmateSessionPinnedMap');
+                    }
+                },
+                persistSessionPinnedMap() {
+                    const payload = (this.sessionPinnedMap && typeof this.sessionPinnedMap === 'object')
+                        ? this.sessionPinnedMap
+                        : {};
+                    localStorage.setItem('codexmateSessionPinnedMap', JSON.stringify(payload));
+                },
+                shouldPruneSessionPinnedMap(sessions = this.sessionsList) {
+                    if (!Array.isArray(sessions) || sessions.length === 0) {
+                        return false;
+                    }
+                    if (this.sessionFilterSource !== 'all') {
+                        return false;
+                    }
+                    if (this.sessionPathFilter) {
+                        return false;
+                    }
+                    if (this.sessionQuery && isSessionQueryEnabled(this.sessionFilterSource)) {
+                        return false;
+                    }
+                    if (this.sessionRoleFilter && this.sessionRoleFilter !== 'all') {
+                        return false;
+                    }
+                    if (this.sessionTimePreset && this.sessionTimePreset !== 'all') {
+                        return false;
+                    }
+                    return true;
+                },
+                pruneSessionPinnedMap(sessions = this.sessionsList) {
+                    const current = (this.sessionPinnedMap && typeof this.sessionPinnedMap === 'object')
+                        ? this.sessionPinnedMap
+                        : {};
+                    const list = Array.isArray(sessions) ? sessions : [];
+                    if (Object.keys(current).length === 0 || !this.shouldPruneSessionPinnedMap(list)) {
+                        return;
+                    }
+                    const validKeys = new Set(list.map((session) => this.getSessionExportKey(session)).filter(Boolean));
+                    const next = {};
+                    let changed = false;
+                    for (const [key, value] of Object.entries(current)) {
+                        if (!validKeys.has(key)) {
+                            changed = true;
+                            continue;
+                        }
+                        next[key] = value;
+                    }
+                    if (!changed) {
+                        return;
+                    }
+                    this.sessionPinnedMap = next;
+                    this.persistSessionPinnedMap();
+                },
+                getSessionPinTimestamp(session) {
+                    if (!session) return 0;
+                    const key = this.getSessionExportKey(session);
+                    if (!key) return 0;
+                    const raw = this.sessionPinnedMap && this.sessionPinnedMap[key];
+                    const numeric = Number(raw);
+                    return Number.isFinite(numeric) && numeric > 0 ? Math.floor(numeric) : 0;
+                },
+                isSessionPinned(session) {
+                    return this.getSessionPinTimestamp(session) > 0;
+                },
+                toggleSessionPin(session) {
+                    if (!session) return;
+                    const key = this.getSessionExportKey(session);
+                    if (!key) return;
+                    const current = (this.sessionPinnedMap && typeof this.sessionPinnedMap === 'object')
+                        ? this.sessionPinnedMap
+                        : {};
+                    const next = { ...current };
+                    if (next[key]) {
+                        delete next[key];
+                    } else {
+                        next[key] = Date.now();
+                    }
+                    this.sessionPinnedMap = next;
+                    this.persistSessionPinnedMap();
+                },
+                removeSessionPin(session) {
+                    if (!session) return;
+                    const key = this.getSessionExportKey(session);
+                    if (!key) return;
+                    const current = (this.sessionPinnedMap && typeof this.sessionPinnedMap === 'object')
+                        ? this.sessionPinnedMap
+                        : {};
+                    if (!current[key]) return;
+                    const next = { ...current };
+                    delete next[key];
+                    this.sessionPinnedMap = next;
+                    this.persistSessionPinnedMap();
                 },
 
                 async onSessionSourceChange() {
@@ -2868,7 +3023,9 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 },
 
                 async loadSessions() {
-                    return loadSessionsHelper.call(this, api);
+                    const result = await loadSessionsHelper.call(this, api);
+                    this.pruneSessionPinnedMap(this.sessionsList);
+                    return result;
                 },
 
                 async selectSession(session) {
@@ -5611,4 +5768,5 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
 
         app.mount('#app');
     });
+
 
