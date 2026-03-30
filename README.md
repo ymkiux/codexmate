@@ -61,25 +61,46 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 ## 架构总览
 
 ```mermaid
-flowchart LR
-    A[CLI: codexmate] --> B[本地配置文件]
-    A --> C[本地 Web UI]
-    C --> D[内建 HTTP API]
-    D --> B
-    D --> E[会话索引与导出]
-    A --> F[MCP stdio server]
-
-    subgraph Local Files
-      B1[~/.codex/config.toml]
-      B2[~/.claude/settings.json]
-      B3[~/.openclaw/openclaw.json]
-      B4[sessions/*.jsonl]
+flowchart TB
+    subgraph Interfaces["入口"]
+      CLI["CLI"]
+      WEB["Web UI"]
+      MCP["MCP Client"]
+      OAI["Codex / OpenAI Client"]
     end
 
-    B --> B1
-    B --> B2
-    B --> B3
-    E --> B4
+    subgraph Runtime["Codex Mate Runtime"]
+      ENTRY["cli.js Entry"]
+      API["Local HTTP API"]
+      MCPS["MCP stdio Server"]
+      PROXY["Built-in Proxy"]
+      SERVICES["Config / Sessions / Skills / Workflow"]
+      CORE["File IO / Network / Diff / Session Utils"]
+    end
+
+    subgraph State["Local State"]
+      CODEX["~/.codex"]
+      CLAUDE["~/.claude"]
+      OPENCLAW["~/.openclaw"]
+      STATE["sessions / trash / workflow runs"]
+    end
+
+    CLI --> ENTRY
+    WEB -->|GET / + POST /api| API
+    MCP -->|stdio JSON-RPC| MCPS
+    OAI -->|HTTP /v1| PROXY
+
+    ENTRY --> SERVICES
+    API --> SERVICES
+    MCPS --> SERVICES
+    PROXY --> CORE
+
+    SERVICES --> CORE
+
+    CORE --> CODEX
+    CORE --> CLAUDE
+    CORE --> OPENCLAW
+    CORE --> STATE
 ```
 
 ## 快速开始
@@ -101,14 +122,13 @@ codexmate run
 git clone https://github.com/SakuraByteCore/codexmate.git
 cd codexmate
 npm install
-npm link
-codexmate run
+npm start run
 ```
 
 ### 测试 / CI（只启动服务）
 
 ```bash
-codexmate run --no-browser
+npm start run --no-browser
 ```
 
 > 约定：自动化测试仅验证服务与 API，不依赖打开页面。
