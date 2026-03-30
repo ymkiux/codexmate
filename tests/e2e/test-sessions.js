@@ -320,7 +320,7 @@ module.exports = async function testSessions(ctx) {
     });
     fs.writeFileSync(trashIndexPath, JSON.stringify(trashIndex, null, 2), 'utf-8');
 
-    const staleTrashList = await api('list-session-trash', { limit: 200 });
+    const staleTrashList = await api('list-session-trash', { limit: 200, forceRefresh: true });
     assert(staleTrashList.totalCount >= staleTrashList.items.length, 'list-session-trash totalCount should be returned with stale-count repair');
     const correctedStaleTrashItem = staleTrashList.items.find(item => item.trashId === staleTrashId);
     assert(correctedStaleTrashItem, 'stale trash entry should still be listed');
@@ -352,7 +352,7 @@ module.exports = async function testSessions(ctx) {
     });
     fs.writeFileSync(trashIndexPath, JSON.stringify(mtimeOnlyIndex, null, 2), 'utf-8');
 
-    const mtimeOnlyTrashList = await api('list-session-trash', { limit: 200 });
+    const mtimeOnlyTrashList = await api('list-session-trash', { limit: 200, forceRefresh: true });
     const mtimeOnlyTrashItem = mtimeOnlyTrashList.items.find(item => item.trashId === mtimeOnlyTrashId);
     assert(mtimeOnlyTrashItem, 'mtime-only trash entry should still be listed');
 
@@ -387,7 +387,7 @@ module.exports = async function testSessions(ctx) {
     }
     fs.writeFileSync(trashIndexPath, JSON.stringify(overflowIndex, null, 2), 'utf-8');
 
-    const overflowTrashList = await api('list-session-trash', { limit: 200 });
+    const overflowTrashList = await api('list-session-trash', { limit: 200, forceRefresh: true });
     assert(overflowTrashList.totalCount === mtimeOnlyTrashList.totalCount + overflowExtraCount, 'list-session-trash totalCount should reflect entries beyond the visible slice');
     assert(overflowTrashList.items.length === 200, 'list-session-trash should keep the visible slice capped by limit');
     assert(overflowTrashList.totalCount > overflowTrashList.items.length, 'list-session-trash totalCount should stay larger than visible items when overflowing');
