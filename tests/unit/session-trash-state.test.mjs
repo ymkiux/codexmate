@@ -247,6 +247,7 @@ test('buildClaudeSessionIndexEntry prefers normalized metadata when stored index
 });
 
 test('resolveClaudeSessionRestoreIndexPath ignores untrusted stored index path', () => {
+    const posixPath = path.posix;
     const resolveClaudeSessionRestoreIndexPathSource = extractFunctionBySignature(
         cliSource,
         'function resolveClaudeSessionRestoreIndexPath(entry, targetFilePath) {',
@@ -257,21 +258,21 @@ test('resolveClaudeSessionRestoreIndexPath ignores untrusted stored index path',
         'resolveClaudeSessionRestoreIndexPath',
         {
             findClaudeSessionIndexPath(targetFilePath) {
-                return path.join(path.dirname(targetFilePath), 'sessions-index.json');
+                return posixPath.join(posixPath.dirname(targetFilePath), 'sessions-index.json');
             },
             getClaudeProjectsDir() {
                 return '/tmp/claude-projects';
             },
             isPathInside(targetPath, rootPath) {
-                const resolvedTarget = path.resolve(targetPath);
-                const resolvedRoot = path.resolve(rootPath);
-                return resolvedTarget === resolvedRoot || resolvedTarget.startsWith(`${resolvedRoot}${path.sep}`);
+                const resolvedTarget = posixPath.resolve(targetPath);
+                const resolvedRoot = posixPath.resolve(rootPath);
+                return resolvedTarget === resolvedRoot || resolvedTarget.startsWith(`${resolvedRoot}${posixPath.sep}`);
             },
-            path
+            path: posixPath
         }
     );
 
-    const fallbackPath = '/tmp/claude-projects/project-a/sessions-index.json';
+    const fallbackPath = posixPath.join('/tmp/claude-projects/project-a', 'sessions-index.json');
     const targetFilePath = '/tmp/claude-projects/project-a/session.jsonl';
 
     assert.strictEqual(
