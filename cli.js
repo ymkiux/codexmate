@@ -5712,13 +5712,6 @@ function removeClaudeSessionIndexEntry(indexPath, sessionFilePath, sessionId) {
         if (!entry || typeof entry !== 'object') {
             return false;
         }
-        const entrySessionId = typeof entry.sessionId === 'string' ? entry.sessionId : '';
-        if (sessionId && entrySessionId === sessionId) {
-            if (!removedEntry) {
-                removedEntry = entry;
-            }
-            return false;
-        }
         if (entry.fullPath) {
             const expanded = expandHomePath(entry.fullPath);
             const entryPath = expanded
@@ -5730,6 +5723,13 @@ function removeClaudeSessionIndexEntry(indexPath, sessionFilePath, sessionId) {
                 }
                 return false;
             }
+        }
+        const entrySessionId = typeof entry.sessionId === 'string' ? entry.sessionId : '';
+        if (!resolvedFile && sessionId && entrySessionId === sessionId) {
+            if (!removedEntry) {
+                removedEntry = entry;
+            }
+            return false;
         }
         return true;
     });
@@ -6069,10 +6069,6 @@ function upsertClaudeSessionIndexEntry(indexPath, sessionFilePath, entry) {
         if (!item || typeof item !== 'object') {
             return false;
         }
-        const itemSessionId = typeof item.sessionId === 'string' ? item.sessionId : '';
-        if (normalizedEntry.sessionId && itemSessionId === normalizedEntry.sessionId) {
-            return false;
-        }
         if (typeof item.fullPath === 'string' && item.fullPath) {
             const expanded = expandHomePath(item.fullPath);
             const itemPath = expanded
@@ -6081,6 +6077,10 @@ function upsertClaudeSessionIndexEntry(indexPath, sessionFilePath, entry) {
             if (itemPath && itemPath === resolvedFile) {
                 return false;
             }
+        }
+        const itemSessionId = typeof item.sessionId === 'string' ? item.sessionId : '';
+        if (!resolvedFile && normalizedEntry.sessionId && itemSessionId === normalizedEntry.sessionId) {
+            return false;
         }
         return true;
     });
