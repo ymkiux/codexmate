@@ -1435,6 +1435,167 @@ test('getSessionFileArg prefers filePath and falls back to file', () => {
     assert.strictEqual(getSessionFileArg({}), '');
 });
 
+test('readSessionDetail resolves file aliases through getSessionFileArg', async () => {
+    const readSessionDetailSource = extractFunctionBySignature(
+        cliSource,
+        'async function readSessionDetail(params = {}) {',
+        'readSessionDetail'
+    );
+    const getSessionFileArgSource = extractFunctionBySignature(
+        cliSource,
+        'function getSessionFileArg(params = {}) {',
+        'getSessionFileArg'
+    );
+    const getSessionFileArg = Function(getSessionFileArgSource)();
+    let resolvedArgs = null;
+    const readSessionDetail = instantiateFunction(readSessionDetailSource, 'readSessionDetail', {
+        resolveSessionFilePath(source, fileArg, sessionId) {
+            resolvedArgs = { source, fileArg, sessionId };
+            return '/tmp/detail.jsonl';
+        },
+        getSessionFileArg,
+        async extractSessionDetailPreviewFromFile() {
+            return {
+                sessionId: 'detail-1',
+                cwd: '/tmp/workspace',
+                updatedAt: '2025-03-30T00:00:00.000Z',
+                totalMessages: 1,
+                messages: [{ role: 'user', text: 'hello' }]
+            };
+        },
+        MAX_SESSION_DETAIL_MESSAGES: 200,
+        DEFAULT_SESSION_DETAIL_MESSAGES: 80
+    });
+
+    const result = await readSessionDetail({ source: 'codex', file: ' /tmp/detail.jsonl ', sessionId: 'detail-1' });
+
+    assert.deepStrictEqual(resolvedArgs, {
+        source: 'codex',
+        fileArg: '/tmp/detail.jsonl',
+        sessionId: 'detail-1'
+    });
+    assert.strictEqual(result.filePath, '/tmp/detail.jsonl');
+});
+
+test('readSessionPlain resolves file aliases through getSessionFileArg', async () => {
+    const readSessionPlainSource = extractFunctionBySignature(
+        cliSource,
+        'async function readSessionPlain(params = {}) {',
+        'readSessionPlain'
+    );
+    const getSessionFileArgSource = extractFunctionBySignature(
+        cliSource,
+        'function getSessionFileArg(params = {}) {',
+        'getSessionFileArg'
+    );
+    const getSessionFileArg = Function(getSessionFileArgSource)();
+    let resolvedArgs = null;
+    const readSessionPlain = instantiateFunction(readSessionPlainSource, 'readSessionPlain', {
+        resolveSessionFilePath(source, fileArg, sessionId) {
+            resolvedArgs = { source, fileArg, sessionId };
+            return '/tmp/plain.jsonl';
+        },
+        getSessionFileArg,
+        async extractMessagesFromFile() {
+            return {
+                sessionId: 'plain-1',
+                messages: [{ role: 'assistant', content: 'plain text' }]
+            };
+        },
+        readJsonlRecords() {
+            throw new Error('fallback records should not run when extraction succeeds');
+        },
+        extractMessagesFromRecords() {
+            throw new Error('fallback extraction should not run when extraction succeeds');
+        },
+        removeLeadingSystemMessage(messages) {
+            return messages;
+        },
+        buildSessionPlainText(messages) {
+            return `messages:${messages.length}`;
+        }
+    });
+
+    const result = await readSessionPlain({ source: 'claude', file: ' /tmp/plain.jsonl ', sessionId: 'plain-1' });
+
+    assert.deepStrictEqual(resolvedArgs, {
+        source: 'claude',
+        fileArg: '/tmp/plain.jsonl',
+        sessionId: 'plain-1'
+    });
+    assert.strictEqual(result.filePath, '/tmp/plain.jsonl');
+    assert.strictEqual(result.text, 'messages:1');
+});
+
+test('exportSessionData resolves file aliases through getSessionFileArg', async () => {
+    const exportSessionDataSource = extractFunctionBySignature(
+        cliSource,
+        'async function exportSessionData(params = {}) {',
+        'exportSessionData'
+    );
+    const getSessionFileArgSource = extractFunctionBySignature(
+        cliSource,
+        'function getSessionFileArg(params = {}) {',
+        'getSessionFileArg'
+    );
+    const getSessionFileArg = Function(getSessionFileArgSource)();
+    let resolvedArgs = null;
+    const exportSessionData = instantiateFunction(exportSessionDataSource, 'exportSessionData', {
+        resolveMaxMessagesValue() {
+            return 12;
+        },
+        MAX_EXPORT_MESSAGES: 200,
+        resolveSessionFilePath(source, fileArg, sessionId) {
+            resolvedArgs = { source, fileArg, sessionId };
+            return '/tmp/export.jsonl';
+        },
+        getSessionFileArg,
+        async extractMessagesFromFile() {
+            return {
+                sessionId: 'export-1',
+                updatedAt: '2025-03-30T00:00:00.000Z',
+                cwd: '/tmp/workspace',
+                messages: [{ role: 'assistant', content: 'markdown' }],
+                truncated: false
+            };
+        },
+        readJsonlRecords() {
+            throw new Error('fallback records should not run when extraction succeeds');
+        },
+        extractMessagesFromRecords() {
+            throw new Error('fallback extraction should not run when extraction succeeds');
+        },
+        removeLeadingSystemMessage(messages) {
+            return messages;
+        },
+        fs: {
+            existsSync() {
+                return true;
+            },
+            statSync() {
+                return { size: 1 };
+            }
+        },
+        path: {
+            basename() {
+                return 'export-1';
+            }
+        },
+        buildSessionMarkdown({ sourceLabel, sessionId, filePath, messages }) {
+            return `${sourceLabel}:${sessionId}:${filePath}:${messages.length}`;
+        }
+    });
+
+    const result = await exportSessionData({ source: 'codex', file: ' /tmp/export.jsonl ', sessionId: 'export-1', maxMessages: '12' });
+
+    assert.deepStrictEqual(resolvedArgs, {
+        source: 'codex',
+        fileArg: '/tmp/export.jsonl',
+        sessionId: 'export-1'
+    });
+    assert.strictEqual(result.content, 'Codex:export-1:/tmp/export.jsonl:1');
+});
+
 test('deleteSession increments trash badge count when only total count has been loaded', async () => {
     let requestedAction = '';
     const deleteSessionSource = extractMethodAsFunction(appSource, 'deleteSession');
