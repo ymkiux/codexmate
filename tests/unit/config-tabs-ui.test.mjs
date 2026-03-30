@@ -68,7 +68,12 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /v-memo="\[activeSessionExportKey === getSessionExportKey\(session\)/);
     assert.match(html, /v-memo="\[msg\.text,\s*msg\.timestamp,\s*msg\.roleLabel,\s*msg\.normalizedRole\]"/);
     assert.match(html, /v-memo="\[sessionTimelineActiveKey === node\.key,\s*node\.safePercent,\s*node\.title\]"/);
-    assert.match(html, /<button[^>]*@click="copyProviderShareCommand\(provider\)"[^>]*disabled[^>]*title="分享导入命令（暂时禁用）"[^>]*aria-label="Share import command"[^>]*>/);
+    const providerShareButton = html.match(
+        /<button[\s\S]*?@click="copyProviderShareCommand\(provider\)"[\s\S]*?aria-label="Share import command">/
+    );
+    assert(providerShareButton, 'provider share button should exist');
+    assert.match(providerShareButton[0], /disabled/);
+    assert.match(providerShareButton[0], /title="分享导入命令（暂时禁用）"/);
     assert.match(html, /<button class="card-action-btn"[^>]*@click="copyClaudeShareCommand\(name\)"[^>]*disabled[^>]*>/);
 });
 
@@ -182,7 +187,7 @@ test('session helper deferred claude refresh validates live tab and mode before 
     assert.match(helperScript, /if \(this\.mainTab !== expectedTab \|\| this\.configMode !== expectedConfigMode\) return;/);
     assert.match(helperScript, /const shouldLoadTrashListOnSettingsEnter = nextTab === 'settings'/);
     assert.match(helperScript, /this\.settingsTab === 'trash'/);
-    assert.match(helperScript, /forceRefresh: this\.settingsTab === 'trash' && !!this\.sessionTrashLoadedOnce/);
+    assert.match(helperScript, /forceRefresh: !!this\.sessionTrashLoadedOnce/);
     assert.match(helperScript, /const shouldPrimeTrashCountOnSettingsEnter = nextTab === 'settings'/);
     assert.match(helperScript, /this\.settingsTab !== 'trash'/);
     assert.match(helperScript, /this\.sessionTrashLoadedOnce = false;/);

@@ -1116,6 +1116,7 @@ test('trashSessionData rolls back a Claude file before restoring the index entry
     const persistError = new Error('persist failed');
     const removedClaudeIndexEntry = { sessionId: 'session-1', messageCount: 7 };
     const trashSessionData = instantiateFunction(trashSessionDataSource, 'trashSessionData', {
+        MAX_SESSION_TRASH_LIST_SIZE: 500,
         resolveSessionFilePath() {
             return '/tmp/session-1.jsonl';
         },
@@ -1232,6 +1233,7 @@ test('trashSessionData keeps the Claude index removed when rollback move fails',
     const persistError = new Error('persist failed');
     const rollbackError = new Error('rollback failed');
     const trashSessionData = instantiateFunction(trashSessionDataSource, 'trashSessionData', {
+        MAX_SESSION_TRASH_LIST_SIZE: 500,
         resolveSessionFilePath() {
             return '/tmp/session-1.jsonl';
         },
@@ -1718,7 +1720,8 @@ test('deleteSession prefers authoritative trash totalCount from the backend resp
 test('prependSessionTrashItem prefers authoritative trash totalCount when provided', () => {
     const prependSessionTrashItemSource = extractMethodAsFunction(appSource, 'prependSessionTrashItem');
     const prependSessionTrashItem = instantiateFunction(prependSessionTrashItemSource, 'prependSessionTrashItem', {
-        SESSION_TRASH_LIST_LIMIT: 500
+        SESSION_TRASH_LIST_LIMIT: 500,
+        SESSION_TRASH_PAGE_SIZE: 200
     });
 
     const context = {
