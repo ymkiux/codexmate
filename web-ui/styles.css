@@ -4208,6 +4208,21 @@ textarea:focus-visible {
 }
 
 @media (max-width: 540px) {
+    .session-item-pin {
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        min-height: 44px;
+        padding: 10px;
+        transform: none;
+    }
+
+    .session-item-pin svg,
+    .session-item-pin .pin-icon {
+        width: 16px;
+        height: 16px;
+    }
+
     body {
         padding: var(--spacing-md) var(--spacing-sm);
     }

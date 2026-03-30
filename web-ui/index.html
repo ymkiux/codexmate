@@ -906,7 +906,7 @@
                         <div
                             v-for="session in sortedSessionsList"
                             :key="session.source + '-' + session.sessionId + '-' + session.filePath"
-                            v-memo="[activeSessionExportKey === getSessionExportKey(session), session.messageCount, session.updatedAt, session.title, session.sourceLabel, isSessionPinned(session)]"
+                            v-memo="[activeSessionExportKey === getSessionExportKey(session), session.messageCount, session.updatedAt, session.title, session.sourceLabel, isSessionPinned(session), sessionsLoading]"
                             :class="[
                                 'session-item',
                                 {

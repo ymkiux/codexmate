@@ -1643,7 +1643,10 @@ test('deleteSession increments trash badge count when only total count has been 
         buildSessionTrashItemFromSession() {
             throw new Error('list hydration path should not run when only count is loaded');
         },
-        removeSessionPin() {},
+        removeSessionPinCalls: [],
+        removeSessionPin(sessionId) {
+            this.removeSessionPinCalls.push(sessionId);
+        },
         async removeSessionFromCurrentList() {
             removed = true;
         },
@@ -1705,7 +1708,10 @@ test('deleteSession prefers authoritative trash totalCount from the backend resp
         buildSessionTrashItemFromSession() {
             throw new Error('loaded-list branch should not run in count-only test');
         },
-        removeSessionPin() {},
+        removeSessionPinCalls: [],
+        removeSessionPin(sessionId) {
+            this.removeSessionPinCalls.push(sessionId);
+        },
         async removeSessionFromCurrentList() {},
         showMessage() {}
     };
