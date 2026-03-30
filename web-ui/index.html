@@ -928,10 +928,10 @@
                                         :aria-label="isSessionPinned(session) ? '取消置顶' : '置顶'"
                                         :title="isSessionPinned(session) ? '取消置顶' : '置顶'"
                                         :aria-pressed="isSessionPinned(session)">
-                                        <svg v-if="isSessionPinned(session)" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.6">
+                                        <svg v-if="isSessionPinned(session)" class="pin-icon" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.6">
                                             <path d="M12 22s8-6 8-12a8 8 0 1 0-16 0c0 6 8 12 8 12z"></path>
                                         </svg>
-                                        <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                                        <svg v-else class="pin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
                                             <path d="M12 22s8-6 8-12a8 8 0 1 0-16 0c0 6 8 12 8 12z"></path>
                                         </svg>
                                     </button>
