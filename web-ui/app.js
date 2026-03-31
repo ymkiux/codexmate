@@ -576,6 +576,32 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     }
                     return list;
                 },
+                hasLocalAndProxy() {
+                    const list = Array.isArray(this.providersList) ? this.providersList : [];
+                    if (!list.length) return false;
+                    const hasLocal = list.some((item) => item && String(item.name || '').trim().toLowerCase() === 'local');
+                    const hasProxy = list.some((item) => item && String(item.name || '').trim().toLowerCase() === 'codexmate-proxy');
+                    return hasLocal && hasProxy;
+                },
+                displayCurrentProvider() {
+                    const current = String(this.currentProvider || '').trim();
+                    if (!current) return '';
+                    if (this.hasLocalAndProxy && current.toLowerCase() === 'local') {
+                        return 'codexmate-proxy';
+                    }
+                    return current;
+                },
+                localHiddenNotice() {
+                    return this.hasLocalAndProxy && String(this.currentProvider || '').trim().toLowerCase() === 'local';
+                },
+                displayProvidersList() {
+                    const list = Array.isArray(this.providersList) ? this.providersList : [];
+                    if (!list.length) return [];
+                    if (!this.hasLocalAndProxy) {
+                        return list;
+                    }
+                    return list.filter((item) => String(item && item.name ? item.name : '').trim().toLowerCase() !== 'local');
+                },
                 proxyProviderOptions() {
                     const source = Array.isArray(this.providersList) ? this.providersList : [];
                     const list = source
@@ -585,10 +611,13 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 },
                 proxyRuntimeDisplayProvider() {
                     if (!this.proxyRuntime) return '';
+                    const hasProxy = this.hasLocalAndProxy;
                     const value = typeof this.proxyRuntime.provider === 'string'
                         ? this.proxyRuntime.provider.trim()
                         : '';
-                    return value || 'local';
+                    if (!value) return hasProxy ? 'codexmate-proxy' : 'local';
+                    if (value.toLowerCase() === 'local') return hasProxy ? 'codexmate-proxy' : value;
+                    return value;
                 },
                 installTargetCards() {
                     const targets = Array.isArray(this.installStatusTargets) ? this.installStatusTargets : [];

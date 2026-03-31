@@ -1326,9 +1326,9 @@ body::after {
     grid-auto-columns: max-content;
     column-gap: var(--spacing-xs);
     row-gap: 6px;
-    align-items: start;
+    align-items: center;
     justify-content: end;
-    align-self: flex-start;
+    align-self: center;
 }
 
 .card-trailing .card-actions {
