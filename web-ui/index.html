@@ -1304,7 +1304,7 @@
                             </div>
                         </div>
 
-                        <div class="market-target-switch" role="tablist" aria-label="选择 Skills 安装目标">
+                        <div class="market-target-switch" role="group" aria-label="选择 Skills 安装目标">
                             <button
                                 type="button"
                                 :class="['market-target-chip', { active: skillsTargetApp === 'codex' }]"
@@ -2133,7 +2133,7 @@
                         <div class="skills-modal-subtitle">集中管理当前宿主的本地技能目录，支持检索筛选、多选删除、跨应用导入、ZIP 导入与导出。</div>
                     </div>
                     <div class="modal-header-actions skills-modal-actions">
-                        <div class="market-target-switch market-target-switch-compact" role="tablist" aria-label="选择 Skills 管理目标">
+                        <div class="market-target-switch market-target-switch-compact" role="group" aria-label="选择 Skills 管理目标">
                             <button
                                 type="button"
                                 :class="['market-target-chip', { active: skillsTargetApp === 'codex' }]"

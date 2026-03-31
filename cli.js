@@ -10344,7 +10344,9 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
         process.exit(1);
     });
 
-    const openHost = isAnyAddressHost(host) ? DEFAULT_WEB_OPEN_HOST : host;
+    const openHost = host === '::'
+        ? '::1'
+        : (host === '0.0.0.0' ? DEFAULT_WEB_OPEN_HOST : host);
     const openUrl = `http://${formatHostForUrl(openHost)}:${port}`;
     server.listen(port, host, () => {
         console.log('\n✓ Web UI 已启动:', openUrl);

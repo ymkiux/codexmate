@@ -50,6 +50,10 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /skillsTargetApp === 'claude'/);
     assert.match(html, /setSkillsTargetApp\('codex', \{ silent: false \}\)/);
     assert.match(html, /setSkillsTargetApp\('claude', \{ silent: false \}\)/);
+    assert.match(html, /class="market-target-switch" role="group" aria-label="选择 Skills 安装目标"/);
+    assert.match(html, /class="market-target-switch market-target-switch-compact" role="group" aria-label="选择 Skills 管理目标"/);
+    assert.doesNotMatch(html, /class="market-target-switch" role="tablist" aria-label="选择 Skills 安装目标"/);
+    assert.doesNotMatch(html, /class="market-target-switch market-target-switch-compact" role="tablist" aria-label="选择 Skills 管理目标"/);
     assert.match(html, /skillsDefaultRootPath/);
     assert.match(html, /可直接导入/);
     assert.match(html, /不再展示任何 MCP 在线目录或外部市场/);

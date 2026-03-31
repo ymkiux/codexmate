@@ -146,6 +146,13 @@ test('resolveWebHost still prefers environment host over default host', () => {
     assert.strictEqual(withEnv({}), '192.168.1.10');
 });
 
+test('web auto-open uses IPv6 loopback when binding to IPv6 any address', () => {
+    assert.match(
+        cliContent,
+        /const openHost = host === '::'\s*\?\s*'::1'\s*:\s*\(host === '0\.0\.0\.0' \? DEFAULT_WEB_OPEN_HOST : host\);/
+    );
+});
+
 const getCodexSkillsDirSource = extractFunctionBySignature(
     cliContent,
     'function getCodexSkillsDir() {',
