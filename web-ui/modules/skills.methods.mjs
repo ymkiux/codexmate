@@ -239,7 +239,7 @@ export function createSkillsMethods({ api }) {
         },
 
         async importSelectedSkills() {
-            if (this.skillsDeleting || this.skillsImporting || this.skillsZipImporting || this.skillsExporting) return;
+            if (this.skillsDeleting || this.skillsScanningImports || this.skillsImporting || this.skillsZipImporting || this.skillsExporting) return;
             const selectedSet = new Set(Array.isArray(this.skillsImportSelectedKeys) ? this.skillsImportSelectedKeys : []);
             const selectedItems = (Array.isArray(this.skillsImportList) ? this.skillsImportList : [])
                 .filter((item) => selectedSet.has(this.buildSkillImportKey(item)))
@@ -331,7 +331,7 @@ export function createSkillsMethods({ api }) {
         },
 
         async importSkillsFromZipFile(file) {
-            if (this.skillsDeleting || this.skillsZipImporting || this.skillsImporting || this.skillsExporting) return;
+            if (this.skillsDeleting || this.skillsScanningImports || this.skillsZipImporting || this.skillsImporting || this.skillsExporting) return;
             const maxSize = 20 * 1024 * 1024;
             if (file.size > maxSize) {
                 this.showMessage('ZIP 文件过大，限制 20MB', 'error');
