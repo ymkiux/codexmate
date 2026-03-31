@@ -1810,7 +1810,7 @@ function importSkills(params = {}) {
     if (!target) {
         return { error: '目标宿主不支持' };
     }
-    const targetRoot = path.resolve(target.dir);
+    const targetRoot = resolveCopyTargetRoot(target.dir);
     const rawItems = Array.isArray(params.items) ? params.items : [];
     if (!rawItems.length) {
         return { error: '请先选择要导入的 skill' };
@@ -1957,7 +1957,7 @@ function importSkills(params = {}) {
         failed,
         targetApp: target.app,
         targetLabel: target.label,
-        root: target.dir
+        root: targetRoot
     };
 }
 
@@ -2033,7 +2033,7 @@ async function importSkillsFromZipFile(zipPath, options = {}) {
         if (!target) {
             return { error: '目标宿主不支持' };
         }
-        targetRoot = path.resolve(target.dir);
+        targetRoot = resolveCopyTargetRoot(target.dir);
         await inspectZipArchiveLimits(zipPath, {
             maxEntryCount: MAX_SKILLS_ZIP_ENTRY_COUNT,
             maxUncompressedBytes: MAX_SKILLS_ZIP_UNCOMPRESSED_BYTES
@@ -2133,7 +2133,7 @@ async function importSkillsFromZipFile(zipPath, options = {}) {
                 failed,
                 targetApp: target.app,
                 targetLabel: target.label,
-                root: target.dir
+                root: targetRoot
             };
         }
 
@@ -2143,7 +2143,7 @@ async function importSkillsFromZipFile(zipPath, options = {}) {
             failed,
             targetApp: target.app,
             targetLabel: target.label,
-            root: target.dir
+            root: targetRoot
         };
     } catch (e) {
         return {
@@ -2170,14 +2170,16 @@ async function importSkillsFromZip(payload = {}) {
     if (!payload || typeof payload.fileBase64 !== 'string' || !payload.fileBase64.trim()) {
         return { error: '缺少技能压缩包内容' };
     }
-    const upload = writeUploadZip(payload.fileBase64, 'codex-skills-import', payload.fileName || 'codex-skills.zip');
+    const targetApp = normalizeSkillTargetApp(payload.targetApp || payload.target) || 'codex';
+    const fallbackName = payload.fileName || `${targetApp}-skills.zip`;
+    const upload = writeUploadZip(payload.fileBase64, 'codex-skills-import', fallbackName);
     if (upload.error) {
         return { error: upload.error };
     }
     return importSkillsFromZipFile(upload.zipPath, {
         tempDir: upload.tempDir,
-        fallbackName: payload.fileName || '',
-        targetApp: payload.targetApp || payload.target || 'codex'
+        fallbackName,
+        targetApp
     });
 }
 
@@ -3792,6 +3794,27 @@ function isPathInside(targetPath, rootPath) {
     }
     const rootWithSlash = resolvedRoot.endsWith(path.sep) ? resolvedRoot : resolvedRoot + path.sep;
     return resolvedTarget.startsWith(rootWithSlash);
+}
+
+function resolveCopyTargetRoot(targetDir) {
+    const suffixSegments = [];
+    let current = path.resolve(targetDir || '');
+    while (current && !fs.existsSync(current)) {
+        const parent = path.dirname(current);
+        if (!parent || parent === current) {
+            break;
+        }
+        suffixSegments.unshift(path.basename(current));
+        current = parent;
+    }
+    let resolvedRoot = normalizePathForCompare(current || targetDir);
+    if (!resolvedRoot) {
+        resolvedRoot = path.resolve(targetDir || '');
+    }
+    for (const segment of suffixSegments) {
+        resolvedRoot = path.join(resolvedRoot, segment);
+    }
+    return resolvedRoot;
 }
 
 function collectJsonlFiles(rootDir, maxFiles = 5000) {
