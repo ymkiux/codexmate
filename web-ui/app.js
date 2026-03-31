@@ -144,6 +144,8 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     confirmDialogConfirmText: '确认',
                     confirmDialogCancelText: '取消',
                     confirmDialogDanger: false,
+                    confirmDialogConfirmDisabled: false,
+                    confirmDialogDisableWhen: null,
                     confirmDialogResolver: null,
                     configTemplateContent: '',
                     configTemplateApplying: false,
@@ -3554,6 +3556,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     if (typeof this.confirmDialogResolver === 'function') {
                         this.confirmDialogResolver(false);
                     }
+                    const confirmDisabled = options.confirmDisabled;
                     this.confirmDialogTitle = typeof options.title === 'string' && options.title.trim()
                         ? options.title.trim()
                         : '请确认操作';
@@ -3565,10 +3568,22 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         ? options.cancelText.trim()
                         : '取消';
                     this.confirmDialogDanger = !!options.danger;
+                    this.confirmDialogConfirmDisabled = typeof confirmDisabled === 'function' ? false : !!confirmDisabled;
+                    this.confirmDialogDisableWhen = typeof confirmDisabled === 'function' ? confirmDisabled : null;
                     this.showConfirmDialog = true;
                     return new Promise((resolve) => {
                         this.confirmDialogResolver = resolve;
                     });
+                },
+                isConfirmDialogDisabled() {
+                    if (typeof this.confirmDialogDisableWhen === 'function') {
+                        try {
+                            return !!this.confirmDialogDisableWhen.call(this);
+                        } catch (_) {
+                            return false;
+                        }
+                    }
+                    return !!this.confirmDialogConfirmDisabled;
                 },
                 resolveConfirmDialog(confirmed) {
                     const resolver = typeof this.confirmDialogResolver === 'function'
@@ -3580,6 +3595,8 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     this.confirmDialogConfirmText = '确认';
                     this.confirmDialogCancelText = '取消';
                     this.confirmDialogDanger = false;
+                    this.confirmDialogConfirmDisabled = false;
+                    this.confirmDialogDisableWhen = null;
                     this.confirmDialogResolver = null;
                     if (resolver) {
                         resolver(!!confirmed);

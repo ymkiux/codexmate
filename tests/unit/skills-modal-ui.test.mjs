@@ -32,7 +32,10 @@ test('skills modal script is modularized and exposes computed/methods from skill
     assert.match(appScript, /\.\.\.createSkillsComputed\(\)/);
     assert.match(appScript, /\.\.\.createSkillsMethods\(\{ api \}\)/);
     assert.match(appScript, /showConfirmDialog:\s*false/);
+    assert.match(appScript, /confirmDialogConfirmDisabled:\s*false/);
+    assert.match(appScript, /confirmDialogDisableWhen:\s*null/);
     assert.match(appScript, /requestConfirmDialog\(/);
+    assert.match(appScript, /isConfirmDialogDisabled\(\)/);
     assert.match(appScript, /resolveConfirmDialog\(/);
 
     assert.match(skillsComputed, /skillsConfiguredCount\(\)/);
@@ -62,6 +65,7 @@ test('skills modal script is modularized and exposes computed/methods from skill
 
 test('skills modal styles define summary and panel layout hooks', () => {
     const styles = readProjectFile('web-ui/styles.css');
+    const html = readProjectFile('web-ui/index.html');
     assert.match(styles, /\.form-select/);
     assert.match(styles, /\.skills-summary-strip/);
     assert.match(styles, /\.skills-summary-item/);
@@ -75,4 +79,5 @@ test('skills modal styles define summary and panel layout hooks', () => {
     assert.match(styles, /\.market-target-chip/);
     assert.doesNotMatch(styles, /\.market-online-toolbar/);
     assert.doesNotMatch(styles, /\.market-ecosystem-card/);
+    assert.match(html, /:disabled="isConfirmDialogDisabled\(\)"/);
 });
