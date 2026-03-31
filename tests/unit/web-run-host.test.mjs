@@ -109,7 +109,7 @@ function instantiateFunction(funcSource, funcName, bindings = {}) {
     return Function(...bindingNames, `${funcSource}\nreturn ${funcName};`)(...bindingValues);
 }
 
-const defaultHostMatch = cliContent.match(/const DEFAULT_WEB_HOST = '([^']+)';/);
+const defaultHostMatch = cliContent.match(/const\s+DEFAULT_WEB_HOST\s*=\s*['\"]([^'\"]+)['\"]\s*;?/);
 if (!defaultHostMatch) {
     throw new Error('DEFAULT_WEB_HOST not found');
 }
@@ -198,6 +198,7 @@ test('resolveSkillTarget still falls back to default target when target is omitt
 
 test('resolveSkillTarget rejects explicit unsupported targets instead of falling back', () => {
     assert.strictEqual(resolveSkillTarget({ targetApp: 'claud' }), null);
+    assert.strictEqual(resolveSkillTarget({ target: 'claud' }), null);
     assert.strictEqual(resolveSkillTarget({ target: 'unknown' }, 'codex'), null);
 });
 

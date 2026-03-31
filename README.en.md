@@ -124,7 +124,9 @@ codexmate status
 codexmate run
 ```
 
-Default listen address is `0.0.0.0:3737` for LAN access, and browser auto-open is enabled by default.
+Default listen address is `127.0.0.1:3737`, localhost-only, and browser auto-open is enabled by default.
+
+> Security note: if you explicitly use `--host 0.0.0.0` or set `CODEXMATE_HOST=0.0.0.0`, the unauthenticated admin UI becomes reachable on your current network. If the instance contains API keys, provider settings, or skills management data, prefer `127.0.0.1` and only enable LAN access on trusted networks.
 
 ### Run from source
 
@@ -232,7 +234,7 @@ codexmate mcp serve --allow-write
 | Variable | Default | Description |
 | --- | --- | --- |
 | `CODEXMATE_PORT` | `3737` | Web server port |
-| `CODEXMATE_HOST` | `0.0.0.0` | Web listen host |
+| `CODEXMATE_HOST` | `127.0.0.1` | Web listen host (set `0.0.0.0` explicitly for LAN access) |
 | `CODEXMATE_NO_BROWSER` | unset | Set `1` to disable browser auto-open |
 | `CODEXMATE_MCP_ALLOW_WRITE` | unset | Set `1` to allow MCP write tools by default |
 | `CODEXMATE_FORCE_RESET_EXISTING_CONFIG` | `0` | Set `1` to force bootstrap reset of existing config |

@@ -35,10 +35,11 @@
 
         async openSkillsManager(options = {}) {
             const targetApp = this.normalizeSkillsTargetApp(options && options.targetApp ? options.targetApp : this.skillsTargetApp);
-            if (targetApp !== this.skillsTargetApp) {
+            const targetChanged = targetApp !== this.skillsTargetApp;
+            if (targetChanged) {
                 this.skillsTargetApp = targetApp;
+                this.resetSkillsTargetState();
             }
-            this.resetSkillsTargetState();
             this.showSkillsModal = true;
             await this.refreshSkillsList({ silent: false });
         },
@@ -158,7 +159,7 @@
         },
 
         async scanImportableSkills(options = {}) {
-            if (this.skillsScanningImports || this.skillsImporting || this.skillsZipImporting || this.skillsExporting) return;
+            if (this.skillsScanningImports || this.skillsImporting || this.skillsZipImporting || this.skillsExporting) return false;
             const silent = !!(options && options.silent);
             this.skillsScanningImports = true;
             try {
