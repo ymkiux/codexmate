@@ -407,6 +407,17 @@ test('resolveSkillTargetAppFromRequest rejects explicit unsupported query target
     );
 });
 
+test('resolveSkillTargetAppFromRequest keeps targetApp precedence over target', () => {
+    assert.strictEqual(
+        resolveSkillTargetAppFromRequest({ url: '/api/import-skills-zip?target=claude&targetApp=codex' }, 'claude'),
+        'codex'
+    );
+    assert.strictEqual(
+        resolveSkillTargetAppFromRequest({ url: '/api/import-skills-zip?target=claude&targetApp=claud' }, 'codex'),
+        null
+    );
+});
+
 test('resolveCopyTargetRoot resolves through the nearest existing parent path', () => {
     const resolveCopyTargetRoot = instantiateFunction(resolveCopyTargetRootSource, 'resolveCopyTargetRoot', {
         path,

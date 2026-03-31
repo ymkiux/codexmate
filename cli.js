@@ -9835,9 +9835,9 @@ function resolveSkillTargetAppFromRequest(req, fallbackApp = 'codex') {
     const fallback = normalizeSkillTargetApp(fallbackApp) || 'codex';
     try {
         const parsed = new URL(req.url || '/', 'http://localhost');
-        if (parsed.searchParams.has('target') || parsed.searchParams.has('targetApp')) {
+        if (parsed.searchParams.has('targetApp') || parsed.searchParams.has('target')) {
             return normalizeSkillTargetApp(
-                parsed.searchParams.get('target') || parsed.searchParams.get('targetApp')
+                parsed.searchParams.get('targetApp') || parsed.searchParams.get('target')
             ) || null;
         }
         return fallback;
