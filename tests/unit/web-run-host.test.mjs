@@ -169,8 +169,7 @@ test('getCodexSkillsDir honors CODEX_HOME before legacy defaults', () => {
         path,
         os: { homedir: () => '/home/demo' },
         process: { env: { CODEX_HOME: '/tmp/custom-codex-home' } },
-        resolveExistingDir: () => '/home/demo/.codex',
-        CONFIG_DIR: '/home/demo/.codex',
+        resolveExistingDir: (candidates, fallback) => candidates[0] || fallback,
         CODEX_SKILLS_DIR: '/home/demo/.codex/skills'
     });
 
@@ -182,12 +181,59 @@ test('getClaudeSkillsDir honors CLAUDE_CONFIG_DIR before legacy defaults', () =>
         path,
         os: { homedir: () => '/home/demo' },
         process: { env: { CLAUDE_CONFIG_DIR: '/tmp/custom-claude-home' } },
-        resolveExistingDir: () => '/home/demo/.claude',
-        CLAUDE_DIR: '/home/demo/.claude',
+        resolveExistingDir: (candidates, fallback) => candidates[0] || fallback,
         CLAUDE_SKILLS_DIR: '/home/demo/.claude/skills'
     });
 
     assert.strictEqual(getClaudeSkillsDir(), '/tmp/custom-claude-home/skills');
+});
+
+test('getCodexSkillsDir resolves concrete skills directories instead of parent config dirs', () => {
+    let received = null;
+    const getCodexSkillsDir = instantiateFunction(getCodexSkillsDirSource, 'getCodexSkillsDir', {
+        path,
+        os: { homedir: () => '/home/demo' },
+        process: { env: { XDG_CONFIG_HOME: '/tmp/xdg-home' } },
+        resolveExistingDir: (candidates, fallback) => {
+            received = { candidates, fallback };
+            return '/resolved/codex-skills';
+        },
+        CODEX_SKILLS_DIR: '/home/demo/.codex/skills'
+    });
+
+    assert.strictEqual(getCodexSkillsDir(), '/resolved/codex-skills');
+    assert.deepStrictEqual(received, {
+        candidates: [
+            '/tmp/xdg-home/codex/skills',
+            '/home/demo/.config/codex/skills',
+            '/home/demo/.codex/skills'
+        ],
+        fallback: '/home/demo/.codex/skills'
+    });
+});
+
+test('getClaudeSkillsDir resolves concrete skills directories instead of parent config dirs', () => {
+    let received = null;
+    const getClaudeSkillsDir = instantiateFunction(getClaudeSkillsDirSource, 'getClaudeSkillsDir', {
+        path,
+        os: { homedir: () => '/home/demo' },
+        process: { env: { XDG_CONFIG_HOME: '/tmp/xdg-home' } },
+        resolveExistingDir: (candidates, fallback) => {
+            received = { candidates, fallback };
+            return '/resolved/claude-skills';
+        },
+        CLAUDE_SKILLS_DIR: '/home/demo/.claude/skills'
+    });
+
+    assert.strictEqual(getClaudeSkillsDir(), '/resolved/claude-skills');
+    assert.deepStrictEqual(received, {
+        candidates: [
+            '/tmp/xdg-home/claude/skills',
+            '/home/demo/.config/claude/skills',
+            '/home/demo/.claude/skills'
+        ],
+        fallback: '/home/demo/.claude/skills'
+    });
 });
 
 test('skills target tables use env-aware skills dir resolvers', () => {

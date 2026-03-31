@@ -173,35 +173,35 @@ const HTTP_KEEP_ALIVE_AGENT = new http.Agent({ keepAlive: true });
 const HTTPS_KEEP_ALIVE_AGENT = new https.Agent({ keepAlive: true });
 
 function getCodexSkillsDir() {
+    const candidates = [];
     const envCodexHome = typeof process.env.CODEX_HOME === 'string' ? process.env.CODEX_HOME.trim() : '';
     if (envCodexHome) {
-        return path.join(envCodexHome, 'skills');
+        candidates.push(path.join(envCodexHome, 'skills'));
     }
     const xdgConfig = typeof process.env.XDG_CONFIG_HOME === 'string' ? process.env.XDG_CONFIG_HOME.trim() : '';
     if (xdgConfig) {
-        return path.join(xdgConfig, 'codex', 'skills');
+        candidates.push(path.join(xdgConfig, 'codex', 'skills'));
     }
-    const resolvedConfigDir = resolveExistingDir([
-        path.join(os.homedir(), '.config', 'codex')
-    ], CONFIG_DIR);
-    return path.join(resolvedConfigDir, 'skills');
+    candidates.push(path.join(os.homedir(), '.config', 'codex', 'skills'));
+    candidates.push(CODEX_SKILLS_DIR);
+    return resolveExistingDir(candidates, CODEX_SKILLS_DIR);
 }
 
 function getClaudeSkillsDir() {
+    const candidates = [];
     const envClaudeHome = typeof process.env.CLAUDE_HOME === 'string' && process.env.CLAUDE_HOME.trim()
         ? process.env.CLAUDE_HOME.trim()
         : (typeof process.env.CLAUDE_CONFIG_DIR === 'string' ? process.env.CLAUDE_CONFIG_DIR.trim() : '');
     if (envClaudeHome) {
-        return path.join(envClaudeHome, 'skills');
+        candidates.push(path.join(envClaudeHome, 'skills'));
     }
     const xdgConfig = typeof process.env.XDG_CONFIG_HOME === 'string' ? process.env.XDG_CONFIG_HOME.trim() : '';
     if (xdgConfig) {
-        return path.join(xdgConfig, 'claude', 'skills');
+        candidates.push(path.join(xdgConfig, 'claude', 'skills'));
     }
-    const resolvedConfigDir = resolveExistingDir([
-        path.join(os.homedir(), '.config', 'claude')
-    ], CLAUDE_DIR);
-    return path.join(resolvedConfigDir, 'skills');
+    candidates.push(path.join(os.homedir(), '.config', 'claude', 'skills'));
+    candidates.push(CLAUDE_SKILLS_DIR);
+    return resolveExistingDir(candidates, CLAUDE_SKILLS_DIR);
 }
 
 function resolveWebPort() {
