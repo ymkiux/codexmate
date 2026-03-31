@@ -309,6 +309,11 @@ const importSkillsFromZipFileSource = extractFunctionBySignature(
     'async function importSkillsFromZipFile(zipPath, options = {}) {',
     'importSkillsFromZipFile'
 );
+const scanUnmanagedSkillsSource = extractFunctionBySignature(
+    cliContent,
+    'function scanUnmanagedSkills(params = {}) {',
+    'scanUnmanagedSkills'
+);
 const importSkillsFromZipSource = extractFunctionBySignature(
     cliContent,
     'async function importSkillsFromZip(payload = {}) {',
@@ -328,6 +333,63 @@ test('resolveSkillTarget still falls back to default target when target is omitt
 test('resolveSkillTarget rejects explicit unsupported targets instead of falling back', () => {
     assert.strictEqual(resolveSkillTarget({ targetApp: 'claud' }), null);
     assert.strictEqual(resolveSkillTarget({ target: 'unknown' }, 'codex'), null);
+});
+
+test('scanUnmanagedSkills skips entries when the resolved target path is already occupied', () => {
+    const scanUnmanagedSkills = instantiateFunction(scanUnmanagedSkillsSource, 'scanUnmanagedSkills', {
+        resolveSkillTarget() {
+            return { app: 'codex', label: 'Codex', dir: '/tmp/codex-skills' };
+        },
+        resolveCopyTargetRoot() {
+            return '/tmp/codex-skills';
+        },
+        listSkills() {
+            return {
+                targetApp: 'codex',
+                targetLabel: 'Codex',
+                root: '/tmp/codex-skills',
+                exists: true,
+                items: []
+            };
+        },
+        SKILL_IMPORT_SOURCES: [
+            { app: 'codex', label: 'Codex', dir: '/tmp/codex-skills' },
+            { app: 'claude', label: 'Claude', dir: '/tmp/claude-skills' }
+        ],
+        listSkillEntriesByRoot() {
+            return [
+                { name: 'alpha', path: '/tmp/claude-skills/alpha', sourceType: 'directory' },
+                { name: 'beta', path: '/tmp/claude-skills/beta', sourceType: 'directory' }
+            ];
+        },
+        readCodexSkillMetadata(skillPath) {
+            return {
+                displayName: path.basename(skillPath),
+                description: '',
+                hasSkillFile: true
+            };
+        },
+        path,
+        fs: {
+            existsSync(targetPath) {
+                return targetPath === '/tmp/codex-skills/alpha';
+            }
+        }
+    });
+
+    const result = scanUnmanagedSkills({ targetApp: 'codex' });
+
+    assert.deepStrictEqual(result.items, [{
+        key: 'claude:beta',
+        name: 'beta',
+        displayName: 'beta',
+        description: '',
+        sourceApp: 'claude',
+        sourceLabel: 'Claude',
+        sourcePath: '/tmp/claude-skills/beta',
+        sourceType: 'directory',
+        hasSkillFile: true
+    }]);
 });
 
 test('resolveSkillTargetAppFromRequest rejects explicit unsupported query target', () => {
