@@ -170,6 +170,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     agentsContext: 'codex',
                     agentsModalTitle: 'AGENTS.md 编辑器',
                     agentsModalHint: '保存后会写入目标 AGENTS.md（与 config.toml 同级）。',
+                    skillsTargetApp: 'codex',
                     skillsRootPath: '',
                     skillsList: [],
                     skillsSelectedNames: [],
@@ -183,6 +184,9 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     skillsImporting: false,
                     skillsZipImporting: false,
                     skillsExporting: false,
+                    skillsMarketLoading: false,
+                    skillsMarketLocalLoadedOnce: false,
+                    skillsMarketImportLoadedOnce: false,
                     sessionPinnedMap: {},
                     sessionsList: [],
                     sessionsLoadedOnce: false,
@@ -5768,5 +5772,3 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
 
         app.mount('#app');
     });
-
-

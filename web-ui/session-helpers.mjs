@@ -61,6 +61,11 @@ export function switchMainTab(tab) {
         this.sessionTrashLoadedOnce = false;
         this.loadSessionTrashCount({ silent: true });
     }
+    const shouldLoadSkillsMarketOnEnter = nextTab === 'market'
+        && typeof this.loadSkillsMarketOverview === 'function';
+    if (shouldLoadSkillsMarketOnEnter) {
+        this.loadSkillsMarketOverview({ silent: true });
+    }
     if (nextTab === 'config' && this.configMode === 'claude') {
         const expectedTab = nextTab;
         const expectedConfigMode = this.configMode;

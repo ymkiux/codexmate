@@ -34,6 +34,31 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /settingsTab === 'backup'/);
     assert.match(html, /settingsTab === 'trash'/);
     assert.match(html, /sessionTrashCount/);
+    assert.match(html, /id="side-tab-market"/);
+    assert.match(html, /id="tab-market"/);
+    assert.match(html, /data-main-tab="market"/);
+    assert.match(html, /onMainTabPointerDown\('market', \$event\)/);
+    assert.match(html, /onMainTabClick\('market', \$event\)/);
+    assert.match(html, /aria-controls="panel-market"/);
+    assert.match(html, /:aria-selected="mainTab === 'market'"/);
+    assert.match(html, /id="panel-market"/);
+    assert.match(html, /v-show="mainTab === 'market'"/);
+    assert.match(html, /loadSkillsMarketOverview\(\{ forceRefresh: true, silent: false \}\)/);
+    assert.match(html, /class="market-grid"/);
+    assert.match(html, /class="market-action-grid"/);
+    assert.match(html, /skillsTargetApp === 'codex'/);
+    assert.match(html, /skillsTargetApp === 'claude'/);
+    assert.match(html, /setSkillsTargetApp\('codex', \{ silent: false \}\)/);
+    assert.match(html, /setSkillsTargetApp\('claude', \{ silent: false \}\)/);
+    assert.match(html, /skillsDefaultRootPath/);
+    assert.match(html, /可直接导入/);
+    assert.match(html, /不再展示任何 MCP 在线目录或外部市场/);
+    assert.match(html, /本地 skills 视图和导入分发流程/);
+    assert.doesNotMatch(html, /skillsMarketRemoteCount/);
+    assert.doesNotMatch(html, /loadOnlineSkillsMarket\(\{ forceRefresh: true, silent: false \}\)/);
+    assert.doesNotMatch(html, /resetOnlineSkillsMarketSearch/);
+    assert.doesNotMatch(html, /class="market-online-list"/);
+    assert.doesNotMatch(html, /class="market-ecosystem-grid"/);
     assert.match(html, /id="settings-tab-backup"/);
     assert.match(html, /id="settings-tab-trash"/);
     assert.match(html, /role="tab"/);
@@ -59,8 +84,10 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /@click="loadMoreSessionTrashItems"/);
     assert.match(html, /回收站列表加载失败，请刷新重试/);
     assert.match(html, /data-main-tab=\"sessions\"/);
+    assert.match(html, /data-main-tab=\"market\"/);
     assert.match(html, /data-config-mode=\"codex\"/);
     assert.match(html, /isMainTabNavActive\('settings'\)/);
+    assert.match(html, /isMainTabNavActive\('market'\)/);
     assert.match(html, /isConfigModeNavActive\('codex'\)/);
     assert.match(html, /:aria-pressed="isSessionPinned\(session\)"/);
     assert.match(html, /class="session-item-copy session-item-pin"/);
@@ -145,6 +172,15 @@ test('web ui script defines provider mode metadata for codex only', () => {
     assert.match(appScript, /const SESSION_TRASH_LIST_LIMIT = 500;/);
     assert.match(appScript, /const SESSION_TRASH_PAGE_SIZE = 200;/);
     assert.match(appScript, /settingsTab:\s*'backup'/);
+    assert.match(appScript, /skillsTargetApp:\s*'codex'/);
+    assert.match(appScript, /skillsMarketLoading:\s*false/);
+    assert.match(appScript, /skillsMarketLocalLoadedOnce:\s*false/);
+    assert.match(appScript, /skillsMarketImportLoadedOnce:\s*false/);
+    assert.doesNotMatch(appScript, /skillsMarketRemoteLoading:\s*false/);
+    assert.doesNotMatch(appScript, /skillsMarketRemoteLoadedOnce:\s*false/);
+    assert.doesNotMatch(appScript, /skillsMarketRemoteItems:\s*\[\]/);
+    assert.doesNotMatch(appScript, /skillsMarketRemoteLatestOnly:\s*true/);
+    assert.doesNotMatch(appScript, /skillsMarketEcosystems:\s*\[\]/);
     assert.match(appScript, /sessionTrashItems:\s*\[\]/);
     assert.match(appScript, /sessionTrashVisibleCount:\s*SESSION_TRASH_PAGE_SIZE/);
     assert.match(appScript, /sessionTrashTotalCount:\s*0/);
@@ -194,6 +230,8 @@ test('session helper deferred claude refresh validates live tab and mode before 
     assert.match(helperScript, /this\.settingsTab !== 'trash'/);
     assert.match(helperScript, /this\.sessionTrashLoadedOnce = false;/);
     assert.match(helperScript, /this\.loadSessionTrashCount\(\{ silent: true \}\);/);
+    assert.match(helperScript, /const shouldLoadSkillsMarketOnEnter = nextTab === 'market'/);
+    assert.match(helperScript, /this\.loadSkillsMarketOverview\(\{ silent: true \}\);/);
 });
 
 test('trash item styles stay aligned with session card layout and keep mobile usability', () => {
@@ -231,4 +269,11 @@ test('settings tab header actions keep compact tool buttons inline on wider scre
         styles,
         /\.settings-tab-actions \.btn-tool,\s*\.settings-tab-actions \.btn-tool-compact\s*\{[\s\S]*width:\s*auto;/
     );
+    assert.match(styles, /\.market-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
+    assert.match(styles, /\.market-action-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/);
+    assert.match(styles, /\.market-target-switch\s*\{/);
+    assert.match(styles, /\.market-target-chip\.active\s*\{/);
+    assert.match(styles, /\.market-panel-wide\s*\{/);
+    assert.doesNotMatch(styles, /\.market-online-list\s*\{/);
+    assert.doesNotMatch(styles, /\.market-ecosystem-grid\s*\{/);
 });

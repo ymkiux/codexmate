@@ -13,6 +13,7 @@ await import(pathToFileURL(path.join(__dirname, 'session-query.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'mcp-stdio.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'workflow-engine.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'skills-modal-ui.test.mjs')));
+await import(pathToFileURL(path.join(__dirname, 'skills-market-runtime.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'config-tabs-ui.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'compact-layout-ui.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'agents-diff-ui.test.mjs')));
@@ -25,6 +26,7 @@ await import(pathToFileURL(path.join(__dirname, 'coderabbit-workflows.test.mjs')
 await import(pathToFileURL(path.join(__dirname, 'session-tab-switch-performance.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'session-trash-state.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'web-ui-restart.test.mjs')));
+await import(pathToFileURL(path.join(__dirname, 'web-run-host.test.mjs')));
 
 let failures = 0;
 for (const { name, fn } of tests) {
