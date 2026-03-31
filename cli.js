@@ -118,12 +118,12 @@ const CODEX_SKILLS_DIR = path.join(CONFIG_DIR, 'skills');
 const CLAUDE_SKILLS_DIR = path.join(CLAUDE_DIR, 'skills');
 const AGENTS_SKILLS_DIR = path.join(os.homedir(), '.agents', 'skills');
 const SKILL_TARGETS = Object.freeze([
-    Object.freeze({ app: 'codex', label: 'Codex', dir: CODEX_SKILLS_DIR }),
-    Object.freeze({ app: 'claude', label: 'Claude Code', dir: CLAUDE_SKILLS_DIR })
+    Object.freeze({ app: 'codex', label: 'Codex', dir: getCodexSkillsDir() }),
+    Object.freeze({ app: 'claude', label: 'Claude Code', dir: getClaudeSkillsDir() })
 ]);
 const SKILL_IMPORT_SOURCES = Object.freeze([
     ...SKILL_TARGETS,
-    { app: 'agents', label: 'Agents', dir: AGENTS_SKILLS_DIR }
+    Object.freeze({ app: 'agents', label: 'Agents', dir: AGENTS_SKILLS_DIR })
 ]);
 const MODELS_CACHE_TTL_MS = 60 * 1000;
 const MODELS_NEGATIVE_CACHE_TTL_MS = 5 * 1000;
@@ -171,6 +171,38 @@ const CLI_INSTALL_TARGETS = Object.freeze([
 
 const HTTP_KEEP_ALIVE_AGENT = new http.Agent({ keepAlive: true });
 const HTTPS_KEEP_ALIVE_AGENT = new https.Agent({ keepAlive: true });
+
+function getCodexSkillsDir() {
+    const envCodexHome = typeof process.env.CODEX_HOME === 'string' ? process.env.CODEX_HOME.trim() : '';
+    if (envCodexHome) {
+        return path.join(envCodexHome, 'skills');
+    }
+    const xdgConfig = typeof process.env.XDG_CONFIG_HOME === 'string' ? process.env.XDG_CONFIG_HOME.trim() : '';
+    if (xdgConfig) {
+        return path.join(xdgConfig, 'codex', 'skills');
+    }
+    const resolvedConfigDir = resolveExistingDir([
+        path.join(os.homedir(), '.config', 'codex')
+    ], CONFIG_DIR);
+    return path.join(resolvedConfigDir, 'skills');
+}
+
+function getClaudeSkillsDir() {
+    const envClaudeHome = typeof process.env.CLAUDE_HOME === 'string' && process.env.CLAUDE_HOME.trim()
+        ? process.env.CLAUDE_HOME.trim()
+        : (typeof process.env.CLAUDE_CONFIG_DIR === 'string' ? process.env.CLAUDE_CONFIG_DIR.trim() : '');
+    if (envClaudeHome) {
+        return path.join(envClaudeHome, 'skills');
+    }
+    const xdgConfig = typeof process.env.XDG_CONFIG_HOME === 'string' ? process.env.XDG_CONFIG_HOME.trim() : '';
+    if (xdgConfig) {
+        return path.join(xdgConfig, 'claude', 'skills');
+    }
+    const resolvedConfigDir = resolveExistingDir([
+        path.join(os.homedir(), '.config', 'claude')
+    ], CLAUDE_DIR);
+    return path.join(resolvedConfigDir, 'skills');
+}
 
 function resolveWebPort() {
     const raw = process.env.CODEXMATE_PORT;
@@ -9777,7 +9809,7 @@ async function handleImportSkillsZipUpload(req, res, options = {}) {
             writeJsonResponse(res, 400, { error: '目标宿主不支持' });
             return;
         }
-        const fileName = resolveUploadFileNameFromRequest(req, 'codex-skills.zip');
+        const fileName = resolveUploadFileNameFromRequest(req, `${targetApp}-skills.zip`);
         const upload = await writeUploadZipStream(
             req,
             'codex-skills-import',
