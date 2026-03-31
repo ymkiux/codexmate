@@ -291,7 +291,7 @@ const resolveSkillTargetAppFromRequest = instantiateFunction(
     'resolveSkillTargetAppFromRequest',
     {
         URL,
-        normalizeSkillTargetApp
+        resolveSkillTarget
     }
 );
 const resolveCopyTargetRootSource = extractFunctionBySignature(
@@ -723,10 +723,7 @@ test('importSkillsFromZip reuses a target-specific fallback zip name for base64 
     let uploadArgs = null;
     let importedOptions = null;
     const importSkillsFromZip = instantiateFunction(importSkillsFromZipSource, 'importSkillsFromZip', {
-        normalizeSkillTargetApp(app) {
-            const value = typeof app === 'string' ? app.trim().toLowerCase() : '';
-            return value === 'codex' || value === 'claude' ? value : '';
-        },
+        resolveSkillTarget,
         writeUploadZip(fileBase64, prefix, fileName) {
             uploadArgs = { fileBase64, prefix, fileName };
             return { zipPath: '/tmp/claude.zip', tempDir: '/tmp/claude-upload' };
@@ -750,7 +747,7 @@ test('importSkillsFromZip reuses a target-specific fallback zip name for base64 
     assert.deepStrictEqual(importedOptions, {
         tempDir: '/tmp/claude-upload',
         fallbackName: 'claude-skills.zip',
-        targetApp: 'claude'
+        target: 'claude'
     });
     assert.deepStrictEqual(result, { imported: [] });
 });
@@ -759,10 +756,7 @@ test('importSkillsFromZip keeps the raw explicit target for downstream validatio
     let uploadArgs = null;
     let importedOptions = null;
     const importSkillsFromZip = instantiateFunction(importSkillsFromZipSource, 'importSkillsFromZip', {
-        normalizeSkillTargetApp(app) {
-            const value = typeof app === 'string' ? app.trim().toLowerCase() : '';
-            return value === 'codex' || value === 'claude' ? value : '';
-        },
+        resolveSkillTarget,
         writeUploadZip(fileBase64, prefix, fileName) {
             uploadArgs = { fileBase64, prefix, fileName };
             return { zipPath: '/tmp/upload.zip', tempDir: '/tmp/upload-dir' };
@@ -786,7 +780,7 @@ test('importSkillsFromZip keeps the raw explicit target for downstream validatio
     assert.deepStrictEqual(importedOptions, {
         tempDir: '/tmp/upload-dir',
         fallbackName: 'codex-skills.zip',
-        targetApp: 'claud'
+        target: 'claud'
     });
     assert.deepStrictEqual(result, { error: '目标宿主不支持' });
 });
@@ -795,10 +789,7 @@ test('importSkillsFromZip keeps targetApp precedence over target', async () => {
     let uploadArgs = null;
     let importedOptions = null;
     const importSkillsFromZip = instantiateFunction(importSkillsFromZipSource, 'importSkillsFromZip', {
-        normalizeSkillTargetApp(app) {
-            const value = typeof app === 'string' ? app.trim().toLowerCase() : '';
-            return value === 'codex' || value === 'claude' ? value : '';
-        },
+        resolveSkillTarget,
         writeUploadZip(fileBase64, prefix, fileName) {
             uploadArgs = { fileBase64, prefix, fileName };
             return { zipPath: '/tmp/claude.zip', tempDir: '/tmp/claude-upload' };
@@ -823,9 +814,45 @@ test('importSkillsFromZip keeps targetApp precedence over target', async () => {
     assert.deepStrictEqual(importedOptions, {
         tempDir: '/tmp/claude-upload',
         fallbackName: 'claude-skills.zip',
-        targetApp: 'claude'
+        targetApp: 'claude',
+        target: 'codex'
     });
     assert.deepStrictEqual(result, { imported: [] });
+});
+
+test('importSkillsFromZip preserves conflicting explicit target keys for downstream rejection', async () => {
+    let uploadArgs = null;
+    let importedOptions = null;
+    const importSkillsFromZip = instantiateFunction(importSkillsFromZipSource, 'importSkillsFromZip', {
+        resolveSkillTarget,
+        writeUploadZip(fileBase64, prefix, fileName) {
+            uploadArgs = { fileBase64, prefix, fileName };
+            return { zipPath: '/tmp/upload.zip', tempDir: '/tmp/upload-dir' };
+        },
+        importSkillsFromZipFile: async (_zipPath, options) => {
+            importedOptions = options;
+            return { error: '目标宿主不支持' };
+        }
+    });
+
+    const result = await importSkillsFromZip({
+        fileBase64: 'QUJD',
+        targetApp: 'claud',
+        target: 'claude'
+    });
+
+    assert.deepStrictEqual(uploadArgs, {
+        fileBase64: 'QUJD',
+        prefix: 'codex-skills-import',
+        fileName: 'codex-skills.zip'
+    });
+    assert.deepStrictEqual(importedOptions, {
+        tempDir: '/tmp/upload-dir',
+        fallbackName: 'codex-skills.zip',
+        targetApp: 'claud',
+        target: 'claude'
+    });
+    assert.deepStrictEqual(result, { error: '目标宿主不支持' });
 });
 
 test('codex-only zip upload route pins target app before request fallback resolution', () => {

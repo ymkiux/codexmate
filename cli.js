@@ -2176,18 +2176,21 @@ async function importSkillsFromZip(payload = {}) {
     if (!payload || typeof payload.fileBase64 !== 'string' || !payload.fileBase64.trim()) {
         return { error: '缺少技能压缩包内容' };
     }
-    const rawTargetApp = payload.targetApp || payload.target || 'codex';
-    const fallbackTargetApp = normalizeSkillTargetApp(rawTargetApp) || 'codex';
+    const fallbackTarget = resolveSkillTarget(payload, 'codex');
+    const fallbackTargetApp = fallbackTarget ? fallbackTarget.app : 'codex';
     const fallbackName = payload.fileName || `${fallbackTargetApp}-skills.zip`;
     const upload = writeUploadZip(payload.fileBase64, 'codex-skills-import', fallbackName);
     if (upload.error) {
         return { error: upload.error };
     }
-    return importSkillsFromZipFile(upload.zipPath, {
-        tempDir: upload.tempDir,
-        fallbackName,
-        targetApp: rawTargetApp
-    });
+    const importOptions = { tempDir: upload.tempDir, fallbackName };
+    if (Object.prototype.hasOwnProperty.call(payload, 'targetApp')) {
+        importOptions.targetApp = payload.targetApp;
+    }
+    if (Object.prototype.hasOwnProperty.call(payload, 'target')) {
+        importOptions.target = payload.target;
+    }
+    return importSkillsFromZipFile(upload.zipPath, importOptions);
 }
 
 async function importCodexSkillsFromZip(payload = {}) {
@@ -9833,13 +9836,18 @@ function resolveUploadFileNameFromRequest(req, fallbackName = 'codex-skills.zip'
 }
 
 function resolveSkillTargetAppFromRequest(req, fallbackApp = 'codex') {
-    const fallback = normalizeSkillTargetApp(fallbackApp) || 'codex';
+    const fallbackTarget = resolveSkillTarget({}, fallbackApp);
+    const fallback = fallbackTarget ? fallbackTarget.app : 'codex';
     try {
         const parsed = new URL(req.url || '/', 'http://localhost');
-        if (parsed.searchParams.has('targetApp') || parsed.searchParams.has('target')) {
-            return normalizeSkillTargetApp(
-                parsed.searchParams.get('targetApp') || parsed.searchParams.get('target')
-            ) || null;
+        const hasTargetApp = parsed.searchParams.has('targetApp');
+        const hasTarget = parsed.searchParams.has('target');
+        if (hasTargetApp || hasTarget) {
+            const target = resolveSkillTarget({
+                ...(hasTargetApp ? { targetApp: parsed.searchParams.get('targetApp') } : {}),
+                ...(hasTarget ? { target: parsed.searchParams.get('target') } : {})
+            }, fallback);
+            return target ? target.app : null;
         }
         return fallback;
     } catch (_) {
