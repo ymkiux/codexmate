@@ -1,11 +1,44 @@
 ﻿export function createSkillsMethods({ api }) {
     return {
-        async openSkillsManager() {
+        normalizeSkillsTargetApp(app) {
+            return app === 'claude' ? 'claude' : 'codex';
+        },
+
+        resetSkillsTargetState() {
             this.skillsSelectedNames = [];
             this.skillsKeyword = '';
             this.skillsStatusFilter = 'all';
+            this.skillsRootPath = '';
+            this.skillsList = [];
             this.skillsImportList = [];
             this.skillsImportSelectedKeys = [];
+            this.skillsMarketLocalLoadedOnce = false;
+            this.skillsMarketImportLoadedOnce = false;
+        },
+
+        async setSkillsTargetApp(app, options = {}) {
+            const nextTarget = this.normalizeSkillsTargetApp(app);
+            const refresh = !(options && options.refresh === false);
+            const silent = !!(options && options.silent);
+            if (nextTarget !== this.skillsTargetApp) {
+                this.skillsTargetApp = nextTarget;
+                this.resetSkillsTargetState();
+            }
+            if (!refresh) {
+                return true;
+            }
+            return await this.loadSkillsMarketOverview({
+                forceRefresh: true,
+                silent
+            });
+        },
+
+        async openSkillsManager(options = {}) {
+            const targetApp = this.normalizeSkillsTargetApp(options && options.targetApp ? options.targetApp : this.skillsTargetApp);
+            if (targetApp !== this.skillsTargetApp) {
+                this.skillsTargetApp = targetApp;
+            }
+            this.resetSkillsTargetState();
             this.showSkillsModal = true;
             await this.refreshSkillsList({ silent: false });
         },
@@ -28,23 +61,25 @@
         async refreshSkillsList(options = {}) {
             this.skillsLoading = true;
             try {
-                const res = await api('list-codex-skills');
+                const res = await api('list-skills', {
+                    targetApp: this.skillsTargetApp
+                });
                 if (res.error) {
                     this.skillsRootPath = '';
                     this.skillsList = [];
                     this.skillsSelectedNames = [];
                     this.showMessage(res.error, 'error');
-                    return;
+                    return false;
                 }
                 const exists = res.exists !== false;
                 if (!exists) {
-                    this.skillsRootPath = '';
+                    this.skillsRootPath = res.root || '';
                     this.skillsList = [];
                     this.skillsSelectedNames = [];
                     if (!options.silent) {
-                        this.showMessage('skills 目录不存在，已按空列表显示', 'info');
+                        this.showMessage(`${this.skillsTargetLabel} skills 目录不存在，已按空列表显示`, 'info');
                     }
-                    return;
+                    return true;
                 }
                 this.skillsRootPath = res.root || '';
                 this.skillsList = Array.isArray(res.items) ? res.items : [];
@@ -53,13 +88,37 @@
                     .filter(Boolean));
                 this.skillsSelectedNames = (Array.isArray(this.skillsSelectedNames) ? this.skillsSelectedNames : [])
                     .filter((name) => currentNames.has(name));
+                return true;
             } catch (e) {
                 this.skillsRootPath = '';
                 this.skillsList = [];
                 this.skillsSelectedNames = [];
                 this.showMessage('加载 skills 失败', 'error');
+                return false;
             } finally {
                 this.skillsLoading = false;
+            }
+        },
+
+        async loadSkillsMarketOverview(options = {}) {
+            if (this.skillsMarketLoading) return false;
+            const silent = !!(options && options.silent);
+            const forceRefresh = !!(options && options.forceRefresh);
+            this.skillsMarketLoading = true;
+            let localLoaded = this.skillsMarketLocalLoadedOnce === true;
+            let importLoaded = this.skillsMarketImportLoadedOnce === true;
+            try {
+                if (forceRefresh || !localLoaded) {
+                    localLoaded = await this.refreshSkillsList({ silent });
+                    this.skillsMarketLocalLoadedOnce = localLoaded;
+                }
+                if (forceRefresh || !importLoaded) {
+                    importLoaded = await this.scanImportableSkills({ silent });
+                    this.skillsMarketImportLoadedOnce = importLoaded;
+                }
+                return !!(localLoaded && importLoaded);
+            } finally {
+                this.skillsMarketLoading = false;
             }
         },
 
@@ -103,14 +162,16 @@
             const silent = !!(options && options.silent);
             this.skillsScanningImports = true;
             try {
-                const res = await api('scan-unmanaged-codex-skills');
+                const res = await api('scan-unmanaged-skills', {
+                    targetApp: this.skillsTargetApp
+                });
                 if (res.error) {
                     this.skillsImportList = [];
                     this.skillsImportSelectedKeys = [];
                     if (!silent) {
                         this.showMessage(res.error, 'error');
                     }
-                    return;
+                    return false;
                 }
                 this.skillsImportList = Array.isArray(res.items) ? res.items : [];
                 const availableKeys = new Set(this.skillsImportSelectableKeys);
@@ -121,12 +182,14 @@
                 } else if (!silent) {
                     this.showMessage(`扫描到 ${this.skillsImportList.length} 个可导入 skill`, 'success');
                 }
+                return true;
             } catch (e) {
                 this.skillsImportList = [];
                 this.skillsImportSelectedKeys = [];
                 if (!silent) {
                     this.showMessage('扫描可导入 skill 失败', 'error');
                 }
+                return false;
             } finally {
                 this.skillsScanningImports = false;
             }
@@ -148,7 +211,10 @@
 
             this.skillsImporting = true;
             try {
-                const res = await api('import-codex-skills', { items: selectedItems });
+                const res = await api('import-skills', {
+                    targetApp: this.skillsTargetApp,
+                    items: selectedItems
+                });
                 if (res.error) {
                     this.showMessage(res.error, 'error');
                     return;
@@ -161,7 +227,7 @@
                     const first = res.failed[0] && res.failed[0].error ? res.failed[0].error : '导入失败';
                     this.showMessage(first, 'error');
                 } else {
-                    this.showMessage(`已导入 ${importedCount} 个 skill`, 'success');
+                    this.showMessage(`已导入 ${importedCount} 个 skill 到 ${this.skillsTargetLabel}`, 'success');
                 }
                 await this.refreshSkillsList({ silent: true });
             } catch (e) {
@@ -197,8 +263,8 @@
         async uploadSkillsZipStream(file) {
             const fileName = (file && typeof file.name === 'string' && file.name.trim())
                 ? file.name.trim()
-                : 'codex-skills.zip';
-            const response = await fetch('/api/import-codex-skills-zip', {
+                : `${this.skillsTargetApp}-skills.zip`;
+            const response = await fetch(`/api/import-skills-zip?targetApp=${encodeURIComponent(this.skillsTargetApp)}`, {
                 method: 'POST',
                 headers: {
                     'x-codexmate-file-name': encodeURIComponent(fileName)
@@ -244,7 +310,7 @@
                     const first = res.failed[0] && res.failed[0].error ? res.failed[0].error : '导入失败';
                     this.showMessage(first, 'error');
                 } else {
-                    this.showMessage(`已导入 ${importedCount} 个 skill`, 'success');
+                    this.showMessage(`已导入 ${importedCount} 个 skill 到 ${this.skillsTargetLabel}`, 'success');
                 }
                 await this.refreshSkillsList({ silent: true });
             } catch (e) {
@@ -267,7 +333,10 @@
             }
             this.skillsExporting = true;
             try {
-                const res = await api('export-codex-skills', { names: selected });
+                const res = await api('export-skills', {
+                    targetApp: this.skillsTargetApp,
+                    names: selected
+                });
                 if (res && res.error) {
                     this.showMessage(res.error, 'error');
                     return;
@@ -290,7 +359,7 @@
                 if (failedCount > 0) {
                     this.showMessage(`已导出 ${exportedCount} 个，失败 ${failedCount} 个`, 'error');
                 } else {
-                    this.showMessage(`已导出 ${exportedCount} 个 skill`, 'success');
+                    this.showMessage(`已从 ${this.skillsTargetLabel} 导出 ${exportedCount} 个 skill`, 'success');
                 }
             } catch (e) {
                 this.showMessage('导出 skill 失败', 'error');
@@ -310,7 +379,7 @@
             }
             const confirmed = await this.requestConfirmDialog({
                 title: '删除 Skills',
-                message: `确认删除 ${selected.length} 个 skill 吗？此操作不可撤销。`,
+                message: `确认从 ${this.skillsTargetLabel} 删除 ${selected.length} 个 skill 吗？此操作不可撤销。`,
                 confirmText: '删除',
                 cancelText: '取消',
                 danger: true
@@ -321,7 +390,10 @@
 
             this.skillsDeleting = true;
             try {
-                const res = await api('delete-codex-skills', { names: selected });
+                const res = await api('delete-skills', {
+                    targetApp: this.skillsTargetApp,
+                    names: selected
+                });
                 if (res.error) {
                     this.showMessage(res.error, 'error');
                     return;
@@ -336,7 +408,7 @@
                     const first = failedList[0] && failedList[0].error ? failedList[0].error : '删除失败';
                     this.showMessage(first, 'error');
                 } else {
-                    this.showMessage(`已删除 ${deletedCount} 个 skill`, 'success');
+                    this.showMessage(`已从 ${this.skillsTargetLabel} 删除 ${deletedCount} 个 skill`, 'success');
                 }
                 await this.refreshSkillsList({ silent: true });
             } catch (e) {

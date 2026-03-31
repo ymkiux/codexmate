@@ -23,9 +23,10 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 - Codex 的 provider / model 切换与配置写入
 - Claude Code 配置方案（写入 `~/.claude/settings.json`）
 - OpenClaw JSON5 配置与 Workspace `AGENTS.md`
+- Codex / Claude Code Skills 市场（安装目标切换、本地 skills 管理、跨应用导入、ZIP 分发）
 - Codex / Claude 本地会话浏览、筛选、导出、删除
 
-项目不依赖云端托管，配置写入你的本地文件，便于审计和回滚。
+项目不依赖云端托管，配置写入你的本地文件，便于审计和回滚。Skills 市场同样坚持本地优先，只操作本地目录，不依赖远程在线市场。
 
 ## 为什么选择 Codex Mate？
 
@@ -34,6 +35,7 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 | 多工具管理 | Codex + Claude Code + OpenClaw 统一入口 | 多文件、多目录分散修改 |
 | 使用方式 | CLI + 本地 Web UI | 纯手改 TOML / JSON / JSON5 |
 | 会话处理 | 支持浏览、导出、批量清理 | 需要手动定位和处理文件 |
+| Skills 复用 | 本地 Skills 市场 + 跨应用导入 + ZIP 分发 | 目录手动复制，容易遗漏 |
 | 可回滚性 | 首次接管前自动备份 | 易误覆盖、回滚成本高 |
 | 自动化接入 | 提供 MCP stdio（默认只读） | 需自行封装脚本 |
 
@@ -51,6 +53,12 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 - 关键词搜索、来源筛选、cwd 路径筛选
 - 会话导出 Markdown
 - 会话与消息级删除（支持批量）
+
+**Skills 市场**
+- 在 Codex 与 Claude Code 之间切换 skills 安装目标
+- 查看本地已安装 skills、根目录与状态
+- 扫描 `Codex` / `Claude Code` / `Agents` 可导入来源
+- 支持跨应用导入、ZIP 导入 / 导出、批量删除
 
 **工程能力**
 - MCP stdio 能力（tools/resources/prompts）
@@ -74,15 +82,16 @@ flowchart TB
       API["Local HTTP API"]
       MCPS["MCP stdio Server"]
       PROXY["Built-in Proxy"]
-      SERVICES["Config / Sessions / Skills / Workflow"]
+      SERVICES["Config / Sessions / Skills Market / Workflow"]
       CORE["File IO / Network / Diff / Session Utils"]
     end
 
     subgraph State["Local State"]
-      CODEX["~/.codex"]
-      CLAUDE["~/.claude"]
-      OPENCLAW["~/.openclaw"]
-      STATE["sessions / trash / workflow runs"]
+      CODEX["~/.codex/config + auth + models"]
+      CLAUDE["~/.claude/settings.json"]
+      OPENCLAW["~/.openclaw/*.json5 + workspace/AGENTS.md"]
+      SKILLS["~/.codex/skills / ~/.claude/skills / ~/.agents/skills"]
+      STATE["sessions / trash / workflow runs / skill exports"]
     end
 
     CLI --> ENTRY
@@ -100,6 +109,7 @@ flowchart TB
     CORE --> CODEX
     CORE --> CLAUDE
     CORE --> OPENCLAW
+    CORE --> SKILLS
     CORE --> STATE
 ```
 
@@ -114,7 +124,7 @@ codexmate status
 codexmate run
 ```
 
-默认监听 `127.0.0.1:3737`，并尝试自动打开浏览器。
+默认监听 `0.0.0.0:3737`，支持局域网访问，并尝试自动打开浏览器。
 
 ### 从源码运行
 
@@ -170,8 +180,6 @@ codexmate codex --model gpt-5.3-codex --follow-up "步骤1" --follow-up "步骤2
 - provider / model 切换
 - 模型管理
 - `~/.codex/AGENTS.md` 编辑
-- `~/.codex/skills` 管理（筛选、批量删除、跨应用导入）
-
 
 ### Claude Code 配置模式
 - 多配置方案管理
@@ -187,6 +195,12 @@ codexmate codex --model gpt-5.3-codex --follow-up "步骤1" --follow-up "步骤2
 - Codex + Claude 会话统一列表
 - 支持本地会话置顶、持久化保存与置顶优先排序
 - 搜索、筛选、导出、删除、批量清理
+
+### Skills 市场标签页
+- 在 `Codex` 与 `Claude Code` 之间切换 skills 安装目标
+- 展示当前目标的本地 skills 根目录、已安装项和可导入项
+- 扫描 `Codex` / `Claude Code` / `Agents` 目录下未托管的 skills
+- 支持跨应用导入、ZIP 导入 / 导出、批量删除
 
 ## MCP
 
@@ -219,7 +233,7 @@ codexmate mcp serve --allow-write
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `CODEXMATE_PORT` | `3737` | Web 服务端口 |
-| `CODEXMATE_HOST` | `127.0.0.1` | Web 服务监听地址 |
+| `CODEXMATE_HOST` | `0.0.0.0` | Web 服务监听地址 |
 | `CODEXMATE_NO_BROWSER` | 未设置 | 设为 `1` 后不自动打开浏览器 |
 | `CODEXMATE_MCP_ALLOW_WRITE` | 未设置 | 设为 `1` 后默认允许 MCP 写工具 |
 | `CODEXMATE_FORCE_RESET_EXISTING_CONFIG` | `0` | 设为 `1` 时首次可强制重建托管配置 |

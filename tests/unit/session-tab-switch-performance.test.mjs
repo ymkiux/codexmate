@@ -127,6 +127,27 @@ test('switchMainTab primes trash badge count and invalidates the cached trash li
     assert.deepStrictEqual(calls, [{ silent: true }]);
 });
 
+test('switchMainTab loads skills market overview when entering market', () => {
+    const calls = [];
+    const vm = {
+        mainTab: 'config',
+        configMode: 'codex',
+        sessionsLoadedOnce: true,
+        teardownSessionTabRender() {},
+        prepareSessionTabRender() {},
+        loadSessions() {},
+        loadSkillsMarketOverview(options) {
+            calls.push(options);
+        },
+        refreshClaudeModelContext() {}
+    };
+
+    switchMainTab.call(vm, 'market');
+
+    assert.strictEqual(vm.mainTab, 'market');
+    assert.deepStrictEqual(calls, [{ silent: true }]);
+});
+
 test('switchMainTab defers session teardown when scheduler exists to keep tab selection responsive', () => {
     let deferredTask = null;
     let teardownCount = 0;
