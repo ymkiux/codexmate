@@ -286,6 +286,16 @@ const resolveSkillTargetAppFromRequest = instantiateFunction(
         normalizeSkillTargetApp
     }
 );
+const importSkillsSource = extractFunctionBySignature(
+    cliContent,
+    'function importSkills(params = {}) {',
+    'importSkills'
+);
+const importSkillsFromZipFileSource = extractFunctionBySignature(
+    cliContent,
+    'async function importSkillsFromZipFile(zipPath, options = {}) {',
+    'importSkillsFromZipFile'
+);
 const handleImportSkillsZipUploadSource = extractFunctionBySignature(
     cliContent,
     'async function handleImportSkillsZipUpload(req, res, options = {}) {',
@@ -400,6 +410,175 @@ test('handleImportSkillsZipUpload derives fallback zip name from the resolved ta
     assert.strictEqual(importedOptions.targetApp, 'claude');
     assert.strictEqual(importedOptions.fallbackName, 'claude-skills.zip');
     assert.strictEqual(res.statusCode, 200);
+});
+
+test('importSkills rejects target roots nested inside the source skill before ensuring the destination root', () => {
+    let copyCalls = 0;
+    const ensureDirCalls = [];
+    const importSkills = instantiateFunction(importSkillsSource, 'importSkills', {
+        resolveSkillTarget() {
+            return { app: 'codex', label: 'Codex', dir: '/tmp/source/nested' };
+        },
+        normalizeCodexSkillName(name) {
+            return { name: String(name || '') };
+        },
+        getSkillImportSourceByApp() {
+            return { app: 'claude', label: 'Claude', dir: '/tmp' };
+        },
+        ensureDir(dir) {
+            ensureDirCalls.push(dir);
+        },
+        path,
+        fs: {
+            existsSync(targetPath) {
+                return targetPath === '/tmp/source';
+            },
+            lstatSync() {
+                return {
+                    isDirectory: () => true,
+                    isSymbolicLink: () => false
+                };
+            },
+            statSync() {
+                return {
+                    isDirectory: () => true
+                };
+            }
+        },
+        copyDirRecursive() {
+            copyCalls += 1;
+        },
+        removeDirectoryRecursive() {},
+        isPathInside(targetPath, rootPath) {
+            return targetPath === '/tmp/source/nested' && rootPath === '/tmp/source';
+        }
+    });
+
+    const result = importSkills({
+        targetApp: 'codex',
+        items: [{ name: 'source', sourceApp: 'claude' }]
+    });
+
+    assert.strictEqual(copyCalls, 0);
+    assert.deepStrictEqual(ensureDirCalls, []);
+    assert.deepStrictEqual(result.imported, []);
+    assert.strictEqual(result.failed.length, 1);
+    assert.strictEqual(result.failed[0].error, '目标路径不能位于来源 skill 目录内');
+});
+
+test('importSkillsFromZipFile rejects target roots nested inside extracted skills before ensuring the destination root', async () => {
+    let copyCalls = 0;
+    const ensureDirCalls = [];
+    const cleanupCalls = [];
+    const importSkillsFromZipFile = instantiateFunction(importSkillsFromZipFileSource, 'importSkillsFromZipFile', {
+        resolveSkillTarget() {
+            return { app: 'codex', label: 'Codex', dir: '/tmp/upload/extract/source/nested' };
+        },
+        path,
+        fs: {
+            realpathSync(targetPath) {
+                return targetPath;
+            },
+            statSync() {
+                return {
+                    isDirectory: () => true
+                };
+            },
+            existsSync() {
+                return false;
+            },
+            rmSync(targetPath, options) {
+                cleanupCalls.push({ targetPath, options });
+            }
+        },
+        inspectZipArchiveLimits: async () => {},
+        extractUploadZip: async () => {},
+        collectSkillDirectoriesFromRoot() {
+            return {
+                results: ['/tmp/upload/extract/source'],
+                truncated: false
+            };
+        },
+        resolveSkillNameFromImportedDirectory() {
+            return { name: 'source' };
+        },
+        ensureDir(dir) {
+            ensureDirCalls.push(dir);
+        },
+        copyDirRecursive() {
+            copyCalls += 1;
+        },
+        removeDirectoryRecursive() {},
+        isPathInside(targetPath, rootPath) {
+            return targetPath === '/tmp/upload/extract/source/nested' && rootPath === '/tmp/upload/extract/source';
+        },
+        MAX_SKILLS_ZIP_ENTRY_COUNT: 100,
+        MAX_SKILLS_ZIP_UNCOMPRESSED_BYTES: 1024
+    });
+
+    const result = await importSkillsFromZipFile('/tmp/upload/archive.zip', {
+        tempDir: '/tmp/upload',
+        targetApp: 'codex'
+    });
+
+    assert.strictEqual(copyCalls, 0);
+    assert.deepStrictEqual(ensureDirCalls, []);
+    assert.deepStrictEqual(result.imported, []);
+    assert.strictEqual(result.failed.length, 1);
+    assert.strictEqual(result.failed[0].error, '目标路径不能位于来源 skill 目录内');
+    assert.deepStrictEqual(cleanupCalls, [{
+        targetPath: '/tmp/upload',
+        options: { recursive: true, force: true }
+    }]);
+});
+
+test('importSkillsFromZipFile still cleans tempDir when target app is unsupported', async () => {
+    const cleanupCalls = [];
+    const importSkillsFromZipFile = instantiateFunction(importSkillsFromZipFileSource, 'importSkillsFromZipFile', {
+        resolveSkillTarget() {
+            return null;
+        },
+        path,
+        fs: {
+            existsSync() {
+                return false;
+            },
+            rmSync(targetPath, options) {
+                cleanupCalls.push({ targetPath, options });
+            }
+        },
+        inspectZipArchiveLimits: async () => {
+            throw new Error('inspectZipArchiveLimits should not run');
+        },
+        extractUploadZip: async () => {
+            throw new Error('extractUploadZip should not run');
+        },
+        collectSkillDirectoriesFromRoot() {
+            return { results: [], truncated: false };
+        },
+        resolveSkillNameFromImportedDirectory() {
+            return { name: 'demo' };
+        },
+        ensureDir() {},
+        copyDirRecursive() {},
+        removeDirectoryRecursive() {},
+        isPathInside() {
+            return false;
+        },
+        MAX_SKILLS_ZIP_ENTRY_COUNT: 100,
+        MAX_SKILLS_ZIP_UNCOMPRESSED_BYTES: 1024
+    });
+
+    const result = await importSkillsFromZipFile('/tmp/upload/archive.zip', {
+        tempDir: '/tmp/upload',
+        targetApp: 'invalid'
+    });
+
+    assert.deepStrictEqual(result, { error: '目标宿主不支持' });
+    assert.deepStrictEqual(cleanupCalls, [{
+        targetPath: '/tmp/upload',
+        options: { recursive: true, force: true }
+    }]);
 });
 
 test('codex-only zip upload route pins target app before request fallback resolution', () => {

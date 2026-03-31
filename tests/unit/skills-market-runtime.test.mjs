@@ -285,3 +285,27 @@ test('skills import and export entrypoints return early while delete is in progr
     assert.strictEqual(uploadCalls, 0);
     assert.deepStrictEqual(vm.messageLog, []);
 });
+
+test('skills import entrypoints return early while scan is in progress', async () => {
+    let apiCalls = 0;
+    let uploadCalls = 0;
+    const vm = buildVm(async () => {
+        apiCalls += 1;
+        return {};
+    }, {
+        skillsScanningImports: true,
+        skillsImportList: [{ name: 'beta', sourceApp: 'claude' }],
+        skillsImportSelectedKeys: ['claude:beta']
+    });
+    vm.uploadSkillsZipStream = async () => {
+        uploadCalls += 1;
+        return {};
+    };
+
+    await vm.importSelectedSkills();
+    await vm.importSkillsFromZipFile({ name: 'skills.zip', size: 1024 });
+
+    assert.strictEqual(apiCalls, 0);
+    assert.strictEqual(uploadCalls, 0);
+    assert.deepStrictEqual(vm.messageLog, []);
+});

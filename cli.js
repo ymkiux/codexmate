@@ -1810,12 +1810,11 @@ function importSkills(params = {}) {
     if (!target) {
         return { error: '目标宿主不支持' };
     }
+    const targetRoot = path.resolve(target.dir);
     const rawItems = Array.isArray(params.items) ? params.items : [];
     if (!rawItems.length) {
         return { error: '请先选择要导入的 skill' };
     }
-
-    ensureDir(target.dir);
 
     const imported = [];
     const failed = [];
@@ -1874,8 +1873,8 @@ function importSkills(params = {}) {
             continue;
         }
 
-        const targetPath = path.join(target.dir, normalizedName.name);
-        const targetRelative = path.relative(target.dir, targetPath);
+        const targetPath = path.join(targetRoot, normalizedName.name);
+        const targetRelative = path.relative(targetRoot, targetPath);
         if (targetRelative.startsWith('..') || path.isAbsolute(targetRelative)) {
             failed.push({
                 name: normalizedName.name,
@@ -1914,6 +1913,15 @@ function importSkills(params = {}) {
                 });
                 continue;
             }
+            if (isPathInside(targetRoot, sourceDirForCopy)) {
+                failed.push({
+                    name: normalizedName.name,
+                    sourceApp: source.app,
+                    error: '目标路径不能位于来源 skill 目录内'
+                });
+                continue;
+            }
+            ensureDir(targetRoot);
             const visitedRealPaths = new Set([sourceDirForCopy]);
             copyDirRecursive(sourceDirForCopy, targetPath, {
                 dereferenceSymlinks: true,
@@ -2011,18 +2019,21 @@ function resolveSkillNameFromImportedDirectory(skillDir, extractionRoot, fallbac
 }
 
 async function importSkillsFromZipFile(zipPath, options = {}) {
-    const target = resolveSkillTarget(options, 'codex');
-    if (!target) {
-        return { error: '目标宿主不支持' };
-    }
     const fallbackName = typeof options.fallbackName === 'string' ? options.fallbackName : '';
     const tempDir = typeof options.tempDir === 'string' ? options.tempDir : '';
     const imported = [];
     const failed = [];
     const dedupNames = new Set();
     const extractionRoot = path.join(tempDir || path.dirname(zipPath), 'extract');
+    let target = null;
+    let targetRoot = '';
 
     try {
+        target = resolveSkillTarget(options, 'codex');
+        if (!target) {
+            return { error: '目标宿主不支持' };
+        }
+        targetRoot = path.resolve(target.dir);
         await inspectZipArchiveLimits(zipPath, {
             maxEntryCount: MAX_SKILLS_ZIP_ENTRY_COUNT,
             maxUncompressedBytes: MAX_SKILLS_ZIP_UNCOMPRESSED_BYTES
@@ -2038,7 +2049,6 @@ async function importSkillsFromZipFile(zipPath, options = {}) {
             return { error: '压缩包中的技能目录数量超出导入上限' };
         }
 
-        ensureDir(target.dir);
         for (const skillDir of discoveredDirs) {
             const normalizedName = resolveSkillNameFromImportedDirectory(skillDir, extractionRoot, fallbackName);
             if (normalizedName.error) {
@@ -2054,8 +2064,8 @@ async function importSkillsFromZipFile(zipPath, options = {}) {
             }
             dedupNames.add(dedupKey);
 
-            const targetPath = path.join(target.dir, normalizedName.name);
-            const targetRelative = path.relative(target.dir, targetPath);
+            const targetPath = path.join(targetRoot, normalizedName.name);
+            const targetRelative = path.relative(targetRoot, targetPath);
             if (targetRelative.startsWith('..') || path.isAbsolute(targetRelative)) {
                 failed.push({
                     name: normalizedName.name,
@@ -2082,6 +2092,14 @@ async function importSkillsFromZipFile(zipPath, options = {}) {
                     });
                     continue;
                 }
+                if (isPathInside(targetRoot, sourceRealPath)) {
+                    failed.push({
+                        name: normalizedName.name,
+                        error: '目标路径不能位于来源 skill 目录内'
+                    });
+                    continue;
+                }
+                ensureDir(targetRoot);
                 const visitedRealPaths = new Set([sourceRealPath]);
                 copyDirRecursive(sourceRealPath, targetPath, {
                     dereferenceSymlinks: true,
