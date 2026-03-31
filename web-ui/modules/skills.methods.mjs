@@ -413,6 +413,10 @@ export function createSkillsMethods({ api }) {
 
         async deleteSelectedSkills() {
             if (this.skillsDeleting || this.skillsZipImporting || this.skillsExporting || this.skillsImporting) return;
+            if (this.skillsScanningImports) {
+                this.showMessage('正在扫描导入源，请稍后再试', 'error');
+                return;
+            }
             const selected = Array.isArray(this.skillsSelectedNames)
                 ? Array.from(new Set(this.skillsSelectedNames.map((item) => String(item || '').trim()).filter(Boolean)))
                 : [];
@@ -425,6 +429,7 @@ export function createSkillsMethods({ api }) {
                 message: `确认从 ${this.skillsTargetLabel} 删除 ${selected.length} 个 skill 吗？此操作不可撤销。`,
                 confirmText: '删除',
                 cancelText: '取消',
+                confirmDisabled: () => this.skillsDeleting || this.skillsScanningImports,
                 danger: true
             });
             if (!confirmed) {

@@ -2326,6 +2326,7 @@
                     <button class="btn btn-cancel" @click="closeConfirmDialog">{{ confirmDialogCancelText }}</button>
                     <button
                         :class="['btn', 'btn-confirm', confirmDialogDanger ? 'btn-danger' : '']"
+                        :disabled="isConfirmDialogDisabled()"
                         @click="resolveConfirmDialog(true)">
                         {{ confirmDialogConfirmText }}
                     </button>

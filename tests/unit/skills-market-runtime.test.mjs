@@ -309,3 +309,47 @@ test('skills import entrypoints return early while scan is in progress', async (
     assert.strictEqual(uploadCalls, 0);
     assert.deepStrictEqual(vm.messageLog, []);
 });
+
+test('deleteSelectedSkills reports busy state while import sources scan is running', async () => {
+    let confirmCalls = 0;
+    let apiCalls = 0;
+    const vm = buildVm(async () => {
+        apiCalls += 1;
+        return {};
+    }, {
+        skillsScanningImports: true,
+        skillsSelectedNames: ['alpha'],
+        requestConfirmDialog: async () => {
+            confirmCalls += 1;
+            return true;
+        }
+    });
+
+    await vm.deleteSelectedSkills();
+
+    assert.strictEqual(confirmCalls, 0);
+    assert.strictEqual(apiCalls, 0);
+    assert.deepStrictEqual(vm.messageLog, [{
+        message: '正在扫描导入源，请稍后再试',
+        type: 'error'
+    }]);
+});
+
+test('deleteSelectedSkills wires confirm dialog disabled state to live scan status', async () => {
+    let confirmOptions = null;
+    const vm = buildVm(async () => ({}), {
+        skillsSelectedNames: ['alpha'],
+        requestConfirmDialog: async (options) => {
+            confirmOptions = options;
+            return false;
+        }
+    });
+
+    await vm.deleteSelectedSkills();
+
+    assert(confirmOptions, 'confirm dialog should be opened');
+    assert.strictEqual(typeof confirmOptions.confirmDisabled, 'function');
+    assert.strictEqual(confirmOptions.confirmDisabled.call(vm), false);
+    vm.skillsScanningImports = true;
+    assert.strictEqual(confirmOptions.confirmDisabled.call(vm), true);
+});
