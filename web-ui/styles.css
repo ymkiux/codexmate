@@ -37,11 +37,13 @@
 
     --font-size-display: 52px;
     --font-size-title: 18px;
+    --font-size-large: 20px;
     --font-size-body: 15px;
     --font-size-secondary: 13px;
     --font-size-caption: 11px;
 
     --font-weight-display: 600;
+    --font-weight-primary: 600;
     --font-weight-title: 600;
     --font-weight-body: 400;
     --font-weight-secondary: 500;
@@ -59,6 +61,7 @@
 
     /* 圆角系统 */
     --radius-sm: 8px;
+    --radius-md: 10px;
     --radius-lg: 12px;
     --radius-xl: 18px;
     --radius-full: 50px;

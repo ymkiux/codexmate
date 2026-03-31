@@ -188,3 +188,44 @@ test('scanImportableSkills returns false when another skills action is already r
     assert.strictEqual(ok, false);
     assert.strictEqual(apiCalls, 0);
 });
+
+test('scanImportableSkills returns false while delete is in progress', async () => {
+    let apiCalls = 0;
+    const vm = buildVm(async () => {
+        apiCalls += 1;
+        return {};
+    }, {
+        skillsDeleting: true
+    });
+
+    const ok = await vm.scanImportableSkills({ silent: true });
+
+    assert.strictEqual(ok, false);
+    assert.strictEqual(apiCalls, 0);
+});
+
+test('skills import and export entrypoints return early while delete is in progress', async () => {
+    let apiCalls = 0;
+    let uploadCalls = 0;
+    const vm = buildVm(async () => {
+        apiCalls += 1;
+        return {};
+    }, {
+        skillsDeleting: true,
+        skillsImportList: [{ name: 'beta', sourceApp: 'claude' }],
+        skillsImportSelectedKeys: ['claude:beta'],
+        skillsSelectedNames: ['alpha']
+    });
+    vm.uploadSkillsZipStream = async () => {
+        uploadCalls += 1;
+        return {};
+    };
+
+    await vm.importSelectedSkills();
+    await vm.importSkillsFromZipFile({ name: 'skills.zip', size: 1024 });
+    await vm.exportSelectedSkills();
+
+    assert.strictEqual(apiCalls, 0);
+    assert.strictEqual(uploadCalls, 0);
+    assert.deepStrictEqual(vm.messageLog, []);
+});

@@ -89,7 +89,7 @@ flowchart TB
     subgraph State["Local State"]
       CODEX["~/.codex/config + auth + models"]
       CLAUDE["~/.claude/settings.json"]
-      OPENCLAW["~/.openclaw/*.json5 + workspace/AGENTS.md"]
+      OPENCLAW["~/.openclaw/*.json5 + ~/.openclaw/openclaw.json + workspace/AGENTS.md"]
       SKILLS["~/.codex/skills / ~/.claude/skills / ~/.agents/skills"]
       STATE["sessions / trash / workflow runs / skill exports"]
     end
