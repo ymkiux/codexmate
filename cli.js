@@ -1439,14 +1439,15 @@ function getSkillTargetByApp(app) {
 }
 
 function resolveSkillTarget(params = {}, defaultApp = 'codex') {
-    const hasExplicitTarget = !!(params && typeof params === 'object' && (
-        Object.prototype.hasOwnProperty.call(params, 'targetApp')
-        || Object.prototype.hasOwnProperty.call(params, 'target')
-    ));
-    const raw = params && typeof params === 'object'
-        ? (params.targetApp || params.target || '')
-        : '';
-    if (hasExplicitTarget && raw && !getSkillTargetByApp(raw)) {
+    const hasExplicitTargetApp = !!(params && typeof params === 'object'
+        && Object.prototype.hasOwnProperty.call(params, 'targetApp'));
+    const hasExplicitTarget = !!(params && typeof params === 'object'
+        && Object.prototype.hasOwnProperty.call(params, 'target'));
+    const hasAnyExplicitTarget = hasExplicitTargetApp || hasExplicitTarget;
+    const rawTargetApp = hasExplicitTargetApp ? params.targetApp : '';
+    const rawTarget = hasExplicitTarget ? params.target : '';
+    const raw = rawTargetApp || rawTarget || '';
+    if (hasAnyExplicitTarget && raw && !getSkillTargetByApp(raw)) {
         return null;
     }
     return getSkillTargetByApp(raw)
