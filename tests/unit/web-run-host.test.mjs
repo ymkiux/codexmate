@@ -165,27 +165,43 @@ const getClaudeSkillsDirSource = extractFunctionBySignature(
 );
 
 test('getCodexSkillsDir honors CODEX_HOME before legacy defaults', () => {
+    let received = null;
     const getCodexSkillsDir = instantiateFunction(getCodexSkillsDirSource, 'getCodexSkillsDir', {
         path,
         os: { homedir: () => '/home/demo' },
         process: { env: { CODEX_HOME: '/tmp/custom-codex-home' } },
-        resolveExistingDir: (candidates, fallback) => candidates[0] || fallback,
+        resolveExistingDir: (candidates, fallback) => {
+            received = { candidates, fallback };
+            return fallback;
+        },
         CODEX_SKILLS_DIR: '/home/demo/.codex/skills'
     });
 
     assert.strictEqual(getCodexSkillsDir(), '/tmp/custom-codex-home/skills');
+    assert.deepStrictEqual(received, {
+        candidates: ['/tmp/custom-codex-home/skills'],
+        fallback: '/tmp/custom-codex-home/skills'
+    });
 });
 
 test('getClaudeSkillsDir honors CLAUDE_CONFIG_DIR before legacy defaults', () => {
+    let received = null;
     const getClaudeSkillsDir = instantiateFunction(getClaudeSkillsDirSource, 'getClaudeSkillsDir', {
         path,
         os: { homedir: () => '/home/demo' },
         process: { env: { CLAUDE_CONFIG_DIR: '/tmp/custom-claude-home' } },
-        resolveExistingDir: (candidates, fallback) => candidates[0] || fallback,
+        resolveExistingDir: (candidates, fallback) => {
+            received = { candidates, fallback };
+            return fallback;
+        },
         CLAUDE_SKILLS_DIR: '/home/demo/.claude/skills'
     });
 
     assert.strictEqual(getClaudeSkillsDir(), '/tmp/custom-claude-home/skills');
+    assert.deepStrictEqual(received, {
+        candidates: ['/tmp/custom-claude-home/skills'],
+        fallback: '/tmp/custom-claude-home/skills'
+    });
 });
 
 test('getCodexSkillsDir resolves concrete skills directories instead of parent config dirs', () => {
@@ -203,12 +219,8 @@ test('getCodexSkillsDir resolves concrete skills directories instead of parent c
 
     assert.strictEqual(getCodexSkillsDir(), '/resolved/codex-skills');
     assert.deepStrictEqual(received, {
-        candidates: [
-            '/tmp/xdg-home/codex/skills',
-            '/home/demo/.config/codex/skills',
-            '/home/demo/.codex/skills'
-        ],
-        fallback: '/home/demo/.codex/skills'
+        candidates: ['/tmp/xdg-home/codex/skills'],
+        fallback: '/tmp/xdg-home/codex/skills'
     });
 });
 
@@ -227,12 +239,8 @@ test('getClaudeSkillsDir resolves concrete skills directories instead of parent 
 
     assert.strictEqual(getClaudeSkillsDir(), '/resolved/claude-skills');
     assert.deepStrictEqual(received, {
-        candidates: [
-            '/tmp/xdg-home/claude/skills',
-            '/home/demo/.config/claude/skills',
-            '/home/demo/.claude/skills'
-        ],
-        fallback: '/home/demo/.claude/skills'
+        candidates: ['/tmp/xdg-home/claude/skills'],
+        fallback: '/tmp/xdg-home/claude/skills'
     });
 });
 
@@ -326,6 +334,10 @@ test('resolveSkillTargetAppFromRequest rejects explicit unsupported query target
     assert.strictEqual(
         resolveSkillTargetAppFromRequest({ url: '/api/import-skills-zip?targetApp=claud' }, 'codex'),
         null
+    );
+    assert.strictEqual(
+        resolveSkillTargetAppFromRequest({ url: '/api/import-skills-zip?target=claude' }, 'codex'),
+        'claude'
     );
     assert.strictEqual(
         resolveSkillTargetAppFromRequest({ url: '/api/import-skills-zip' }, 'claude'),
@@ -656,6 +668,42 @@ test('importSkillsFromZip reuses a target-specific fallback zip name for base64 
         targetApp: 'claude'
     });
     assert.deepStrictEqual(result, { imported: [] });
+});
+
+test('importSkillsFromZip keeps the raw explicit target for downstream validation', async () => {
+    let uploadArgs = null;
+    let importedOptions = null;
+    const importSkillsFromZip = instantiateFunction(importSkillsFromZipSource, 'importSkillsFromZip', {
+        normalizeSkillTargetApp(app) {
+            const value = typeof app === 'string' ? app.trim().toLowerCase() : '';
+            return value === 'codex' || value === 'claude' ? value : '';
+        },
+        writeUploadZip(fileBase64, prefix, fileName) {
+            uploadArgs = { fileBase64, prefix, fileName };
+            return { zipPath: '/tmp/upload.zip', tempDir: '/tmp/upload-dir' };
+        },
+        importSkillsFromZipFile: async (_zipPath, options) => {
+            importedOptions = options;
+            return { error: '目标宿主不支持' };
+        }
+    });
+
+    const result = await importSkillsFromZip({
+        fileBase64: 'QUJD',
+        target: 'claud'
+    });
+
+    assert.deepStrictEqual(uploadArgs, {
+        fileBase64: 'QUJD',
+        prefix: 'codex-skills-import',
+        fileName: 'codex-skills.zip'
+    });
+    assert.deepStrictEqual(importedOptions, {
+        tempDir: '/tmp/upload-dir',
+        fallbackName: 'codex-skills.zip',
+        targetApp: 'claud'
+    });
+    assert.deepStrictEqual(result, { error: '目标宿主不支持' });
 });
 
 test('codex-only zip upload route pins target app before request fallback resolution', () => {
