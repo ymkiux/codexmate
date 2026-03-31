@@ -146,6 +146,49 @@ test('resolveWebHost still prefers environment host over default host', () => {
     assert.strictEqual(withEnv({}), '192.168.1.10');
 });
 
+const getCodexSkillsDirSource = extractFunctionBySignature(
+    cliContent,
+    'function getCodexSkillsDir() {',
+    'getCodexSkillsDir'
+);
+const getClaudeSkillsDirSource = extractFunctionBySignature(
+    cliContent,
+    'function getClaudeSkillsDir() {',
+    'getClaudeSkillsDir'
+);
+
+test('getCodexSkillsDir honors CODEX_HOME before legacy defaults', () => {
+    const getCodexSkillsDir = instantiateFunction(getCodexSkillsDirSource, 'getCodexSkillsDir', {
+        path,
+        os: { homedir: () => '/home/demo' },
+        process: { env: { CODEX_HOME: '/tmp/custom-codex-home' } },
+        resolveExistingDir: () => '/home/demo/.codex',
+        CONFIG_DIR: '/home/demo/.codex',
+        CODEX_SKILLS_DIR: '/home/demo/.codex/skills'
+    });
+
+    assert.strictEqual(getCodexSkillsDir(), '/tmp/custom-codex-home/skills');
+});
+
+test('getClaudeSkillsDir honors CLAUDE_CONFIG_DIR before legacy defaults', () => {
+    const getClaudeSkillsDir = instantiateFunction(getClaudeSkillsDirSource, 'getClaudeSkillsDir', {
+        path,
+        os: { homedir: () => '/home/demo' },
+        process: { env: { CLAUDE_CONFIG_DIR: '/tmp/custom-claude-home' } },
+        resolveExistingDir: () => '/home/demo/.claude',
+        CLAUDE_DIR: '/home/demo/.claude',
+        CLAUDE_SKILLS_DIR: '/home/demo/.claude/skills'
+    });
+
+    assert.strictEqual(getClaudeSkillsDir(), '/tmp/custom-claude-home/skills');
+});
+
+test('skills target tables use env-aware skills dir resolvers', () => {
+    assert.match(cliContent, /dir:\s*getCodexSkillsDir\(\)/);
+    assert.match(cliContent, /dir:\s*getClaudeSkillsDir\(\)/);
+    assert.match(cliContent, /Object\.freeze\(\{\s*app:\s*'agents',\s*label:\s*'Agents',\s*dir:\s*AGENTS_SKILLS_DIR\s*\}\)/s);
+});
+
 const SKILL_TARGETS = [
     { app: 'codex', label: 'Codex', dir: '/tmp/codex-skills' },
     { app: 'claude', label: 'Claude', dir: '/tmp/claude-skills' }
@@ -190,6 +233,11 @@ const resolveSkillTargetAppFromRequest = instantiateFunction(
         normalizeSkillTargetApp
     }
 );
+const handleImportSkillsZipUploadSource = extractFunctionBySignature(
+    cliContent,
+    'async function handleImportSkillsZipUpload(req, res, options = {}) {',
+    'handleImportSkillsZipUpload'
+);
 
 test('resolveSkillTarget still falls back to default target when target is omitted', () => {
     assert.deepStrictEqual(resolveSkillTarget({}), SKILL_TARGETS[0]);
@@ -210,6 +258,95 @@ test('resolveSkillTargetAppFromRequest rejects explicit unsupported query target
         resolveSkillTargetAppFromRequest({ url: '/api/import-skills-zip' }, 'claude'),
         'claude'
     );
+});
+
+test('handleImportSkillsZipUpload keeps forced target app on the codex-only route', async () => {
+    let resolverCalls = 0;
+    let importedOptions = null;
+    const handleImportSkillsZipUpload = instantiateFunction(
+        handleImportSkillsZipUploadSource,
+        'handleImportSkillsZipUpload',
+        {
+            normalizeSkillTargetApp(app) {
+                const value = typeof app === 'string' ? app.trim().toLowerCase() : '';
+                return value === 'codex' || value === 'claude' ? value : '';
+            },
+            resolveSkillTargetAppFromRequest() {
+                resolverCalls += 1;
+                return 'claude';
+            },
+            resolveUploadFileNameFromRequest() {
+                return 'codex-skills.zip';
+            },
+            writeUploadZipStream: async () => ({ zipPath: '/tmp/codex.zip', tempDir: '/tmp/codex-upload' }),
+            importSkillsFromZipFile: async (_zipPath, options) => {
+                importedOptions = options;
+                return { imported: [] };
+            },
+            writeJsonResponse(res, statusCode, payload) {
+                res.statusCode = statusCode;
+                res.payload = payload;
+            },
+            MAX_SKILLS_ZIP_UPLOAD_SIZE: 20 * 1024 * 1024
+        }
+    );
+
+    const res = {};
+    await handleImportSkillsZipUpload({
+        method: 'POST',
+        url: '/api/import-codex-skills-zip?targetApp=claude',
+        headers: {}
+    }, res, { targetApp: 'codex' });
+
+    assert.strictEqual(resolverCalls, 0);
+    assert(importedOptions, 'importSkillsFromZipFile should receive options');
+    assert.strictEqual(importedOptions.targetApp, 'codex');
+    assert.strictEqual(res.statusCode, 200);
+});
+
+test('handleImportSkillsZipUpload derives fallback zip name from the resolved target app', async () => {
+    let fallbackName = '';
+    let importedOptions = null;
+    const handleImportSkillsZipUpload = instantiateFunction(
+        handleImportSkillsZipUploadSource,
+        'handleImportSkillsZipUpload',
+        {
+            normalizeSkillTargetApp(app) {
+                const value = typeof app === 'string' ? app.trim().toLowerCase() : '';
+                return value === 'codex' || value === 'claude' ? value : '';
+            },
+            resolveSkillTargetAppFromRequest() {
+                return 'claude';
+            },
+            resolveUploadFileNameFromRequest(_req, nextFallbackName) {
+                fallbackName = nextFallbackName;
+                return nextFallbackName;
+            },
+            writeUploadZipStream: async () => ({ zipPath: '/tmp/claude.zip', tempDir: '/tmp/claude-upload' }),
+            importSkillsFromZipFile: async (_zipPath, options) => {
+                importedOptions = options;
+                return { imported: [] };
+            },
+            writeJsonResponse(res, statusCode, payload) {
+                res.statusCode = statusCode;
+                res.payload = payload;
+            },
+            MAX_SKILLS_ZIP_UPLOAD_SIZE: 20 * 1024 * 1024
+        }
+    );
+
+    const res = {};
+    await handleImportSkillsZipUpload({
+        method: 'POST',
+        url: '/api/import-skills-zip?targetApp=claude',
+        headers: {}
+    }, res);
+
+    assert.strictEqual(fallbackName, 'claude-skills.zip');
+    assert(importedOptions, 'importSkillsFromZipFile should receive options');
+    assert.strictEqual(importedOptions.targetApp, 'claude');
+    assert.strictEqual(importedOptions.fallbackName, 'claude-skills.zip');
+    assert.strictEqual(res.statusCode, 200);
 });
 
 test('codex-only zip upload route pins target app before request fallback resolution', () => {
