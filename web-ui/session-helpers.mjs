@@ -62,6 +62,7 @@ export function switchMainTab(tab) {
         this.loadSessionTrashCount({ silent: true });
     }
     const shouldLoadSkillsMarketOnEnter = nextTab === 'market'
+        && previousTab !== 'market'
         && typeof this.loadSkillsMarketOverview === 'function';
     if (shouldLoadSkillsMarketOnEnter) {
         this.loadSkillsMarketOverview({ silent: true });

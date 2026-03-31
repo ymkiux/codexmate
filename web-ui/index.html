@@ -277,7 +277,7 @@
                         浏览、导出或独立查看 Codex / Claude 会话记录。
                     </p>
                     <p class="subtitle" v-else-if="mainTab === 'market'">
-                        统一管理 Codex / Claude Skills，并接入在线生态目录。
+                        统一管理 Codex / Claude Skills，并聚焦本地导入与分发。
                     </p>
                 </div>
 
@@ -481,7 +481,7 @@
                     <div class="selector-header">
                         <span class="selector-title">Skills 管理</span>
                     </div>
-                    <div class="config-template-hint skills-hint-line">默认打开 Codex skills 管理；市场页已支持切换到 Claude Code 并查看在线目录。</div>
+                    <div class="config-template-hint skills-hint-line">默认打开 Codex skills 管理；市场页已支持切换到 Claude Code 并查看本地概览与导入来源。</div>
                     <button class="btn-tool" @click="openSkillsManager({ targetApp: 'codex' })" :disabled="loading || !!initError || skillsLoading || skillsDeleting || skillsScanningImports || skillsImporting || skillsZipImporting || skillsExporting">
                         {{ skillsLoading ? '加载中...' : '打开 Skills 管理' }}
                     </button>

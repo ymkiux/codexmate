@@ -109,7 +109,7 @@ function instantiateFunction(funcSource, funcName, bindings = {}) {
     return Function(...bindingNames, `${funcSource}\nreturn ${funcName};`)(...bindingValues);
 }
 
-const defaultHostMatch = cliContent.match(/const DEFAULT_WEB_HOST = '([^']+)';/);
+const defaultHostMatch = cliContent.match(/const\s+DEFAULT_WEB_HOST\s*=\s*['"]([^'"]+)['"]\s*;?/);
 if (!defaultHostMatch) {
     throw new Error('DEFAULT_WEB_HOST not found');
 }
@@ -123,9 +123,9 @@ const resolveWebHost = instantiateFunction(resolveWebHostSource, 'resolveWebHost
     process: { env: {} }
 });
 
-test('resolveWebHost defaults to loopback host', () => {
-    assert.strictEqual(resolveWebHost({}), '127.0.0.1');
-    assert.strictEqual(resolveWebHost(), '127.0.0.1');
+test('resolveWebHost defaults to LAN host', () => {
+    assert.strictEqual(resolveWebHost({}), '0.0.0.0');
+    assert.strictEqual(resolveWebHost(), '0.0.0.0');
 });
 
 test('resolveWebHost still prefers CLI host over environment and default host', () => {
@@ -209,5 +209,16 @@ test('resolveSkillTargetAppFromRequest rejects explicit unsupported query target
     assert.strictEqual(
         resolveSkillTargetAppFromRequest({ url: '/api/import-skills-zip' }, 'claude'),
         'claude'
+    );
+});
+
+test('codex-only zip upload route pins target app before request fallback resolution', () => {
+    assert.match(
+        cliContent,
+        /const forcedTargetApp = normalizeSkillTargetApp\(options && options\.targetApp \? options\.targetApp : ''\);/
+    );
+    assert.match(
+        cliContent,
+        /const targetApp = forcedTargetApp \|\| resolveSkillTargetAppFromRequest\(req, 'codex'\);/
     );
 });

@@ -124,9 +124,9 @@ codexmate status
 codexmate run
 ```
 
-默认监听 `127.0.0.1:3737`，仅本机可访问，并尝试自动打开浏览器。
+默认监听 `0.0.0.0:3737`，支持局域网访问，并尝试自动打开浏览器。
 
-> 安全提示：若显式使用 `--host 0.0.0.0` 或设置 `CODEXMATE_HOST=0.0.0.0`，会在当前网络暴露未鉴权的管理界面。若包含 API Key、provider 配置或 skills 管理，请优先使用 `127.0.0.1`，仅在可信网络中开启局域网访问。
+> 安全提示：默认监听会在当前局域网暴露未鉴权的管理界面。若包含 API Key、provider 配置或 skills 管理，请仅在可信网络中使用；如需仅本机访问，可设置 `CODEXMATE_HOST=127.0.0.1` 或启动时传入 `--host 127.0.0.1`。
 
 ### 从源码运行
 
@@ -235,7 +235,7 @@ codexmate mcp serve --allow-write
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `CODEXMATE_PORT` | `3737` | Web 服务端口 |
-| `CODEXMATE_HOST` | `127.0.0.1` | Web 服务监听地址（局域网访问需显式设为 `0.0.0.0`） |
+| `CODEXMATE_HOST` | `0.0.0.0` | Web 服务监听地址（如需仅本机访问，显式设为 `127.0.0.1`） |
 | `CODEXMATE_NO_BROWSER` | 未设置 | 设为 `1` 后不自动打开浏览器 |
 | `CODEXMATE_MCP_ALLOW_WRITE` | 未设置 | 设为 `1` 后默认允许 MCP 写工具 |
 | `CODEXMATE_FORCE_RESET_EXISTING_CONFIG` | `0` | 设为 `1` 时首次可强制重建托管配置 |
