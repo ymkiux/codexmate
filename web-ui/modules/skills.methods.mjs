@@ -1,7 +1,21 @@
-﻿export function createSkillsMethods({ api }) {
+﻿function createUnsupportedSkillsTargetAppError(app) {
+    return new Error(`Unsupported skills target app: ${String(app)}`);
+}
+
+function showUnsupportedSkillsTargetMessage(vm, app) {
+    vm.showMessage(`不支持的 Skills 安装目标：${String(app)}`, 'error');
+}
+
+export function createSkillsMethods({ api }) {
     return {
         normalizeSkillsTargetApp(app) {
-            return app === 'claude' ? 'claude' : 'codex';
+            if (app == null) {
+                return 'codex';
+            }
+            if (app === 'codex' || app === 'claude') {
+                return app;
+            }
+            throw createUnsupportedSkillsTargetAppError(app);
         },
 
         resetSkillsTargetState() {
@@ -28,7 +42,13 @@
             ) {
                 return false;
             }
-            const nextTarget = this.normalizeSkillsTargetApp(app);
+            let nextTarget;
+            try {
+                nextTarget = this.normalizeSkillsTargetApp(app);
+            } catch (error) {
+                showUnsupportedSkillsTargetMessage(this, app);
+                return false;
+            }
             const refresh = !(options && options.refresh === false);
             const silent = !!(options && options.silent);
             if (nextTarget !== this.skillsTargetApp) {
@@ -45,7 +65,13 @@
         },
 
         async openSkillsManager(options = {}) {
-            const targetApp = this.normalizeSkillsTargetApp(options && options.targetApp ? options.targetApp : this.skillsTargetApp);
+            let targetApp;
+            try {
+                targetApp = this.normalizeSkillsTargetApp(options && options.targetApp ? options.targetApp : this.skillsTargetApp);
+            } catch (error) {
+                showUnsupportedSkillsTargetMessage(this, options && options.targetApp);
+                return false;
+            }
             const targetChanged = targetApp !== this.skillsTargetApp;
             if (targetChanged) {
                 this.skillsTargetApp = targetApp;

@@ -120,6 +120,62 @@ test('setSkillsTargetApp returns false while any skills action is in flight', as
     assert.strictEqual(loadCalled, false);
 });
 
+test('normalizeSkillsTargetApp rejects unsupported explicit targets', () => {
+    const vm = buildVm(async () => ({}));
+
+    assert.strictEqual(vm.normalizeSkillsTargetApp(undefined), 'codex');
+    assert.strictEqual(vm.normalizeSkillsTargetApp('codex'), 'codex');
+    assert.strictEqual(vm.normalizeSkillsTargetApp('claude'), 'claude');
+    assert.throws(() => vm.normalizeSkillsTargetApp('Claude'), /Unsupported skills target app/);
+    assert.throws(() => vm.normalizeSkillsTargetApp(' claude '), /Unsupported skills target app/);
+});
+
+test('setSkillsTargetApp rejects invalid explicit target without mutating state', async () => {
+    let loadCalled = false;
+    const vm = buildVm(async () => ({}), {
+        skillsTargetApp: 'codex',
+        skillsRootPath: '/tmp/codex-skills',
+        skillsList: [{ name: 'alpha', hasSkillFile: true }]
+    });
+    vm.loadSkillsMarketOverview = async () => {
+        loadCalled = true;
+        return true;
+    };
+
+    const ok = await vm.setSkillsTargetApp('Claude', { silent: false });
+
+    assert.strictEqual(ok, false);
+    assert.strictEqual(vm.skillsTargetApp, 'codex');
+    assert.deepStrictEqual(vm.skillsList, [{ name: 'alpha', hasSkillFile: true }]);
+    assert.strictEqual(loadCalled, false);
+    assert.deepStrictEqual(vm.messageLog, [{
+        message: '不支持的 Skills 安装目标：Claude',
+        type: 'error'
+    }]);
+});
+
+test('openSkillsManager rejects invalid explicit target without reopening the modal', async () => {
+    let refreshCalls = 0;
+    const vm = buildVm(async () => ({}), {
+        skillsTargetApp: 'codex',
+        showSkillsModal: false
+    });
+    vm.refreshSkillsList = async () => {
+        refreshCalls += 1;
+        return true;
+    };
+
+    await vm.openSkillsManager({ targetApp: 'Claude' });
+
+    assert.strictEqual(vm.skillsTargetApp, 'codex');
+    assert.strictEqual(vm.showSkillsModal, false);
+    assert.strictEqual(refreshCalls, 0);
+    assert.deepStrictEqual(vm.messageLog, [{
+        message: '不支持的 Skills 安装目标：Claude',
+        type: 'error'
+    }]);
+});
+
 test('openSkillsManager keeps market overview state when reopening same target', async () => {
     const refreshCalls = [];
     const vm = buildVm(async () => ({}), {
