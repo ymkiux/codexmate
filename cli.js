@@ -64,7 +64,7 @@ const {
 } = require('./lib/workflow-engine');
 
 const DEFAULT_WEB_PORT = 3737;
-const DEFAULT_WEB_HOST = '0.0.0.0';
+const DEFAULT_WEB_HOST = '127.0.0.1';
 const DEFAULT_WEB_OPEN_HOST = '127.0.0.1';
 
 // ============================================================================
@@ -1407,9 +1407,16 @@ function getSkillTargetByApp(app) {
 }
 
 function resolveSkillTarget(params = {}, defaultApp = 'codex') {
+    const hasExplicitTarget = !!(params && typeof params === 'object' && (
+        Object.prototype.hasOwnProperty.call(params, 'targetApp')
+        || Object.prototype.hasOwnProperty.call(params, 'target')
+    ));
     const raw = params && typeof params === 'object'
         ? (params.targetApp || params.target || '')
         : '';
+    if (hasExplicitTarget && raw && !getSkillTargetByApp(raw)) {
+        return null;
+    }
     return getSkillTargetByApp(raw)
         || getSkillTargetByApp(defaultApp)
         || SKILL_TARGETS[0]
@@ -9749,7 +9756,10 @@ function resolveSkillTargetAppFromRequest(req, fallbackApp = 'codex') {
     const fallback = normalizeSkillTargetApp(fallbackApp) || 'codex';
     try {
         const parsed = new URL(req.url || '/', 'http://localhost');
-        return normalizeSkillTargetApp(parsed.searchParams.get('targetApp')) || fallback;
+        if (parsed.searchParams.has('targetApp')) {
+            return normalizeSkillTargetApp(parsed.searchParams.get('targetApp')) || null;
+        }
+        return fallback;
     } catch (_) {
         return fallback;
     }
@@ -9762,6 +9772,10 @@ async function handleImportSkillsZipUpload(req, res, options = {}) {
     }
     try {
         const targetApp = resolveSkillTargetAppFromRequest(req, options && options.targetApp ? options.targetApp : 'codex');
+        if (!targetApp) {
+            writeJsonResponse(res, 400, { error: '目标宿主不支持' });
+            return;
+        }
         const fileName = resolveUploadFileNameFromRequest(req, 'codex-skills.zip');
         const upload = await writeUploadZipStream(
             req,
