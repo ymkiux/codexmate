@@ -13,8 +13,13 @@ function readProjectFile(relativePath) {
 
 test('README OpenClaw state diagram includes the documented runtime config file', () => {
     const readme = readProjectFile('README.md');
+    const readmeEn = readProjectFile('README.en.md');
     assert.match(
         readme,
+        /OPENCLAW\["~\/\.openclaw\/\*\.json5 \+ ~\/\.openclaw\/openclaw\.json \+ workspace\/AGENTS\.md"\]/
+    );
+    assert.match(
+        readmeEn,
         /OPENCLAW\["~\/\.openclaw\/\*\.json5 \+ ~\/\.openclaw\/openclaw\.json \+ workspace\/AGENTS\.md"\]/
     );
 });
