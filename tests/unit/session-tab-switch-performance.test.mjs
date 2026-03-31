@@ -148,6 +148,36 @@ test('switchMainTab loads skills market overview when entering market', () => {
     assert.deepStrictEqual(calls, [{ silent: true }]);
 });
 
+test('switchMainTab swallows rejected skills market overview loads', async () => {
+    const unhandled = [];
+    const onUnhandledRejection = (reason) => {
+        unhandled.push(reason);
+    };
+    const vm = {
+        mainTab: 'config',
+        configMode: 'codex',
+        sessionsLoadedOnce: true,
+        teardownSessionTabRender() {},
+        prepareSessionTabRender() {},
+        loadSessions() {},
+        loadSkillsMarketOverview() {
+            return Promise.reject(new Error('boom'));
+        },
+        refreshClaudeModelContext() {}
+    };
+
+    process.on('unhandledRejection', onUnhandledRejection);
+    try {
+        switchMainTab.call(vm, 'market');
+        await new Promise((resolve) => setImmediate(resolve));
+    } finally {
+        process.removeListener('unhandledRejection', onUnhandledRejection);
+    }
+
+    assert.strictEqual(vm.mainTab, 'market');
+    assert.deepStrictEqual(unhandled, []);
+});
+
 test('switchMainTab does not reload skills market overview when already on market', () => {
     const calls = [];
     const vm = {

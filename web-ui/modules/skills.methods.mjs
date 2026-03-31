@@ -175,7 +175,7 @@
         },
 
         async scanImportableSkills(options = {}) {
-            if (this.skillsScanningImports || this.skillsImporting || this.skillsZipImporting || this.skillsExporting) return false;
+            if (this.skillsDeleting || this.skillsScanningImports || this.skillsImporting || this.skillsZipImporting || this.skillsExporting) return false;
             const silent = !!(options && options.silent);
             this.skillsScanningImports = true;
             try {
@@ -213,7 +213,7 @@
         },
 
         async importSelectedSkills() {
-            if (this.skillsImporting || this.skillsZipImporting || this.skillsExporting) return;
+            if (this.skillsDeleting || this.skillsImporting || this.skillsZipImporting || this.skillsExporting) return;
             const selectedSet = new Set(Array.isArray(this.skillsImportSelectedKeys) ? this.skillsImportSelectedKeys : []);
             const selectedItems = (Array.isArray(this.skillsImportList) ? this.skillsImportList : [])
                 .filter((item) => selectedSet.has(this.buildSkillImportKey(item)))
@@ -305,7 +305,7 @@
         },
 
         async importSkillsFromZipFile(file) {
-            if (this.skillsZipImporting || this.skillsImporting || this.skillsExporting) return;
+            if (this.skillsDeleting || this.skillsZipImporting || this.skillsImporting || this.skillsExporting) return;
             const maxSize = 20 * 1024 * 1024;
             if (file.size > maxSize) {
                 this.showMessage('ZIP 文件过大，限制 20MB', 'error');
@@ -340,7 +340,7 @@
         },
 
         async exportSelectedSkills() {
-            if (this.skillsExporting || this.skillsZipImporting || this.skillsImporting) return;
+            if (this.skillsDeleting || this.skillsExporting || this.skillsZipImporting || this.skillsImporting) return;
             const selected = Array.isArray(this.skillsSelectedNames)
                 ? Array.from(new Set(this.skillsSelectedNames.map((item) => String(item || '').trim()).filter(Boolean)))
                 : [];

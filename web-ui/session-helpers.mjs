@@ -65,7 +65,7 @@ export function switchMainTab(tab) {
         && previousTab !== 'market'
         && typeof this.loadSkillsMarketOverview === 'function';
     if (shouldLoadSkillsMarketOnEnter) {
-        this.loadSkillsMarketOverview({ silent: true });
+        void Promise.resolve(this.loadSkillsMarketOverview({ silent: true })).catch(() => {});
     }
     if (nextTab === 'config' && this.configMode === 'claude') {
         const expectedTab = nextTab;

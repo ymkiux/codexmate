@@ -1309,6 +1309,7 @@
                                 type="button"
                                 :class="['market-target-chip', { active: skillsTargetApp === 'codex' }]"
                                 :aria-pressed="skillsTargetApp === 'codex'"
+                                :disabled="skillsMarketBusy"
                                 @click="setSkillsTargetApp('codex', { silent: false })">
                                 Codex
                             </button>
@@ -1316,6 +1317,7 @@
                                 type="button"
                                 :class="['market-target-chip', { active: skillsTargetApp === 'claude' }]"
                                 :aria-pressed="skillsTargetApp === 'claude'"
+                                :disabled="skillsMarketBusy"
                                 @click="setSkillsTargetApp('claude', { silent: false })">
                                 Claude Code
                             </button>
@@ -2138,6 +2140,7 @@
                                 type="button"
                                 :class="['market-target-chip', { active: skillsTargetApp === 'codex' }]"
                                 :aria-pressed="skillsTargetApp === 'codex'"
+                                :disabled="skillsMarketBusy"
                                 @click="setSkillsTargetApp('codex', { silent: false })">
                                 Codex
                             </button>
@@ -2145,6 +2148,7 @@
                                 type="button"
                                 :class="['market-target-chip', { active: skillsTargetApp === 'claude' }]"
                                 :aria-pressed="skillsTargetApp === 'claude'"
+                                :disabled="skillsMarketBusy"
                                 @click="setSkillsTargetApp('claude', { silent: false })">
                                 Claude Code
                             </button>

@@ -50,6 +50,13 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /skillsTargetApp === 'claude'/);
     assert.match(html, /setSkillsTargetApp\('codex', \{ silent: false \}\)/);
     assert.match(html, /setSkillsTargetApp\('claude', \{ silent: false \}\)/);
+    const targetSwitchButtons = [...html.matchAll(
+        /<button[\s\S]*?:class="\['market-target-chip', \{ active: skillsTargetApp === '(codex|claude)' \}\]"[\s\S]*?@click="setSkillsTargetApp\('\1', \{ silent: false \}\)"[\s\S]*?>/g
+    )];
+    assert.strictEqual(targetSwitchButtons.length, 4);
+    for (const [buttonMarkup] of targetSwitchButtons) {
+        assert.match(buttonMarkup, /:disabled="skillsMarketBusy"/);
+    }
     assert.match(html, /class="market-target-switch" role="group" aria-label="选择 Skills 安装目标"/);
     assert.match(html, /class="market-target-switch market-target-switch-compact" role="group" aria-label="选择 Skills 管理目标"/);
     assert.doesNotMatch(html, /class="market-target-switch" role="tablist" aria-label="选择 Skills 安装目标"/);
@@ -238,7 +245,7 @@ test('session helper deferred claude refresh validates live tab and mode before 
     assert.match(helperScript, /this\.loadSessionTrashCount\(\{ silent: true \}\);/);
     assert.match(helperScript, /const shouldLoadSkillsMarketOnEnter = nextTab === 'market'/);
     assert.match(helperScript, /previousTab !== 'market'/);
-    assert.match(helperScript, /this\.loadSkillsMarketOverview\(\{ silent: true \}\);/);
+    assert.match(helperScript, /void Promise\.resolve\(this\.loadSkillsMarketOverview\(\{ silent: true \}\)\)\.catch\(\(\) => \{\}\);/);
 });
 
 test('trash item styles stay aligned with session card layout and keep mobile usability', () => {
@@ -281,6 +288,9 @@ test('settings tab header actions keep compact tool buttons inline on wider scre
     assert.match(styles, /\.market-target-switch\s*\{/);
     assert.match(styles, /\.market-target-chip\.active\s*\{/);
     assert.match(styles, /\.market-panel-wide\s*\{/);
+    assert.match(styles, /--radius-md:\s*[0-9.]+(?:px|rem);/);
+    assert.match(styles, /--font-weight-primary:\s*[0-9]+;/);
+    assert.match(styles, /--font-size-large:\s*[0-9.]+(?:px|rem);/);
     assert.doesNotMatch(styles, /\.market-online-list\s*\{/);
     assert.doesNotMatch(styles, /\.market-ecosystem-grid\s*\{/);
 });
