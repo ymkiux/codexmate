@@ -123,9 +123,9 @@ const resolveWebHost = instantiateFunction(resolveWebHostSource, 'resolveWebHost
     process: { env: {} }
 });
 
-test('resolveWebHost defaults to all interfaces for LAN access', () => {
-    assert.strictEqual(resolveWebHost({}), '0.0.0.0');
-    assert.strictEqual(resolveWebHost(), '0.0.0.0');
+test('resolveWebHost defaults to loopback host', () => {
+    assert.strictEqual(resolveWebHost({}), '127.0.0.1');
+    assert.strictEqual(resolveWebHost(), '127.0.0.1');
 });
 
 test('resolveWebHost still prefers CLI host over environment and default host', () => {
@@ -144,4 +144,70 @@ test('resolveWebHost still prefers environment host over default host', () => {
     });
 
     assert.strictEqual(withEnv({}), '192.168.1.10');
+});
+
+const SKILL_TARGETS = [
+    { app: 'codex', label: 'Codex', dir: '/tmp/codex-skills' },
+    { app: 'claude', label: 'Claude', dir: '/tmp/claude-skills' }
+];
+const normalizeSkillTargetAppSource = extractFunctionBySignature(
+    cliContent,
+    'function normalizeSkillTargetApp(app) {',
+    'normalizeSkillTargetApp'
+);
+const normalizeSkillTargetApp = instantiateFunction(normalizeSkillTargetAppSource, 'normalizeSkillTargetApp', {
+    SKILL_TARGETS
+});
+const getSkillTargetByAppSource = extractFunctionBySignature(
+    cliContent,
+    'function getSkillTargetByApp(app) {',
+    'getSkillTargetByApp'
+);
+const getSkillTargetByApp = instantiateFunction(getSkillTargetByAppSource, 'getSkillTargetByApp', {
+    SKILL_TARGETS,
+    normalizeSkillTargetApp
+});
+const resolveSkillTargetSource = extractFunctionBySignature(
+    cliContent,
+    'function resolveSkillTarget(params = {}, defaultApp = \'codex\') {',
+    'resolveSkillTarget'
+);
+const resolveSkillTarget = instantiateFunction(resolveSkillTargetSource, 'resolveSkillTarget', {
+    SKILL_TARGETS,
+    getSkillTargetByApp,
+    Object
+});
+const resolveSkillTargetAppFromRequestSource = extractFunctionBySignature(
+    cliContent,
+    'function resolveSkillTargetAppFromRequest(req, fallbackApp = \'codex\') {',
+    'resolveSkillTargetAppFromRequest'
+);
+const resolveSkillTargetAppFromRequest = instantiateFunction(
+    resolveSkillTargetAppFromRequestSource,
+    'resolveSkillTargetAppFromRequest',
+    {
+        URL,
+        normalizeSkillTargetApp
+    }
+);
+
+test('resolveSkillTarget still falls back to default target when target is omitted', () => {
+    assert.deepStrictEqual(resolveSkillTarget({}), SKILL_TARGETS[0]);
+    assert.deepStrictEqual(resolveSkillTarget({ items: [] }), SKILL_TARGETS[0]);
+});
+
+test('resolveSkillTarget rejects explicit unsupported targets instead of falling back', () => {
+    assert.strictEqual(resolveSkillTarget({ targetApp: 'claud' }), null);
+    assert.strictEqual(resolveSkillTarget({ target: 'unknown' }, 'codex'), null);
+});
+
+test('resolveSkillTargetAppFromRequest rejects explicit unsupported query target', () => {
+    assert.strictEqual(
+        resolveSkillTargetAppFromRequest({ url: '/api/import-skills-zip?targetApp=claud' }, 'codex'),
+        null
+    );
+    assert.strictEqual(
+        resolveSkillTargetAppFromRequest({ url: '/api/import-skills-zip' }, 'claude'),
+        'claude'
+    );
 });
