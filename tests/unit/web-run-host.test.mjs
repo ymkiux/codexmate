@@ -286,6 +286,11 @@ const resolveSkillTargetAppFromRequest = instantiateFunction(
         normalizeSkillTargetApp
     }
 );
+const resolveCopyTargetRootSource = extractFunctionBySignature(
+    cliContent,
+    'function resolveCopyTargetRoot(targetDir) {',
+    'resolveCopyTargetRoot'
+);
 const importSkillsSource = extractFunctionBySignature(
     cliContent,
     'function importSkills(params = {}) {',
@@ -295,6 +300,11 @@ const importSkillsFromZipFileSource = extractFunctionBySignature(
     cliContent,
     'async function importSkillsFromZipFile(zipPath, options = {}) {',
     'importSkillsFromZipFile'
+);
+const importSkillsFromZipSource = extractFunctionBySignature(
+    cliContent,
+    'async function importSkillsFromZip(payload = {}) {',
+    'importSkillsFromZip'
 );
 const handleImportSkillsZipUploadSource = extractFunctionBySignature(
     cliContent,
@@ -321,6 +331,22 @@ test('resolveSkillTargetAppFromRequest rejects explicit unsupported query target
         resolveSkillTargetAppFromRequest({ url: '/api/import-skills-zip' }, 'claude'),
         'claude'
     );
+});
+
+test('resolveCopyTargetRoot resolves through the nearest existing parent path', () => {
+    const resolveCopyTargetRoot = instantiateFunction(resolveCopyTargetRootSource, 'resolveCopyTargetRoot', {
+        path,
+        fs: {
+            existsSync(targetPath) {
+                return targetPath === '/link-target' || targetPath === '/';
+            }
+        },
+        normalizePathForCompare(targetPath) {
+            return targetPath === '/link-target' ? '/real/source' : targetPath;
+        }
+    });
+
+    assert.strictEqual(resolveCopyTargetRoot('/link-target/nested/skills'), '/real/source/nested/skills');
 });
 
 test('handleImportSkillsZipUpload keeps forced target app on the codex-only route', async () => {
@@ -415,9 +441,14 @@ test('handleImportSkillsZipUpload derives fallback zip name from the resolved ta
 test('importSkills rejects target roots nested inside the source skill before ensuring the destination root', () => {
     let copyCalls = 0;
     const ensureDirCalls = [];
+    let resolvedTargetDir = '';
     const importSkills = instantiateFunction(importSkillsSource, 'importSkills', {
         resolveSkillTarget() {
             return { app: 'codex', label: 'Codex', dir: '/tmp/source/nested' };
+        },
+        resolveCopyTargetRoot(targetDir) {
+            resolvedTargetDir = targetDir;
+            return '/tmp/source/nested';
         },
         normalizeCodexSkillName(name) {
             return { name: String(name || '') };
@@ -460,6 +491,7 @@ test('importSkills rejects target roots nested inside the source skill before en
     });
 
     assert.strictEqual(copyCalls, 0);
+    assert.strictEqual(resolvedTargetDir, '/tmp/source/nested');
     assert.deepStrictEqual(ensureDirCalls, []);
     assert.deepStrictEqual(result.imported, []);
     assert.strictEqual(result.failed.length, 1);
@@ -470,9 +502,14 @@ test('importSkillsFromZipFile rejects target roots nested inside extracted skill
     let copyCalls = 0;
     const ensureDirCalls = [];
     const cleanupCalls = [];
+    let resolvedTargetDir = '';
     const importSkillsFromZipFile = instantiateFunction(importSkillsFromZipFileSource, 'importSkillsFromZipFile', {
         resolveSkillTarget() {
             return { app: 'codex', label: 'Codex', dir: '/tmp/upload/extract/source/nested' };
+        },
+        resolveCopyTargetRoot(targetDir) {
+            resolvedTargetDir = targetDir;
+            return '/tmp/upload/extract/source/nested';
         },
         path,
         fs: {
@@ -522,6 +559,7 @@ test('importSkillsFromZipFile rejects target roots nested inside extracted skill
     });
 
     assert.strictEqual(copyCalls, 0);
+    assert.strictEqual(resolvedTargetDir, '/tmp/upload/extract/source/nested');
     assert.deepStrictEqual(ensureDirCalls, []);
     assert.deepStrictEqual(result.imported, []);
     assert.strictEqual(result.failed.length, 1);
@@ -537,6 +575,9 @@ test('importSkillsFromZipFile still cleans tempDir when target app is unsupporte
     const importSkillsFromZipFile = instantiateFunction(importSkillsFromZipFileSource, 'importSkillsFromZipFile', {
         resolveSkillTarget() {
             return null;
+        },
+        resolveCopyTargetRoot(targetDir) {
+            return targetDir;
         },
         path,
         fs: {
@@ -579,6 +620,42 @@ test('importSkillsFromZipFile still cleans tempDir when target app is unsupporte
         targetPath: '/tmp/upload',
         options: { recursive: true, force: true }
     }]);
+});
+
+test('importSkillsFromZip reuses a target-specific fallback zip name for base64 imports', async () => {
+    let uploadArgs = null;
+    let importedOptions = null;
+    const importSkillsFromZip = instantiateFunction(importSkillsFromZipSource, 'importSkillsFromZip', {
+        normalizeSkillTargetApp(app) {
+            const value = typeof app === 'string' ? app.trim().toLowerCase() : '';
+            return value === 'codex' || value === 'claude' ? value : '';
+        },
+        writeUploadZip(fileBase64, prefix, fileName) {
+            uploadArgs = { fileBase64, prefix, fileName };
+            return { zipPath: '/tmp/claude.zip', tempDir: '/tmp/claude-upload' };
+        },
+        importSkillsFromZipFile: async (_zipPath, options) => {
+            importedOptions = options;
+            return { imported: [] };
+        }
+    });
+
+    const result = await importSkillsFromZip({
+        fileBase64: 'QUJD',
+        target: 'claude'
+    });
+
+    assert.deepStrictEqual(uploadArgs, {
+        fileBase64: 'QUJD',
+        prefix: 'codex-skills-import',
+        fileName: 'claude-skills.zip'
+    });
+    assert.deepStrictEqual(importedOptions, {
+        tempDir: '/tmp/claude-upload',
+        fallbackName: 'claude-skills.zip',
+        targetApp: 'claude'
+    });
+    assert.deepStrictEqual(result, { imported: [] });
 });
 
 test('codex-only zip upload route pins target app before request fallback resolution', () => {
