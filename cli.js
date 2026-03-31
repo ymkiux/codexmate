@@ -1750,6 +1750,7 @@ function scanUnmanagedSkills(params = {}) {
     if (!target) {
         return { error: '目标宿主不支持' };
     }
+    const targetRoot = resolveCopyTargetRoot(target.dir);
     const existing = listSkills({ targetApp: target.app });
     if (existing.error) {
         return { error: existing.error };
@@ -1763,6 +1764,10 @@ function scanUnmanagedSkills(params = {}) {
     for (const source of sources) {
         const sourceEntries = listSkillEntriesByRoot(source.dir);
         for (const entry of sourceEntries) {
+            const targetCandidate = path.join(targetRoot, entry.name);
+            if (fs.existsSync(targetCandidate)) {
+                continue;
+            }
             if (existingNames.has(entry.name)) {
                 continue;
             }
