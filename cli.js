@@ -173,35 +173,35 @@ const HTTP_KEEP_ALIVE_AGENT = new http.Agent({ keepAlive: true });
 const HTTPS_KEEP_ALIVE_AGENT = new https.Agent({ keepAlive: true });
 
 function getCodexSkillsDir() {
-    const candidates = [];
     const envCodexHome = typeof process.env.CODEX_HOME === 'string' ? process.env.CODEX_HOME.trim() : '';
     if (envCodexHome) {
-        candidates.push(path.join(envCodexHome, 'skills'));
+        const target = path.join(envCodexHome, 'skills');
+        return resolveExistingDir([target], target);
     }
     const xdgConfig = typeof process.env.XDG_CONFIG_HOME === 'string' ? process.env.XDG_CONFIG_HOME.trim() : '';
     if (xdgConfig) {
-        candidates.push(path.join(xdgConfig, 'codex', 'skills'));
+        const target = path.join(xdgConfig, 'codex', 'skills');
+        return resolveExistingDir([target], target);
     }
-    candidates.push(path.join(os.homedir(), '.config', 'codex', 'skills'));
-    candidates.push(CODEX_SKILLS_DIR);
-    return resolveExistingDir(candidates, CODEX_SKILLS_DIR);
+    const homeConfigDir = path.join(os.homedir(), '.config', 'codex', 'skills');
+    return resolveExistingDir([homeConfigDir], CODEX_SKILLS_DIR);
 }
 
 function getClaudeSkillsDir() {
-    const candidates = [];
     const envClaudeHome = typeof process.env.CLAUDE_HOME === 'string' && process.env.CLAUDE_HOME.trim()
         ? process.env.CLAUDE_HOME.trim()
         : (typeof process.env.CLAUDE_CONFIG_DIR === 'string' ? process.env.CLAUDE_CONFIG_DIR.trim() : '');
     if (envClaudeHome) {
-        candidates.push(path.join(envClaudeHome, 'skills'));
+        const target = path.join(envClaudeHome, 'skills');
+        return resolveExistingDir([target], target);
     }
     const xdgConfig = typeof process.env.XDG_CONFIG_HOME === 'string' ? process.env.XDG_CONFIG_HOME.trim() : '';
     if (xdgConfig) {
-        candidates.push(path.join(xdgConfig, 'claude', 'skills'));
+        const target = path.join(xdgConfig, 'claude', 'skills');
+        return resolveExistingDir([target], target);
     }
-    candidates.push(path.join(os.homedir(), '.config', 'claude', 'skills'));
-    candidates.push(CLAUDE_SKILLS_DIR);
-    return resolveExistingDir(candidates, CLAUDE_SKILLS_DIR);
+    const homeConfigDir = path.join(os.homedir(), '.config', 'claude', 'skills');
+    return resolveExistingDir([homeConfigDir], CLAUDE_SKILLS_DIR);
 }
 
 function resolveWebPort() {
@@ -2170,8 +2170,9 @@ async function importSkillsFromZip(payload = {}) {
     if (!payload || typeof payload.fileBase64 !== 'string' || !payload.fileBase64.trim()) {
         return { error: '缺少技能压缩包内容' };
     }
-    const targetApp = normalizeSkillTargetApp(payload.targetApp || payload.target) || 'codex';
-    const fallbackName = payload.fileName || `${targetApp}-skills.zip`;
+    const rawTargetApp = payload.targetApp || payload.target || 'codex';
+    const fallbackTargetApp = normalizeSkillTargetApp(rawTargetApp) || 'codex';
+    const fallbackName = payload.fileName || `${fallbackTargetApp}-skills.zip`;
     const upload = writeUploadZip(payload.fileBase64, 'codex-skills-import', fallbackName);
     if (upload.error) {
         return { error: upload.error };
@@ -2179,7 +2180,7 @@ async function importSkillsFromZip(payload = {}) {
     return importSkillsFromZipFile(upload.zipPath, {
         tempDir: upload.tempDir,
         fallbackName,
-        targetApp
+        targetApp: rawTargetApp
     });
 }
 
@@ -9829,8 +9830,10 @@ function resolveSkillTargetAppFromRequest(req, fallbackApp = 'codex') {
     const fallback = normalizeSkillTargetApp(fallbackApp) || 'codex';
     try {
         const parsed = new URL(req.url || '/', 'http://localhost');
-        if (parsed.searchParams.has('targetApp')) {
-            return normalizeSkillTargetApp(parsed.searchParams.get('targetApp')) || null;
+        if (parsed.searchParams.has('target') || parsed.searchParams.has('targetApp')) {
+            return normalizeSkillTargetApp(
+                parsed.searchParams.get('target') || parsed.searchParams.get('targetApp')
+            ) || null;
         }
         return fallback;
     } catch (_) {
