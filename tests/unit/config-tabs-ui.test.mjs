@@ -54,6 +54,8 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /可直接导入/);
     assert.match(html, /不再展示任何 MCP 在线目录或外部市场/);
     assert.match(html, /本地 skills 视图和导入分发流程/);
+    assert.doesNotMatch(html, /在线生态目录/);
+    assert.doesNotMatch(html, /查看在线目录/);
     assert.doesNotMatch(html, /skillsMarketRemoteCount/);
     assert.doesNotMatch(html, /loadOnlineSkillsMarket\(\{ forceRefresh: true, silent: false \}\)/);
     assert.doesNotMatch(html, /resetOnlineSkillsMarketSearch/);
@@ -231,6 +233,7 @@ test('session helper deferred claude refresh validates live tab and mode before 
     assert.match(helperScript, /this\.sessionTrashLoadedOnce = false;/);
     assert.match(helperScript, /this\.loadSessionTrashCount\(\{ silent: true \}\);/);
     assert.match(helperScript, /const shouldLoadSkillsMarketOnEnter = nextTab === 'market'/);
+    assert.match(helperScript, /previousTab !== 'market'/);
     assert.match(helperScript, /this\.loadSkillsMarketOverview\(\{ silent: true \}\);/);
 });
 

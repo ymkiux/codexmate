@@ -102,6 +102,54 @@ test('setSkillsTargetApp resets local state and reloads local market slices only
     });
 });
 
+test('setSkillsTargetApp returns false while any skills action is in flight', async () => {
+    let loadCalled = false;
+    const vm = buildVm(async () => ({}), {
+        skillsTargetApp: 'codex',
+        skillsImporting: true
+    });
+    vm.loadSkillsMarketOverview = async () => {
+        loadCalled = true;
+        return true;
+    };
+
+    const ok = await vm.setSkillsTargetApp('claude', { silent: false });
+
+    assert.strictEqual(ok, false);
+    assert.strictEqual(vm.skillsTargetApp, 'codex');
+    assert.strictEqual(loadCalled, false);
+});
+
+test('openSkillsManager keeps market overview state when reopening same target', async () => {
+    const refreshCalls = [];
+    const vm = buildVm(async () => ({}), {
+        skillsTargetApp: 'codex',
+        skillsSelectedNames: ['alpha'],
+        skillsKeyword: 'demo',
+        skillsStatusFilter: 'missing',
+        skillsImportList: [{ name: 'beta', sourceApp: 'claude' }],
+        skillsImportSelectedKeys: ['claude:beta'],
+        skillsMarketLocalLoadedOnce: true,
+        skillsMarketImportLoadedOnce: true
+    });
+    vm.refreshSkillsList = async (options) => {
+        refreshCalls.push(options);
+        return true;
+    };
+
+    await vm.openSkillsManager({ targetApp: 'codex' });
+
+    assert.strictEqual(vm.showSkillsModal, true);
+    assert.deepStrictEqual(vm.skillsImportList, [{ name: 'beta', sourceApp: 'claude' }]);
+    assert.strictEqual(vm.skillsMarketLocalLoadedOnce, true);
+    assert.strictEqual(vm.skillsMarketImportLoadedOnce, true);
+    assert.deepStrictEqual(vm.skillsSelectedNames, []);
+    assert.deepStrictEqual(vm.skillsImportSelectedKeys, []);
+    assert.strictEqual(vm.skillsKeyword, '');
+    assert.strictEqual(vm.skillsStatusFilter, 'all');
+    assert.deepStrictEqual(refreshCalls, [{ silent: false }]);
+});
+
 test('loadSkillsMarketOverview refreshes installed skills and importable sources only', async () => {
     const steps = [];
     const vm = buildVm(async () => ({}));
@@ -124,4 +172,19 @@ test('loadSkillsMarketOverview refreshes installed skills and importable sources
         ['scan', { silent: true }]
     ]);
     assert.strictEqual(vm.skillsMarketLoading, false);
+});
+
+test('scanImportableSkills returns false when another skills action is already running', async () => {
+    let apiCalls = 0;
+    const vm = buildVm(async () => {
+        apiCalls += 1;
+        return {};
+    }, {
+        skillsImporting: true
+    });
+
+    const ok = await vm.scanImportableSkills({ silent: true });
+
+    assert.strictEqual(ok, false);
+    assert.strictEqual(apiCalls, 0);
 });

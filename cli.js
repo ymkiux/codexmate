@@ -64,7 +64,7 @@ const {
 } = require('./lib/workflow-engine');
 
 const DEFAULT_WEB_PORT = 3737;
-const DEFAULT_WEB_HOST = '127.0.0.1';
+const DEFAULT_WEB_HOST = '0.0.0.0';
 const DEFAULT_WEB_OPEN_HOST = '127.0.0.1';
 
 // ============================================================================
@@ -9771,7 +9771,8 @@ async function handleImportSkillsZipUpload(req, res, options = {}) {
         return;
     }
     try {
-        const targetApp = resolveSkillTargetAppFromRequest(req, options && options.targetApp ? options.targetApp : 'codex');
+        const forcedTargetApp = normalizeSkillTargetApp(options && options.targetApp ? options.targetApp : '');
+        const targetApp = forcedTargetApp || resolveSkillTargetAppFromRequest(req, 'codex');
         if (!targetApp) {
             writeJsonResponse(res, 400, { error: '目标宿主不支持' });
             return;
