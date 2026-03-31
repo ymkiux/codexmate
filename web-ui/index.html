@@ -299,15 +299,15 @@
                     </div>
                 </div>
                 <div
-                    v-if="!sessionStandalone && mainTab === 'config' && isProviderConfigMode && forceCompactLayout && !loading && !initError && providersList.length > 1"
+                    v-if="!sessionStandalone && mainTab === 'config' && isProviderConfigMode && forceCompactLayout && !loading && !initError && displayProvidersList.length > 1"
                     class="provider-fast-switch">
                     <label class="provider-fast-switch-label" for="provider-fast-switch-select">快速切换提供商</label>
                     <select
                         id="provider-fast-switch-select"
                         class="provider-fast-switch-select"
-                        :value="currentProvider"
+                        :value="displayCurrentProvider"
                         @change="quickSwitchProvider($event.target.value)">
-                        <option v-for="provider in providersList" :key="'quick-switch-' + provider.name" :value="provider.name">
+                        <option v-for="provider in displayProvidersList" :key="'quick-switch-' + provider.name" :value="provider.name">
                             {{ provider.name }}
                         </option>
                     </select>
@@ -553,9 +553,13 @@
                     </button>
                 </div>
 
+                <div v-if="!loading && !initError && localHiddenNotice" class="config-template-hint">
+                    当前 provider 为 <code>local</code>，已合并显示为 <code>codexmate-proxy</code>。
+                </div>
+
                 <div v-if="!loading && !initError" class="card-list">
-                    <div v-for="provider in providersList" :key="provider.name"
-                         :class="['card', { active: currentProvider === provider.name }]"
+                    <div v-for="provider in displayProvidersList" :key="provider.name"
+                         :class="['card', { active: displayCurrentProvider === provider.name }]"
                          @click="switchProvider(provider.name)">
                         <div class="card-leading">
                             <div class="card-icon">{{ provider.name.charAt(0).toUpperCase() }}</div>
