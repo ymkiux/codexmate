@@ -2,6 +2,10 @@
 language: "en-US"
 reviews:
   profile: "chill"
+  instructions: |
+    Do not suggest any breaking changes, API/interface/behavior alterations, or refactoring of any kind.
+    Limit all feedback exclusively to correctness, safety, and quality issues within the existing design.
+    Do not suggest changes that alter existing APIs, interfaces, or behaviors.
   review_details: true
   enable_prompt_for_ai_agents: true
   request_changes_workflow: true
