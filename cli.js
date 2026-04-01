@@ -7982,6 +7982,10 @@ function cmdAdd(name, baseUrl, apiKey, silent = false) {
         if (!silent) console.error('错误: local provider 为系统保留名称，不可新增');
         throw new Error('local provider 为系统保留名称，不可新增');
     }
+    if (isBuiltinProxyProvider(providerName)) {
+        if (!silent) console.error('错误: codexmate-proxy 为保留名称，不可手动添加');
+        throw new Error('codexmate-proxy 为保留名称，不可手动添加');
+    }
 
     const config = readConfig();
     if (config.model_providers && config.model_providers[providerName]) {

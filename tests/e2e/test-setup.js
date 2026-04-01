@@ -52,7 +52,7 @@ module.exports = async function testSetup(ctx) {
     assert(listResult.status === 0, 'list failed');
     assert(listResult.stdout.includes('e2e'), 'list missing provider');
 
-    const helpResult = runSync(node, [cliPath, '--help'], { env });
+    const helpResult = runSync(node, [cliPath], { env });
     assert(helpResult.status === 0, 'help output failed');
     assert(!helpResult.stdout.includes('codexmate proxy'), 'help should not expose removed proxy entry');
     assert(!helpResult.stdout.includes('codexmate auth'), 'help should not expose removed auth entry');

@@ -179,6 +179,10 @@ module.exports = async function testAuthProxy(ctx) {
 
     const providerList = await api('list');
     assert(
+        providerList && Array.isArray(providerList.providers),
+        `list should return providers: ${providerList && providerList.error ? providerList.error : JSON.stringify(providerList)}`
+    );
+    assert(
         !providerList.providers.some((item) => item && item.name === 'codexmate-proxy'),
         'provider list should not expose removed builtin proxy provider'
     );
