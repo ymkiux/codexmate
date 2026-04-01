@@ -381,24 +381,6 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     claudeImportLoading: false,
                     codexImportLoading: false,
                     codexAuthProfiles: [],
-                    codexAuthImportLoading: false,
-                    codexAuthSwitching: {},
-                    codexAuthDeleting: {},
-                    proxySettings: {
-                        enabled: false,
-                        host: '127.0.0.1',
-                        port: 8318,
-                        provider: '',
-                        authSource: 'provider',
-                        timeoutMs: 30000
-                    },
-                    proxyRuntime: null,
-                    proxyLoading: false,
-                    proxySaving: false,
-                    proxyStarting: false,
-                    proxyStopping: false,
-                    proxyApplying: false,
-                    showProxyAdvanced: false,
                     forceCompactLayout: false
                 }
             },
@@ -583,47 +565,15 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     return list;
                 },
                 hasLocalAndProxy() {
-                    const list = Array.isArray(this.providersList) ? this.providersList : [];
-                    if (!list.length) return false;
-                    const hasLocal = list.some((item) => item && String(item.name || '').trim().toLowerCase() === 'local');
-                    const hasProxy = list.some((item) => item && String(item.name || '').trim().toLowerCase() === 'codexmate-proxy');
-                    return hasLocal && hasProxy;
+                    return false;
                 },
                 displayCurrentProvider() {
                     const current = String(this.currentProvider || '').trim();
-                    if (!current) return '';
-                    if (this.hasLocalAndProxy && current.toLowerCase() === 'local') {
-                        return 'codexmate-proxy';
-                    }
                     return current;
-                },
-                localHiddenNotice() {
-                    return this.hasLocalAndProxy && String(this.currentProvider || '').trim().toLowerCase() === 'local';
                 },
                 displayProvidersList() {
                     const list = Array.isArray(this.providersList) ? this.providersList : [];
-                    if (!list.length) return [];
-                    if (!this.hasLocalAndProxy) {
-                        return list;
-                    }
-                    return list.filter((item) => String(item && item.name ? item.name : '').trim().toLowerCase() !== 'local');
-                },
-                proxyProviderOptions() {
-                    const source = Array.isArray(this.providersList) ? this.providersList : [];
-                    const list = source
-                        .map((item) => (item && typeof item.name === 'string' ? item.name.trim() : ''))
-                        .filter((name) => name && name !== 'codexmate-proxy');
-                    return Array.from(new Set(list));
-                },
-                proxyRuntimeDisplayProvider() {
-                    if (!this.proxyRuntime) return '';
-                    const hasProxy = this.hasLocalAndProxy;
-                    const value = typeof this.proxyRuntime.provider === 'string'
-                        ? this.proxyRuntime.provider.trim()
-                        : '';
-                    if (!value) return hasProxy ? 'codexmate-proxy' : 'local';
-                    if (value.toLowerCase() === 'local') return hasProxy ? 'codexmate-proxy' : value;
-                    return value;
+                    return list.filter((item) => String(item && item.name ? item.name : '').trim().toLowerCase() !== 'codexmate-proxy');
                 },
                 installTargetCards() {
                     const targets = Array.isArray(this.installStatusTargets) ? this.installStatusTargets : [];
@@ -674,7 +624,6 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     if (this.codexApplying || this.configTemplateApplying || this.openclawApplying) tasks.push('配置应用');
                     if (this.agentsSaving) tasks.push('AGENTS 保存');
                     if (this.skillsLoading || this.skillsDeleting || this.skillsScanningImports || this.skillsImporting || this.skillsZipImporting || this.skillsExporting) tasks.push('Skills 管理');
-                    if (this.proxySaving || this.proxyApplying || this.proxyStarting || this.proxyStopping) tasks.push('代理更新');
                     return tasks.length ? tasks.join(' / ') : '空闲';
                 },
                 inspectorMessageSummary() {
@@ -713,15 +662,6 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         return '加载异常';
                     }
                     return '正常';
-                },
-                inspectorProxyStatus() {
-                    if (this.proxySaving || this.proxyApplying || this.proxyStarting || this.proxyStopping) {
-                        return '状态更新中';
-                    }
-                    if (this.proxyRuntime && this.proxyRuntime.running === true) {
-                        return `运行中（${this.proxyRuntimeDisplayProvider}）`;
-                    }
-                    return '未运行';
                 },
                 installTroubleshootingTips() {
                     const platform = this.resolveInstallPlatform();
@@ -786,12 +726,9 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     }
 
                     try {
-                        await Promise.all([
-                            this.loadCodexAuthProfiles(),
-                            this.loadProxyStatus()
-                        ]);
+                        await this.loadCodexAuthProfiles();
                     } catch (e) {
-                        // 认证/代理状态加载失败不阻塞主界面
+                        // 认证状态加载失败不阻塞主界面
                     }
                 },
 
@@ -3877,7 +3814,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         ? String(providerOrName.name || '')
                         : String(providerOrName);
                     const normalized = rawName.trim().toLowerCase();
-                    return normalized === 'local' || normalized === 'codexmate-proxy';
+                    return normalized === 'local';
                 },
 
                 providerPillState(provider) {
@@ -3917,7 +3854,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     if (!providerOrName) return false;
                     if (typeof providerOrName === 'object') {
                         const directName = String(providerOrName.name || '').trim().toLowerCase();
-                        if (directName === 'local' || directName === 'codexmate-proxy') {
+                        if (directName === 'local') {
                             return true;
                         }
                         return !!providerOrName.nonDeletable;
@@ -3925,7 +3862,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     const name = String(providerOrName).trim();
                     if (!name) return false;
                     const normalized = name.toLowerCase();
-                    if (normalized === 'local' || normalized === 'codexmate-proxy') {
+                    if (normalized === 'local') {
                         return true;
                     }
                     const target = (this.providersList || []).find((item) => item && item.name === name);
@@ -5594,215 +5531,6 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         if (!silent) {
                             this.showMessage('读取认证列表失败', 'error');
                         }
-                    }
-                },
-
-                triggerCodexAuthUpload() {
-                    const input = this.$refs.codexAuthImportInput;
-                    if (input) {
-                        input.value = '';
-                        input.click();
-                    }
-                },
-
-                handleCodexAuthImportChange(event) {
-                    const file = event && event.target && event.target.files ? event.target.files[0] : null;
-                    if (file) {
-                        void this.importCodexAuthFile(file);
-                    }
-                },
-
-                resetCodexAuthImportInput() {
-                    const el = this.$refs.codexAuthImportInput;
-                    if (el) {
-                        el.value = '';
-                    }
-                },
-
-                async importCodexAuthFile(file) {
-                    this.codexAuthImportLoading = true;
-                    try {
-                        const base64 = await this.readFileAsBase64(file);
-                        const res = await api('import-auth-profile', {
-                            fileName: file.name || 'codex-auth.json',
-                            fileBase64: base64,
-                            activate: true
-                        });
-                        if (res && res.error) {
-                            this.showMessage(res.error, 'error');
-                            return;
-                        }
-                        await this.loadCodexAuthProfiles({ silent: true });
-                        this.showMessage('认证文件已导入并切换', 'success');
-                    } catch (e) {
-                        this.showMessage('导入认证文件失败', 'error');
-                    } finally {
-                        this.codexAuthImportLoading = false;
-                        this.resetCodexAuthImportInput();
-                    }
-                },
-
-                async switchCodexAuthProfile(name) {
-                    const key = String(name || '').trim();
-                    if (!key || this.codexAuthSwitching[key]) return;
-                    this.codexAuthSwitching[key] = true;
-                    try {
-                        const res = await api('switch-auth-profile', { name: key });
-                        if (res && res.error) {
-                            this.showMessage(res.error, 'error');
-                            return;
-                        }
-                        await this.loadCodexAuthProfiles({ silent: true });
-                        this.showMessage(`已切换认证: ${key}`, 'success');
-                    } catch (e) {
-                        this.showMessage('切换认证失败', 'error');
-                    } finally {
-                        this.codexAuthSwitching[key] = false;
-                    }
-                },
-
-                async deleteCodexAuthProfile(name) {
-                    const key = String(name || '').trim();
-                    if (!key || this.codexAuthDeleting[key]) return;
-                    this.codexAuthDeleting[key] = true;
-                    try {
-                        const res = await api('delete-auth-profile', { name: key });
-                        if (res && res.error) {
-                            this.showMessage(res.error, 'error');
-                            return;
-                        }
-                        await this.loadCodexAuthProfiles({ silent: true });
-                        const switchedTip = res && res.switchedTo ? `，已切换到 ${res.switchedTo}` : '';
-                        this.showMessage(`已删除认证${switchedTip}`, 'success');
-                    } catch (e) {
-                        this.showMessage('删除认证失败', 'error');
-                    } finally {
-                        this.codexAuthDeleting[key] = false;
-                    }
-                },
-
-                mergeProxySettings(nextSettings) {
-                    const safe = nextSettings && typeof nextSettings === 'object' ? nextSettings : {};
-                    const port = parseInt(String(safe.port), 10);
-                    const timeoutMs = parseInt(String(safe.timeoutMs), 10);
-                    this.proxySettings = {
-                        enabled: safe.enabled !== false,
-                        host: typeof safe.host === 'string' && safe.host.trim() ? safe.host.trim() : '127.0.0.1',
-                        port: Number.isFinite(port) ? port : 8318,
-                        provider: typeof safe.provider === 'string' ? safe.provider.trim() : '',
-                        authSource: safe.authSource === 'profile' || safe.authSource === 'none' ? safe.authSource : 'provider',
-                        timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : 30000
-                    };
-                },
-
-                async loadProxyStatus(options = {}) {
-                    const silent = !!options.silent;
-                    this.proxyLoading = true;
-                    try {
-                        const res = await api('proxy-status');
-                        if (res && res.error) {
-                            if (!silent) {
-                                this.showMessage(res.error, 'error');
-                            }
-                            return;
-                        }
-                        this.mergeProxySettings(res && res.settings ? res.settings : {});
-                        this.proxyRuntime = res && res.runtime ? { running: true, ...res.runtime } : null;
-                    } catch (e) {
-                        if (!silent) {
-                            this.showMessage('读取代理状态失败', 'error');
-                        }
-                    } finally {
-                        this.proxyLoading = false;
-                    }
-                },
-
-                async saveProxySettings(options = {}) {
-                    const silent = !!options.silent;
-                    this.proxySaving = true;
-                    try {
-                        const res = await api('proxy-save-config', this.proxySettings);
-                        if (res && res.error) {
-                            if (!silent) {
-                                this.showMessage(res.error, 'error');
-                            }
-                            return;
-                        }
-                        if (res && res.settings) {
-                            this.mergeProxySettings(res.settings);
-                        }
-                        if (!silent) {
-                            this.showMessage('代理配置已保存', 'success');
-                        }
-                    } catch (e) {
-                        if (!silent) {
-                            this.showMessage('保存代理配置失败', 'error');
-                        }
-                    } finally {
-                        this.proxySaving = false;
-                    }
-                },
-
-                async startBuiltinProxy() {
-                    this.proxyStarting = true;
-                    try {
-                        const res = await api('proxy-start', {
-                            ...this.proxySettings,
-                            enabled: true
-                        });
-                        if (res && res.error) {
-                            this.showMessage(res.error, 'error');
-                            return;
-                        }
-                        if (res && res.settings) {
-                            this.mergeProxySettings(res.settings);
-                        }
-                        await this.loadProxyStatus({ silent: true });
-                        const listenTip = res && res.listenUrl ? `：${res.listenUrl}` : '';
-                        this.showMessage(`代理已启动${listenTip}`, 'success');
-                    } catch (e) {
-                        this.showMessage('启动代理失败', 'error');
-                    } finally {
-                        this.proxyStarting = false;
-                    }
-                },
-
-                async stopBuiltinProxy() {
-                    this.proxyStopping = true;
-                    try {
-                        const res = await api('proxy-stop');
-                        if (res && res.error) {
-                            this.showMessage(res.error, 'error');
-                            return;
-                        }
-                        await this.loadProxyStatus({ silent: true });
-                        this.showMessage('代理已停止', 'success');
-                    } catch (e) {
-                        this.showMessage('停止代理失败', 'error');
-                    } finally {
-                        this.proxyStopping = false;
-                    }
-                },
-
-                async applyBuiltinProxyProvider() {
-                    this.proxyApplying = true;
-                    try {
-                        const saveRes = await api('proxy-save-config', this.proxySettings);
-                        if (saveRes && saveRes.error) {
-                            this.showMessage(saveRes.error, 'error');
-                            return;
-                        }
-                        const res = await api('proxy-apply-provider', { switchToProxy: true });
-                        if (res && res.error) {
-                            this.showMessage(res.error, 'error');
-                            return;
-                        }
-                        await this.loadAll();
-                        this.showMessage('本地代理 provider 已写入并切换', 'success');
-                    } catch (e) {
-                        this.showMessage('应用代理 provider 失败', 'error');
-                    } finally {
-                        this.proxyApplying = false;
                     }
                 },
 
