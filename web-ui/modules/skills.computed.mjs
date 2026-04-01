@@ -1,5 +1,11 @@
 ﻿export function createSkillsComputed() {
     return {
+        skillsTargetLabel() {
+            return this.skillsTargetApp === 'claude' ? 'Claude Code' : 'Codex';
+        },
+        skillsDefaultRootPath() {
+            return this.skillsTargetApp === 'claude' ? '~/.claude/skills' : '~/.codex/skills';
+        },
         filteredSkillsList() {
             const list = Array.isArray(this.skillsList) ? this.skillsList : [];
             const keyword = typeof this.skillsKeyword === 'string' ? this.skillsKeyword.trim().toLowerCase() : '';
@@ -77,6 +83,25 @@
         skillsImportMissingSkillFileCount() {
             const list = Array.isArray(this.skillsImportList) ? this.skillsImportList : [];
             return list.filter((item) => !(item && item.hasSkillFile)).length;
+        },
+        skillsMarketBusy() {
+            return !!(
+                this.skillsMarketLoading
+                || this.skillsLoading
+                || this.skillsDeleting
+                || this.skillsScanningImports
+                || this.skillsImporting
+                || this.skillsZipImporting
+                || this.skillsExporting
+            );
+        },
+        skillsMarketInstalledPreview() {
+            const list = Array.isArray(this.skillsList) ? this.skillsList : [];
+            return list.slice(0, 6);
+        },
+        skillsMarketImportPreview() {
+            const list = Array.isArray(this.skillsImportList) ? this.skillsImportList : [];
+            return list.slice(0, 6);
         }
     };
 }
