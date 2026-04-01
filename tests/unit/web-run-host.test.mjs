@@ -334,6 +334,8 @@ test('resolveSkillTarget rejects explicit unsupported targets instead of falling
     assert.strictEqual(resolveSkillTarget({ targetApp: 'claud' }), null);
     assert.strictEqual(resolveSkillTarget({ targetApp: 'claud', target: 'claude' }), null);
     assert.strictEqual(resolveSkillTarget({ target: 'unknown' }, 'codex'), null);
+    assert.strictEqual(resolveSkillTarget({ targetApp: '' }, 'codex'), null);
+    assert.strictEqual(resolveSkillTarget({ target: '' }, 'codex'), null);
 });
 
 test('resolveSkillTarget keeps targetApp precedence over target', () => {
@@ -407,6 +409,10 @@ test('scanUnmanagedSkills skips entries when the resolved target path is already
 test('resolveSkillTargetAppFromRequest rejects explicit unsupported query target', () => {
     assert.strictEqual(
         resolveSkillTargetAppFromRequest({ url: '/api/import-skills-zip?targetApp=claud' }, 'codex'),
+        null
+    );
+    assert.strictEqual(
+        resolveSkillTargetAppFromRequest({ url: '/api/import-skills-zip?target=' }, 'codex'),
         null
     );
     assert.strictEqual(
@@ -488,6 +494,96 @@ test('handleImportSkillsZipUpload keeps forced target app on the codex-only rout
     assert(importedOptions, 'importSkillsFromZipFile should receive options');
     assert.strictEqual(importedOptions.targetApp, 'codex');
     assert.strictEqual(res.statusCode, 200);
+});
+
+test('handleImportSkillsZipUpload drains request body before method errors', async () => {
+    let resumeCalls = 0;
+    const handleImportSkillsZipUpload = instantiateFunction(
+        handleImportSkillsZipUploadSource,
+        'handleImportSkillsZipUpload',
+        {
+            normalizeSkillTargetApp() {
+                return '';
+            },
+            resolveSkillTargetAppFromRequest() {
+                return 'codex';
+            },
+            resolveUploadFileNameFromRequest() {
+                throw new Error('resolveUploadFileNameFromRequest should not run');
+            },
+            writeUploadZipStream: async () => {
+                throw new Error('writeUploadZipStream should not run');
+            },
+            importSkillsFromZipFile: async () => {
+                throw new Error('importSkillsFromZipFile should not run');
+            },
+            writeJsonResponse(res, statusCode, payload) {
+                res.statusCode = statusCode;
+                res.payload = payload;
+            },
+            MAX_SKILLS_ZIP_UPLOAD_SIZE: 20 * 1024 * 1024
+        }
+    );
+
+    const req = {
+        method: 'GET',
+        url: '/api/import-skills-zip',
+        headers: {},
+        resume() {
+            resumeCalls += 1;
+        }
+    };
+    const res = {};
+    await handleImportSkillsZipUpload(req, res);
+
+    assert.strictEqual(resumeCalls, 1);
+    assert.strictEqual(res.statusCode, 405);
+    assert.deepStrictEqual(res.payload, { error: 'Method Not Allowed' });
+});
+
+test('handleImportSkillsZipUpload drains request body before unsupported target errors', async () => {
+    let resumeCalls = 0;
+    const handleImportSkillsZipUpload = instantiateFunction(
+        handleImportSkillsZipUploadSource,
+        'handleImportSkillsZipUpload',
+        {
+            normalizeSkillTargetApp() {
+                return '';
+            },
+            resolveSkillTargetAppFromRequest() {
+                return null;
+            },
+            resolveUploadFileNameFromRequest() {
+                throw new Error('resolveUploadFileNameFromRequest should not run');
+            },
+            writeUploadZipStream: async () => {
+                throw new Error('writeUploadZipStream should not run');
+            },
+            importSkillsFromZipFile: async () => {
+                throw new Error('importSkillsFromZipFile should not run');
+            },
+            writeJsonResponse(res, statusCode, payload) {
+                res.statusCode = statusCode;
+                res.payload = payload;
+            },
+            MAX_SKILLS_ZIP_UPLOAD_SIZE: 20 * 1024 * 1024
+        }
+    );
+
+    const req = {
+        method: 'POST',
+        url: '/api/import-skills-zip?target=',
+        headers: {},
+        resume() {
+            resumeCalls += 1;
+        }
+    };
+    const res = {};
+    await handleImportSkillsZipUpload(req, res);
+
+    assert.strictEqual(resumeCalls, 1);
+    assert.strictEqual(res.statusCode, 400);
+    assert.deepStrictEqual(res.payload, { error: '目标宿主不支持' });
 });
 
 test('handleImportSkillsZipUpload derives fallback zip name from the resolved target app', async () => {

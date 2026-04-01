@@ -65,7 +65,13 @@ export function switchMainTab(tab) {
         && previousTab !== 'market'
         && typeof this.loadSkillsMarketOverview === 'function';
     if (shouldLoadSkillsMarketOnEnter) {
-        void Promise.resolve(this.loadSkillsMarketOverview({ silent: true })).catch(() => {});
+        let marketOverviewLoad = null;
+        try {
+            marketOverviewLoad = this.loadSkillsMarketOverview({ silent: true });
+        } catch (_) {
+            marketOverviewLoad = null;
+        }
+        void Promise.resolve(marketOverviewLoad).catch(() => {});
     }
     if (nextTab === 'config' && this.configMode === 'claude') {
         const expectedTab = nextTab;

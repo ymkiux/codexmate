@@ -201,7 +201,7 @@ codexmate codex --model gpt-5.3-codex --follow-up "step1" --follow-up "step2"
 ### Skills Market Tab
 - Switch the skills install target between `Codex` and `Claude Code`
 - Show the current local skills root, installed items, and importable items
-- Scan unmanaged skills under `Codex` / `Claude Code` / `Agents`
+- Scan importable sources under `Codex` / `Claude Code` / `Agents`
 - Support cross-app import, ZIP import/export, and batch delete
 
 ## MCP

@@ -3708,6 +3708,14 @@ body::after {
     transition: border-color var(--transition-fast) var(--ease-smooth), background var(--transition-fast) var(--ease-smooth), color var(--transition-fast) var(--ease-smooth), box-shadow var(--transition-fast) var(--ease-smooth);
 }
 
+.market-target-chip:disabled,
+.market-target-chip[disabled] {
+    cursor: not-allowed;
+    opacity: 0.64;
+    pointer-events: none;
+    box-shadow: none;
+}
+
 .market-target-chip.active {
     border-color: rgba(208, 88, 58, 0.4);
     background: linear-gradient(to bottom, rgba(255, 243, 236, 0.98) 0%, rgba(255, 232, 220, 0.86) 100%);

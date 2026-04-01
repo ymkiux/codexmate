@@ -65,6 +65,17 @@ export function createSkillsMethods({ api }) {
         },
 
         async openSkillsManager(options = {}) {
+            if (
+                this.skillsLoading
+                || this.skillsDeleting
+                || this.skillsScanningImports
+                || this.skillsImporting
+                || this.skillsZipImporting
+                || this.skillsExporting
+                || this.skillsMarketLoading
+            ) {
+                return false;
+            }
             let targetApp;
             try {
                 targetApp = this.normalizeSkillsTargetApp(options && options.targetApp ? options.targetApp : this.skillsTargetApp);

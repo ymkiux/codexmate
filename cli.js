@@ -1447,7 +1447,10 @@ function resolveSkillTarget(params = {}, defaultApp = 'codex') {
     const rawTargetApp = hasExplicitTargetApp ? params.targetApp : '';
     const rawTarget = hasExplicitTarget ? params.target : '';
     const raw = rawTargetApp || rawTarget || '';
-    if (hasAnyExplicitTarget && raw && !getSkillTargetByApp(raw)) {
+    if (hasAnyExplicitTarget && raw === '') {
+        return null;
+    }
+    if (hasAnyExplicitTarget && !getSkillTargetByApp(raw)) {
         return null;
     }
     return getSkillTargetByApp(raw)
@@ -9857,6 +9860,9 @@ function resolveSkillTargetAppFromRequest(req, fallbackApp = 'codex') {
 
 async function handleImportSkillsZipUpload(req, res, options = {}) {
     if (req.method !== 'POST') {
+        if (req && typeof req.resume === 'function') {
+            req.resume();
+        }
         writeJsonResponse(res, 405, { error: 'Method Not Allowed' });
         return;
     }
@@ -9864,6 +9870,9 @@ async function handleImportSkillsZipUpload(req, res, options = {}) {
         const forcedTargetApp = normalizeSkillTargetApp(options && options.targetApp ? options.targetApp : '');
         const targetApp = forcedTargetApp || resolveSkillTargetAppFromRequest(req, 'codex');
         if (!targetApp) {
+            if (req && typeof req.resume === 'function') {
+                req.resume();
+            }
             writeJsonResponse(res, 400, { error: '目标宿主不支持' });
             return;
         }

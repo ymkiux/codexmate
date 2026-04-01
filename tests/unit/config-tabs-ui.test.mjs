@@ -55,8 +55,12 @@ test('config template keeps expected config tabs in top and side navigation', ()
     )];
     assert.strictEqual(targetSwitchButtons.length, 4);
     for (const [buttonMarkup] of targetSwitchButtons) {
-        assert.match(buttonMarkup, /:disabled="skillsMarketBusy"/);
+        assert.match(buttonMarkup, /:disabled="loading \|\| !!initError \|\| skillsMarketBusy"/);
     }
+    assert.match(html, /@click="loadSkillsMarketOverview\(\{ forceRefresh: true, silent: false \}\)" :disabled="loading \|\| !!initError \|\| skillsMarketBusy"/);
+    assert.match(html, /<button class="market-action-card" @click="openSkillsManager" :disabled="loading \|\| !!initError \|\| skillsMarketBusy">/);
+    assert.match(html, /<button class="market-action-card" @click="scanImportableSkills\(\{ silent: false \}\)" :disabled="loading \|\| !!initError \|\| skillsMarketBusy">/);
+    assert.match(html, /<button class="market-action-card" @click="triggerSkillsZipImport" :disabled="loading \|\| !!initError \|\| skillsMarketBusy">/);
     assert.match(html, /class="market-target-switch" role="group" aria-label="选择 Skills 安装目标"/);
     assert.match(html, /class="market-target-switch market-target-switch-compact" role="group" aria-label="选择 Skills 管理目标"/);
     assert.doesNotMatch(html, /class="market-target-switch" role="tablist" aria-label="选择 Skills 安装目标"/);
@@ -245,7 +249,9 @@ test('session helper deferred claude refresh validates live tab and mode before 
     assert.match(helperScript, /this\.loadSessionTrashCount\(\{ silent: true \}\);/);
     assert.match(helperScript, /const shouldLoadSkillsMarketOnEnter = nextTab === 'market'/);
     assert.match(helperScript, /previousTab !== 'market'/);
-    assert.match(helperScript, /void Promise\.resolve\(this\.loadSkillsMarketOverview\(\{ silent: true \}\)\)\.catch\(\(\) => \{\}\);/);
+    assert.match(helperScript, /let marketOverviewLoad = null;/);
+    assert.match(helperScript, /marketOverviewLoad = this\.loadSkillsMarketOverview\(\{ silent: true \}\);/);
+    assert.match(helperScript, /void Promise\.resolve\(marketOverviewLoad\)\.catch\(\(\) => \{\}\);/);
 });
 
 test('trash item styles stay aligned with session card layout and keep mobile usability', () => {
@@ -287,6 +293,7 @@ test('settings tab header actions keep compact tool buttons inline on wider scre
     assert.match(styles, /\.market-action-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/);
     assert.match(styles, /\.market-target-switch\s*\{/);
     assert.match(styles, /\.market-target-chip\.active\s*\{/);
+    assert.match(styles, /\.market-target-chip:disabled,\s*\.market-target-chip\[disabled\]\s*\{/);
     assert.match(styles, /\.market-panel-wide\s*\{/);
     assert.match(styles, /--radius-md:\s*[0-9.]+(?:px|rem);/);
     assert.match(styles, /--font-weight-primary:\s*[0-9]+;/);
