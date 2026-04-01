@@ -97,6 +97,16 @@
                 @pointerdown="onMainTabPointerDown('sessions', $event)"
                 @click="onMainTabClick('sessions', $event)">会话浏览</button>
             <button class="top-tab"
+                id="tab-market"
+                role="tab"
+                data-main-tab="market"
+                :tabindex="mainTab === 'market' ? 0 : -1"
+                :aria-selected="mainTab === 'market'"
+                aria-controls="panel-market"
+                :class="{ active: isMainTabNavActive('market') }"
+                @pointerdown="onMainTabPointerDown('market', $event)"
+                @click="onMainTabClick('market', $event)">技能市场</button>
+            <button class="top-tab"
                 id="tab-settings"
                 role="tab"
                 data-main-tab="settings"
@@ -215,6 +225,26 @@
                     </button>
                 </div>
 
+                <div class="side-section" role="tablist" aria-label="技能市场">
+                    <div class="side-section-title">技能市场</div>
+                    <button
+                        role="tab"
+                        id="side-tab-market"
+                        data-main-tab="market"
+                        aria-controls="panel-market"
+                        :tabindex="mainTab === 'market' ? 0 : -1"
+                        :aria-selected="mainTab === 'market'"
+                        :class="['side-item', { active: isMainTabNavActive('market') }]"
+                        @pointerdown="onMainTabPointerDown('market', $event)"
+                        @click="onMainTabClick('market', $event)">
+                        <div class="side-item-title">市场</div>
+                        <div class="side-item-meta">
+                            <span>{{ skillsTargetLabel }} / 本地 Skills</span>
+                            <span>已装 {{ skillsList.length }} · 可导入 {{ skillsImportList.length }}</span>
+                        </div>
+                    </button>
+                </div>
+
                 <div class="side-section" role="tablist" aria-label="设置">
                     <div class="side-section-title">设置</div>
                     <button
@@ -237,7 +267,7 @@
             <main class="main-panel">
                 <div class="panel-header" v-if="!sessionStandalone">
                     <h1 class="main-title">
-                        {{ mainTab === 'config' ? '配置中心' : (mainTab === 'sessions' ? '会话浏览' : '设置') }}
+                        {{ mainTab === 'config' ? '配置中心' : (mainTab === 'sessions' ? '会话浏览' : (mainTab === 'market' ? '技能市场' : '设置')) }}
                     </h1>
                     <p class="subtitle" v-if="mainTab === 'config'">
                         配置中枢：管理 Codex / Claude / OpenClaw
@@ -245,6 +275,9 @@
                     </p>
                     <p class="subtitle" v-else-if="mainTab === 'sessions'">
                         浏览、导出或独立查看 Codex / Claude 会话记录。
+                    </p>
+                    <p class="subtitle" v-else-if="mainTab === 'market'">
+                        统一管理 Codex / Claude Skills，并聚焦本地导入与分发。
                     </p>
                 </div>
 
@@ -296,6 +329,24 @@
                     <div class="status-chip">
                         <span class="label">会话数</span>
                         <span class="value">{{ sessionsList.length }}</span>
+                    </div>
+                </div>
+                <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'market'">
+                    <div class="status-chip">
+                        <span class="label">当前目标</span>
+                        <span class="value">{{ skillsTargetLabel }}</span>
+                    </div>
+                    <div class="status-chip">
+                        <span class="label">本地 Skills</span>
+                        <span class="value">{{ skillsList.length }}</span>
+                    </div>
+                    <div class="status-chip">
+                        <span class="label">可导入</span>
+                        <span class="value">{{ skillsImportList.length }}</span>
+                    </div>
+                    <div class="status-chip">
+                        <span class="label">可直接导入</span>
+                        <span class="value">{{ skillsImportConfiguredCount }}</span>
                     </div>
                 </div>
                 <div
@@ -430,8 +481,8 @@
                     <div class="selector-header">
                         <span class="selector-title">Skills 管理</span>
                     </div>
-                    <div class="config-template-hint skills-hint-line">管理 <code>~/.codex/skills</code> 自定义 skills，弹窗提供统计概览、筛选检索、多选删除、ZIP 导入与导出。</div>
-                    <button class="btn-tool" @click="openSkillsManager" :disabled="loading || !!initError || skillsLoading || skillsDeleting || skillsScanningImports || skillsImporting || skillsZipImporting || skillsExporting">
+                    <div class="config-template-hint skills-hint-line">默认打开 Codex skills 管理；市场页已支持切换到 Claude Code 并查看本地概览与导入来源。</div>
+                    <button class="btn-tool" @click="openSkillsManager({ targetApp: 'codex' })" :disabled="loading || !!initError || skillsLoading || skillsDeleting || skillsScanningImports || skillsImporting || skillsZipImporting || skillsExporting">
                         {{ skillsLoading ? '加载中...' : '打开 Skills 管理' }}
                     </button>
                 </div>
@@ -1235,6 +1286,182 @@
                     </div>
                 </div>
 
+                <div
+                    v-show="mainTab === 'market'"
+                    class="mode-content"
+                    id="panel-market"
+                    role="tabpanel"
+                    aria-labelledby="tab-market">
+                    <div class="selector-section market-overview-section">
+                        <div class="selector-header market-overview-header">
+                            <div>
+                                <span class="selector-title">Skills 市场概览</span>
+                                <div class="skills-panel-note">当前市场页只保留本地 skills 能力：切换 Codex / Claude Code 安装目标，查看已安装项，执行跨应用导入与 ZIP 分发。</div>
+                            </div>
+                            <div class="settings-tab-actions market-header-actions">
+                                <button class="btn-tool btn-tool-compact" @click="loadSkillsMarketOverview({ forceRefresh: true, silent: false })" :disabled="loading || !!initError || skillsMarketBusy">
+                                    {{ skillsMarketLoading ? '刷新中...' : '刷新概览' }}
+                                </button>
+                                <button class="btn-tool btn-tool-compact" @click="openSkillsManager" :disabled="loading || !!initError || skillsMarketBusy">
+                                    打开 Skills 管理
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="market-target-switch" role="group" aria-label="选择 Skills 安装目标">
+                            <button
+                                type="button"
+                                :class="['market-target-chip', { active: skillsTargetApp === 'codex' }]"
+                                :aria-pressed="skillsTargetApp === 'codex'"
+                                :disabled="loading || !!initError || skillsMarketBusy"
+                                @click="setSkillsTargetApp('codex', { silent: false })">
+                                Codex
+                            </button>
+                            <button
+                                type="button"
+                                :class="['market-target-chip', { active: skillsTargetApp === 'claude' }]"
+                                :aria-pressed="skillsTargetApp === 'claude'"
+                                :disabled="loading || !!initError || skillsMarketBusy"
+                                @click="setSkillsTargetApp('claude', { silent: false })">
+                                Claude Code
+                            </button>
+                        </div>
+
+                        <div class="skills-root-box market-root-box">{{ skillsRootPath || skillsDefaultRootPath }}</div>
+
+                        <div class="skills-summary-strip market-summary-strip">
+                            <div class="skills-summary-item">
+                                <span class="skills-summary-label">安装目标</span>
+                                <strong class="skills-summary-value">{{ skillsTargetLabel }}</strong>
+                            </div>
+                            <div class="skills-summary-item">
+                                <span class="skills-summary-label">本地总数</span>
+                                <strong class="skills-summary-value">{{ skillsList.length }}</strong>
+                            </div>
+                            <div class="skills-summary-item">
+                                <span class="skills-summary-label">含 SKILL.md</span>
+                                <strong class="skills-summary-value">{{ skillsConfiguredCount }}</strong>
+                            </div>
+                            <div class="skills-summary-item">
+                                <span class="skills-summary-label">缺少 SKILL.md</span>
+                                <strong class="skills-summary-value">{{ skillsMissingSkillFileCount }}</strong>
+                            </div>
+                            <div class="skills-summary-item">
+                                <span class="skills-summary-label">可导入</span>
+                                <strong class="skills-summary-value">{{ skillsImportList.length }}</strong>
+                            </div>
+                            <div class="skills-summary-item">
+                                <span class="skills-summary-label">可直接导入</span>
+                                <strong class="skills-summary-value">{{ skillsImportConfiguredCount }}</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="market-grid">
+                        <div class="skills-panel market-panel">
+                            <div class="skills-panel-header">
+                                <div class="skills-panel-title-wrap">
+                                    <div class="skills-panel-title">已安装 Skills</div>
+                                    <div class="skills-panel-note">展示当前已落地到 <code>{{ skillsRootPath || skillsDefaultRootPath }}</code> 的前 6 个目录，可继续进入管理弹窗做筛选、导出和删除。</div>
+                                </div>
+                                <button class="btn-mini" @click="refreshSkillsList({ silent: false })" :disabled="loading || !!initError || skillsMarketBusy">
+                                    {{ skillsLoading ? '刷新中...' : '刷新本地' }}
+                                </button>
+                            </div>
+                            <div v-if="skillsLoading && !skillsMarketLocalLoadedOnce" class="skills-empty-state">正在加载本地 Skills...</div>
+                            <div v-else-if="skillsList.length === 0" class="skills-empty-state">当前还没有已安装 skill，可通过 ZIP 或跨应用导入补充。</div>
+                            <div v-else class="market-preview-list">
+                                <div v-for="skill in skillsMarketInstalledPreview" :key="'market-local-' + skill.name" class="market-preview-item">
+                                    <div class="market-preview-main">
+                                        <div class="market-preview-title">{{ skill.displayName || skill.name }}</div>
+                                        <div class="market-preview-meta">{{ skill.description || skill.path }}</div>
+                                    </div>
+                                    <span :class="['pill', skill.hasSkillFile ? 'configured' : 'empty']">
+                                        {{ skill.hasSkillFile ? '已验证' : '待补 SKILL.md' }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="skills-panel market-panel">
+                            <div class="skills-panel-header">
+                                <div class="skills-panel-title-wrap">
+                                    <div class="skills-panel-title">可导入来源</div>
+                                    <div class="skills-panel-note">扫描其他应用下未托管的 skill，先确认来源和目录，再批量导入到当前 {{ skillsTargetLabel }} skills 目录。</div>
+                                </div>
+                                <button class="btn-mini" @click="scanImportableSkills({ silent: false })" :disabled="loading || !!initError || skillsMarketBusy">
+                                    {{ skillsScanningImports ? '扫描中...' : '扫描来源' }}
+                                </button>
+                            </div>
+                            <div v-if="skillsScanningImports && !skillsMarketImportLoadedOnce" class="skills-empty-state">正在扫描可导入 skill...</div>
+                            <div v-else-if="skillsImportList.length === 0" class="skills-empty-state">还没有扫描到可导入 skill，可点击“扫描来源”重新读取。</div>
+                            <div v-else class="market-preview-list">
+                                <div v-for="skill in skillsMarketImportPreview" :key="'market-import-' + buildSkillImportKey(skill)" class="market-preview-item">
+                                    <div class="market-preview-main">
+                                        <div class="market-preview-title">{{ skill.displayName || skill.name }}</div>
+                                        <div class="market-preview-meta">{{ skill.sourceLabel }} · {{ skill.sourcePath }}</div>
+                                    </div>
+                                    <span :class="['pill', skill.hasSkillFile ? 'configured' : 'empty']">
+                                        {{ skill.hasSkillFile ? '可直接导入' : '缺少 SKILL.md' }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="skills-panel market-panel market-actions-panel">
+                            <div class="skills-panel-header">
+                                <div class="skills-panel-title-wrap">
+                                    <div class="skills-panel-title">分发入口</div>
+                                    <div class="skills-panel-note">市场页聚焦本地落地：本地管理、跨应用导入、ZIP 分发，全部作用到当前安装目标。</div>
+                                </div>
+                            </div>
+                            <div class="market-action-grid">
+                                <button class="market-action-card" @click="openSkillsManager" :disabled="loading || !!initError || skillsMarketBusy">
+                                    <span class="market-action-title">本地 Skills 管理</span>
+                                    <span class="market-action-copy">查看、筛选、导出、删除当前 {{ skillsTargetLabel }} 已安装 skills</span>
+                                </button>
+                                <button class="market-action-card" @click="scanImportableSkills({ silent: false })" :disabled="loading || !!initError || skillsMarketBusy">
+                                    <span class="market-action-title">跨应用导入</span>
+                                    <span class="market-action-copy">扫描其他应用目录并导入到当前 {{ skillsTargetLabel }}</span>
+                                </button>
+                                <button class="market-action-card" @click="triggerSkillsZipImport" :disabled="loading || !!initError || skillsMarketBusy">
+                                    <span class="market-action-title">ZIP 导入</span>
+                                    <span class="market-action-copy">从压缩包分发并安装到当前目标宿主</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="skills-panel market-panel market-panel-wide">
+                            <div class="skills-panel-header">
+                                <div class="skills-panel-title-wrap">
+                                    <div class="skills-panel-title">市场说明</div>
+                                    <div class="skills-panel-note">这里不再展示任何 MCP 在线目录或外部市场，只保留当前项目自己的本地 skills 视图和导入分发流程。</div>
+                                </div>
+                            </div>
+                            <div class="market-preview-list">
+                                <div class="market-preview-item">
+                                    <div class="market-preview-main">
+                                        <div class="market-preview-title">目标宿主切换</div>
+                                        <div class="market-preview-meta">在 Codex 和 Claude Code 之间切换后，后续扫描、导入、导出、删除都会落到当前 {{ skillsTargetLabel }} 目录。</div>
+                                    </div>
+                                </div>
+                                <div class="market-preview-item">
+                                    <div class="market-preview-main">
+                                        <div class="market-preview-title">跨应用导入</div>
+                                        <div class="market-preview-meta">扫描 `Codex`、`Claude Code` 与 `Agents` 目录里的未托管 skills，筛选后批量导入到当前宿主。</div>
+                                    </div>
+                                </div>
+                                <div class="market-preview-item">
+                                    <div class="market-preview-main">
+                                        <div class="market-preview-title">ZIP 分发</div>
+                                        <div class="market-preview-meta">通过压缩包在不同环境间分发技能目录，保持本地可控，不依赖外部目录服务。</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             <!-- 加载状态 -->
             <div v-if="loading" class="state-message">
                 加载配置中...
@@ -1909,9 +2136,27 @@
                 <div class="modal-header skills-modal-header">
                     <div>
                         <div class="modal-title">Skills 管理</div>
-                        <div class="skills-modal-subtitle">集中管理本地技能目录，支持检索筛选、多选删除、跨应用导入、ZIP 导入与导出。</div>
+                        <div class="skills-modal-subtitle">集中管理当前宿主的本地技能目录，支持检索筛选、多选删除、跨应用导入、ZIP 导入与导出。</div>
                     </div>
                     <div class="modal-header-actions skills-modal-actions">
+                        <div class="market-target-switch market-target-switch-compact" role="group" aria-label="选择 Skills 管理目标">
+                            <button
+                                type="button"
+                                :class="['market-target-chip', { active: skillsTargetApp === 'codex' }]"
+                                :aria-pressed="skillsTargetApp === 'codex'"
+                                :disabled="loading || !!initError || skillsMarketBusy"
+                                @click="setSkillsTargetApp('codex', { silent: false })">
+                                Codex
+                            </button>
+                            <button
+                                type="button"
+                                :class="['market-target-chip', { active: skillsTargetApp === 'claude' }]"
+                                :aria-pressed="skillsTargetApp === 'claude'"
+                                :disabled="loading || !!initError || skillsMarketBusy"
+                                @click="setSkillsTargetApp('claude', { silent: false })">
+                                Claude Code
+                            </button>
+                        </div>
                         <button class="btn-mini" @click="refreshSkillsList({ silent: false })" :disabled="skillsLoading || skillsDeleting || skillsScanningImports || skillsImporting || skillsZipImporting || skillsExporting">
                             {{ skillsLoading ? '刷新中...' : '刷新' }}
                         </button>
@@ -1919,11 +2164,15 @@
                 </div>
 
                 <div class="form-group skills-root-group">
-                    <label class="form-label">Skills 目录</label>
-                    <div class="skills-root-box">{{ skillsRootPath || '~/.codex/skills' }}</div>
+                    <label class="form-label">Skills 目录（{{ skillsTargetLabel }}）</label>
+                    <div class="skills-root-box">{{ skillsRootPath || skillsDefaultRootPath }}</div>
                 </div>
 
                 <div class="skills-summary-strip">
+                    <div class="skills-summary-item">
+                        <span class="skills-summary-label">安装目标</span>
+                        <strong class="skills-summary-value">{{ skillsTargetLabel }}</strong>
+                    </div>
                     <div class="skills-summary-item">
                         <span class="skills-summary-label">本地总数</span>
                         <strong class="skills-summary-value">{{ skillsList.length }}</strong>
@@ -1946,7 +2195,7 @@
                     <div class="skills-panel-header">
                         <div class="skills-panel-title-wrap">
                             <div class="skills-panel-title">本地 Skills</div>
-                            <div class="skills-panel-note">支持关键词检索与状态筛选，勾选后可批量删除。</div>
+                            <div class="skills-panel-note">支持关键词检索与状态筛选，勾选后可批量删除当前 {{ skillsTargetLabel }} 本地 skill。</div>
                         </div>
                         <button
                             class="btn-mini"
@@ -2005,8 +2254,8 @@
                 <div class="skills-panel skills-import-block">
                     <div class="skills-panel-header">
                         <div class="skills-panel-title-wrap">
-                            <div class="skills-import-title">跨应用导入（对齐 cc-switch 能力）</div>
-                            <div class="skills-panel-note">从其他应用扫描并导入未托管技能，支持多选批量导入。</div>
+                            <div class="skills-import-title">跨应用导入</div>
+                            <div class="skills-panel-note">从其他应用扫描并导入未托管技能，支持多选批量导入到当前 {{ skillsTargetLabel }}。</div>
                         </div>
                         <button class="btn-mini" @click="scanImportableSkills" :disabled="skillsLoading || skillsDeleting || skillsScanningImports || skillsImporting || skillsZipImporting || skillsExporting">
                             {{ skillsScanningImports ? '扫描中...' : '扫描可导入' }}
@@ -2057,14 +2306,15 @@
                         {{ skillsDeleting ? '删除中...' : '删除选中' }}
                     </button>
                 </div>
-                <input
-                    ref="skillsZipImportInput"
-                    type="file"
-                    accept=".zip,application/zip"
-                    style="display:none"
-                    @change="handleSkillsZipImportChange">
             </div>
         </div>
+
+        <input
+            ref="skillsZipImportInput"
+            type="file"
+            accept=".zip,application/zip"
+            style="display:none"
+            @change="handleSkillsZipImportChange">
 
         <div v-if="showConfirmDialog" class="modal-overlay" @click.self="closeConfirmDialog">
             <div
@@ -2080,6 +2330,7 @@
                     <button class="btn btn-cancel" @click="closeConfirmDialog">{{ confirmDialogCancelText }}</button>
                     <button
                         :class="['btn', 'btn-confirm', confirmDialogDanger ? 'btn-danger' : '']"
+                        :disabled="isConfirmDialogDisabled()"
                         @click="resolveConfirmDialog(true)">
                         {{ confirmDialogConfirmText }}
                     </button>

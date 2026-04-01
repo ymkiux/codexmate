@@ -40,6 +40,10 @@ async function main() {
         ...process.env,
         HOME: tmpHome,
         USERPROFILE: tmpHome,
+        CODEX_HOME: '',
+        CLAUDE_HOME: '',
+        CLAUDE_CONFIG_DIR: '',
+        XDG_CONFIG_HOME: '',
         CODEXMATE_FORCE_RESET_EXISTING_CONFIG: '1',
         CODEXMATE_NO_BROWSER: '1'
     };

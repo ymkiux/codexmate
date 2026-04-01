@@ -127,6 +127,98 @@ test('switchMainTab primes trash badge count and invalidates the cached trash li
     assert.deepStrictEqual(calls, [{ silent: true }]);
 });
 
+test('switchMainTab loads skills market overview when entering market', () => {
+    const calls = [];
+    const vm = {
+        mainTab: 'config',
+        configMode: 'codex',
+        sessionsLoadedOnce: true,
+        teardownSessionTabRender() {},
+        prepareSessionTabRender() {},
+        loadSessions() {},
+        loadSkillsMarketOverview(options) {
+            calls.push(options);
+        },
+        refreshClaudeModelContext() {}
+    };
+
+    switchMainTab.call(vm, 'market');
+
+    assert.strictEqual(vm.mainTab, 'market');
+    assert.deepStrictEqual(calls, [{ silent: true }]);
+});
+
+test('switchMainTab swallows rejected skills market overview loads', async () => {
+    const unhandled = [];
+    const onUnhandledRejection = (reason) => {
+        unhandled.push(reason);
+    };
+    const vm = {
+        mainTab: 'config',
+        configMode: 'codex',
+        sessionsLoadedOnce: true,
+        teardownSessionTabRender() {},
+        prepareSessionTabRender() {},
+        loadSessions() {},
+        loadSkillsMarketOverview() {
+            return Promise.reject(new Error('boom'));
+        },
+        refreshClaudeModelContext() {}
+    };
+
+    process.on('unhandledRejection', onUnhandledRejection);
+    try {
+        switchMainTab.call(vm, 'market');
+        await new Promise((resolve) => setImmediate(resolve));
+    } finally {
+        process.removeListener('unhandledRejection', onUnhandledRejection);
+    }
+
+    assert.strictEqual(vm.mainTab, 'market');
+    assert.deepStrictEqual(unhandled, []);
+});
+
+test('switchMainTab swallows synchronous skills market overview errors', () => {
+    const vm = {
+        mainTab: 'config',
+        configMode: 'codex',
+        sessionsLoadedOnce: true,
+        teardownSessionTabRender() {},
+        prepareSessionTabRender() {},
+        loadSessions() {},
+        loadSkillsMarketOverview() {
+            throw new Error('boom');
+        },
+        refreshClaudeModelContext() {}
+    };
+
+    assert.doesNotThrow(() => {
+        switchMainTab.call(vm, 'market');
+    });
+    assert.strictEqual(vm.mainTab, 'market');
+});
+
+test('switchMainTab does not reload skills market overview when already on market', () => {
+    const calls = [];
+    const vm = {
+        mainTab: 'market',
+        configMode: 'codex',
+        sessionsLoadedOnce: true,
+        teardownSessionTabRender() {},
+        prepareSessionTabRender() {},
+        loadSessions() {},
+        loadSkillsMarketOverview(options) {
+            calls.push(options);
+        },
+        refreshClaudeModelContext() {}
+    };
+
+    switchMainTab.call(vm, 'market');
+
+    assert.strictEqual(vm.mainTab, 'market');
+    assert.deepStrictEqual(calls, []);
+});
+
 test('switchMainTab defers session teardown when scheduler exists to keep tab selection responsive', () => {
     let deferredTask = null;
     let teardownCount = 0;

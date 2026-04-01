@@ -23,9 +23,10 @@ Codex Mate is a local-first CLI + Web UI for unified management of:
 - Codex provider/model switching and config writes
 - Claude Code profiles (writes to `~/.claude/settings.json`)
 - OpenClaw JSON5 profiles and workspace `AGENTS.md`
+- Local skills market for Codex / Claude Code (target switching, local skills management, cross-app import, ZIP distribution)
 - Local Codex/Claude sessions (list/filter/export/delete)
 
-It works on local files directly and does not require cloud hosting.
+It works on local files directly and does not require cloud hosting. The skills market is also local-first: it operates on local directories and does not depend on a remote marketplace.
 
 ## Why Codex Mate?
 
@@ -34,6 +35,7 @@ It works on local files directly and does not require cloud hosting.
 | Multi-tool management | Codex + Claude Code + OpenClaw in one entry | Different files and folders per tool |
 | Operation mode | CLI + local Web UI | Manual TOML/JSON/JSON5 edits |
 | Session handling | Browse/export/batch cleanup | Manual file location and processing |
+| Skills reuse | Local skills market + cross-app import + ZIP distribution | Manual folder copy and reconciliation |
 | Rollback readiness | Backup before first takeover | Easy to overwrite by mistake |
 | Automation integration | MCP stdio (read-only by default) | Requires custom scripting |
 
@@ -51,6 +53,12 @@ It works on local files directly and does not require cloud hosting.
 - Keyword/source/cwd filters
 - Markdown export
 - Session-level and message-level delete (supports batch)
+
+**Skills Market**
+- Switch the skills install target between Codex and Claude Code
+- Inspect local installed skills, root paths, and status
+- Scan importable sources from `Codex` / `Claude Code` / `Agents`
+- Support cross-app import, ZIP import/export, and batch delete
 
 **Engineering Utilities**
 - MCP stdio domains (`tools`, `resources`, `prompts`)
@@ -74,15 +82,16 @@ flowchart TB
       API["Local HTTP API"]
       MCPS["MCP stdio Server"]
       PROXY["Built-in Proxy"]
-      SERVICES["Config / Sessions / Skills / Workflow"]
+      SERVICES["Config / Sessions / Skills Market / Workflow"]
       CORE["File IO / Network / Diff / Session Utils"]
     end
 
     subgraph Data["Local Files"]
-      CODEX["~/.codex"]
-      CLAUDE["~/.claude"]
-      OPENCLAW["~/.openclaw"]
-      STATE["sessions / trash / workflow runs"]
+      CODEX["~/.codex/config + auth + models"]
+      CLAUDE["~/.claude/settings.json"]
+      OPENCLAW["~/.openclaw/*.json5 + ~/.openclaw/openclaw.json + workspace/AGENTS.md"]
+      SKILLS["~/.codex/skills / ~/.claude/skills / ~/.agents/skills"]
+      STATE["sessions / trash / workflow runs / skill exports"]
     end
 
     CLI --> ENTRY
@@ -100,6 +109,7 @@ flowchart TB
     CORE --> CODEX
     CORE --> CLAUDE
     CORE --> OPENCLAW
+    CORE --> SKILLS
     CORE --> STATE
 ```
 
@@ -114,7 +124,9 @@ codexmate status
 codexmate run
 ```
 
-Default listen address is `127.0.0.1:3737`, and browser auto-open is enabled by default.
+Default listen address is `0.0.0.0:3737` for LAN access, and browser auto-open is enabled by default.
+
+> Safety note: the unauthenticated management UI is exposed to your current LAN by default. Use trusted networks only; for local-only access, set `CODEXMATE_HOST=127.0.0.1` or pass `--host 127.0.0.1`.
 
 ### Run from source
 
@@ -170,8 +182,6 @@ codexmate codex --model gpt-5.3-codex --follow-up "step1" --follow-up "step2"
 - Provider/model switching
 - Model list management
 - `~/.codex/AGENTS.md` editing
-- `~/.codex/skills` management (filter, batch delete, cross-app import)
-
 
 ### Claude Code Mode
 - Multi-profile management
@@ -187,6 +197,12 @@ codexmate codex --model gpt-5.3-codex --follow-up "step1" --follow-up "step2"
 - Unified Codex + Claude sessions
 - Local pin/unpin with persistent storage and pinned-first ordering
 - Search, filter, export, delete, batch cleanup
+
+### Skills Market Tab
+- Switch the skills install target between `Codex` and `Claude Code`
+- Show the current local skills root, installed items, and importable items
+- Scan importable sources under `Codex` / `Claude Code` / `Agents`
+- Support cross-app import, ZIP import/export, and batch delete
 
 ## MCP
 
@@ -218,7 +234,7 @@ codexmate mcp serve --allow-write
 | Variable | Default | Description |
 | --- | --- | --- |
 | `CODEXMATE_PORT` | `3737` | Web server port |
-| `CODEXMATE_HOST` | `127.0.0.1` | Web listen host |
+| `CODEXMATE_HOST` | `0.0.0.0` | Web listen host (set `127.0.0.1` for local-only access) |
 | `CODEXMATE_NO_BROWSER` | unset | Set `1` to disable browser auto-open |
 | `CODEXMATE_MCP_ALLOW_WRITE` | unset | Set `1` to allow MCP write tools by default |
 | `CODEXMATE_FORCE_RESET_EXISTING_CONFIG` | `0` | Set `1` to force bootstrap reset of existing config |
