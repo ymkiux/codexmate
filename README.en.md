@@ -28,7 +28,7 @@ Codex Mate is a local-first CLI + Web UI for unified management of:
 
 It works on local files directly and does not require cloud hosting. The skills market is also local-first: it operates on local directories and does not depend on a remote marketplace.
 
-## Why Codex Mate?
+## Comparison
 
 | Dimension | Codex Mate | Manual File Editing |
 | --- | --- | --- |
@@ -248,7 +248,7 @@ codexmate mcp serve --allow-write
 
 ## Contributing
 
-Issues and pull requests are welcome.
+Issues and pull requests are accepted.
 
 - English changelog: `doc/CHANGELOG.md`
 - Chinese changelog: `doc/CHANGELOG.zh-CN.md`

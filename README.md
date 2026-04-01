@@ -28,7 +28,7 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 
 项目不依赖云端托管，配置写入你的本地文件，便于审计和回滚。Skills 市场同样坚持本地优先，只操作本地目录，不依赖远程在线市场。
 
-## 为什么选择 Codex Mate？
+## 功能对比
 
 | 维度 | Codex Mate | 手动维护配置 |
 | --- | --- | --- |
@@ -249,7 +249,7 @@ codexmate mcp serve --allow-write
 
 ## 参与贡献
 
-欢迎提交 Issue 和 Pull Request。
+Issue 与 Pull Request 可按需提交。
 
 - 英文更新日志：`doc/CHANGELOG.md`
 - 中文更新日志：`doc/CHANGELOG.zh-CN.md`
