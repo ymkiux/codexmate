@@ -3580,7 +3580,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         try {
                             return !!this.confirmDialogDisableWhen.call(this);
                         } catch (_) {
-                            return false;
+                            return true;
                         }
                     }
                     return !!this.confirmDialogConfirmDisabled;

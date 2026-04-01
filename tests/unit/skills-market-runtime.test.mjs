@@ -176,6 +176,26 @@ test('openSkillsManager rejects invalid explicit target without reopening the mo
     }]);
 });
 
+test('openSkillsManager returns false while skills actions are in flight', async () => {
+    let refreshCalls = 0;
+    const vm = buildVm(async () => ({}), {
+        skillsTargetApp: 'codex',
+        skillsImporting: true,
+        showSkillsModal: false
+    });
+    vm.refreshSkillsList = async () => {
+        refreshCalls += 1;
+        return true;
+    };
+
+    const ok = await vm.openSkillsManager({ targetApp: 'claude' });
+
+    assert.strictEqual(ok, false);
+    assert.strictEqual(vm.skillsTargetApp, 'codex');
+    assert.strictEqual(vm.showSkillsModal, false);
+    assert.strictEqual(refreshCalls, 0);
+});
+
 test('openSkillsManager keeps market overview state when reopening same target', async () => {
     const refreshCalls = [];
     const vm = buildVm(async () => ({}), {

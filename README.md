@@ -201,7 +201,7 @@ codexmate codex --model gpt-5.3-codex --follow-up "步骤1" --follow-up "步骤2
 ### Skills 市场标签页
 - 在 `Codex` 与 `Claude Code` 之间切换 skills 安装目标
 - 展示当前目标的本地 skills 根目录、已安装项和可导入项
-- 扫描 `Codex` / `Claude Code` / `Agents` 目录下未托管的 skills
+- 扫描 `Codex` / `Claude Code` / `Agents` 目录中的可导入来源
 - 支持跨应用导入、ZIP 导入 / 导出、批量删除
 
 ## MCP

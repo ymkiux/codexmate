@@ -178,6 +178,26 @@ test('switchMainTab swallows rejected skills market overview loads', async () =>
     assert.deepStrictEqual(unhandled, []);
 });
 
+test('switchMainTab swallows synchronous skills market overview errors', () => {
+    const vm = {
+        mainTab: 'config',
+        configMode: 'codex',
+        sessionsLoadedOnce: true,
+        teardownSessionTabRender() {},
+        prepareSessionTabRender() {},
+        loadSessions() {},
+        loadSkillsMarketOverview() {
+            throw new Error('boom');
+        },
+        refreshClaudeModelContext() {}
+    };
+
+    assert.doesNotThrow(() => {
+        switchMainTab.call(vm, 'market');
+    });
+    assert.strictEqual(vm.mainTab, 'market');
+});
+
 test('switchMainTab does not reload skills market overview when already on market', () => {
     const calls = [];
     const vm = {
