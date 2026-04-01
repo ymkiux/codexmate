@@ -253,7 +253,7 @@ let g_builtinProxyRuntime = null;
 const DEFAULT_LOCAL_PROVIDER_NAME = 'local';
 
 function isBuiltinProxyProvider(providerName) {
-    return typeof providerName === 'string' && providerName.trim() === BUILTIN_PROXY_PROVIDER_NAME;
+    return typeof providerName === 'string' && providerName.trim().toLowerCase() === BUILTIN_PROXY_PROVIDER_NAME.toLowerCase();
 }
 
 function isReservedProviderNameForCreation(providerName) {
