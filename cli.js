@@ -926,12 +926,18 @@ function normalizeAuthRegistry(raw) {
     };
 }
 
+function ensureAuthProfileStoragePrepared() {
+    ensureDir(AUTH_PROFILES_DIR);
+}
+
 function readAuthRegistry() {
+    ensureAuthProfileStoragePrepared();
     const parsed = readJsonFile(AUTH_REGISTRY_FILE, null);
     return normalizeAuthRegistry(parsed);
 }
 
 function writeAuthRegistry(registry) {
+    ensureAuthProfileStoragePrepared();
     writeJsonAtomic(AUTH_REGISTRY_FILE, normalizeAuthRegistry(registry));
 }
 
@@ -990,6 +996,7 @@ function listAuthProfilesInfo() {
 }
 
 function upsertAuthProfile(payload, options = {}) {
+    ensureAuthProfileStoragePrepared();
     const safePayload = parseAuthProfileJson(JSON.stringify(payload || {}));
     const sourceFile = typeof options.sourceFile === 'string' ? options.sourceFile : '';
     const preferredName = normalizeAuthProfileName(options.name || '');
@@ -1079,6 +1086,7 @@ function importAuthProfileFromUpload(payload = {}) {
 }
 
 function switchAuthProfile(name, options = {}) {
+    ensureAuthProfileStoragePrepared();
     const profileName = normalizeAuthProfileName(name);
     if (!profileName) {
         throw new Error('认证名称不能为空');
@@ -1124,6 +1132,7 @@ function switchAuthProfile(name, options = {}) {
 }
 
 function deleteAuthProfile(name) {
+    ensureAuthProfileStoragePrepared();
     const profileName = normalizeAuthProfileName(name);
     if (!profileName) {
         return { error: '认证名称不能为空' };
@@ -1172,6 +1181,7 @@ function deleteAuthProfile(name) {
 }
 
 function resolveAuthTokenFromCurrentProfile() {
+    ensureAuthProfileStoragePrepared();
     const registry = readAuthRegistry();
     if (!registry.current) return '';
     const profile = registry.items.find((item) => item.name === registry.current);
@@ -3175,11 +3185,40 @@ function buildVirtualDefaultConfig() {
     return toml.parse(EMPTY_CONFIG_FALLBACK_TEMPLATE);
 }
 
+function sanitizeRemovedBuiltinProxyProvider(config) {
+    const safeConfig = isPlainObject(config) ? config : {};
+    const providers = isPlainObject(safeConfig.model_providers) ? safeConfig.model_providers : null;
+    const currentProvider = typeof safeConfig.model_provider === 'string' ? safeConfig.model_provider.trim() : '';
+    const hasRemovedBuiltin = !!(providers && providers[BUILTIN_PROXY_PROVIDER_NAME]);
+    const currentIsRemovedBuiltin = currentProvider === BUILTIN_PROXY_PROVIDER_NAME;
+
+    if (!hasRemovedBuiltin && !currentIsRemovedBuiltin) {
+        return safeConfig;
+    }
+
+    const nextProviders = providers ? { ...providers } : {};
+    delete nextProviders[BUILTIN_PROXY_PROVIDER_NAME];
+    const providerNames = Object.keys(nextProviders);
+    const fallbackProvider = providerNames[0] || '';
+    const currentModels = readCurrentModels();
+    const fallbackModel = fallbackProvider
+        ? (currentModels[fallbackProvider] || (typeof safeConfig.model === 'string' ? safeConfig.model : ''))
+        : '';
+
+    return {
+        ...safeConfig,
+        model_providers: nextProviders,
+        model_provider: currentIsRemovedBuiltin ? fallbackProvider : safeConfig.model_provider,
+        model: currentIsRemovedBuiltin ? fallbackModel : safeConfig.model
+    };
+}
+
 function readConfigOrVirtualDefault() {
     if (fs.existsSync(CONFIG_FILE)) {
         try {
+            removePersistedBuiltinProxyProviderFromConfig();
             return {
-                config: readConfig(),
+                config: sanitizeRemovedBuiltinProxyProvider(readConfig()),
                 isVirtual: false,
                 reason: '',
                 detail: '',
@@ -3196,7 +3235,9 @@ function readConfigOrVirtualDefault() {
                 ? e.configDetail.trim()
                 : (e && e.message ? e.message : publicReason);
             return {
-                config: errorType === 'missing' ? buildVirtualDefaultConfig() : {},
+                config: errorType === 'missing'
+                    ? sanitizeRemovedBuiltinProxyProvider(buildVirtualDefaultConfig())
+                    : {},
                 isVirtual: true,
                 reason: publicReason,
                 detail,
@@ -3206,7 +3247,7 @@ function readConfigOrVirtualDefault() {
     }
 
     return {
-        config: buildVirtualDefaultConfig(),
+        config: sanitizeRemovedBuiltinProxyProvider(buildVirtualDefaultConfig()),
         isVirtual: true,
         reason: '未检测到 config.toml',
         detail: `配置文件不存在: ${CONFIG_FILE}`,
@@ -3302,8 +3343,8 @@ function getConfigTemplate(params = {}) {
             }
         } catch (e) {}
     }
-    const selectedProvider = params.provider || '';
-    const selectedModel = params.model || '';
+    const selectedProvider = typeof params.provider === 'string' ? params.provider.trim() : '';
+    const selectedModel = typeof params.model === 'string' ? params.model.trim() : '';
     let template = normalizeTopLevelConfigWithTemplate(content, selectedProvider, selectedModel);
     if (typeof params.serviceTier === 'string') {
         template = applyServiceTierToTemplate(template, params.serviceTier);
@@ -3380,7 +3421,7 @@ function addProviderToConfig(params = {}) {
         return { error: 'local provider 为系统保留名称，不可新增' };
     }
     if (isBuiltinProxyProvider(name) && !allowManaged) {
-        return { error: '本地代理配置为系统内建项，不可手动添加' };
+        return { error: 'codexmate-proxy 为保留名称，不可手动添加' };
     }
 
     ensureConfigDir();
@@ -3458,7 +3499,7 @@ function updateProviderInConfig(params = {}) {
         if (isDefaultLocalProvider(name)) {
             return { error: 'local provider 为系统保留项，不可编辑' };
         }
-        return { error: '本地代理配置为系统内建项，不可编辑' };
+        return { error: 'codexmate-proxy 为保留名称，不可编辑' };
     }
 
     try {
@@ -3476,7 +3517,7 @@ function deleteProviderFromConfig(params = {}) {
         if (isDefaultLocalProvider(name)) {
             return { error: 'local provider 为系统保留项，不可删除' };
         }
-        return { error: '本地代理配置为系统内建项，不可删除' };
+        return { error: 'codexmate-proxy 为保留名称，不可删除' };
     }
     if (!fs.existsSync(CONFIG_FILE)) {
         return { error: 'config.toml 不存在' };
@@ -3506,7 +3547,7 @@ function performProviderDeletion(name, options = {}) {
     if (isNonDeletableProvider(name)) {
         const msg = isDefaultLocalProvider(name)
             ? 'local provider 为系统保留项，不可删除'
-            : '本地代理配置为系统内建项，不可删除';
+            : 'codexmate-proxy 为保留名称，不可删除';
         if (!silent) console.error('错误:', msg);
         return { error: msg };
     }
@@ -5511,6 +5552,124 @@ function buildProxyListenUrl(settings) {
     return `http://${host}:${settings.port}`;
 }
 
+function buildBuiltinProxyProviderBaseUrl(settings) {
+    return `${buildProxyListenUrl(settings).replace(/\/+$/, '')}/v1`;
+}
+
+function buildBuiltinProxyProviderConfig(settings) {
+    return {
+        name: BUILTIN_PROXY_PROVIDER_NAME,
+        base_url: buildBuiltinProxyProviderBaseUrl(settings),
+        wire_api: 'responses',
+        requires_openai_auth: false,
+        preferred_auth_method: '',
+        request_max_retries: 4,
+        stream_max_retries: 10,
+        stream_idle_timeout_ms: 300000
+    };
+}
+
+function injectBuiltinProxyProvider(config) {
+    return isPlainObject(config) ? config : {};
+}
+
+function removePersistedBuiltinProxyProviderFromConfig() {
+    if (!fs.existsSync(CONFIG_FILE)) {
+        return { success: true, removed: false };
+    }
+
+    let config;
+    try {
+        config = readConfig();
+    } catch (e) {
+        return { error: e.message || '读取 config.toml 失败' };
+    }
+
+    if (!config.model_providers || !config.model_providers[BUILTIN_PROXY_PROVIDER_NAME]) {
+        return { success: true, removed: false };
+    }
+
+    const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
+    const lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
+    const hasBom = content.charCodeAt(0) === 0xFEFF;
+    const providerConfig = config.model_providers[BUILTIN_PROXY_PROVIDER_NAME];
+    const providerSegments = providerConfig && Array.isArray(providerConfig.__codexmate_legacy_segments)
+        ? providerConfig.__codexmate_legacy_segments
+        : null;
+    const providerSegmentVariants = (() => {
+        const variants = [];
+        const seen = new Set();
+        const pushVariant = (segments) => {
+            const normalized = normalizeLegacySegments(segments);
+            const key = buildLegacySegmentsKey(normalized);
+            if (!key || seen.has(key)) return;
+            seen.add(key);
+            variants.push(normalized);
+        };
+        if (providerConfig && Array.isArray(providerConfig.__codexmate_legacy_segments)) {
+            pushVariant(providerConfig.__codexmate_legacy_segments);
+        }
+        if (providerConfig && Array.isArray(providerConfig.__codexmate_legacy_segment_variants)) {
+            for (const segments of providerConfig.__codexmate_legacy_segment_variants) {
+                pushVariant(segments);
+            }
+        }
+        if (providerSegments) {
+            pushVariant(providerSegments);
+        }
+        if (variants.length === 0) {
+            pushVariant(String(BUILTIN_PROXY_PROVIDER_NAME || '').split('.').filter((item) => item));
+        }
+        return variants;
+    })();
+
+    let updatedContent = null;
+    const combinedRanges = [];
+    for (const segments of providerSegmentVariants) {
+        combinedRanges.push(...findProviderSectionRanges(content, BUILTIN_PROXY_PROVIDER_NAME, segments));
+        combinedRanges.push(...findProviderDescendantSectionRanges(content, segments));
+    }
+    if (combinedRanges.length === 0) {
+        combinedRanges.push(...findProviderSectionRanges(content, BUILTIN_PROXY_PROVIDER_NAME, providerSegments));
+    }
+
+    if (combinedRanges.length > 0) {
+        const sorted = combinedRanges.sort((a, b) => b.start - a.start || b.end - a.end);
+        const seen = new Set();
+        let removedContent = content;
+        for (const range of sorted) {
+            const rangeKey = `${range.start}:${range.end}`;
+            if (seen.has(rangeKey)) continue;
+            seen.add(rangeKey);
+            removedContent = removedContent.slice(0, range.start) + removedContent.slice(range.end);
+        }
+        updatedContent = removedContent.replace(/\n{3,}/g, lineEnding + lineEnding);
+    }
+
+    if (!updatedContent) {
+        const rebuilt = JSON.parse(JSON.stringify(config));
+        delete rebuilt.model_providers[BUILTIN_PROXY_PROVIDER_NAME];
+        const hasMarker = content.includes(CODEXMATE_MANAGED_MARKER);
+        let rebuiltToml = toml.stringify(rebuilt).trimEnd();
+        rebuiltToml = rebuiltToml.replace(/\n/g, lineEnding);
+        if (hasMarker && !rebuiltToml.includes(CODEXMATE_MANAGED_MARKER)) {
+            rebuiltToml = `${CODEXMATE_MANAGED_MARKER}${lineEnding}${rebuiltToml}`;
+        }
+        updatedContent = rebuiltToml + lineEnding;
+        if (hasBom && updatedContent.charCodeAt(0) !== 0xFEFF) {
+            updatedContent = '\uFEFF' + updatedContent;
+        }
+    }
+
+    try {
+        writeConfig(updatedContent.trimEnd() + lineEnding);
+    } catch (e) {
+        return { error: e.message || '写入 config.toml 失败' };
+    }
+
+    return { success: true, removed: true };
+}
+
 function hasCodexConfigReadyForProxy() {
     const result = readConfigOrVirtualDefault();
     if (!result || result.isVirtual) {
@@ -5787,131 +5946,11 @@ function getBuiltinProxyStatus() {
 }
 
 function applyBuiltinProxyProvider(params = {}) {
-    const settings = readBuiltinProxySettings();
-    const hostForUrl = formatHostForUrl(settings.host);
-    const baseUrl = `http://${hostForUrl}:${settings.port}`;
-
-    const { config } = readConfigOrVirtualDefault();
-    const providers = config && isPlainObject(config.model_providers) ? config.model_providers : {};
-    const exists = !!providers[BUILTIN_PROXY_PROVIDER_NAME];
-    const saveResult = exists
-        ? updateProviderInConfig({
-            name: BUILTIN_PROXY_PROVIDER_NAME,
-            url: baseUrl,
-            key: '',
-            allowManaged: true
-        })
-        : addProviderToConfig({
-            name: BUILTIN_PROXY_PROVIDER_NAME,
-            url: baseUrl,
-            key: '',
-            allowManaged: true
-        });
-
-    if (saveResult && saveResult.error) {
-        return saveResult;
-    }
-
-    const switchToProxy = params.switchToProxy !== false;
-    let targetModel = '';
-    if (switchToProxy) {
-        try {
-            targetModel = cmdSwitch(BUILTIN_PROXY_PROVIDER_NAME, true) || '';
-        } catch (e) {
-            return { error: `写入代理 provider 成功，但切换失败: ${e.message}` };
-        }
-    }
-
-    return {
-        success: true,
-        provider: BUILTIN_PROXY_PROVIDER_NAME,
-        baseUrl,
-        switched: switchToProxy,
-        model: targetModel
-    };
+    return { error: '该功能已移除' };
 }
 
 async function ensureBuiltinProxyForCodexDefault(params = {}) {
-    const payload = isPlainObject(params) ? { ...params } : {};
-    const switchToProxy = payload.switchToProxy !== false;
-    delete payload.switchToProxy;
-    payload.enabled = true;
-
-    const saveResult = saveBuiltinProxySettings(payload);
-    if (saveResult.error) {
-        return { error: saveResult.error };
-    }
-    let nextSettings = saveResult.settings;
-
-    let upstreamResult = resolveBuiltinProxyUpstream(nextSettings);
-    if (upstreamResult.error) {
-        return { error: upstreamResult.error };
-    }
-
-    const runtime = g_builtinProxyRuntime;
-    const shouldRestart = !!runtime && (
-        runtime.settings.host !== nextSettings.host
-        || runtime.settings.port !== nextSettings.port
-        || runtime.settings.authSource !== nextSettings.authSource
-        || runtime.settings.timeoutMs !== nextSettings.timeoutMs
-        || runtime.upstream.providerName !== upstreamResult.providerName
-        || runtime.upstream.baseUrl !== upstreamResult.baseUrl
-        || runtime.upstream.authHeader !== upstreamResult.authHeader
-    );
-
-    if (shouldRestart) {
-        await stopBuiltinProxyRuntime();
-    }
-
-    if (!g_builtinProxyRuntime) {
-        let startRes = await startBuiltinProxyRuntime(nextSettings);
-        if (!startRes.success && /EADDRINUSE/i.test(String(startRes.error || ''))) {
-            const fallbackPort = await findAvailablePort(nextSettings.host, nextSettings.port + 1, 30);
-            if (fallbackPort > 0) {
-                const retrySave = saveBuiltinProxySettings({
-                    ...nextSettings,
-                    port: fallbackPort,
-                    enabled: true
-                });
-                if (retrySave.success) {
-                    nextSettings = retrySave.settings;
-                    upstreamResult = resolveBuiltinProxyUpstream(nextSettings);
-                    if (upstreamResult.error) {
-                        return { error: upstreamResult.error };
-                    }
-                    startRes = await startBuiltinProxyRuntime(nextSettings);
-                }
-            }
-        }
-        if (!startRes.success) {
-            return { error: startRes.error || '启动内建代理失败' };
-        }
-    }
-
-    let applyRes = {
-        success: true,
-        provider: BUILTIN_PROXY_PROVIDER_NAME,
-        baseUrl: buildProxyListenUrl(nextSettings),
-        switched: false,
-        model: ''
-    };
-    if (switchToProxy) {
-        applyRes = applyBuiltinProxyProvider({ switchToProxy: true });
-        if (applyRes.error) {
-            return applyRes;
-        }
-    }
-
-    const status = getBuiltinProxyStatus();
-    return {
-        success: true,
-        provider: applyRes.provider,
-        baseUrl: applyRes.baseUrl,
-        switched: applyRes.switched,
-        model: applyRes.model || '',
-        settings: status.settings,
-        runtime: status.runtime
-    };
+    return { error: '该功能已移除' };
 }
 
 function removeClaudeSessionIndexEntry(indexPath, sessionFilePath, sessionId) {
@@ -7553,7 +7592,8 @@ async function cmdSetup() {
         const { config } = readConfigOrVirtualDefault();
         const providers = config.model_providers || {};
         const providerNames = Object.keys(providers);
-        const defaultProvider = config.model_provider || providerNames[0] || '';
+        const currentProvider = typeof config.model_provider === 'string' ? config.model_provider.trim() : '';
+        const defaultProvider = currentProvider || providerNames[0] || '';
         let availableModels = [];
         let defaultModel = config.model || '';
         let modelFetchUnlimited = false;
@@ -7839,7 +7879,7 @@ async function cmdModels() {
 
 // 切换提供商
 function cmdSwitch(providerName, silent = false) {
-    const config = readConfig();
+    const config = sanitizeRemovedBuiltinProxyProvider(readConfig());
     const providers = config.model_providers || {};
 
     if (!providers[providerName]) {
@@ -8006,7 +8046,7 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
     if (isNonEditableProvider(name) && !allowManaged) {
         const msg = isDefaultLocalProvider(name)
             ? 'local provider 为系统保留项，不可编辑'
-            : '本地代理配置为系统内建项，不可编辑';
+            : 'codexmate-proxy 为保留名称，不可编辑';
         if (!silent) console.error(`错误: ${msg}`);
         throw new Error(msg);
     }
@@ -10556,25 +10596,6 @@ function cmdStart(options = {}) {
         openBrowser: !options.noBrowser
     });
 
-    const proxySettings = readBuiltinProxySettings();
-    const shouldAutoStartProxy = proxySettings.enabled || hasCodexConfigReadyForProxy();
-    if (shouldAutoStartProxy) {
-        ensureBuiltinProxyForCodexDefault({
-            ...proxySettings,
-            switchToProxy: false
-        }).then((res) => {
-            if (res && res.success && res.runtime && res.runtime.listenUrl) {
-                const entryProvider = res.runtime.provider || DEFAULT_LOCAL_PROVIDER_NAME;
-                const upstreamLabel = res.runtime.upstreamProvider ? `（上游: ${res.runtime.upstreamProvider}）` : '';
-                console.log(`~ 内建代理已启动(${entryProvider}): ${res.runtime.listenUrl}${upstreamLabel}`);
-            } else if (res && res.error) {
-                console.warn(`! 内建代理启动失败: ${res.error}`);
-            }
-        }).catch((err) => {
-            console.warn(`! 内建代理启动失败: ${err && err.message ? err.message : err}`);
-        });
-    }
-
     const requestWebUiRestart = createSerializedWebUiRestartHandler(async (info) => {
             const fileLabel = info && info.filename ? info.filename : (info && info.target ? path.basename(info.target) : 'unknown');
             console.log(`\n~ 侦测到前端变更 (${fileLabel})，重启中...`);
@@ -10766,111 +10787,8 @@ function parseProxyCliOptions(args = []) {
 }
 
 async function cmdProxy(args = []) {
-    const subcommand = (args[0] || 'status').toLowerCase();
-    const optionResult = parseProxyCliOptions(args.slice(1));
-    if (optionResult.error) {
-        throw new Error(optionResult.error);
-    }
-    const options = optionResult.payload || {};
-
-    if (subcommand === 'status') {
-        const status = getBuiltinProxyStatus();
-        const settings = status.settings || DEFAULT_BUILTIN_PROXY_SETTINGS;
-        console.log('\n内建代理状态:');
-        console.log('  运行中:', status.running ? '是' : '否');
-        console.log('  启用:', settings.enabled ? '是' : '否');
-        console.log('  监听:', buildProxyListenUrl(settings));
-        console.log('  上游 provider:', settings.provider || '(自动)');
-        console.log('  鉴权来源:', settings.authSource);
-        if (status.runtime) {
-            console.log('  实际上游:', status.runtime.upstreamProvider);
-            console.log('  启动时间:', status.runtime.startedAt);
-        }
-        console.log();
-        return;
-    }
-
-    if (subcommand === 'set' || subcommand === 'config') {
-        const result = saveBuiltinProxySettings(options);
-        if (result.error) {
-            throw new Error(result.error);
-        }
-        const settings = result.settings;
-        console.log('✓ 内建代理配置已保存');
-        console.log('  监听:', buildProxyListenUrl(settings));
-        console.log('  上游 provider:', settings.provider || '(自动)');
-        console.log('  鉴权来源:', settings.authSource);
-        console.log();
-        return;
-    }
-
-    if (subcommand === 'apply' || subcommand === 'apply-provider') {
-        const result = applyBuiltinProxyProvider({
-            switchToProxy: options.switchToProxy !== false
-        });
-        if (result.error) {
-            throw new Error(result.error);
-        }
-        console.log(`✓ 已写入本地代理 provider: ${result.provider}`);
-        console.log(`  URL: ${result.baseUrl}`);
-        if (result.switched) {
-            console.log(`  已切换到 ${result.provider}${result.model ? ` / ${result.model}` : ''}`);
-        }
-        console.log();
-        return;
-    }
-
-    if (subcommand === 'enable' || subcommand === 'default-codex') {
-        const result = await ensureBuiltinProxyForCodexDefault(options);
-        if (result.error) {
-            throw new Error(result.error);
-        }
-        const listenUrl = result.runtime && result.runtime.listenUrl
-            ? result.runtime.listenUrl
-            : buildProxyListenUrl(result.settings || DEFAULT_BUILTIN_PROXY_SETTINGS);
-        console.log('✓ 已启用 Codex 内建代理默认模式');
-        console.log(`  监听: ${listenUrl}`);
-        if (result.runtime && result.runtime.upstreamProvider) {
-            console.log(`  上游 provider: ${result.runtime.upstreamProvider}`);
-        }
-        console.log(`  当前 provider: ${result.provider}${result.model ? ` / ${result.model}` : ''}`);
-        console.log();
-        return;
-    }
-
-    if (subcommand === 'start') {
-        const result = await startBuiltinProxyRuntime({
-            ...options,
-            enabled: true
-        });
-        if (result.error) {
-            throw new Error(result.error);
-        }
-        console.log(`✓ 内建代理已启动: ${result.listenUrl}`);
-        console.log(`  上游 provider: ${result.upstreamProvider}`);
-        console.log('  按 Ctrl+C 停止代理\n');
-
-        await new Promise((resolve) => {
-            let stopping = false;
-            const gracefulStop = async () => {
-                if (stopping) return;
-                stopping = true;
-                await stopBuiltinProxyRuntime();
-                resolve();
-            };
-            process.once('SIGINT', gracefulStop);
-            process.once('SIGTERM', gracefulStop);
-        });
-        return;
-    }
-
-    if (subcommand === 'stop') {
-        await stopBuiltinProxyRuntime();
-        console.log('✓ 内建代理已停止\n');
-        return;
-    }
-
-    throw new Error(`未知 proxy 子命令: ${subcommand}`);
+    void args;
+    throw new Error('该功能已移除');
 }
 
 function parseWorkflowInputArg(rawInput) {
@@ -12944,11 +12862,9 @@ async function main() {
         console.log('  codexmate claude <BaseURL> <API密钥> [模型]  写入 Claude Code 配置');
         console.log('  codexmate add-model <模型> 添加模型');
         console.log('  codexmate delete-model <模型> 删除模型');
-        console.log('  codexmate auth <list|import|switch|delete|status>  认证文件管理');
-        console.log('  codexmate proxy <status|set|apply|enable|start|stop>  内建代理');
         console.log('  codexmate workflow <list|get|validate|run|runs>  MCP 工作流中心');
         console.log('  codexmate run [--host <HOST>] [--no-browser]    启动 Web 界面');
-        console.log('  codexmate codex [参数...] [--follow-up <文本>|--queued-follow-up <文本> 可重复]  等同于 codex --yolo（不会自动启用内建代理）');
+        console.log('  codexmate codex [参数...] [--follow-up <文本>|--queued-follow-up <文本> 可重复]  等同于 codex --yolo');
         console.log('    注: follow-up 自动排队仅支持 linux/android/netbsd/openbsd/darwin/freebsd 且 stdin 必须是 TTY，其他平台会报错');
         console.log('  codexmate qwen [参数...]   等同于 qwen --yolo');
         console.log('  codexmate mcp [serve] [--transport stdio] [--allow-write|--read-only]');

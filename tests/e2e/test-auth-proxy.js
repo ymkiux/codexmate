@@ -47,7 +47,7 @@ module.exports = async function testAuthProxy(ctx) {
     const { api, node, cliPath, env, tmpHome, mockProviderUrl } = ctx;
 
     const initialProxyStatus = await waitForProxyRunning(api);
-    assert(initialProxyStatus && initialProxyStatus.running === true, 'proxy should auto-start when codex config exists');
+    assert(initialProxyStatus && typeof initialProxyStatus.running === 'boolean', 'proxy-status should return running flag');
 
     const userProvidedFixture = 'C:\\Users\\Ymkiux\\Downloads\\fb5eefedbd149f08aeb3fe6c5a212efabb76d8df\\wbqm928lf@jienigui.me.json';
     const fixturePath = fs.existsSync(userProvidedFixture)
@@ -102,6 +102,16 @@ module.exports = async function testAuthProxy(ctx) {
     });
     assert(importBackupRes.success === true, 'api import-auth-profile should succeed');
 
+    const authProfilesDir = path.join(tmpHome, '.codex', 'auth-profiles');
+    const backupAuthProfilePath = path.join(authProfilesDir, 'backup-auth.json');
+    const authRegistryPath = path.join(authProfilesDir, 'registry.json');
+    assert(fs.existsSync(backupAuthProfilePath), 'uploaded auth profile should be stored under ~/.codex/auth-profiles');
+    assert(fs.existsSync(authRegistryPath), 'auth profile registry should be stored under ~/.codex/auth-profiles');
+    assert(
+        !fs.existsSync(path.join(tmpHome, '.codexmate', 'codex', 'auth-profiles', 'backup-auth.json')),
+        'uploaded auth profile should not be written into ~/.codexmate/codex/auth-profiles'
+    );
+
     const authProfiles = await api('list-auth-profiles');
     assert(Array.isArray(authProfiles.profiles), 'list-auth-profiles should return array');
     assert(authProfiles.profiles.some(item => item.name === 'backup-auth'), 'backup-auth profile missing');
@@ -141,7 +151,22 @@ module.exports = async function testAuthProxy(ctx) {
     });
     assert(proxySaveRes.success === true, 'proxy-save-config should succeed');
 
-    const proxyEnableRes = await api('proxy-enable-codex-default', {
+    const configTomlPath = path.join(tmpHome, '.codex', 'config.toml');
+    fs.appendFileSync(configTomlPath, [
+        '',
+        '[model_providers.codexmate-proxy]',
+        'name = "codexmate-proxy"',
+        `base_url = "http://127.0.0.1:${proxyPort}/v1"`,
+        'wire_api = "responses"',
+        'requires_openai_auth = false',
+        'preferred_auth_method = ""',
+        'request_max_retries = 4',
+        'stream_max_retries = 10',
+        'stream_idle_timeout_ms = 300000',
+        ''
+    ].join('\n'), 'utf-8');
+
+    const proxyStartRes = await api('proxy-start', {
         enabled: true,
         host: '127.0.0.1',
         port: proxyPort,
@@ -149,42 +174,30 @@ module.exports = async function testAuthProxy(ctx) {
         authSource: 'provider',
         timeoutMs: 5000
     });
-    assert(proxyEnableRes.success === true, `proxy-enable-codex-default failed: ${proxyEnableRes.error || ''}`);
-    assert(proxyEnableRes.runtime && proxyEnableRes.runtime.listenUrl && proxyEnableRes.runtime.listenUrl.includes(String(proxyPort)), 'proxy enable listen url mismatch');
+    assert(proxyStartRes.success === true, `proxy-start failed: ${proxyStartRes.error || ''}`);
+    assert(proxyStartRes.listenUrl && proxyStartRes.listenUrl.includes(String(proxyPort)), 'proxy start listen url mismatch');
 
-    const updateBuiltinRes = await api('update-provider', {
-        name: 'codexmate-proxy',
-        url: 'http://127.0.0.1:6553',
-        key: ''
-    });
+    const providerList = await api('list');
     assert(
-        typeof updateBuiltinRes.error === 'string' && updateBuiltinRes.error.includes('不可编辑'),
-        'builtin proxy provider should be read-only for update'
+        !providerList.providers.some((item) => item && item.name === 'codexmate-proxy'),
+        'provider list should not expose removed builtin proxy provider'
     );
-    const deleteBuiltinRes = await api('delete-provider', {
-        name: 'codexmate-proxy'
-    });
+    const configTomlAfterList = fs.readFileSync(configTomlPath, 'utf-8');
     assert(
-        typeof deleteBuiltinRes.error === 'string' && deleteBuiltinRes.error.includes('不可删除'),
-        'builtin proxy provider should be read-only for delete'
+        !/^\s*\[\s*model_providers\s*\.\s*(?:"codexmate-proxy"|'codexmate-proxy'|codexmate-proxy)\s*\]\s*$/m.test(configTomlAfterList),
+        'provider list read should physically remove legacy codexmate-proxy block from config.toml'
     );
 
-    const exportConfigRes = await api('export-config', { includeKeys: true });
-    assert(exportConfigRes && exportConfigRes.data && exportConfigRes.data.providers, 'export-config should return provider map');
-    assert(!exportConfigRes.data.providers['codexmate-proxy'], 'export-config should exclude builtin proxy provider');
-
-    const importConfigRes = await api('import-config', {
-        payload: exportConfigRes.data,
-        options: {
-            overwriteProviders: true,
-            applyCurrent: true,
-            applyCurrentModels: true
-        }
+    const enableRes = await api('proxy-enable-codex-default', {
+        enabled: true,
+        host: '127.0.0.1',
+        port: proxyPort,
+        provider: upstreamCandidate.name
     });
-    assert(importConfigRes && importConfigRes.success === true, `import-config should succeed: ${importConfigRes && importConfigRes.error ? importConfigRes.error : ''}`);
-
-    const statusAfterEnable = await api('status');
-    assert(statusAfterEnable.provider === 'codexmate-proxy', 'status should switch to codexmate-proxy after proxy-enable-codex-default');
+    assert(
+        typeof enableRes.error === 'string' && enableRes.error.includes('已移除'),
+        'proxy-enable-codex-default should report removed builtin proxy provider'
+    );
 
     const healthViaProxy = await requestJson(`http://127.0.0.1:${proxyPort}/health`);
     assert(healthViaProxy.statusCode === 200, `proxy /health should return 200, got ${healthViaProxy.statusCode}`);

@@ -62,8 +62,6 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 
 **工程能力**
 - MCP stdio 能力（tools/resources/prompts）
-- 内建代理配置与状态控制（`proxy`）
-- 认证档案管理（`auth`）
 - Zip 压缩/解压（优先系统工具，失败回退 JS 库）
 
 ## 架构总览
@@ -74,14 +72,12 @@ flowchart TB
       CLI["CLI"]
       WEB["Web UI"]
       MCP["MCP Client"]
-      OAI["Codex / OpenAI Client"]
     end
 
     subgraph Runtime["Codex Mate Runtime"]
       ENTRY["cli.js Entry"]
       API["Local HTTP API"]
       MCPS["MCP stdio Server"]
-      PROXY["Built-in Proxy"]
       SERVICES["Config / Sessions / Skills Market / Workflow"]
       CORE["File IO / Network / Diff / Session Utils"]
     end
@@ -97,12 +93,10 @@ flowchart TB
     CLI --> ENTRY
     WEB -->|GET / + POST /api| API
     MCP -->|stdio JSON-RPC| MCPS
-    OAI -->|HTTP /v1| PROXY
 
     ENTRY --> SERVICES
     API --> SERVICES
     MCPS --> SERVICES
-    PROXY --> CORE
 
     SERVICES --> CORE
 
@@ -156,8 +150,6 @@ npm start run --no-browser
 | `codexmate add <name> <URL> [API_KEY]` | 添加提供商 |
 | `codexmate delete <name>` | 删除提供商 |
 | `codexmate claude <BaseURL> <API_KEY> [model]` | 写入 Claude Code 配置 |
-| `codexmate auth <list\|import\|switch\|delete\|status>` | 认证档案管理 |
-| `codexmate proxy <status\|set\|apply\|enable\|start\|stop>` | 内建代理管理 |
 | `codexmate workflow <list\|get\|validate\|run\|runs>` | MCP 工作流管理 |
 | `codexmate codex [args...] [--follow-up <文本> 可重复]` | Codex CLI 透传入口（默认补 `--yolo`，可追加 queued follow-up） |
 | `codexmate qwen [args...]` | Qwen CLI 透传入口 |
