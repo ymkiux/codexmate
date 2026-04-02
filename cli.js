@@ -3366,11 +3366,16 @@ function applyPositiveIntegerConfigToTemplate(template, key, value) {
         return content;
     }
 
+    const hasBom = content.charCodeAt(0) === 0xFEFF;
+    const lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
+    if (hasBom) {
+        content = content.slice(1);
+    }
     const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const pattern = new RegExp(`^\\s*${escapedKey}\\s*=\\s*[^\\n]*\\n?`, 'gmi');
     content = content.replace(pattern, '');
-    content = content.replace(/^\s*\n*/, '');
-    return `${key} = ${normalized}\n${content}`;
+    content = content.replace(new RegExp(`^(?:[\\t ]*${lineEnding})+`), '');
+    return `${hasBom ? '\uFEFF' : ''}${key} = ${normalized}${lineEnding}${content}`;
 }
 
 function getConfigTemplate(params = {}) {
@@ -3382,6 +3387,20 @@ function getConfigTemplate(params = {}) {
                 content = raw;
             }
         } catch (e) {}
+    }
+    if (
+        params.modelAutoCompactTokenLimit !== undefined
+        && params.modelAutoCompactTokenLimit !== null
+        && normalizePositiveIntegerParam(params.modelAutoCompactTokenLimit) === null
+    ) {
+        return { error: 'modelAutoCompactTokenLimit must be a positive integer' };
+    }
+    if (
+        params.modelContextWindow !== undefined
+        && params.modelContextWindow !== null
+        && normalizePositiveIntegerParam(params.modelContextWindow) === null
+    ) {
+        return { error: 'modelContextWindow must be a positive integer' };
     }
     const selectedProvider = typeof params.provider === 'string' ? params.provider.trim() : '';
     const selectedModel = typeof params.model === 'string' ? params.model.trim() : '';

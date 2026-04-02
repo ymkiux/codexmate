@@ -249,6 +249,113 @@ test('getConfigTemplate restores missing context budget defaults for upgraded co
     assert.match(result.template, /^\s*model_auto_compact_token_limit\s*=\s*185000\s*$/m);
 });
 
+test('getConfigTemplate rejects explicit invalid context budget params', () => {
+    const normalizePositiveIntegerParamSource = extractBlockBySignature(
+        cliSource,
+        'function normalizePositiveIntegerParam(value) {'
+    );
+    const normalizePositiveIntegerParam = instantiateFunction(
+        normalizePositiveIntegerParamSource,
+        'normalizePositiveIntegerParam'
+    );
+    const applyPositiveIntegerConfigToTemplateSource = extractBlockBySignature(
+        cliSource,
+        'function applyPositiveIntegerConfigToTemplate(template, key, value) {'
+    );
+    const applyPositiveIntegerConfigToTemplate = instantiateFunction(
+        applyPositiveIntegerConfigToTemplateSource,
+        'applyPositiveIntegerConfigToTemplate',
+        { normalizePositiveIntegerParam }
+    );
+    const getConfigTemplateSource = extractBlockBySignature(cliSource, 'function getConfigTemplate(params = {}) {');
+    const getConfigTemplate = instantiateFunction(getConfigTemplateSource, 'getConfigTemplate', {
+        fs: {
+            existsSync() {
+                return false;
+            },
+            readFileSync() {
+                return '';
+            }
+        },
+        CONFIG_FILE: '/tmp/config.toml',
+        EMPTY_CONFIG_FALLBACK_TEMPLATE: 'model_provider = "alpha"\nmodel = "alpha-model"\n',
+        normalizeTopLevelConfigWithTemplate(content) {
+            return content;
+        },
+        applyServiceTierToTemplate(template) {
+            return template;
+        },
+        applyReasoningEffortToTemplate(template) {
+            return template;
+        },
+        applyPositiveIntegerConfigToTemplate,
+        normalizePositiveIntegerParam,
+        DEFAULT_MODEL_CONTEXT_WINDOW: 190000,
+        DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT: 185000
+    });
+
+    assert.deepStrictEqual(
+        getConfigTemplate({ modelContextWindow: 0 }),
+        { error: 'modelContextWindow must be a positive integer' }
+    );
+    assert.deepStrictEqual(
+        getConfigTemplate({ modelAutoCompactTokenLimit: 'abc' }),
+        { error: 'modelAutoCompactTokenLimit must be a positive integer' }
+    );
+});
+
+test('getConfigTemplate preserves BOM and CRLF when restoring missing context budget defaults', () => {
+    const normalizePositiveIntegerParamSource = extractBlockBySignature(
+        cliSource,
+        'function normalizePositiveIntegerParam(value) {'
+    );
+    const normalizePositiveIntegerParam = instantiateFunction(
+        normalizePositiveIntegerParamSource,
+        'normalizePositiveIntegerParam'
+    );
+    const applyPositiveIntegerConfigToTemplateSource = extractBlockBySignature(
+        cliSource,
+        'function applyPositiveIntegerConfigToTemplate(template, key, value) {'
+    );
+    const applyPositiveIntegerConfigToTemplate = instantiateFunction(
+        applyPositiveIntegerConfigToTemplateSource,
+        'applyPositiveIntegerConfigToTemplate',
+        { normalizePositiveIntegerParam }
+    );
+    const getConfigTemplateSource = extractBlockBySignature(cliSource, 'function getConfigTemplate(params = {}) {');
+    const getConfigTemplate = instantiateFunction(getConfigTemplateSource, 'getConfigTemplate', {
+        fs: {
+            existsSync() {
+                return true;
+            },
+            readFileSync() {
+                return '\uFEFFmodel_provider = "alpha"\r\nmodel = "alpha-model"\r\n';
+            }
+        },
+        CONFIG_FILE: '/tmp/config.toml',
+        EMPTY_CONFIG_FALLBACK_TEMPLATE: '',
+        normalizeTopLevelConfigWithTemplate(content) {
+            return content;
+        },
+        applyServiceTierToTemplate(template) {
+            return template;
+        },
+        applyReasoningEffortToTemplate(template) {
+            return template;
+        },
+        applyPositiveIntegerConfigToTemplate,
+        DEFAULT_MODEL_CONTEXT_WINDOW: 190000,
+        DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT: 185000
+    });
+
+    const result = getConfigTemplate({});
+
+    assert.strictEqual(result.template.charCodeAt(0), 0xFEFF);
+    assert(result.template.includes('model_auto_compact_token_limit = 185000\r\n'));
+    assert(result.template.includes('model_context_window = 190000\r\n'));
+    assert(!/(?<!\r)\n/.test(result.template), 'template should preserve CRLF line endings');
+});
+
 test('readPositiveIntegerConfigValue falls back to defaults only when budget keys are missing', () => {
     const normalizePositiveIntegerParamSource = extractBlockBySignature(
         cliSource,
