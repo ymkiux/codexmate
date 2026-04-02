@@ -38,6 +38,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /@blur="onModelAutoCompactTokenLimitBlur"/);
     assert.match(html, /@keydown\.enter\.prevent="onModelContextWindowBlur"/);
     assert.match(html, /@keydown\.enter\.prevent="onModelAutoCompactTokenLimitBlur"/);
+    assert.doesNotMatch(html, /使用自定义数字输入框；失焦或回车后会按当前 Codex 配置规范写入模板。/);
     assert.match(
         html,
         /<button[^>]*@click="resetCodexContextBudgetDefaults"[^>]*>[\s\S]*?重置默认值[\s\S]*?<\/button>/
@@ -334,11 +335,11 @@ test('settings tab header actions keep compact tool buttons inline on wider scre
         styles,
         /\.settings-tab-actions \.btn-tool,\s*\.settings-tab-actions \.btn-tool-compact\s*\{[\s\S]*width:\s*auto;/
     );
-    assert.match(styles, /\.trash-header-actions\s*\{[\s\S]*display:\s*inline-grid;/);
-    assert.match(styles, /\.trash-header-actions\s*\{[\s\S]*grid-auto-flow:\s*column;/);
-    assert.match(styles, /\.trash-header-actions\s*\{[\s\S]*grid-auto-columns:\s*minmax\(0,\s*max-content\);/);
+    assert.match(styles, /\.trash-header-actions\s*\{[\s\S]*display:\s*flex;/);
+    assert.match(styles, /\.trash-header-actions\s*\{[\s\S]*flex-direction:\s*row;/);
+    assert.match(styles, /\.trash-header-actions\s*\{[\s\S]*flex-wrap:\s*nowrap;/);
     assert.match(styles, /\.trash-header-actions\s*\{[\s\S]*align-items:\s*stretch;/);
-    assert.match(styles, /\.trash-header-actions\s*\{[\s\S]*justify-content:\s*end;/);
+    assert.match(styles, /\.trash-header-actions\s*\{[\s\S]*justify-content:\s*flex-end;/);
     assert.match(styles, /\.trash-header-actions\s*\{[\s\S]*max-width:\s*100%;/);
     assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact\s*\{[\s\S]*display:\s*flex;/);
     assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact\s*\{[\s\S]*align-self:\s*stretch;/);
@@ -352,6 +353,7 @@ test('settings tab header actions keep compact tool buttons inline on wider scre
     assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact\s*\{[\s\S]*vertical-align:\s*top;/);
     assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact\s*\{[\s\S]*top:\s*0;/);
     assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact\s*\{[\s\S]*white-space:\s*nowrap;/);
+    assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool \+ \.btn-tool\s*\{[\s\S]*margin-top:\s*0;/);
     assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool:hover,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact:hover\s*\{[\s\S]*transform:\s*none;/);
     assert.match(styles, /\.market-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
     assert.match(styles, /\.market-action-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/);
