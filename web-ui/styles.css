@@ -1522,11 +1522,11 @@ body::after {
 }
 
 .trash-header-actions {
-    display: inline-grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, max-content);
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
     align-items: stretch;
-    justify-content: end;
+    justify-content: flex-end;
     width: auto;
     max-width: 100%;
     margin-left: auto;
@@ -1792,6 +1792,10 @@ body::after {
 .selector-section .btn-tool + .btn-tool {
     margin-left: 0;
     margin-top: var(--spacing-xs);
+}
+
+.selector-header .trash-header-actions > .btn-tool + .btn-tool {
+    margin-top: 0;
 }
 
 .btn-tool:hover {
