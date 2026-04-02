@@ -93,6 +93,8 @@ const RECENT_CONFIGS_FILE = path.join(CONFIG_DIR, 'recent-configs.json');
 const WORKFLOW_DEFINITIONS_FILE = path.join(CONFIG_DIR, 'codexmate-workflows.json');
 const WORKFLOW_RUNS_FILE = path.join(CONFIG_DIR, 'codexmate-workflow-runs.jsonl');
 const DEFAULT_CLAUDE_MODEL = 'glm-4.7';
+const DEFAULT_MODEL_CONTEXT_WINDOW = 190000;
+const DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT = 185000;
 const CODEX_BACKUP_NAME = 'codex-config';
 
 const DEFAULT_MODELS = ['gpt-5.3-codex', 'gpt-5.1-codex-max', 'gpt-4-turbo', 'gpt-4'];
@@ -226,6 +228,8 @@ function resolveWebHost(options = {}) {
 
 const EMPTY_CONFIG_FALLBACK_TEMPLATE = `model = "gpt-5.3-codex"
 model_reasoning_effort = "high"
+model_context_window = ${DEFAULT_MODEL_CONTEXT_WINDOW}
+model_auto_compact_token_limit = ${DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT}
 disable_response_storage = true
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
@@ -3168,6 +3172,8 @@ function buildDefaultConfigContent(initializedAt) {
 
 model_provider = "openai"
 model = "${defaultModel}"
+model_context_window = ${DEFAULT_MODEL_CONTEXT_WINDOW}
+model_auto_compact_token_limit = ${DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT}
 
 [model_providers.openai]
 name = "openai"
@@ -3333,6 +3339,40 @@ function applyReasoningEffortToTemplate(template, reasoningEffort) {
     return content;
 }
 
+function normalizePositiveIntegerParam(value) {
+    if (value === undefined || value === null) {
+        return null;
+    }
+    const text = typeof value === 'number'
+        ? String(value)
+        : (typeof value === 'string' ? value.trim() : String(value).trim());
+    if (!text) {
+        return null;
+    }
+    if (!/^\d+$/.test(text)) {
+        return null;
+    }
+    const parsed = Number.parseInt(text, 10);
+    if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+        return null;
+    }
+    return parsed;
+}
+
+function applyPositiveIntegerConfigToTemplate(template, key, value) {
+    let content = typeof template === 'string' ? template : '';
+    const normalized = normalizePositiveIntegerParam(value);
+    if (!key || normalized === null) {
+        return content;
+    }
+
+    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`^\\s*${escapedKey}\\s*=\\s*[^\\n]*\\n?`, 'gmi');
+    content = content.replace(pattern, '');
+    content = content.replace(/^\s*\n*/, '');
+    return `${key} = ${normalized}\n${content}`;
+}
+
 function getConfigTemplate(params = {}) {
     let content = EMPTY_CONFIG_FALLBACK_TEMPLATE;
     if (fs.existsSync(CONFIG_FILE)) {
@@ -3352,9 +3392,32 @@ function getConfigTemplate(params = {}) {
     if (typeof params.reasoningEffort === 'string') {
         template = applyReasoningEffortToTemplate(template, params.reasoningEffort);
     }
+    if (params.modelAutoCompactTokenLimit !== undefined) {
+        template = applyPositiveIntegerConfigToTemplate(
+            template,
+            'model_auto_compact_token_limit',
+            params.modelAutoCompactTokenLimit
+        );
+    }
+    if (params.modelContextWindow !== undefined) {
+        template = applyPositiveIntegerConfigToTemplate(
+            template,
+            'model_context_window',
+            params.modelContextWindow
+        );
+    }
     return {
         template
     };
+}
+
+function readPositiveIntegerConfigValue(config, key) {
+    if (!config || typeof config !== 'object' || !key) {
+        return '';
+    }
+    const raw = config[key];
+    const normalized = normalizePositiveIntegerParam(raw);
+    return normalized === null ? '' : normalized;
 }
 
 function applyConfigTemplate(params = {}) {
@@ -9981,11 +10044,15 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             const config = statusConfigResult.config;
                             const serviceTier = typeof config.service_tier === 'string' ? config.service_tier.trim() : '';
                             const modelReasoningEffort = typeof config.model_reasoning_effort === 'string' ? config.model_reasoning_effort.trim() : '';
+                            const modelContextWindow = readPositiveIntegerConfigValue(config, 'model_context_window');
+                            const modelAutoCompactTokenLimit = readPositiveIntegerConfigValue(config, 'model_auto_compact_token_limit');
                             result = {
                                 provider: config.model_provider || '未设置',
                                 model: config.model || '未设置',
                                 serviceTier,
                                 modelReasoningEffort,
+                                modelContextWindow,
+                                modelAutoCompactTokenLimit,
                                 configReady: !statusConfigResult.isVirtual,
                                 configErrorType: statusConfigResult.errorType || '',
                                 configNotice: statusConfigResult.reason || '',
@@ -11464,11 +11531,15 @@ function buildMcpStatusPayload() {
     const config = statusConfigResult.config;
     const serviceTier = typeof config.service_tier === 'string' ? config.service_tier.trim() : '';
     const modelReasoningEffort = typeof config.model_reasoning_effort === 'string' ? config.model_reasoning_effort.trim() : '';
+    const modelContextWindow = readPositiveIntegerConfigValue(config, 'model_context_window');
+    const modelAutoCompactTokenLimit = readPositiveIntegerConfigValue(config, 'model_auto_compact_token_limit');
     return {
         provider: config.model_provider || '未设置',
         model: config.model || '未设置',
         serviceTier,
         modelReasoningEffort,
+        modelContextWindow,
+        modelAutoCompactTokenLimit,
         configReady: !statusConfigResult.isVirtual,
         configErrorType: statusConfigResult.errorType || '',
         configNotice: statusConfigResult.reason || '',
@@ -11566,6 +11637,8 @@ const BUILTIN_WORKFLOW_DEFINITIONS = Object.freeze({
                 model: { type: 'string' },
                 serviceTier: { type: 'string' },
                 reasoningEffort: { type: 'string' },
+                modelContextWindow: { type: ['string', 'number'] },
+                modelAutoCompactTokenLimit: { type: ['string', 'number'] },
                 apply: { type: 'boolean' }
             },
             required: ['provider'],
@@ -11580,7 +11653,9 @@ const BUILTIN_WORKFLOW_DEFINITIONS = Object.freeze({
                     provider: '{{input.provider}}',
                     model: '{{input.model}}',
                     serviceTier: '{{input.serviceTier}}',
-                    reasoningEffort: '{{input.reasoningEffort}}'
+                    reasoningEffort: '{{input.reasoningEffort}}',
+                    modelContextWindow: '{{input.modelContextWindow}}',
+                    modelAutoCompactTokenLimit: '{{input.modelAutoCompactTokenLimit}}'
                 }
             },
             {
@@ -12149,7 +12224,7 @@ function createMcpTools(options = {}) {
 
     pushTool({
         name: 'codexmate.config.template.get',
-        description: 'Get Codex config template with optional provider/model/service tier/reasoning effort.',
+        description: 'Get Codex config template with optional provider/model/service tier/reasoning effort/context budget.',
         readOnly: true,
         inputSchema: {
             type: 'object',
@@ -12157,7 +12232,9 @@ function createMcpTools(options = {}) {
                 provider: { type: 'string' },
                 model: { type: 'string' },
                 serviceTier: { type: 'string' },
-                reasoningEffort: { type: 'string' }
+                reasoningEffort: { type: 'string' },
+                modelContextWindow: { type: ['string', 'number'] },
+                modelAutoCompactTokenLimit: { type: ['string', 'number'] }
             },
             additionalProperties: false
         },

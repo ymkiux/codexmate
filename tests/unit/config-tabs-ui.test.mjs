@@ -29,6 +29,16 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /onConfigTabPointerDown\('codex', \$event\)/);
     assert.match(html, /onMainTabClick\('sessions', \$event\)/);
     assert.match(html, /onConfigTabClick\('codex', \$event\)/);
+    assert.match(html, /<span class="selector-title">上下文压缩阈值<\/span>/);
+    assert.match(html, /v-model="modelContextWindowInput"/);
+    assert.match(html, /v-model="modelAutoCompactTokenLimitInput"/);
+    assert.match(html, /@blur="onModelContextWindowBlur"/);
+    assert.match(html, /@blur="onModelAutoCompactTokenLimitBlur"/);
+    assert.match(html, /@keydown\.enter\.prevent="onModelContextWindowBlur"/);
+    assert.match(html, /@keydown\.enter\.prevent="onModelAutoCompactTokenLimitBlur"/);
+    assert.match(html, /@click="resetCodexContextBudgetDefaults"/);
+    assert.match(html, />\s*重置默认值\s*<\/button>/);
+    assert.match(html, /class="codex-config-grid"/);
     assert.match(html, /onSettingsTabClick\('backup'\)/);
     assert.match(html, /onSettingsTabClick\('trash'\)/);
     assert.match(html, /settingsTab === 'backup'/);
@@ -87,6 +97,10 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /id="settings-panel-trash"/);
     assert.match(html, /<div[\s\S]*v-show="settingsTab === 'backup'"[\s\S]*id="settings-panel-backup"[\s\S]*aria-labelledby="settings-tab-backup">/);
     assert.match(html, /<div[\s\S]*v-show="settingsTab === 'trash'"[\s\S]*id="settings-panel-trash"[\s\S]*aria-labelledby="settings-tab-trash">/);
+    assert.match(html, /class="settings-tab-actions trash-header-actions" style="display:flex; flex-wrap:nowrap; align-items:stretch; justify-content:flex-end; gap:8px; margin-left:auto;"/);
+    assert.match(html, /<button class="btn-tool btn-tool-compact" style="margin:0; width:96px; min-width:96px; height:32px; min-height:32px; padding:0 10px; display:flex; align-items:center; justify-content:center; align-self:stretch; line-height:1; vertical-align:top; position:relative; top:0; transform:none;" @click="loadSessionTrash\(\{ forceRefresh: true \}\)"/);
+    assert.match(html, /<button class="btn-tool btn-tool-compact" style="margin:0; width:96px; min-width:96px; height:32px; min-height:32px; padding:0 10px; display:flex; align-items:center; justify-content:center; align-self:stretch; line-height:1; vertical-align:top; position:relative; top:0; transform:none;" @click="clearSessionTrash"/);
+    assert.doesNotMatch(html, /<span class="selector-title">会话回收站<\/span>/);
     assert.match(html, /role="tabpanel"/);
     assert.doesNotMatch(html, /v-if="settingsTab === 'backup'"/);
     assert.match(html, /class="trash-item session-item session-card"/);
@@ -184,6 +198,14 @@ test('web ui script defines provider mode metadata for codex only', () => {
     assert.match(appScript, /runLatestOnlyQueue\(/);
     assert.match(appScript, /providerSwitchInProgress:\s*false/);
     assert.match(appScript, /pendingProviderSwitch:\s*''/);
+    assert.match(appScript, /modelContextWindowInput:\s*'190000'/);
+    assert.match(appScript, /modelAutoCompactTokenLimitInput:\s*'185000'/);
+    assert.match(appScript, /statusRes\.modelContextWindow/);
+    assert.match(appScript, /statusRes\.modelAutoCompactTokenLimit/);
+    assert.match(appScript, /onModelContextWindowBlur\(\)/);
+    assert.match(appScript, /onModelAutoCompactTokenLimitBlur\(\)/);
+    assert.match(appScript, /resetCodexContextBudgetDefaults\(\)/);
+    assert.match(appScript, /normalizePositiveIntegerInput\(/);
     assert.match(appScript, /const SESSION_TRASH_LIST_LIMIT = 500;/);
     assert.match(appScript, /const SESSION_TRASH_PAGE_SIZE = 200;/);
     assert.match(appScript, /settingsTab:\s*'backup'/);
@@ -266,6 +288,8 @@ test('trash item styles stay aligned with session card layout and keep mobile us
     assert.match(styles, /\.trash-item\.session-item\s*\{[\s\S]*height:\s*auto;/);
     assert.match(styles, /\.trash-item-title\s*\{[\s\S]*-webkit-line-clamp:\s*2;/);
     assert.match(styles, /\.trash-item-side\s*\{[\s\S]*min-width:\s*132px;/);
+    assert.match(styles, /\.trash-item-actions\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(108px,\s*108px\)\);/);
+    assert.match(styles, /\.trash-item-actions \.btn-mini\s*\{[\s\S]*min-height:\s*36px;/);
     assert.match(styles, /\.trash-item-path\s*\{[\s\S]*grid-template-columns:\s*48px\s+minmax\(0,\s*1fr\);/);
     assert.match(mobile520Block, /\.trash-item-header\s*\{[\s\S]*flex-direction:\s*column;/);
     assert.match(mobile520Block, /\.trash-item-actions\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
@@ -277,16 +301,42 @@ test('trash item styles stay aligned with session card layout and keep mobile us
     assert.match(styles, /@media \(max-width: 540px\)\s*\{[\s\S]*\.trash-item-actions \.btn-mini\s*\{[\s\S]*min-height:\s*44px;/);
     assert.match(styles, /@media \(max-width: 540px\)\s*\{[\s\S]*\.trash-item \.session-count-badge\s*\{[\s\S]*align-self:\s*flex-start;/);
     assert.match(styles, /@media \(max-width: 540px\)\s*\{[\s\S]*\.trash-item-title\s*\{[\s\S]*-webkit-line-clamp:\s*3;/);
+    assert.doesNotMatch(styles, /@media \(max-width: 540px\)\s*\{[\s\S]*\.session-item-copy\.session-item-pin\s*\{[\s\S]*width:\s*44px;/);
+    assert.doesNotMatch(
+        styles,
+        /@media \(max-width: 540px\)\s*\{[\s\S]*\.session-item-copy\.session-item-pin svg,\s*[\s\S]*width:\s*16px;/
+    );
+    assert.match(styles, /\.codex-config-grid\s*\{/);
+    assert.match(styles, /\.codex-config-field\s*\{/);
 });
 
 test('settings tab header actions keep compact tool buttons inline on wider screens', () => {
     const styles = readProjectFile('web-ui/styles.css');
 
+    assert.match(styles, /\.settings-tab-header\s*\{[\s\S]*justify-content:\s*flex-end;/);
+    assert.match(styles, /\.settings-tab-header\s*\{[\s\S]*align-items:\s*center;/);
     assert.match(styles, /\.settings-tab-actions\s*\{[\s\S]*display:\s*flex;/);
     assert.match(
         styles,
         /\.settings-tab-actions \.btn-tool,\s*\.settings-tab-actions \.btn-tool-compact\s*\{[\s\S]*width:\s*auto;/
     );
+    assert.match(styles, /\.trash-header-actions\s*\{[\s\S]*display:\s*inline-grid;/);
+    assert.match(styles, /\.trash-header-actions\s*\{[\s\S]*grid-auto-flow:\s*column;/);
+    assert.match(styles, /\.trash-header-actions\s*\{[\s\S]*grid-auto-columns:\s*96px;/);
+    assert.match(styles, /\.trash-header-actions\s*\{[\s\S]*align-items:\s*stretch;/);
+    assert.match(styles, /\.trash-header-actions\s*\{[\s\S]*justify-content:\s*end;/);
+    assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact\s*\{[\s\S]*display:\s*flex;/);
+    assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact\s*\{[\s\S]*align-self:\s*stretch;/);
+    assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact\s*\{[\s\S]*margin:\s*0;/);
+    assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact\s*\{[\s\S]*width:\s*96px;/);
+    assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact\s*\{[\s\S]*min-width:\s*96px;/);
+    assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact\s*\{[\s\S]*height:\s*32px;/);
+    assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact\s*\{[\s\S]*min-height:\s*32px;/);
+    assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact\s*\{[\s\S]*line-height:\s*1;/);
+    assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact\s*\{[\s\S]*vertical-align:\s*top;/);
+    assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact\s*\{[\s\S]*top:\s*0;/);
+    assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact\s*\{[\s\S]*white-space:\s*nowrap;/);
+    assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool:hover,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact:hover\s*\{[\s\S]*transform:\s*none;/);
     assert.match(styles, /\.market-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
     assert.match(styles, /\.market-action-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/);
     assert.match(styles, /\.market-target-switch\s*\{/);

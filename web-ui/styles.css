@@ -1505,7 +1505,8 @@ body::after {
 }
 
 .settings-tab-header {
-    align-items: flex-start;
+    justify-content: flex-end;
+    align-items: center;
 }
 
 .settings-tab-actions {
@@ -1518,6 +1519,40 @@ body::after {
 .settings-tab-actions .btn-tool,
 .settings-tab-actions .btn-tool-compact {
     width: auto;
+}
+
+.trash-header-actions {
+    display: inline-grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 96px;
+    align-items: stretch;
+    justify-content: end;
+    width: auto;
+    margin-left: auto;
+}
+
+.selector-header .trash-header-actions > .btn-tool,
+.selector-header .trash-header-actions > .btn-tool-compact {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    align-self: stretch;
+    margin: 0;
+    width: 96px;
+    min-width: 96px;
+    height: 32px;
+    min-height: 32px;
+    padding: 0 10px;
+    line-height: 1;
+    vertical-align: top;
+    position: relative;
+    top: 0;
+    white-space: nowrap;
+}
+
+.selector-header .trash-header-actions > .btn-tool:hover,
+.selector-header .trash-header-actions > .btn-tool-compact:hover {
+    transform: none;
 }
 
 .selector-title {
@@ -1669,6 +1704,18 @@ body::after {
     font-size: var(--font-size-caption);
     color: var(--color-text-tertiary);
     line-height: 1.4;
+}
+
+.codex-config-grid {
+    display: grid;
+    gap: var(--spacing-sm);
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    align-items: start;
+}
+
+.codex-config-field {
+    min-width: 0;
+    margin-bottom: 0;
 }
 
 .btn-template-editor {
@@ -2095,11 +2142,19 @@ body::after {
 }
 
 .trash-item-actions {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(108px, 108px));
     align-self: flex-end;
     justify-content: flex-end;
-    flex-wrap: wrap;
     gap: 8px;
+}
+
+.trash-item-actions .btn-mini {
+    width: 100%;
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .trash-item-time {
@@ -4377,21 +4432,6 @@ textarea:focus-visible {
 }
 
 @media (max-width: 540px) {
-    .session-item-copy.session-item-pin {
-        width: 44px;
-        height: 44px;
-        min-width: 44px;
-        min-height: 44px;
-        padding: 10px;
-        transform: none;
-    }
-
-    .session-item-copy.session-item-pin svg,
-    .session-item-copy.session-item-pin .pin-icon {
-        width: 16px;
-        height: 16px;
-    }
-
     body {
         padding: var(--spacing-md) var(--spacing-sm);
     }
