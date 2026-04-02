@@ -4432,6 +4432,12 @@ textarea:focus-visible {
 }
 
 @media (max-width: 540px) {
+    .selector-header .trash-header-actions > .btn-tool,
+    .selector-header .trash-header-actions > .btn-tool-compact {
+        height: 44px;
+        min-height: 44px;
+    }
+
     body {
         padding: var(--spacing-md) var(--spacing-sm);
     }

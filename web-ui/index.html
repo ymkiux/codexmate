@@ -1168,11 +1168,11 @@
                         aria-labelledby="settings-tab-trash">
                         <div class="selector-section">
                             <div class="selector-header settings-tab-header">
-                                <div class="settings-tab-actions trash-header-actions" style="display:flex; flex-wrap:nowrap; align-items:stretch; justify-content:flex-end; gap:8px; margin-left:auto;">
-                                    <button class="btn-tool btn-tool-compact" style="margin:0; width:96px; min-width:96px; height:32px; min-height:32px; padding:0 10px; display:flex; align-items:center; justify-content:center; align-self:stretch; line-height:1; vertical-align:top; position:relative; top:0; transform:none;" @click="loadSessionTrash({ forceRefresh: true })" :disabled="sessionTrashLoading || sessionTrashClearing">
+                                <div class="settings-tab-actions trash-header-actions">
+                                    <button class="btn-tool btn-tool-compact" @click="loadSessionTrash({ forceRefresh: true })" :disabled="sessionTrashLoading || sessionTrashClearing">
                                         {{ sessionTrashLoading ? '刷新中...' : '刷新列表' }}
                                     </button>
-                                    <button class="btn-tool btn-tool-compact" style="margin:0; width:96px; min-width:96px; height:32px; min-height:32px; padding:0 10px; display:flex; align-items:center; justify-content:center; align-self:stretch; line-height:1; vertical-align:top; position:relative; top:0; transform:none;" @click="clearSessionTrash" :disabled="sessionTrashClearing || sessionTrashLoading || !(Number(sessionTrashCount) > 0)">
+                                    <button class="btn-tool btn-tool-compact" @click="clearSessionTrash" :disabled="sessionTrashClearing || sessionTrashLoading || !(Number(sessionTrashCount) > 0)">
                                         {{ sessionTrashClearing ? '清空中...' : '清空回收站' }}
                                     </button>
                                 </div>

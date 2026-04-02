@@ -97,9 +97,9 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /id="settings-panel-trash"/);
     assert.match(html, /<div[\s\S]*v-show="settingsTab === 'backup'"[\s\S]*id="settings-panel-backup"[\s\S]*aria-labelledby="settings-tab-backup">/);
     assert.match(html, /<div[\s\S]*v-show="settingsTab === 'trash'"[\s\S]*id="settings-panel-trash"[\s\S]*aria-labelledby="settings-tab-trash">/);
-    assert.match(html, /class="settings-tab-actions trash-header-actions" style="display:flex; flex-wrap:nowrap; align-items:stretch; justify-content:flex-end; gap:8px; margin-left:auto;"/);
-    assert.match(html, /<button class="btn-tool btn-tool-compact" style="margin:0; width:96px; min-width:96px; height:32px; min-height:32px; padding:0 10px; display:flex; align-items:center; justify-content:center; align-self:stretch; line-height:1; vertical-align:top; position:relative; top:0; transform:none;" @click="loadSessionTrash\(\{ forceRefresh: true \}\)"/);
-    assert.match(html, /<button class="btn-tool btn-tool-compact" style="margin:0; width:96px; min-width:96px; height:32px; min-height:32px; padding:0 10px; display:flex; align-items:center; justify-content:center; align-self:stretch; line-height:1; vertical-align:top; position:relative; top:0; transform:none;" @click="clearSessionTrash"/);
+    assert.match(html, /class="settings-tab-actions trash-header-actions"/);
+    assert.match(html, /<button class="btn-tool btn-tool-compact" @click="loadSessionTrash\(\{ forceRefresh: true \}\)"/);
+    assert.match(html, /<button class="btn-tool btn-tool-compact" @click="clearSessionTrash"/);
     assert.doesNotMatch(html, /<span class="selector-title">会话回收站<\/span>/);
     assert.match(html, /role="tabpanel"/);
     assert.doesNotMatch(html, /v-if="settingsTab === 'backup'"/);
@@ -301,6 +301,10 @@ test('trash item styles stay aligned with session card layout and keep mobile us
     assert.match(styles, /@media \(max-width: 540px\)\s*\{[\s\S]*\.trash-item-actions \.btn-mini\s*\{[\s\S]*min-height:\s*44px;/);
     assert.match(styles, /@media \(max-width: 540px\)\s*\{[\s\S]*\.trash-item \.session-count-badge\s*\{[\s\S]*align-self:\s*flex-start;/);
     assert.match(styles, /@media \(max-width: 540px\)\s*\{[\s\S]*\.trash-item-title\s*\{[\s\S]*-webkit-line-clamp:\s*3;/);
+    assert.match(
+        styles,
+        /@media \(max-width: 540px\)\s*\{[\s\S]*\.selector-header \.trash-header-actions > \.btn-tool,\s*[\s\S]*min-height:\s*44px;/
+    );
     assert.doesNotMatch(styles, /@media \(max-width: 540px\)\s*\{[\s\S]*\.session-item-copy\.session-item-pin\s*\{[\s\S]*width:\s*44px;/);
     assert.doesNotMatch(
         styles,

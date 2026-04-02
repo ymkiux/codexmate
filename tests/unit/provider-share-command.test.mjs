@@ -145,3 +145,148 @@ test('buildProviderShareCommand keeps legacy command when payload model is empty
 
     assert.strictEqual(command, "codexmate add alpha 'https://api.example.com/v1' sk-alpha && codexmate switch alpha");
 });
+
+test('applyConfigTemplate rejects invalid positive integer context budget values', () => {
+    const normalizePositiveIntegerParamSource = extractBlockBySignature(
+        cliSource,
+        'function normalizePositiveIntegerParam(value) {'
+    );
+    const normalizePositiveIntegerParam = instantiateFunction(
+        normalizePositiveIntegerParamSource,
+        'normalizePositiveIntegerParam'
+    );
+    const applyConfigTemplateSource = extractBlockBySignature(cliSource, 'function applyConfigTemplate(params = {}) {');
+    let writeConfigCalls = 0;
+    const applyConfigTemplate = instantiateFunction(applyConfigTemplateSource, 'applyConfigTemplate', {
+        toml: require('@iarna/toml'),
+        normalizePositiveIntegerParam,
+        writeConfig() {
+            writeConfigCalls += 1;
+        },
+        updateAuthJson() {},
+        readModels() {
+            return [];
+        },
+        writeModels() {},
+        readCurrentModels() {
+            return {};
+        },
+        writeCurrentModels() {},
+        recordRecentConfig() {}
+    });
+
+    const invalidContextResult = applyConfigTemplate({
+        template: `model_provider = "alpha"
+model = "alpha-model"
+model_context_window = 0
+
+[model_providers.alpha]
+preferred_auth_method = "sk-alpha"
+`
+    });
+    const invalidAutoCompactResult = applyConfigTemplate({
+        template: `model_provider = "alpha"
+model = "alpha-model"
+model_auto_compact_token_limit = "abc"
+
+[model_providers.alpha]
+preferred_auth_method = "sk-alpha"
+`
+    });
+
+    assert.deepStrictEqual(invalidContextResult, { error: '模板中的 model_context_window 必须是正整数' });
+    assert.deepStrictEqual(invalidAutoCompactResult, { error: '模板中的 model_auto_compact_token_limit 必须是正整数' });
+    assert.strictEqual(writeConfigCalls, 0);
+});
+
+test('status api case keeps lexical declarations scoped to the switch branch', () => {
+    assert.match(cliSource, /case 'status': \{/);
+});
+
+test('applyCodexConfigDirect queues the latest pending budget update while an apply is in flight', async () => {
+    const applyCodexConfigDirectSource = extractBlockBySignature(
+        appSource,
+        'async applyCodexConfigDirect(options = {}) {'
+    ).replace(/^async applyCodexConfigDirect/, 'async function applyCodexConfigDirect');
+    let firstTemplateResolve = null;
+    const templateRequests = [];
+    const appliedTemplates = [];
+    const applyCodexConfigDirect = instantiateFunction(applyCodexConfigDirectSource, 'applyCodexConfigDirect', {
+        DEFAULT_MODEL_CONTEXT_WINDOW: 190000,
+        DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT: 185000,
+        api: async (action, params) => {
+            if (action === 'get-config-template') {
+                templateRequests.push(params);
+                if (templateRequests.length === 1) {
+                    return await new Promise((resolve) => {
+                        firstTemplateResolve = resolve;
+                    });
+                }
+                return { template: `template-${templateRequests.length}` };
+            }
+            if (action === 'apply-config-template') {
+                appliedTemplates.push(params);
+                return { success: true };
+            }
+            throw new Error(`Unexpected api action: ${action}`);
+        }
+    });
+
+    const messages = [];
+    let loadAllCalls = 0;
+    const context = {
+        codexApplying: false,
+        _pendingCodexApplyOptions: null,
+        currentProvider: 'alpha',
+        currentModel: 'alpha-model',
+        serviceTier: 'fast',
+        modelReasoningEffort: 'high',
+        modelContextWindowInput: '190000',
+        modelAutoCompactTokenLimitInput: '185000',
+        normalizePositiveIntegerInput(value, label, fallback = '') {
+            const raw = value === undefined || value === null || value === ''
+                ? String(fallback || '')
+                : String(value);
+            const text = raw.trim();
+            const numeric = Number.parseInt(text, 10);
+            if (!Number.isFinite(numeric) || numeric <= 0) {
+                return { ok: false, error: `${label} invalid` };
+            }
+            return { ok: true, value: numeric, text: String(numeric) };
+        },
+        showMessage(message, type) {
+            messages.push({ message, type });
+        },
+        async loadAll() {
+            loadAllCalls += 1;
+        }
+    };
+    context.applyCodexConfigDirect = applyCodexConfigDirect;
+
+    const firstApply = applyCodexConfigDirect.call(context, {
+        silent: true,
+        modelContextWindow: 190000
+    });
+    await Promise.resolve();
+
+    await applyCodexConfigDirect.call(context, {
+        silent: true,
+        modelAutoCompactTokenLimit: 175000
+    });
+    assert.deepStrictEqual(context._pendingCodexApplyOptions, {
+        silent: true,
+        modelAutoCompactTokenLimit: 175000
+    });
+
+    firstTemplateResolve({ template: 'template-1' });
+    await firstApply;
+
+    assert.strictEqual(templateRequests.length, 2);
+    assert.strictEqual(templateRequests[1].modelContextWindow, 190000);
+    assert.strictEqual(templateRequests[1].modelAutoCompactTokenLimit, 175000);
+    assert.strictEqual(appliedTemplates.length, 2);
+    assert.strictEqual(loadAllCalls, 2);
+    assert.strictEqual(context._pendingCodexApplyOptions, null);
+    assert.strictEqual(context.codexApplying, false);
+    assert.deepStrictEqual(messages, []);
+});
