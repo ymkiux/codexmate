@@ -145,3 +145,697 @@ test('buildProviderShareCommand keeps legacy command when payload model is empty
 
     assert.strictEqual(command, "codexmate add alpha 'https://api.example.com/v1' sk-alpha && codexmate switch alpha");
 });
+
+test('applyConfigTemplate rejects invalid positive integer context budget values', () => {
+    const normalizePositiveIntegerParamSource = extractBlockBySignature(
+        cliSource,
+        'function normalizePositiveIntegerParam(value) {'
+    );
+    const normalizePositiveIntegerParam = instantiateFunction(
+        normalizePositiveIntegerParamSource,
+        'normalizePositiveIntegerParam'
+    );
+    const applyConfigTemplateSource = extractBlockBySignature(cliSource, 'function applyConfigTemplate(params = {}) {');
+    let writeConfigCalls = 0;
+    let updateAuthJsonCalls = 0;
+    let writeModelsCalls = 0;
+    let writeCurrentModelsCalls = 0;
+    let recordRecentConfigCalls = 0;
+    const applyConfigTemplate = instantiateFunction(applyConfigTemplateSource, 'applyConfigTemplate', {
+        toml: require('@iarna/toml'),
+        normalizePositiveIntegerParam,
+        writeConfig() {
+            writeConfigCalls += 1;
+        },
+        updateAuthJson() {
+            updateAuthJsonCalls += 1;
+        },
+        readModels() {
+            return [];
+        },
+        writeModels() {
+            writeModelsCalls += 1;
+        },
+        readCurrentModels() {
+            return {};
+        },
+        writeCurrentModels() {
+            writeCurrentModelsCalls += 1;
+        },
+        recordRecentConfig() {
+            recordRecentConfigCalls += 1;
+        }
+    });
+
+    const invalidContextResult = applyConfigTemplate({
+        template: `model_provider = "alpha"
+model = "alpha-model"
+model_context_window = 0
+
+[model_providers.alpha]
+preferred_auth_method = "sk-alpha"
+`
+    });
+    const invalidAutoCompactResult = applyConfigTemplate({
+        template: `model_provider = "alpha"
+model = "alpha-model"
+model_auto_compact_token_limit = "abc"
+
+[model_providers.alpha]
+preferred_auth_method = "sk-alpha"
+`
+    });
+
+    assert.deepStrictEqual(invalidContextResult, { error: '模板中的 model_context_window 必须是正整数' });
+    assert.deepStrictEqual(invalidAutoCompactResult, { error: '模板中的 model_auto_compact_token_limit 必须是正整数' });
+    assert.strictEqual(writeConfigCalls, 0);
+    assert.strictEqual(updateAuthJsonCalls, 0);
+    assert.strictEqual(writeModelsCalls, 0);
+    assert.strictEqual(writeCurrentModelsCalls, 0);
+    assert.strictEqual(recordRecentConfigCalls, 0);
+});
+
+test('getConfigTemplate restores missing context budget defaults for upgraded configs', () => {
+    const normalizePositiveIntegerParamSource = extractBlockBySignature(
+        cliSource,
+        'function normalizePositiveIntegerParam(value) {'
+    );
+    const normalizePositiveIntegerParam = instantiateFunction(
+        normalizePositiveIntegerParamSource,
+        'normalizePositiveIntegerParam'
+    );
+    const applyPositiveIntegerConfigToTemplateSource = extractBlockBySignature(
+        cliSource,
+        'function applyPositiveIntegerConfigToTemplate(template, key, value) {'
+    );
+    const applyPositiveIntegerConfigToTemplate = instantiateFunction(
+        applyPositiveIntegerConfigToTemplateSource,
+        'applyPositiveIntegerConfigToTemplate',
+        { normalizePositiveIntegerParam }
+    );
+    const getConfigTemplateSource = extractBlockBySignature(cliSource, 'function getConfigTemplate(params = {}) {');
+    const getConfigTemplate = instantiateFunction(getConfigTemplateSource, 'getConfigTemplate', {
+        fs: {
+            existsSync() {
+                return true;
+            },
+            readFileSync() {
+                return `model_provider = "alpha"\nmodel = "alpha-model"\n`;
+            }
+        },
+        CONFIG_FILE: '/tmp/config.toml',
+        EMPTY_CONFIG_FALLBACK_TEMPLATE: '',
+        normalizeTopLevelConfigWithTemplate(content) {
+            return content;
+        },
+        applyServiceTierToTemplate(template) {
+            return template;
+        },
+        applyReasoningEffortToTemplate(template) {
+            return template;
+        },
+        applyPositiveIntegerConfigToTemplate,
+        DEFAULT_MODEL_CONTEXT_WINDOW: 190000,
+        DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT: 185000
+    });
+
+    const result = getConfigTemplate({});
+
+    assert.match(result.template, /^\s*model_context_window\s*=\s*190000\s*$/m);
+    assert.match(result.template, /^\s*model_auto_compact_token_limit\s*=\s*185000\s*$/m);
+});
+
+test('getConfigTemplate rejects explicit invalid context budget params', () => {
+    const normalizePositiveIntegerParamSource = extractBlockBySignature(
+        cliSource,
+        'function normalizePositiveIntegerParam(value) {'
+    );
+    const normalizePositiveIntegerParam = instantiateFunction(
+        normalizePositiveIntegerParamSource,
+        'normalizePositiveIntegerParam'
+    );
+    const applyPositiveIntegerConfigToTemplateSource = extractBlockBySignature(
+        cliSource,
+        'function applyPositiveIntegerConfigToTemplate(template, key, value) {'
+    );
+    const applyPositiveIntegerConfigToTemplate = instantiateFunction(
+        applyPositiveIntegerConfigToTemplateSource,
+        'applyPositiveIntegerConfigToTemplate',
+        { normalizePositiveIntegerParam }
+    );
+    const getConfigTemplateSource = extractBlockBySignature(cliSource, 'function getConfigTemplate(params = {}) {');
+    const getConfigTemplate = instantiateFunction(getConfigTemplateSource, 'getConfigTemplate', {
+        fs: {
+            existsSync() {
+                return false;
+            },
+            readFileSync() {
+                return '';
+            }
+        },
+        CONFIG_FILE: '/tmp/config.toml',
+        EMPTY_CONFIG_FALLBACK_TEMPLATE: 'model_provider = "alpha"\nmodel = "alpha-model"\n',
+        normalizeTopLevelConfigWithTemplate(content) {
+            return content;
+        },
+        applyServiceTierToTemplate(template) {
+            return template;
+        },
+        applyReasoningEffortToTemplate(template) {
+            return template;
+        },
+        applyPositiveIntegerConfigToTemplate,
+        normalizePositiveIntegerParam,
+        DEFAULT_MODEL_CONTEXT_WINDOW: 190000,
+        DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT: 185000
+    });
+
+    assert.deepStrictEqual(
+        getConfigTemplate({ modelContextWindow: 0 }),
+        { error: 'modelContextWindow must be a positive integer' }
+    );
+    assert.deepStrictEqual(
+        getConfigTemplate({ modelAutoCompactTokenLimit: 'abc' }),
+        { error: 'modelAutoCompactTokenLimit must be a positive integer' }
+    );
+});
+
+test('getConfigTemplate preserves BOM and CRLF when restoring missing context budget defaults', () => {
+    const normalizePositiveIntegerParamSource = extractBlockBySignature(
+        cliSource,
+        'function normalizePositiveIntegerParam(value) {'
+    );
+    const normalizePositiveIntegerParam = instantiateFunction(
+        normalizePositiveIntegerParamSource,
+        'normalizePositiveIntegerParam'
+    );
+    const applyPositiveIntegerConfigToTemplateSource = extractBlockBySignature(
+        cliSource,
+        'function applyPositiveIntegerConfigToTemplate(template, key, value) {'
+    );
+    const applyPositiveIntegerConfigToTemplate = instantiateFunction(
+        applyPositiveIntegerConfigToTemplateSource,
+        'applyPositiveIntegerConfigToTemplate',
+        { normalizePositiveIntegerParam }
+    );
+    const getConfigTemplateSource = extractBlockBySignature(cliSource, 'function getConfigTemplate(params = {}) {');
+    const getConfigTemplate = instantiateFunction(getConfigTemplateSource, 'getConfigTemplate', {
+        fs: {
+            existsSync() {
+                return true;
+            },
+            readFileSync() {
+                return '\uFEFFmodel_provider = "alpha"\r\nmodel = "alpha-model"\r\n';
+            }
+        },
+        CONFIG_FILE: '/tmp/config.toml',
+        EMPTY_CONFIG_FALLBACK_TEMPLATE: '',
+        normalizeTopLevelConfigWithTemplate(content) {
+            return content;
+        },
+        applyServiceTierToTemplate(template) {
+            return template;
+        },
+        applyReasoningEffortToTemplate(template) {
+            return template;
+        },
+        applyPositiveIntegerConfigToTemplate,
+        DEFAULT_MODEL_CONTEXT_WINDOW: 190000,
+        DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT: 185000
+    });
+
+    const result = getConfigTemplate({});
+
+    assert.strictEqual(result.template.charCodeAt(0), 0xFEFF);
+    assert(result.template.includes('model_auto_compact_token_limit = 185000\r\n'));
+    assert(result.template.includes('model_context_window = 190000\r\n'));
+    assert(!/(?<!\r)\n/.test(result.template), 'template should preserve CRLF line endings');
+});
+
+test('readPositiveIntegerConfigValue falls back to defaults only when budget keys are missing', () => {
+    const normalizePositiveIntegerParamSource = extractBlockBySignature(
+        cliSource,
+        'function normalizePositiveIntegerParam(value) {'
+    );
+    const normalizePositiveIntegerParam = instantiateFunction(
+        normalizePositiveIntegerParamSource,
+        'normalizePositiveIntegerParam'
+    );
+    const readPositiveIntegerConfigValueSource = extractBlockBySignature(
+        cliSource,
+        'function readPositiveIntegerConfigValue(config, key) {'
+    );
+    const readPositiveIntegerConfigValue = instantiateFunction(
+        readPositiveIntegerConfigValueSource,
+        'readPositiveIntegerConfigValue',
+        {
+            normalizePositiveIntegerParam,
+            DEFAULT_MODEL_CONTEXT_WINDOW: 190000,
+            DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT: 185000
+        }
+    );
+
+    assert.strictEqual(readPositiveIntegerConfigValue({}, 'model_context_window'), 190000);
+    assert.strictEqual(readPositiveIntegerConfigValue({}, 'model_auto_compact_token_limit'), 185000);
+    assert.strictEqual(readPositiveIntegerConfigValue({}, 'other_key'), '');
+    assert.strictEqual(readPositiveIntegerConfigValue({ model_context_window: 0 }, 'model_context_window'), '');
+});
+
+test('buildMcpStatusPayload does not synthesize budget defaults after config load errors', () => {
+    const normalizePositiveIntegerParamSource = extractBlockBySignature(
+        cliSource,
+        'function normalizePositiveIntegerParam(value) {'
+    );
+    const normalizePositiveIntegerParam = instantiateFunction(
+        normalizePositiveIntegerParamSource,
+        'normalizePositiveIntegerParam'
+    );
+    const readPositiveIntegerConfigValueSource = extractBlockBySignature(
+        cliSource,
+        'function readPositiveIntegerConfigValue(config, key) {'
+    );
+    const readPositiveIntegerConfigValue = instantiateFunction(
+        readPositiveIntegerConfigValueSource,
+        'readPositiveIntegerConfigValue',
+        {
+            normalizePositiveIntegerParam,
+            DEFAULT_MODEL_CONTEXT_WINDOW: 190000,
+            DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT: 185000
+        }
+    );
+    const buildMcpStatusPayloadSource = extractBlockBySignature(
+        cliSource,
+        'function buildMcpStatusPayload() {'
+    );
+    const hasConfigLoadErrorSource = extractBlockBySignature(
+        cliSource,
+        'function hasConfigLoadError(result) {'
+    );
+    const hasConfigLoadError = instantiateFunction(
+        hasConfigLoadErrorSource,
+        'hasConfigLoadError'
+    );
+    const buildMcpStatusPayload = instantiateFunction(
+        buildMcpStatusPayloadSource,
+        'buildMcpStatusPayload',
+        {
+            readConfigOrVirtualDefault: () => ({
+                config: {},
+                isVirtual: true,
+                errorType: 'parse',
+                reason: 'config.toml 解析失败'
+            }),
+            hasConfigLoadError,
+            readPositiveIntegerConfigValue,
+            consumeInitNotice: () => ''
+        }
+    );
+
+    const result = buildMcpStatusPayload();
+
+    assert.strictEqual(result.modelContextWindow, '');
+    assert.strictEqual(result.modelAutoCompactTokenLimit, '');
+    assert.strictEqual(result.configErrorType, 'parse');
+    assert.strictEqual(result.configNotice, 'config.toml 解析失败');
+});
+
+test('status api case does not synthesize budget defaults after config load errors', () => {
+    const normalizePositiveIntegerParamSource = extractBlockBySignature(
+        cliSource,
+        'function normalizePositiveIntegerParam(value) {'
+    );
+    const normalizePositiveIntegerParam = instantiateFunction(
+        normalizePositiveIntegerParamSource,
+        'normalizePositiveIntegerParam'
+    );
+    const readPositiveIntegerConfigValueSource = extractBlockBySignature(
+        cliSource,
+        'function readPositiveIntegerConfigValue(config, key) {'
+    );
+    const readPositiveIntegerConfigValue = instantiateFunction(
+        readPositiveIntegerConfigValueSource,
+        'readPositiveIntegerConfigValue',
+        {
+            normalizePositiveIntegerParam,
+            DEFAULT_MODEL_CONTEXT_WINDOW: 190000,
+            DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT: 185000
+        }
+    );
+    const hasConfigLoadErrorSource = extractBlockBySignature(
+        cliSource,
+        'function hasConfigLoadError(result) {'
+    );
+    const hasConfigLoadError = instantiateFunction(
+        hasConfigLoadErrorSource,
+        'hasConfigLoadError'
+    );
+    const statusCaseBlock = extractBlockBySignature(
+        cliSource,
+        "case 'status': {"
+    )
+        .replace(/^case\s+['"]status['"]:\s*/, '')
+        .replace(/\bbreak;\s*(?=\}\s*$)/, '');
+    const runStatusCase = instantiateFunction(
+        `function runStatusCase() {
+            let result;
+            ${statusCaseBlock}
+            return result;
+        }`,
+        'runStatusCase',
+        {
+            readConfigOrVirtualDefault: () => ({
+                config: {},
+                isVirtual: true,
+                errorType: 'parse',
+                reason: 'config.toml 解析失败'
+            }),
+            hasConfigLoadError,
+            readPositiveIntegerConfigValue,
+            consumeInitNotice: () => ''
+        }
+    );
+
+    const result = runStatusCase();
+
+    assert.strictEqual(result.modelContextWindow, '');
+    assert.strictEqual(result.modelAutoCompactTokenLimit, '');
+    assert.strictEqual(result.configErrorType, 'parse');
+    assert.strictEqual(result.configNotice, 'config.toml 解析失败');
+});
+
+test('status api case keeps lexical declarations scoped to the switch branch', () => {
+    assert.match(cliSource, /^\s*case\s+['"]status['"]:\s*\{/m);
+});
+
+test('applyCodexConfigDirect queues the latest pending budget update while an apply is in flight', async () => {
+    const applyCodexConfigDirectSource = extractBlockBySignature(
+        appSource,
+        'async applyCodexConfigDirect(options = {}) {'
+    ).replace(/^async applyCodexConfigDirect/, 'async function applyCodexConfigDirect');
+    let firstTemplateResolve = null;
+    const templateRequests = [];
+    const appliedTemplates = [];
+    const applyCodexConfigDirect = instantiateFunction(applyCodexConfigDirectSource, 'applyCodexConfigDirect', {
+        DEFAULT_MODEL_CONTEXT_WINDOW: 190000,
+        DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT: 185000,
+        api: async (action, params) => {
+            if (action === 'get-config-template') {
+                templateRequests.push(params);
+                if (templateRequests.length === 1) {
+                    return await new Promise((resolve) => {
+                        firstTemplateResolve = resolve;
+                    });
+                }
+                return { template: `template-${templateRequests.length}` };
+            }
+            if (action === 'apply-config-template') {
+                appliedTemplates.push(params);
+                return { success: true };
+            }
+            throw new Error(`Unexpected api action: ${action}`);
+        }
+    });
+
+    const messages = [];
+    let loadAllCalls = 0;
+    const context = {
+        codexApplying: false,
+        _pendingCodexApplyOptions: null,
+        currentProvider: 'alpha',
+        currentModel: 'alpha-model',
+        serviceTier: 'fast',
+        modelReasoningEffort: 'high',
+        modelContextWindowInput: '190000',
+        modelAutoCompactTokenLimitInput: '185000',
+        normalizePositiveIntegerInput(value, label, fallback = '') {
+            const raw = value === undefined || value === null || value === ''
+                ? String(fallback || '')
+                : String(value);
+            const text = raw.trim();
+            const numeric = Number.parseInt(text, 10);
+            if (!Number.isFinite(numeric) || numeric <= 0) {
+                return { ok: false, error: `${label} invalid` };
+            }
+            return { ok: true, value: numeric, text: String(numeric) };
+        },
+        showMessage(message, type) {
+            messages.push({ message, type });
+        },
+        async loadAll() {
+            loadAllCalls += 1;
+        }
+    };
+    context.applyCodexConfigDirect = applyCodexConfigDirect;
+
+    const firstApply = applyCodexConfigDirect.call(context, {
+        silent: true,
+        modelContextWindow: 190000
+    });
+    await Promise.resolve();
+
+    await applyCodexConfigDirect.call(context, {
+        silent: true,
+        modelAutoCompactTokenLimit: 175000
+    });
+    assert.deepStrictEqual(context._pendingCodexApplyOptions, {
+        silent: true,
+        modelAutoCompactTokenLimit: 175000
+    });
+
+    firstTemplateResolve({ template: 'template-1' });
+    await firstApply;
+
+    assert.strictEqual(templateRequests.length, 2);
+    assert.strictEqual(templateRequests[1].modelContextWindow, 190000);
+    assert.strictEqual(templateRequests[1].modelAutoCompactTokenLimit, 175000);
+    assert.strictEqual(appliedTemplates.length, 2);
+    assert.strictEqual(appliedTemplates[0].template, 'template-1');
+    assert.strictEqual(appliedTemplates[1].template, 'template-2');
+    assert.strictEqual(loadAllCalls, 2);
+    assert.strictEqual(context._pendingCodexApplyOptions, null);
+    assert.strictEqual(context.codexApplying, false);
+    assert.deepStrictEqual(messages, []);
+});
+
+test('loadAll preserves an unsaved codex budget draft while refreshing the sibling value', async () => {
+    const loadAllSource = extractBlockBySignature(
+        appSource,
+        'async loadAll() {'
+    ).replace(/^async loadAll/, 'async function loadAll');
+    const loadAll = instantiateFunction(loadAllSource, 'loadAll', {
+        DEFAULT_MODEL_CONTEXT_WINDOW: 190000,
+        DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT: 185000,
+        api: async (action) => {
+            if (action === 'status') {
+                return {
+                    provider: 'alpha',
+                    model: 'alpha-model',
+                    serviceTier: 'fast',
+                    modelReasoningEffort: 'high',
+                    modelContextWindow: 200000,
+                    modelAutoCompactTokenLimit: 185000,
+                    configReady: true,
+                    initNotice: ''
+                };
+            }
+            if (action === 'list') {
+                return {
+                    providers: [{ name: 'alpha', url: 'https://api.example.com/v1', hasKey: true }]
+                };
+            }
+            throw new Error(`Unexpected api action: ${action}`);
+        }
+    });
+
+    const context = {
+        loading: false,
+        initError: '',
+        currentProvider: 'alpha',
+        currentModel: 'alpha-model',
+        serviceTier: 'fast',
+        modelReasoningEffort: 'high',
+        modelContextWindowInput: '190000',
+        modelAutoCompactTokenLimitInput: '180000',
+        editingCodexBudgetField: 'modelAutoCompactTokenLimitInput',
+        providersList: [],
+        normalizePositiveIntegerInput(value, label, fallback = '') {
+            const raw = value === undefined || value === null || value === ''
+                ? String(fallback || '')
+                : String(value);
+            const text = raw.trim();
+            const numeric = Number.parseInt(text, 10);
+            if (!Number.isFinite(numeric) || numeric <= 0) {
+                return { ok: false, error: `${label} invalid` };
+            }
+            return { ok: true, value: numeric, text: String(numeric) };
+        },
+        showMessage() {},
+        maybeShowStarPrompt() {},
+        async loadModelsForProvider() {},
+        async loadCodexAuthProfiles() {}
+    };
+
+    await loadAll.call(context);
+
+    assert.strictEqual(context.modelContextWindowInput, '200000');
+    assert.strictEqual(context.modelAutoCompactTokenLimitInput, '180000');
+});
+
+test('applyCodexConfigDirect preserves a focused sibling budget draft across the loadAll refresh', async () => {
+    const loadAllSource = extractBlockBySignature(
+        appSource,
+        'async loadAll() {'
+    ).replace(/^async loadAll/, 'async function loadAll');
+    const loadAll = instantiateFunction(loadAllSource, 'loadAll', {
+        DEFAULT_MODEL_CONTEXT_WINDOW: 190000,
+        DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT: 185000,
+        api: async (action) => {
+            if (action === 'status') {
+                return {
+                    provider: 'alpha',
+                    model: 'alpha-model',
+                    serviceTier: 'fast',
+                    modelReasoningEffort: 'high',
+                    modelContextWindow: 200000,
+                    modelAutoCompactTokenLimit: 185000,
+                    configReady: true,
+                    initNotice: ''
+                };
+            }
+            if (action === 'list') {
+                return {
+                    providers: [{ name: 'alpha', url: 'https://api.example.com/v1', hasKey: true }]
+                };
+            }
+            throw new Error(`Unexpected loadAll api action: ${action}`);
+        }
+    });
+    const applyCodexConfigDirectSource = extractBlockBySignature(
+        appSource,
+        'async applyCodexConfigDirect(options = {}) {'
+    ).replace(/^async applyCodexConfigDirect/, 'async function applyCodexConfigDirect');
+    let firstTemplateResolve = null;
+    const applyCodexConfigDirect = instantiateFunction(
+        applyCodexConfigDirectSource,
+        'applyCodexConfigDirect',
+        {
+            DEFAULT_MODEL_CONTEXT_WINDOW: 190000,
+            DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT: 185000,
+            api: async (action, params) => {
+                if (action === 'get-config-template') {
+                    return await new Promise((resolve) => {
+                        firstTemplateResolve = resolve;
+                    });
+                }
+                if (action === 'apply-config-template') {
+                    assert.deepStrictEqual(params, { template: 'template-1' });
+                    return { success: true };
+                }
+                throw new Error(`Unexpected apply api action: ${action}`);
+            }
+        }
+    );
+
+    const context = {
+        loading: false,
+        initError: '',
+        codexApplying: false,
+        _pendingCodexApplyOptions: null,
+        currentProvider: 'alpha',
+        currentModel: 'alpha-model',
+        serviceTier: 'fast',
+        modelReasoningEffort: 'high',
+        modelContextWindowInput: '190000',
+        modelAutoCompactTokenLimitInput: '185000',
+        editingCodexBudgetField: '',
+        providersList: [],
+        normalizePositiveIntegerInput(value, label, fallback = '') {
+            const raw = value === undefined || value === null || value === ''
+                ? String(fallback || '')
+                : String(value);
+            const text = raw.trim();
+            const numeric = Number.parseInt(text, 10);
+            if (!Number.isFinite(numeric) || numeric <= 0) {
+                return { ok: false, error: `${label} invalid` };
+            }
+            return { ok: true, value: numeric, text: String(numeric) };
+        },
+        showMessage() {},
+        maybeShowStarPrompt() {},
+        async loadModelsForProvider() {},
+        async loadCodexAuthProfiles() {}
+    };
+    context.loadAll = loadAll;
+    context.applyCodexConfigDirect = applyCodexConfigDirect;
+
+    const firstApply = applyCodexConfigDirect.call(context, {
+        silent: true,
+        modelContextWindow: 200000
+    });
+    await Promise.resolve();
+
+    context.editingCodexBudgetField = 'modelAutoCompactTokenLimitInput';
+    context.modelAutoCompactTokenLimitInput = '180000';
+
+    firstTemplateResolve({ template: 'template-1' });
+    await firstApply;
+
+    assert.strictEqual(context.modelContextWindowInput, '200000');
+    assert.strictEqual(context.modelAutoCompactTokenLimitInput, '180000');
+    assert.strictEqual(context.editingCodexBudgetField, 'modelAutoCompactTokenLimitInput');
+});
+
+test('applyCodexConfigDirect surfaces backend validation details from direct apply failures', async () => {
+    const applyCodexConfigDirectSource = extractBlockBySignature(
+        appSource,
+        'async applyCodexConfigDirect(options = {}) {'
+    ).replace(/^async applyCodexConfigDirect/, 'async function applyCodexConfigDirect');
+    const messages = [];
+    const applyCodexConfigDirect = instantiateFunction(applyCodexConfigDirectSource, 'applyCodexConfigDirect', {
+        DEFAULT_MODEL_CONTEXT_WINDOW: 190000,
+        DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT: 185000,
+        api: async (action) => {
+            if (action === 'get-config-template') {
+                return { error: '模板中的 model_context_window 必须是正整数' };
+            }
+            throw new Error(`Unexpected api action: ${action}`);
+        }
+    });
+
+    const context = {
+        codexApplying: false,
+        _pendingCodexApplyOptions: null,
+        currentProvider: 'alpha',
+        currentModel: 'alpha-model',
+        serviceTier: 'fast',
+        modelReasoningEffort: 'high',
+        modelContextWindowInput: '190000',
+        modelAutoCompactTokenLimitInput: '185000',
+        normalizePositiveIntegerInput(value, label, fallback = '') {
+            const raw = value === undefined || value === null || value === ''
+                ? String(fallback || '')
+                : String(value);
+            const text = raw.trim();
+            const numeric = Number.parseInt(text, 10);
+            if (!Number.isFinite(numeric) || numeric <= 0) {
+                return { ok: false, error: `${label} invalid` };
+            }
+            return { ok: true, value: numeric, text: String(numeric) };
+        },
+        showMessage(message, type) {
+            messages.push({ message, type });
+        },
+        async loadAll() {
+            throw new Error('loadAll should not be called when template generation fails');
+        }
+    };
+
+    await applyCodexConfigDirect.call(context, { silent: true });
+
+    assert.deepStrictEqual(messages, [{
+        message: '模板中的 model_context_window 必须是正整数',
+        type: 'error'
+    }]);
+    assert.strictEqual(context.codexApplying, false);
+    assert.strictEqual(context._pendingCodexApplyOptions, null);
+});

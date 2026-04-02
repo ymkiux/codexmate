@@ -470,6 +470,55 @@
 
                 <div class="selector-section">
                     <div class="selector-header">
+                        <span class="selector-title">上下文压缩阈值</span>
+                        <div class="selector-actions">
+                            <button
+                                class="btn-tool btn-tool-compact"
+                                @click="resetCodexContextBudgetDefaults"
+                                :disabled="loading || !!initError || codexApplying">
+                                重置默认值
+                            </button>
+                        </div>
+                    </div>
+                    <div class="codex-config-grid">
+                        <div class="form-group codex-config-field">
+                            <label class="form-label" for="codex-model-context-window">model_context_window</label>
+                            <input
+                                id="codex-model-context-window"
+                                v-model="modelContextWindowInput"
+                                class="form-input"
+                                inputmode="numeric"
+                                autocomplete="off"
+                                placeholder="例如: 190000"
+                                @focus="editingCodexBudgetField = 'modelContextWindowInput'"
+                                @input="sanitizePositiveIntegerDraft('modelContextWindowInput')"
+                                @blur="onModelContextWindowBlur"
+                                @keydown.enter.prevent="onModelContextWindowBlur">
+                            <div class="form-hint">控制上下文窗口上限，默认 190000。</div>
+                        </div>
+                        <div class="form-group codex-config-field">
+                            <label class="form-label" for="codex-model-auto-compact-token-limit">model_auto_compact_token_limit</label>
+                            <input
+                                id="codex-model-auto-compact-token-limit"
+                                v-model="modelAutoCompactTokenLimitInput"
+                                class="form-input"
+                                inputmode="numeric"
+                                autocomplete="off"
+                                placeholder="例如: 185000"
+                                @focus="editingCodexBudgetField = 'modelAutoCompactTokenLimitInput'"
+                                @input="sanitizePositiveIntegerDraft('modelAutoCompactTokenLimitInput')"
+                                @blur="onModelAutoCompactTokenLimitBlur"
+                                @keydown.enter.prevent="onModelAutoCompactTokenLimitBlur">
+                            <div class="form-hint">控制自动压缩触发阈值，默认 185000。</div>
+                        </div>
+                    </div>
+                    <div class="config-template-hint">
+                        使用自定义数字输入框；失焦或回车后会按当前 Codex 配置规范写入模板。
+                    </div>
+                </div>
+
+                <div class="selector-section">
+                    <div class="selector-header">
                         <span class="selector-title">AGENTS.md</span>
                     </div>
                     <button class="btn-tool" @click="openAgentsEditor" :disabled="loading || !!initError || agentsLoading">
@@ -1121,10 +1170,7 @@
                         aria-labelledby="settings-tab-trash">
                         <div class="selector-section">
                             <div class="selector-header settings-tab-header">
-                                <div>
-                                    <span class="selector-title">会话回收站</span>
-                                </div>
-                                <div class="settings-tab-actions">
+                                <div class="settings-tab-actions trash-header-actions">
                                     <button class="btn-tool btn-tool-compact" @click="loadSessionTrash({ forceRefresh: true })" :disabled="sessionTrashLoading || sessionTrashClearing">
                                         {{ sessionTrashLoading ? '刷新中...' : '刷新列表' }}
                                     </button>
