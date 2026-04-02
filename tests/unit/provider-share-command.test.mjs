@@ -386,7 +386,7 @@ test('readPositiveIntegerConfigValue falls back to defaults only when budget key
 });
 
 test('status api case keeps lexical declarations scoped to the switch branch', () => {
-    assert.match(cliSource, /case 'status': \{/);
+    assert.match(cliSource, /^\s*case\s+['"]status['"]:\s*\{/m);
 });
 
 test('applyCodexConfigDirect queues the latest pending budget update while an apply is in flight', async () => {
