@@ -22,7 +22,7 @@ async function fetchHtml(port) {
 }
 
 module.exports = async function testSessionSearch(ctx) {
-    const { api, sessionId, claudeSessionId, daudeSessionId } = ctx;
+    const { api, sessionId, claudeSessionId, daudeSessionId, lateKeywordSessionId, lateKeywordMessage } = ctx;
 
     // ========== Basic Query Tests ==========
     const claudeSearch = await api('list-sessions', { source: 'claude', query: 'claudecode', limit: 20, forceRefresh: true });
@@ -101,6 +101,30 @@ module.exports = async function testSessionSearch(ctx) {
     assert(Array.isArray(numericHit.match.snippets) && numericHit.match.snippets.some(
         snippet => typeof snippet === 'string' && snippet.includes('222')
     ), '222 snippets missing numeric token');
+
+    // ========== Late Content Query Tests ==========
+    const lateKeywordDetail = await api('session-detail', {
+        source: 'codex',
+        sessionId: lateKeywordSessionId
+    });
+    assert(Array.isArray(lateKeywordDetail.messages), 'late keyword session detail missing messages');
+    assert(lateKeywordDetail.messages.some(
+        message => message && typeof message.text === 'string' && message.text.includes(lateKeywordMessage)
+    ), 'late keyword session detail should expose the tail message');
+
+    const lateKeywordSearch = await api('list-sessions', {
+        source: 'codex',
+        query: '提示 通过',
+        queryScope: 'content',
+        limit: 20,
+        forceRefresh: true
+    });
+    const lateKeywordHit = lateKeywordSearch.sessions.find(item => item.sessionId === lateKeywordSessionId);
+    assert(lateKeywordHit, 'late keyword query should find the tail-only session');
+    assert(lateKeywordHit.match && lateKeywordHit.match.hit === true, 'late keyword query missing match metadata');
+    assert(Array.isArray(lateKeywordHit.match.snippets) && lateKeywordHit.match.snippets.some(
+        snippet => typeof snippet === 'string' && snippet.includes('提示') && snippet.includes('通过')
+    ), 'late keyword query snippets should include the tail message');
 
     // ========== Pagination Tests ==========
     const paged = await api('list-sessions', {
