@@ -199,6 +199,85 @@ preferred_auth_method = "sk-alpha"
     assert.strictEqual(writeConfigCalls, 0);
 });
 
+test('getConfigTemplate restores missing context budget defaults for upgraded configs', () => {
+    const normalizePositiveIntegerParamSource = extractBlockBySignature(
+        cliSource,
+        'function normalizePositiveIntegerParam(value) {'
+    );
+    const normalizePositiveIntegerParam = instantiateFunction(
+        normalizePositiveIntegerParamSource,
+        'normalizePositiveIntegerParam'
+    );
+    const applyPositiveIntegerConfigToTemplateSource = extractBlockBySignature(
+        cliSource,
+        'function applyPositiveIntegerConfigToTemplate(template, key, value) {'
+    );
+    const applyPositiveIntegerConfigToTemplate = instantiateFunction(
+        applyPositiveIntegerConfigToTemplateSource,
+        'applyPositiveIntegerConfigToTemplate',
+        { normalizePositiveIntegerParam }
+    );
+    const getConfigTemplateSource = extractBlockBySignature(cliSource, 'function getConfigTemplate(params = {}) {');
+    const getConfigTemplate = instantiateFunction(getConfigTemplateSource, 'getConfigTemplate', {
+        fs: {
+            existsSync() {
+                return true;
+            },
+            readFileSync() {
+                return `model_provider = "alpha"\nmodel = "alpha-model"\n`;
+            }
+        },
+        CONFIG_FILE: '/tmp/config.toml',
+        EMPTY_CONFIG_FALLBACK_TEMPLATE: '',
+        normalizeTopLevelConfigWithTemplate(content) {
+            return content;
+        },
+        applyServiceTierToTemplate(template) {
+            return template;
+        },
+        applyReasoningEffortToTemplate(template) {
+            return template;
+        },
+        applyPositiveIntegerConfigToTemplate,
+        DEFAULT_MODEL_CONTEXT_WINDOW: 190000,
+        DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT: 185000
+    });
+
+    const result = getConfigTemplate({});
+
+    assert.match(result.template, /^\s*model_context_window\s*=\s*190000\s*$/m);
+    assert.match(result.template, /^\s*model_auto_compact_token_limit\s*=\s*185000\s*$/m);
+});
+
+test('readPositiveIntegerConfigValue falls back to defaults only when budget keys are missing', () => {
+    const normalizePositiveIntegerParamSource = extractBlockBySignature(
+        cliSource,
+        'function normalizePositiveIntegerParam(value) {'
+    );
+    const normalizePositiveIntegerParam = instantiateFunction(
+        normalizePositiveIntegerParamSource,
+        'normalizePositiveIntegerParam'
+    );
+    const readPositiveIntegerConfigValueSource = extractBlockBySignature(
+        cliSource,
+        'function readPositiveIntegerConfigValue(config, key) {'
+    );
+    const readPositiveIntegerConfigValue = instantiateFunction(
+        readPositiveIntegerConfigValueSource,
+        'readPositiveIntegerConfigValue',
+        {
+            normalizePositiveIntegerParam,
+            DEFAULT_MODEL_CONTEXT_WINDOW: 190000,
+            DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT: 185000
+        }
+    );
+
+    assert.strictEqual(readPositiveIntegerConfigValue({}, 'model_context_window'), 190000);
+    assert.strictEqual(readPositiveIntegerConfigValue({}, 'model_auto_compact_token_limit'), 185000);
+    assert.strictEqual(readPositiveIntegerConfigValue({}, 'other_key'), '');
+    assert.strictEqual(readPositiveIntegerConfigValue({ model_context_window: 0 }, 'model_context_window'), '');
+});
+
 test('status api case keeps lexical declarations scoped to the switch branch', () => {
     assert.match(cliSource, /case 'status': \{/);
 });

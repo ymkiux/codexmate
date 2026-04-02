@@ -391,6 +391,21 @@ preferred_auth_method = "shadow-key"
         await waitForServer(legacyPort);
 
         const legacyApi = (action, params) => postJson(legacyPort, { action, params }, 2000);
+        const legacyStatus = await legacyApi('status');
+        assert(legacyStatus.modelContextWindow === 190000, 'legacy status should default modelContextWindow');
+        assert(
+            legacyStatus.modelAutoCompactTokenLimit === 185000,
+            'legacy status should default modelAutoCompactTokenLimit'
+        );
+        const legacyTemplateDefaults = await legacyApi('get-config-template', {});
+        assert(
+            /^\s*model_context_window\s*=\s*190000\s*$/m.test(legacyTemplateDefaults.template),
+            'legacy get-config-template should restore default model_context_window'
+        );
+        assert(
+            /^\s*model_auto_compact_token_limit\s*=\s*185000\s*$/m.test(legacyTemplateDefaults.template),
+            'legacy get-config-template should restore default model_auto_compact_token_limit'
+        );
         const legacyAddDup = await legacyApi('add-provider', {
             name: 'foo.bar',
             url: 'https://dup.example.com/v1',
