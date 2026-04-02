@@ -1709,7 +1709,7 @@ body::after {
 .codex-config-grid {
     display: grid;
     gap: var(--spacing-sm);
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
     align-items: start;
 }
 
@@ -4432,8 +4432,16 @@ textarea:focus-visible {
 }
 
 @media (max-width: 540px) {
+    .trash-header-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: 100%;
+    }
+
     .selector-header .trash-header-actions > .btn-tool,
     .selector-header .trash-header-actions > .btn-tool-compact {
+        width: 100%;
+        min-width: 0;
         height: 44px;
         min-height: 44px;
     }
