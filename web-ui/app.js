@@ -118,6 +118,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     modelReasoningEffort: 'high',
                     modelContextWindowInput: '190000',
                     modelAutoCompactTokenLimitInput: '185000',
+                    editingCodexBudgetField: '',
                     providersList: [],
                     models: [],
                     codexModelsLoading: false,
@@ -714,9 +715,11 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                                     'model_context_window',
                                     DEFAULT_MODEL_CONTEXT_WINDOW
                                 );
-                                this.modelContextWindowInput = contextWindow.ok && contextWindow.text
-                                    ? contextWindow.text
-                                    : '190000';
+                                if (this.editingCodexBudgetField !== 'modelContextWindowInput') {
+                                    this.modelContextWindowInput = contextWindow.ok && contextWindow.text
+                                        ? contextWindow.text
+                                        : '190000';
+                                }
                             }
                             {
                                 const autoCompactTokenLimit = this.normalizePositiveIntegerInput(
@@ -724,9 +727,11 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                                     'model_auto_compact_token_limit',
                                     DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT
                                 );
-                                this.modelAutoCompactTokenLimitInput = autoCompactTokenLimit.ok && autoCompactTokenLimit.text
-                                    ? autoCompactTokenLimit.text
-                                    : '185000';
+                                if (this.editingCodexBudgetField !== 'modelAutoCompactTokenLimitInput') {
+                                    this.modelAutoCompactTokenLimitInput = autoCompactTokenLimit.ok && autoCompactTokenLimit.text
+                                        ? autoCompactTokenLimit.text
+                                        : '185000';
+                                }
                             }
                             this.providersList = listRes.providers;
                             if (statusRes.configReady === false) {
@@ -3244,6 +3249,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 },
 
                 async onModelContextWindowBlur() {
+                    this.editingCodexBudgetField = '';
                     const normalized = this.normalizePositiveIntegerInput(
                         this.modelContextWindowInput,
                         'model_context_window',
@@ -3261,6 +3267,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 },
 
                 async onModelAutoCompactTokenLimitBlur() {
+                    this.editingCodexBudgetField = '';
                     const normalized = this.normalizePositiveIntegerInput(
                         this.modelAutoCompactTokenLimitInput,
                         'model_auto_compact_token_limit',
@@ -3452,7 +3459,13 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             modelAutoCompactTokenLimit: modelAutoCompactTokenLimit.value
                         });
                         if (tplRes.error) {
-                            this.showMessage('获取模板失败', 'error');
+                            this.showMessage(
+                                (typeof tplRes.error === 'string' && tplRes.error.trim())
+                                || (typeof tplRes.message === 'string' && tplRes.message.trim())
+                                || (typeof tplRes.detail === 'string' && tplRes.detail.trim())
+                                || '获取模板失败',
+                                'error'
+                            );
                             return;
                         }
 
@@ -3460,7 +3473,13 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             template: tplRes.template
                         });
                         if (applyRes.error) {
-                            this.showMessage('应用模板失败', 'error');
+                            this.showMessage(
+                                (typeof applyRes.error === 'string' && applyRes.error.trim())
+                                || (typeof applyRes.message === 'string' && applyRes.message.trim())
+                                || (typeof applyRes.detail === 'string' && applyRes.detail.trim())
+                                || '应用模板失败',
+                                'error'
+                            );
                             return;
                         }
 

@@ -490,6 +490,7 @@
                                 inputmode="numeric"
                                 autocomplete="off"
                                 placeholder="例如: 190000"
+                                @focus="editingCodexBudgetField = 'modelContextWindowInput'"
                                 @input="sanitizePositiveIntegerDraft('modelContextWindowInput')"
                                 @blur="onModelContextWindowBlur"
                                 @keydown.enter.prevent="onModelContextWindowBlur">
@@ -504,6 +505,7 @@
                                 inputmode="numeric"
                                 autocomplete="off"
                                 placeholder="例如: 185000"
+                                @focus="editingCodexBudgetField = 'modelAutoCompactTokenLimitInput'"
                                 @input="sanitizePositiveIntegerDraft('modelAutoCompactTokenLimitInput')"
                                 @blur="onModelAutoCompactTokenLimitBlur"
                                 @keydown.enter.prevent="onModelAutoCompactTokenLimitBlur">
