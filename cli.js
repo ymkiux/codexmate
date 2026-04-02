@@ -3433,6 +3433,20 @@ function applyConfigTemplate(params = {}) {
         return { error: `模板 TOML 解析失败: ${e.message}` };
     }
 
+    if (
+        Object.prototype.hasOwnProperty.call(parsed, 'model_context_window')
+        && normalizePositiveIntegerParam(parsed.model_context_window) === null
+    ) {
+        return { error: '模板中的 model_context_window 必须是正整数' };
+    }
+
+    if (
+        Object.prototype.hasOwnProperty.call(parsed, 'model_auto_compact_token_limit')
+        && normalizePositiveIntegerParam(parsed.model_auto_compact_token_limit) === null
+    ) {
+        return { error: '模板中的 model_auto_compact_token_limit 必须是正整数' };
+    }
+
     if (!parsed.model_provider || typeof parsed.model_provider !== 'string') {
         return { error: '模板缺少 model_provider' };
     }
@@ -10039,7 +10053,7 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                     let result;
 
                     switch (action) {
-                        case 'status':
+                        case 'status': {
                             const statusConfigResult = readConfigOrVirtualDefault();
                             const config = statusConfigResult.config;
                             const serviceTier = typeof config.service_tier === 'string' ? config.service_tier.trim() : '';
@@ -10059,6 +10073,7 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                                 initNotice: consumeInitNotice()
                             };
                             break;
+                        }
                         case 'install-status':
                             result = buildInstallStatusReport();
                             break;

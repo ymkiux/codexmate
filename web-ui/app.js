@@ -154,6 +154,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     configTemplateContent: '',
                     configTemplateApplying: false,
                     codexApplying: false,
+                    _pendingCodexApplyOptions: null,
                     agentsContent: '',
                     agentsPath: '',
                     agentsExists: false,
@@ -3402,7 +3403,13 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 },
 
                 async applyCodexConfigDirect(options = {}) {
-                    if (this.codexApplying) return;
+                    if (this.codexApplying) {
+                        this._pendingCodexApplyOptions = {
+                            ...(this._pendingCodexApplyOptions || {}),
+                            ...options
+                        };
+                        return;
+                    }
 
                     const provider = (this.currentProvider || '').trim();
                     const model = (this.currentModel || '').trim();
@@ -3466,6 +3473,11 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         this.showMessage('应用失败', 'error');
                     } finally {
                         this.codexApplying = false;
+                        const pendingOptions = this._pendingCodexApplyOptions;
+                        this._pendingCodexApplyOptions = null;
+                        if (pendingOptions) {
+                            await this.applyCodexConfigDirect(pendingOptions);
+                        }
                     }
                 },
 

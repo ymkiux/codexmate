@@ -127,6 +127,37 @@ module.exports = async function testConfig(ctx) {
     assert(/^\s*model_context_window\s*=\s*210000\s*$/m.test(templateCombinedXhigh.template), 'get-config-template(combined xhigh) missing model_context_window');
     assert(/^\s*model_auto_compact_token_limit\s*=\s*200000\s*$/m.test(templateCombinedXhigh.template), 'get-config-template(combined xhigh) missing model_auto_compact_token_limit');
 
+    // ========== Apply Config Template Validation Tests ==========
+    const invalidContextBudgetApply = await api('apply-config-template', {
+        template: `model_provider = "shadow"
+model = "shadow-model"
+model_context_window = 0
+
+[model_providers.shadow]
+base_url = "https://example.test/v1"
+preferred_auth_method = "shadow-key"
+`
+    });
+    assert(
+        invalidContextBudgetApply.error === '模板中的 model_context_window 必须是正整数',
+        'apply-config-template should reject invalid model_context_window'
+    );
+
+    const invalidAutoCompactApply = await api('apply-config-template', {
+        template: `model_provider = "shadow"
+model = "shadow-model"
+model_auto_compact_token_limit = "abc"
+
+[model_providers.shadow]
+base_url = "https://example.test/v1"
+preferred_auth_method = "shadow-key"
+`
+    });
+    assert(
+        invalidAutoCompactApply.error === '模板中的 model_auto_compact_token_limit 必须是正整数',
+        'apply-config-template should reject invalid model_auto_compact_token_limit'
+    );
+
     // ========== Export Config Tests ==========
     const exportResult = await api('export-config', { includeKeys: true });
     assert(exportResult.data, 'export-config missing data');
