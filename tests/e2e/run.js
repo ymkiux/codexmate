@@ -20,7 +20,6 @@ const testSessions = require('./test-sessions');
 const testOpenclaw = require('./test-openclaw');
 const testHealthSpeed = require('./test-health-speed');
 const testMessages = require('./test-messages');
-const testAuthProxy = require('./test-auth-proxy');
 const testMcp = require('./test-mcp');
 const testWorkflow = require('./test-workflow');
 const testInvalidConfig = require('./test-invalid-config');
@@ -117,7 +116,6 @@ async function main() {
         await testOpenclaw(ctx);
         await testHealthSpeed(ctx);
         await testMessages(ctx);
-        await testAuthProxy(ctx);
         await testMcp(ctx);
         await testWorkflow(ctx);
 

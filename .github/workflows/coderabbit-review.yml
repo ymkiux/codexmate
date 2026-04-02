@@ -25,14 +25,43 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
+            const { owner, repo } = context.repo;
             const pr = context.payload.pull_request;
+            const markerRegex = /<!-- codexmate-coderabbit-review-commit-count: (\d+) -->/;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: pr.number,
+              per_page: 100,
+            });
+
+            let previousCommitCount = null;
+            for (const comment of comments.slice().reverse()) {
+              const match = comment.body?.match(markerRegex);
+              if (!match) {
+                continue;
+              }
+
+              previousCommitCount = Number(match[1]);
+              break;
+            }
+
+            if (previousCommitCount === pr.commits) {
+              core.info(
+                `Skipping CodeRabbit re-review comment because commit count is unchanged at ${pr.commits}.`
+              );
+              return;
+            }
+
             const body = [
-              "@coderabbitai re-review ！Stop making breaking changes, do a proper review！",
+              "@coderabbitai re-review",
+              "Stop making breaking changes, do a proper review!",
+              `<!-- codexmate-coderabbit-review-commit-count: ${pr.commits} -->`,
             ].join("\n");
 
             await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+              owner,
+              repo,
               issue_number: pr.number,
               body,
             });

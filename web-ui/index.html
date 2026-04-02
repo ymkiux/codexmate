@@ -432,7 +432,7 @@
                         Codex 配置需先改模板，再手动应用。
                     </div>
                     <div class="config-template-hint" v-else-if="activeProviderBridgeHint">
-                        {{ activeProviderBridgeHint }} 模板、认证和代理仅在 Codex 模式下可编辑。
+                        {{ activeProviderBridgeHint }} 模板仅在 Codex 模式下可编辑。
                     </div>
                     <button class="btn-tool btn-template-editor" v-if="isCodexConfigMode" @click="openConfigTemplateEditor" :disabled="loading || !!initError">
                         打开 Config 模板编辑器
@@ -497,102 +497,6 @@
                     </button>
                 </div>
 
-                <div class="selector-section">
-                    <div class="selector-header">
-                        <span class="selector-title">Codex 认证文件</span>
-                    </div>
-                    <div class="config-template-hint hint-single-line" title="上传 JSON 切换账号（写入 ~/.codex/auth.json）。">
-                        上传 JSON 切换账号（写入 <code>~/.codex/auth.json</code>）。
-                    </div>
-                    <button class="btn-tool" @click="triggerCodexAuthUpload" :disabled="codexAuthImportLoading || loading || !!initError">
-                        {{ codexAuthImportLoading ? '上传中...' : '上传认证文件' }}
-                    </button>
-                    <input
-                        ref="codexAuthImportInput"
-                        type="file"
-                        accept=".json,application/json"
-                        style="display:none"
-                        @change="handleCodexAuthImportChange">
-                    <div v-if="codexAuthProfiles.length === 0" class="form-hint">暂无认证文件。</div>
-                    <div v-else class="auth-profile-list">
-                        <div class="auth-profile-item" v-for="profile in codexAuthProfiles" :key="'auth-' + profile.name">
-                            <div class="auth-profile-header">
-                                <div class="auth-profile-main">
-                                    <div class="auth-profile-title">{{ profile.name }}</div>
-                                    <div class="auth-profile-meta">
-                                        <span class="provider-source">{{ profile.type || 'unknown' }}</span>
-                                        <span :class="['pill', profile.current ? 'configured' : 'empty']">
-                                            {{ profile.current ? '当前' : '备用' }}
-                                        </span>
-                                    </div>
-                                </div>
-                                <div class="auth-profile-actions">
-                                    <button
-                                        class="btn-mini"
-                                        :disabled="profile.current || codexAuthSwitching[profile.name]"
-                                        @click="switchCodexAuthProfile(profile.name)">
-                                        {{ codexAuthSwitching[profile.name] ? '切换中...' : (profile.current ? '当前使用' : '切换账号') }}
-                                    </button>
-                                    <button
-                                        class="btn-mini delete"
-                                        :disabled="codexAuthDeleting[profile.name]"
-                                        @click="deleteCodexAuthProfile(profile.name)">
-                                        {{ codexAuthDeleting[profile.name] ? '删除中...' : '删除' }}
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="auth-profile-grid">
-                                <div v-if="profile.email" class="auth-profile-row">
-                                    <span class="auth-profile-key">email</span>
-                                    <span class="auth-profile-value">{{ profile.email }}</span>
-                                </div>
-                                <div v-if="profile.accountId" class="auth-profile-row">
-                                    <span class="auth-profile-key">account_id</span>
-                                    <span class="auth-profile-value">{{ profile.accountId }}</span>
-                                </div>
-                                <div v-if="profile.expired" class="auth-profile-row">
-                                    <span class="auth-profile-key">expired</span>
-                                    <span class="auth-profile-value">{{ profile.expired }}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="selector-section">
-                    <div class="selector-header">
-                        <span class="selector-title">内建代理</span>
-                    </div>
-                    <button class="btn-mini" @click="showProxyAdvanced = !showProxyAdvanced">
-                        {{ showProxyAdvanced ? '收起高级设置' : '展开高级设置（端口/鉴权）' }}
-                    </button>
-                    <div v-if="showProxyAdvanced">
-                        <div class="list-row">
-                            <label class="form-label">上游 Provider</label>
-                            <select class="form-input" v-model="proxySettings.provider" @change="saveProxySettings({ silent: true })">
-                                <option value="">自动（当前 provider）</option>
-                                <option v-for="name in proxyProviderOptions" :key="'proxy-provider-' + name" :value="name">{{ name }}</option>
-                            </select>
-                            <label class="form-label">端口</label>
-                            <input v-model.number="proxySettings.port" class="form-input" type="number" min="1" max="65535" placeholder="8318" @change="saveProxySettings({ silent: true })">
-                        </div>
-                        <div class="list-row">
-                            <label class="form-label">鉴权来源</label>
-                            <select class="form-input" v-model="proxySettings.authSource" @change="saveProxySettings({ silent: true })">
-                                <option value="provider">provider 优先</option>
-                                <option value="profile">仅当前认证文件</option>
-                                <option value="none">不注入鉴权头</option>
-                            </select>
-                            <label class="form-label">超时(ms)</label>
-                            <input v-model.number="proxySettings.timeoutMs" class="form-input" type="number" min="1000" step="500" placeholder="30000" @change="saveProxySettings({ silent: true })">
-                        </div>
-                        <div class="form-hint">高级参数修改后自动保存。</div>
-                    </div>
-                    <div class="config-template-hint" v-if="proxyRuntime">
-                        运行中：入口 <code>{{ proxyRuntimeDisplayProvider }}</code>
-                        <span v-if="proxyRuntime.upstreamProvider">（上游 <code>{{ proxyRuntime.upstreamProvider }}</code>）</span>
-                    </div>
-                </div>
                 </template>
 
                 <div class="selector-section">
@@ -604,10 +508,6 @@
                     </button>
                 </div>
 
-                <div v-if="!loading && !initError && localHiddenNotice" class="config-template-hint">
-                    当前 provider 为 <code>local</code>，已合并显示为 <code>codexmate-proxy</code>。
-                </div>
-
                 <div v-if="!loading && !initError" class="card-list">
                     <div v-for="provider in displayProvidersList" :key="provider.name"
                          :class="['card', { active: displayCurrentProvider === provider.name }]"
@@ -617,10 +517,10 @@
                             <div class="card-content">
                                 <div class="card-title">
                                     <span>{{ provider.name }}</span>
-                                    <span v-if="provider.readOnly" class="provider-readonly-badge">内建</span>
+                                    <span v-if="provider.readOnly" class="provider-readonly-badge">系统</span>
                                 </div>
                                 <div class="card-subtitle">
-                                    {{ provider.readOnly ? '系统内建本地代理（自动维护）' : (provider.url || '未设置 URL') }}
+                                    {{ provider.url || '未设置 URL' }}
                                 </div>
                             </div>
                         </div>
@@ -1526,8 +1426,6 @@
                         <span :class="['value', 'tone-' + inspectorHealthTone]">{{ inspectorHealthStatus }}</span>
                         <span class="key">模型加载</span>
                         <span class="value">{{ inspectorModelLoadStatus }}</span>
-                        <span class="key">代理状态</span>
-                        <span class="value">{{ inspectorProxyStatus }}</span>
                     </div>
                 </section>
             </aside>
@@ -1932,7 +1830,7 @@
                         <div class="structured-card">
                             <div class="structured-card-title">Providers（只读）</div>
                             <div v-if="openclawProviders.length === 0" class="form-hint">
-                                未发现 providers 配置（可能使用内置 provider 或 auth profiles）。
+                                未发现 providers 配置（可能使用环境变量或外部配置）。
                             </div>
                             <div v-else class="provider-list">
                                 <div class="provider-item" v-for="(provider, index) in openclawProviders" :key="provider.key + '-' + provider.source + '-' + index">
