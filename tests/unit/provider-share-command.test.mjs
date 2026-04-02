@@ -157,22 +157,34 @@ test('applyConfigTemplate rejects invalid positive integer context budget values
     );
     const applyConfigTemplateSource = extractBlockBySignature(cliSource, 'function applyConfigTemplate(params = {}) {');
     let writeConfigCalls = 0;
+    let updateAuthJsonCalls = 0;
+    let writeModelsCalls = 0;
+    let writeCurrentModelsCalls = 0;
+    let recordRecentConfigCalls = 0;
     const applyConfigTemplate = instantiateFunction(applyConfigTemplateSource, 'applyConfigTemplate', {
         toml: require('@iarna/toml'),
         normalizePositiveIntegerParam,
         writeConfig() {
             writeConfigCalls += 1;
         },
-        updateAuthJson() {},
+        updateAuthJson() {
+            updateAuthJsonCalls += 1;
+        },
         readModels() {
             return [];
         },
-        writeModels() {},
+        writeModels() {
+            writeModelsCalls += 1;
+        },
         readCurrentModels() {
             return {};
         },
-        writeCurrentModels() {},
-        recordRecentConfig() {}
+        writeCurrentModels() {
+            writeCurrentModelsCalls += 1;
+        },
+        recordRecentConfig() {
+            recordRecentConfigCalls += 1;
+        }
     });
 
     const invalidContextResult = applyConfigTemplate({
@@ -197,6 +209,10 @@ preferred_auth_method = "sk-alpha"
     assert.deepStrictEqual(invalidContextResult, { error: '模板中的 model_context_window 必须是正整数' });
     assert.deepStrictEqual(invalidAutoCompactResult, { error: '模板中的 model_auto_compact_token_limit 必须是正整数' });
     assert.strictEqual(writeConfigCalls, 0);
+    assert.strictEqual(updateAuthJsonCalls, 0);
+    assert.strictEqual(writeModelsCalls, 0);
+    assert.strictEqual(writeCurrentModelsCalls, 0);
+    assert.strictEqual(recordRecentConfigCalls, 0);
 });
 
 test('getConfigTemplate restores missing context budget defaults for upgraded configs', () => {
