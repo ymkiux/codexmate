@@ -112,6 +112,34 @@ module.exports = async function testSetup(ctx) {
     ];
     fs.writeFileSync(daudeSessionPath, daudeRecords.map(record => JSON.stringify(record)).join('\n') + '\n', 'utf-8');
 
+    const lateKeywordSessionId = 'late-keyword-e2e-session';
+    const lateKeywordSessionPath = path.join(sessionsDir, `${lateKeywordSessionId}.jsonl`);
+    const lateKeywordMessage = '这是后段命中的提示，测试已经通过。';
+    const lateKeywordRecords = [
+        {
+            type: 'session_meta',
+            payload: { id: lateKeywordSessionId, cwd: '/tmp/late-keyword' },
+            timestamp: '2025-02-10T00:00:00.000Z'
+        }
+    ];
+    for (let i = 0; i < 32; i++) {
+        lateKeywordRecords.push({
+            type: 'response_item',
+            payload: {
+                type: 'message',
+                role: i % 2 === 0 ? 'user' : 'assistant',
+                content: `padding-${String(i).padStart(2, '0')}-${'x'.repeat(12 * 1024)}`
+            },
+            timestamp: `2025-02-10T00:00:${String(i + 1).padStart(2, '0')}.000Z`
+        });
+    }
+    lateKeywordRecords.push({
+        type: 'response_item',
+        payload: { type: 'message', role: 'assistant', content: lateKeywordMessage },
+        timestamp: '2025-02-10T00:01:00.000Z'
+    });
+    fs.writeFileSync(lateKeywordSessionPath, lateKeywordRecords.map(record => JSON.stringify(record)).join('\n') + '\n', 'utf-8');
+
     const claudeProjectsDir = path.join(tmpHome, '.claude', 'projects');
     const claudeProjectDir = path.join(claudeProjectsDir, 'e2e-project');
     fs.mkdirSync(claudeProjectDir, { recursive: true });
@@ -155,6 +183,9 @@ module.exports = async function testSetup(ctx) {
         sessionPath,
         daudeSessionId,
         daudeSessionPath,
+        lateKeywordSessionId,
+        lateKeywordSessionPath,
+        lateKeywordMessage,
         claudeSessionId,
         claudeSessionPath,
         noModelsUrl,
