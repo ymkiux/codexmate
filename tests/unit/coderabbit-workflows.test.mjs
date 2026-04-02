@@ -18,8 +18,14 @@ test('coderabbit autofix workflow is removed', () => {
     );
 });
 
-test('coderabbit review workflow uses github-script v8 and sends the re-review command', () => {
+test('coderabbit review workflow only comments when commit count changes and uses an ASCII-safe re-review command', () => {
     const workflow = readProjectFile('.github/workflows/coderabbit-review.yml');
     assert.match(workflow, /uses:\s+actions\/github-script@v8/);
-    assert.match(workflow, /@coderabbitai re-review ！Stop making breaking changes, do a proper review！/);
+    assert.match(workflow, /github\.paginate\(github\.rest\.issues\.listComments/);
+    assert.match(workflow, /codexmate-coderabbit-review-commit-count/);
+    assert.match(workflow, /previousCommitCount === pr\.commits/);
+    assert.match(workflow, /github\.rest\.issues\.createComment/);
+    assert.match(workflow, /@coderabbitai re-review/);
+    assert.match(workflow, /Stop making breaking changes, do a proper review!/);
+    assert.doesNotMatch(workflow, /！/);
 });
