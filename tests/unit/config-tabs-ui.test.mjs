@@ -32,12 +32,16 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /<span class="selector-title">上下文压缩阈值<\/span>/);
     assert.match(html, /v-model="modelContextWindowInput"/);
     assert.match(html, /v-model="modelAutoCompactTokenLimitInput"/);
+    assert.match(html, /@focus="editingCodexBudgetField = 'modelContextWindowInput'"/);
+    assert.match(html, /@focus="editingCodexBudgetField = 'modelAutoCompactTokenLimitInput'"/);
     assert.match(html, /@blur="onModelContextWindowBlur"/);
     assert.match(html, /@blur="onModelAutoCompactTokenLimitBlur"/);
     assert.match(html, /@keydown\.enter\.prevent="onModelContextWindowBlur"/);
     assert.match(html, /@keydown\.enter\.prevent="onModelAutoCompactTokenLimitBlur"/);
-    assert.match(html, /@click="resetCodexContextBudgetDefaults"/);
-    assert.match(html, />\s*重置默认值\s*<\/button>/);
+    assert.match(
+        html,
+        /<button[^>]*@click="resetCodexContextBudgetDefaults"[^>]*>[\s\S]*?重置默认值[\s\S]*?<\/button>/
+    );
     assert.match(html, /class="codex-config-grid"/);
     assert.match(html, /onSettingsTabClick\('backup'\)/);
     assert.match(html, /onSettingsTabClick\('trash'\)/);
@@ -200,6 +204,7 @@ test('web ui script defines provider mode metadata for codex only', () => {
     assert.match(appScript, /pendingProviderSwitch:\s*''/);
     assert.match(appScript, /modelContextWindowInput:\s*'190000'/);
     assert.match(appScript, /modelAutoCompactTokenLimitInput:\s*'185000'/);
+    assert.match(appScript, /editingCodexBudgetField:\s*''/);
     assert.match(appScript, /statusRes\.modelContextWindow/);
     assert.match(appScript, /statusRes\.modelAutoCompactTokenLimit/);
     assert.match(appScript, /onModelContextWindowBlur\(\)/);

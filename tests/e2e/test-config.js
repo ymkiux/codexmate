@@ -95,6 +95,8 @@ module.exports = async function testConfig(ctx) {
         modelAutoCompactTokenLimit: 195000
     });
     assert(typeof templateContextBudget.template === 'string', 'get-config-template(context budget) missing template');
+    assert(templateContextBudget.template.includes('model_provider = "shadow"'), 'get-config-template(context budget) missing provider override');
+    assert(templateContextBudget.template.includes('model = "shadow-model"'), 'get-config-template(context budget) missing model override');
     assert(/^\s*model_context_window\s*=\s*200000\s*$/m.test(templateContextBudget.template), 'get-config-template(context budget) missing model_context_window');
     assert(/^\s*model_auto_compact_token_limit\s*=\s*195000\s*$/m.test(templateContextBudget.template), 'get-config-template(context budget) missing model_auto_compact_token_limit');
 

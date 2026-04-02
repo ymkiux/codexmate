@@ -3445,11 +3445,13 @@ function getConfigTemplate(params = {}) {
 }
 
 function readPositiveIntegerConfigValue(config, key) {
+    const options = arguments[2] && typeof arguments[2] === 'object' ? arguments[2] : {};
+    const useDefaultsWhenMissing = options.useDefaultsWhenMissing !== false;
     if (!config || typeof config !== 'object' || !key) {
         return '';
     }
     const raw = config[key];
-    if (raw === undefined) {
+    if (raw === undefined && useDefaultsWhenMissing) {
         if (key === 'model_context_window') return DEFAULT_MODEL_CONTEXT_WINDOW;
         if (key === 'model_auto_compact_token_limit') return DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT;
     }
@@ -10095,8 +10097,19 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             const config = statusConfigResult.config;
                             const serviceTier = typeof config.service_tier === 'string' ? config.service_tier.trim() : '';
                             const modelReasoningEffort = typeof config.model_reasoning_effort === 'string' ? config.model_reasoning_effort.trim() : '';
-                            const modelContextWindow = readPositiveIntegerConfigValue(config, 'model_context_window');
-                            const modelAutoCompactTokenLimit = readPositiveIntegerConfigValue(config, 'model_auto_compact_token_limit');
+                            const budgetReadOptions = {
+                                useDefaultsWhenMissing: !hasConfigLoadError(statusConfigResult)
+                            };
+                            const modelContextWindow = readPositiveIntegerConfigValue(
+                                config,
+                                'model_context_window',
+                                budgetReadOptions
+                            );
+                            const modelAutoCompactTokenLimit = readPositiveIntegerConfigValue(
+                                config,
+                                'model_auto_compact_token_limit',
+                                budgetReadOptions
+                            );
                             result = {
                                 provider: config.model_provider || '未设置',
                                 model: config.model || '未设置',
@@ -11583,8 +11596,19 @@ function buildMcpStatusPayload() {
     const config = statusConfigResult.config;
     const serviceTier = typeof config.service_tier === 'string' ? config.service_tier.trim() : '';
     const modelReasoningEffort = typeof config.model_reasoning_effort === 'string' ? config.model_reasoning_effort.trim() : '';
-    const modelContextWindow = readPositiveIntegerConfigValue(config, 'model_context_window');
-    const modelAutoCompactTokenLimit = readPositiveIntegerConfigValue(config, 'model_auto_compact_token_limit');
+    const budgetReadOptions = {
+        useDefaultsWhenMissing: !hasConfigLoadError(statusConfigResult)
+    };
+    const modelContextWindow = readPositiveIntegerConfigValue(
+        config,
+        'model_context_window',
+        budgetReadOptions
+    );
+    const modelAutoCompactTokenLimit = readPositiveIntegerConfigValue(
+        config,
+        'model_auto_compact_token_limit',
+        budgetReadOptions
+    );
     return {
         provider: config.model_provider || '未设置',
         model: config.model || '未设置',
