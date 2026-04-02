@@ -3392,6 +3392,20 @@ function getConfigTemplate(params = {}) {
     if (typeof params.reasoningEffort === 'string') {
         template = applyReasoningEffortToTemplate(template, params.reasoningEffort);
     }
+    if (!/^\s*model_auto_compact_token_limit\s*=.*$/m.test(template)) {
+        template = applyPositiveIntegerConfigToTemplate(
+            template,
+            'model_auto_compact_token_limit',
+            DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT
+        );
+    }
+    if (!/^\s*model_context_window\s*=.*$/m.test(template)) {
+        template = applyPositiveIntegerConfigToTemplate(
+            template,
+            'model_context_window',
+            DEFAULT_MODEL_CONTEXT_WINDOW
+        );
+    }
     if (params.modelAutoCompactTokenLimit !== undefined) {
         template = applyPositiveIntegerConfigToTemplate(
             template,
@@ -3416,6 +3430,10 @@ function readPositiveIntegerConfigValue(config, key) {
         return '';
     }
     const raw = config[key];
+    if (raw === undefined) {
+        if (key === 'model_context_window') return DEFAULT_MODEL_CONTEXT_WINDOW;
+        if (key === 'model_auto_compact_token_limit') return DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT;
+    }
     const normalized = normalizePositiveIntegerParam(raw);
     return normalized === null ? '' : normalized;
 }
