@@ -250,9 +250,6 @@ codexmate mcp serve --allow-write
 
 Issues and pull requests are accepted.
 
-- English changelog: `doc/CHANGELOG.md`
-- Chinese changelog: `doc/CHANGELOG.zh-CN.md`
-
 ## License
 
 Apache-2.0

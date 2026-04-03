@@ -243,9 +243,6 @@ codexmate mcp serve --allow-write
 
 Issue 与 Pull Request 可按需提交。
 
-- 英文更新日志：`doc/CHANGELOG.md`
-- 中文更新日志：`doc/CHANGELOG.zh-CN.md`
-
 ## License
 
 Apache-2.0
