@@ -54,6 +54,8 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 : 'http://localhost:3737';
             const SESSION_TRASH_LIST_LIMIT = 500;
             const SESSION_TRASH_PAGE_SIZE = 200;
+            const DEFAULT_MODEL_CONTEXT_WINDOW = 190000;
+            const DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT = 185000;
             const DEFAULT_OPENCLAW_TEMPLATE = `{
   // OpenClaw config (JSON5)
   agent: {
@@ -114,6 +116,9 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     currentModel: '',
                     serviceTier: 'fast',
                     modelReasoningEffort: 'high',
+                    modelContextWindowInput: '190000',
+                    modelAutoCompactTokenLimitInput: '185000',
+                    editingCodexBudgetField: '',
                     providersList: [],
                     models: [],
                     codexModelsLoading: false,
@@ -150,6 +155,7 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     configTemplateContent: '',
                     configTemplateApplying: false,
                     codexApplying: false,
+                    _pendingCodexApplyOptions: null,
                     agentsContent: '',
                     agentsPath: '',
                     agentsExists: false,
@@ -702,6 +708,30 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                                     ? statusRes.modelReasoningEffort.trim().toLowerCase()
                                     : '';
                                 this.modelReasoningEffort = effort || 'high';
+                            }
+                            {
+                                const contextWindow = this.normalizePositiveIntegerInput(
+                                    statusRes.modelContextWindow,
+                                    'model_context_window',
+                                    DEFAULT_MODEL_CONTEXT_WINDOW
+                                );
+                                if (this.editingCodexBudgetField !== 'modelContextWindowInput') {
+                                    this.modelContextWindowInput = contextWindow.ok && contextWindow.text
+                                        ? contextWindow.text
+                                        : '190000';
+                                }
+                            }
+                            {
+                                const autoCompactTokenLimit = this.normalizePositiveIntegerInput(
+                                    statusRes.modelAutoCompactTokenLimit,
+                                    'model_auto_compact_token_limit',
+                                    DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT
+                                );
+                                if (this.editingCodexBudgetField !== 'modelAutoCompactTokenLimitInput') {
+                                    this.modelAutoCompactTokenLimitInput = autoCompactTokenLimit.ok && autoCompactTokenLimit.text
+                                        ? autoCompactTokenLimit.text
+                                        : '185000';
+                                }
                             }
                             this.providersList = listRes.providers;
                             if (statusRes.configReady === false) {
@@ -3188,6 +3218,81 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                     await this.applyCodexConfigDirect({ silent: true });
                 },
 
+                sanitizePositiveIntegerDraft(field) {
+                    if (!field || typeof this[field] === 'undefined') return;
+                    const current = typeof this[field] === 'string'
+                        ? this[field]
+                        : String(this[field] || '');
+                    const sanitized = current.replace(/[^\d]/g, '');
+                    if (sanitized !== current) {
+                        this[field] = sanitized;
+                    }
+                },
+
+                normalizePositiveIntegerInput(value, label, fallback = '') {
+                    const fallbackText = fallback === '' ? '' : String(fallback).trim();
+                    const raw = typeof value === 'string'
+                        ? value.trim()
+                        : String(value ?? '').trim();
+                    const text = raw || fallbackText;
+                    if (!text) {
+                        return { ok: true, value: null, text: '' };
+                    }
+                    if (!/^\d+$/.test(text)) {
+                        return { ok: false, error: `${label} 请输入正整数` };
+                    }
+                    const num = Number.parseInt(text, 10);
+                    if (!Number.isSafeInteger(num) || num <= 0) {
+                        return { ok: false, error: `${label} 请输入正整数` };
+                    }
+                    return { ok: true, value: num, text: String(num) };
+                },
+
+                async onModelContextWindowBlur() {
+                    this.editingCodexBudgetField = '';
+                    const normalized = this.normalizePositiveIntegerInput(
+                        this.modelContextWindowInput,
+                        'model_context_window',
+                        DEFAULT_MODEL_CONTEXT_WINDOW
+                    );
+                    if (!normalized.ok) {
+                        this.showMessage(normalized.error, 'error');
+                        return;
+                    }
+                    this.modelContextWindowInput = normalized.text;
+                    await this.applyCodexConfigDirect({
+                        silent: true,
+                        modelContextWindow: normalized.value
+                    });
+                },
+
+                async onModelAutoCompactTokenLimitBlur() {
+                    this.editingCodexBudgetField = '';
+                    const normalized = this.normalizePositiveIntegerInput(
+                        this.modelAutoCompactTokenLimitInput,
+                        'model_auto_compact_token_limit',
+                        DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT
+                    );
+                    if (!normalized.ok) {
+                        this.showMessage(normalized.error, 'error');
+                        return;
+                    }
+                    this.modelAutoCompactTokenLimitInput = normalized.text;
+                    await this.applyCodexConfigDirect({
+                        silent: true,
+                        modelAutoCompactTokenLimit: normalized.value
+                    });
+                },
+
+                async resetCodexContextBudgetDefaults() {
+                    this.modelContextWindowInput = String(DEFAULT_MODEL_CONTEXT_WINDOW);
+                    this.modelAutoCompactTokenLimitInput = String(DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT);
+                    await this.applyCodexConfigDirect({
+                        modelContextWindow: DEFAULT_MODEL_CONTEXT_WINDOW,
+                        modelAutoCompactTokenLimit: DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT
+                    });
+                },
+
                 async runHealthCheck() {
                     this.healthCheckLoading = true;
                     this.healthCheckResult = null;
@@ -3257,11 +3362,32 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 },
 
                 async openConfigTemplateEditor(options = {}) {
+                    const modelContextWindow = this.normalizePositiveIntegerInput(
+                        this.modelContextWindowInput,
+                        'model_context_window',
+                        DEFAULT_MODEL_CONTEXT_WINDOW
+                    );
+                    if (!modelContextWindow.ok) {
+                        this.showMessage(modelContextWindow.error, 'error');
+                        return;
+                    }
+                    const modelAutoCompactTokenLimit = this.normalizePositiveIntegerInput(
+                        this.modelAutoCompactTokenLimitInput,
+                        'model_auto_compact_token_limit',
+                        DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT
+                    );
+                    if (!modelAutoCompactTokenLimit.ok) {
+                        this.showMessage(modelAutoCompactTokenLimit.error, 'error');
+                        return;
+                    }
                     try {
                         const res = await api('get-config-template', {
                             provider: this.currentProvider,
                             model: this.currentModel,
-                            serviceTier: this.serviceTier
+                            serviceTier: this.serviceTier,
+                            reasoningEffort: this.modelReasoningEffort,
+                            modelContextWindow: modelContextWindow.value,
+                            modelAutoCompactTokenLimit: modelAutoCompactTokenLimit.value
                         });
                         if (res.error) {
                             this.showMessage(res.error, 'error');
@@ -3284,7 +3410,13 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                 },
 
                 async applyCodexConfigDirect(options = {}) {
-                    if (this.codexApplying) return;
+                    if (this.codexApplying) {
+                        this._pendingCodexApplyOptions = {
+                            ...(this._pendingCodexApplyOptions || {}),
+                            ...options
+                        };
+                        return;
+                    }
 
                     const provider = (this.currentProvider || '').trim();
                     const model = (this.currentModel || '').trim();
@@ -3293,16 +3425,47 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         return;
                     }
 
+                    const modelContextWindow = this.normalizePositiveIntegerInput(
+                        options.modelContextWindow !== undefined ? options.modelContextWindow : this.modelContextWindowInput,
+                        'model_context_window',
+                        DEFAULT_MODEL_CONTEXT_WINDOW
+                    );
+                    if (!modelContextWindow.ok) {
+                        this.showMessage(modelContextWindow.error, 'error');
+                        return;
+                    }
+                    const modelAutoCompactTokenLimit = this.normalizePositiveIntegerInput(
+                        options.modelAutoCompactTokenLimit !== undefined
+                            ? options.modelAutoCompactTokenLimit
+                            : this.modelAutoCompactTokenLimitInput,
+                        'model_auto_compact_token_limit',
+                        DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT
+                    );
+                    if (!modelAutoCompactTokenLimit.ok) {
+                        this.showMessage(modelAutoCompactTokenLimit.error, 'error');
+                        return;
+                    }
+                    this.modelContextWindowInput = modelContextWindow.text;
+                    this.modelAutoCompactTokenLimitInput = modelAutoCompactTokenLimit.text;
+
                     this.codexApplying = true;
                     try {
                         const tplRes = await api('get-config-template', {
                             provider,
                             model,
                             serviceTier: this.serviceTier,
-                            reasoningEffort: this.modelReasoningEffort
+                            reasoningEffort: this.modelReasoningEffort,
+                            modelContextWindow: modelContextWindow.value,
+                            modelAutoCompactTokenLimit: modelAutoCompactTokenLimit.value
                         });
                         if (tplRes.error) {
-                            this.showMessage('获取模板失败', 'error');
+                            this.showMessage(
+                                (typeof tplRes.error === 'string' && tplRes.error.trim())
+                                || (typeof tplRes.message === 'string' && tplRes.message.trim())
+                                || (typeof tplRes.detail === 'string' && tplRes.detail.trim())
+                                || '获取模板失败',
+                                'error'
+                            );
                             return;
                         }
 
@@ -3310,7 +3473,13 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                             template: tplRes.template
                         });
                         if (applyRes.error) {
-                            this.showMessage('应用模板失败', 'error');
+                            this.showMessage(
+                                (typeof applyRes.error === 'string' && applyRes.error.trim())
+                                || (typeof applyRes.message === 'string' && applyRes.message.trim())
+                                || (typeof applyRes.detail === 'string' && applyRes.detail.trim())
+                                || '应用模板失败',
+                                'error'
+                            );
                             return;
                         }
 
@@ -3323,6 +3492,11 @@ import { createSkillsMethods } from './modules/skills.methods.mjs';
                         this.showMessage('应用失败', 'error');
                     } finally {
                         this.codexApplying = false;
+                        const pendingOptions = this._pendingCodexApplyOptions;
+                        this._pendingCodexApplyOptions = null;
+                        if (pendingOptions) {
+                            await this.applyCodexConfigDirect(pendingOptions);
+                        }
                     }
                 },
 

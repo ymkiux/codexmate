@@ -22,6 +22,10 @@ module.exports = async function testConfig(ctx) {
     assert(typeof apiStatus.configReady === 'boolean', 'api status configReady missing');
     assert('modelReasoningEffort' in apiStatus, 'api status modelReasoningEffort missing');
     assert('serviceTier' in apiStatus, 'api status serviceTier missing');
+    assert('modelContextWindow' in apiStatus, 'api status modelContextWindow missing');
+    assert('modelAutoCompactTokenLimit' in apiStatus, 'api status modelAutoCompactTokenLimit missing');
+    assert(apiStatus.modelContextWindow === 190000, 'api status modelContextWindow mismatch');
+    assert(apiStatus.modelAutoCompactTokenLimit === 185000, 'api status modelAutoCompactTokenLimit mismatch');
 
     // ========== List API Tests ==========
     const apiList = await api('list');
@@ -83,26 +87,78 @@ module.exports = async function testConfig(ctx) {
     assert(typeof templateReasoningXhigh.template === 'string', 'get-config-template(reasoning xhigh) missing template');
     assert(/^\s*model_reasoning_effort\s*=\s*"xhigh"\s*$/m.test(templateReasoningXhigh.template), 'get-config-template(reasoning xhigh) missing model_reasoning_effort');
 
+    // ========== Get Config Template Tests - Context Budget ==========
+    const templateContextBudget = await api('get-config-template', {
+        provider: 'shadow',
+        model: 'shadow-model',
+        modelContextWindow: 200000,
+        modelAutoCompactTokenLimit: 195000
+    });
+    assert(typeof templateContextBudget.template === 'string', 'get-config-template(context budget) missing template');
+    assert(templateContextBudget.template.includes('model_provider = "shadow"'), 'get-config-template(context budget) missing provider override');
+    assert(templateContextBudget.template.includes('model = "shadow-model"'), 'get-config-template(context budget) missing model override');
+    assert(/^\s*model_context_window\s*=\s*200000\s*$/m.test(templateContextBudget.template), 'get-config-template(context budget) missing model_context_window');
+    assert(/^\s*model_auto_compact_token_limit\s*=\s*195000\s*$/m.test(templateContextBudget.template), 'get-config-template(context budget) missing model_auto_compact_token_limit');
+
     // ========== Get Config Template Tests - Combined ==========
     const templateCombined = await api('get-config-template', {
         provider: 'shadow',
         model: 'shadow-model',
         serviceTier: 'fast',
-        reasoningEffort: 'high'
+        reasoningEffort: 'high',
+        modelContextWindow: 190000,
+        modelAutoCompactTokenLimit: 185000
     });
     assert(typeof templateCombined.template === 'string', 'get-config-template(combined) missing template');
     assert(/^\s*service_tier\s*=\s*"fast"\s*$/m.test(templateCombined.template), 'get-config-template(combined) missing service_tier');
     assert(/^\s*model_reasoning_effort\s*=\s*"high"\s*$/m.test(templateCombined.template), 'get-config-template(combined) missing model_reasoning_effort');
+    assert(/^\s*model_context_window\s*=\s*190000\s*$/m.test(templateCombined.template), 'get-config-template(combined) missing model_context_window');
+    assert(/^\s*model_auto_compact_token_limit\s*=\s*185000\s*$/m.test(templateCombined.template), 'get-config-template(combined) missing model_auto_compact_token_limit');
 
     const templateCombinedXhigh = await api('get-config-template', {
         provider: 'shadow',
         model: 'shadow-model',
         serviceTier: 'fast',
-        reasoningEffort: 'xhigh'
+        reasoningEffort: 'xhigh',
+        modelContextWindow: 210000,
+        modelAutoCompactTokenLimit: 200000
     });
     assert(typeof templateCombinedXhigh.template === 'string', 'get-config-template(combined xhigh) missing template');
     assert(/^\s*service_tier\s*=\s*"fast"\s*$/m.test(templateCombinedXhigh.template), 'get-config-template(combined xhigh) missing service_tier');
     assert(/^\s*model_reasoning_effort\s*=\s*"xhigh"\s*$/m.test(templateCombinedXhigh.template), 'get-config-template(combined xhigh) missing model_reasoning_effort');
+    assert(/^\s*model_context_window\s*=\s*210000\s*$/m.test(templateCombinedXhigh.template), 'get-config-template(combined xhigh) missing model_context_window');
+    assert(/^\s*model_auto_compact_token_limit\s*=\s*200000\s*$/m.test(templateCombinedXhigh.template), 'get-config-template(combined xhigh) missing model_auto_compact_token_limit');
+
+    // ========== Apply Config Template Validation Tests ==========
+    const invalidContextBudgetApply = await api('apply-config-template', {
+        template: `model_provider = "shadow"
+model = "shadow-model"
+model_context_window = 0
+
+[model_providers.shadow]
+base_url = "https://example.test/v1"
+preferred_auth_method = "shadow-key"
+`
+    });
+    assert(
+        invalidContextBudgetApply.error === '模板中的 model_context_window 必须是正整数',
+        'apply-config-template should reject invalid model_context_window'
+    );
+
+    const invalidAutoCompactApply = await api('apply-config-template', {
+        template: `model_provider = "shadow"
+model = "shadow-model"
+model_auto_compact_token_limit = "abc"
+
+[model_providers.shadow]
+base_url = "https://example.test/v1"
+preferred_auth_method = "shadow-key"
+`
+    });
+    assert(
+        invalidAutoCompactApply.error === '模板中的 model_auto_compact_token_limit 必须是正整数',
+        'apply-config-template should reject invalid model_auto_compact_token_limit'
+    );
 
     // ========== Export Config Tests ==========
     const exportResult = await api('export-config', { includeKeys: true });
@@ -337,6 +393,21 @@ module.exports = async function testConfig(ctx) {
         await waitForServer(legacyPort);
 
         const legacyApi = (action, params) => postJson(legacyPort, { action, params }, 2000);
+        const legacyStatus = await legacyApi('status');
+        assert(legacyStatus.modelContextWindow === 190000, 'legacy status should default modelContextWindow');
+        assert(
+            legacyStatus.modelAutoCompactTokenLimit === 185000,
+            'legacy status should default modelAutoCompactTokenLimit'
+        );
+        const legacyTemplateDefaults = await legacyApi('get-config-template', {});
+        assert(
+            /^\s*model_context_window\s*=\s*190000\s*$/m.test(legacyTemplateDefaults.template),
+            'legacy get-config-template should restore default model_context_window'
+        );
+        assert(
+            /^\s*model_auto_compact_token_limit\s*=\s*185000\s*$/m.test(legacyTemplateDefaults.template),
+            'legacy get-config-template should restore default model_auto_compact_token_limit'
+        );
         const legacyAddDup = await legacyApi('add-provider', {
             name: 'foo.bar',
             url: 'https://dup.example.com/v1',
