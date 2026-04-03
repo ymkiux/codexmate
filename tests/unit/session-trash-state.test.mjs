@@ -1,7 +1,7 @@
 ﻿import assert from 'assert';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,6 +14,8 @@ const appSource = fs.readFileSync(appPath, 'utf-8');
 const cliSource = fs.readFileSync(cliPath, 'utf-8');
 const indexHtmlSource = fs.readFileSync(indexHtmlPath, 'utf-8');
 const stylesSource = fs.readFileSync(stylesPath, 'utf-8');
+const sessionTrashModule = await import(pathToFileURL(path.join(__dirname, '..', '..', 'web-ui', 'modules', 'session-trash.methods.mjs')).href);
+const { createSessionTrashMethods } = sessionTrashModule;
 
 function escapeRegExp(value) {
     return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -193,6 +195,10 @@ function instantiateFunction(funcSource, funcName, bindings = {}) {
     const bindingNames = Object.keys(bindings);
     const bindingValues = Object.values(bindings);
     return Function(...bindingNames, `${funcSource}\nreturn ${funcName};`)(...bindingValues);
+}
+
+function createSessionTrashTestMethods(api, constants = {}) {
+    return createSessionTrashMethods({ api, constants });
 }
 
 test('buildClaudeSessionIndexEntry prefers normalized metadata when stored index entry is missing or stale', () => {
@@ -528,12 +534,9 @@ test('upsertClaudeSessionIndexEntry prefers normalized fullPath over stale sessi
 
 test('loadSessionTrashCount ignores stale responses after a newer trash request invalidates them', async () => {
     let resolveApi = null;
-    const loadSessionTrashCountSource = extractMethodAsFunction(appSource, 'loadSessionTrashCount');
-    const loadSessionTrashCount = instantiateFunction(loadSessionTrashCountSource, 'loadSessionTrashCount', {
-        api: async () => await new Promise((resolve) => {
-            resolveApi = resolve;
-        })
-    });
+    const loadSessionTrashCount = createSessionTrashTestMethods(async () => await new Promise((resolve) => {
+        resolveApi = resolve;
+    })).loadSessionTrashCount;
 
     const context = {
         sessionTrashCountLoading: false,
@@ -579,18 +582,11 @@ test('loadSessionTrashCount ignores stale responses after a newer trash request 
 });
 
 test('loadSessionTrashCount trusts a lower authoritative backend totalCount during count-only refresh', async () => {
-    const normalizeSessionTrashTotalCountSource = extractMethodAsFunction(appSource, 'normalizeSessionTrashTotalCount');
-    const normalizeSessionTrashTotalCount = instantiateFunction(
-        normalizeSessionTrashTotalCountSource,
-        'normalizeSessionTrashTotalCount'
-    );
-    const loadSessionTrashCountSource = extractMethodAsFunction(appSource, 'loadSessionTrashCount');
-    const loadSessionTrashCount = instantiateFunction(loadSessionTrashCountSource, 'loadSessionTrashCount', {
-        api: async () => ({
-            totalCount: 0,
-            items: []
-        })
-    });
+    const normalizeSessionTrashTotalCount = createSessionTrashTestMethods(async () => ({})).normalizeSessionTrashTotalCount;
+    const loadSessionTrashCount = createSessionTrashTestMethods(async () => ({
+        totalCount: 0,
+        items: []
+    })).loadSessionTrashCount;
 
     const context = {
         sessionTrashCountLoading: false,
@@ -654,19 +650,8 @@ test('loadSessionTrash and loadSessionTrashCount keep independent stale-response
         }
         resolveList = resolve;
     });
-    const loadSessionTrashCount = instantiateFunction(
-        extractMethodAsFunction(appSource, 'loadSessionTrashCount'),
-        'loadSessionTrashCount',
-        { api }
-    );
-    const loadSessionTrash = instantiateFunction(
-        extractMethodAsFunction(appSource, 'loadSessionTrash'),
-        'loadSessionTrash',
-        {
-            SESSION_TRASH_LIST_LIMIT: 50,
-            api
-        }
-    );
+    const loadSessionTrashCount = createSessionTrashTestMethods(api, { sessionTrashListLimit: 50 }).loadSessionTrashCount;
+    const loadSessionTrash = createSessionTrashTestMethods(api, { sessionTrashListLimit: 50 }).loadSessionTrash;
 
     const context = {
         sessionTrashItems: [],
@@ -731,8 +716,7 @@ test('loadSessionTrash and loadSessionTrashCount keep independent stale-response
 });
 
 test('getSessionTrashViewState returns retry when badge count exists but list has never loaded', () => {
-    const getSessionTrashViewStateSource = extractMethodAsFunction(appSource, 'getSessionTrashViewState');
-    const getSessionTrashViewState = instantiateFunction(getSessionTrashViewStateSource, 'getSessionTrashViewState');
+    const getSessionTrashViewState = createSessionTrashTestMethods(async () => ({})).getSessionTrashViewState;
 
     assert.strictEqual(getSessionTrashViewState.call({
         sessionTrashLoading: false,
@@ -761,23 +745,22 @@ test('getSessionTrashViewState returns retry when badge count exists but list ha
 
 test('loadSessionTrash marks latest failures as retryable and clears the failure state after a successful reload', async () => {
     let callCount = 0;
-    const loadSessionTrashSource = extractMethodAsFunction(appSource, 'loadSessionTrash');
-    const loadSessionTrash = instantiateFunction(loadSessionTrashSource, 'loadSessionTrash', {
-        SESSION_TRASH_LIST_LIMIT: 50,
-        api: async () => {
-            callCount += 1;
-            if (callCount === 1) {
-                return { error: 'load failed' };
-            }
-            return {
-                totalCount: 1,
-                items: [{
-                    trashId: 'trash-1',
-                    sessionId: 'session-1'
-                }]
-            };
+    const loadSessionTrash = createSessionTrashTestMethods(async () => {
+        callCount += 1;
+        if (callCount === 1) {
+            return { error: 'load failed' };
         }
-    });
+        return {
+            totalCount: 1,
+            items: [{
+                trashId: 'trash-1',
+                sessionId: 'session-1'
+            }]
+        };
+    }, {
+        sessionTrashListLimit: 50,
+        sessionTrashPageSize: 50
+    }).loadSessionTrash;
 
     const messages = [];
     const context = {
@@ -1740,11 +1723,10 @@ test('deleteSession prefers authoritative trash totalCount from the backend resp
 });
 
 test('prependSessionTrashItem prefers authoritative trash totalCount when provided', () => {
-    const prependSessionTrashItemSource = extractMethodAsFunction(appSource, 'prependSessionTrashItem');
-    const prependSessionTrashItem = instantiateFunction(prependSessionTrashItemSource, 'prependSessionTrashItem', {
-        SESSION_TRASH_LIST_LIMIT: 500,
-        SESSION_TRASH_PAGE_SIZE: 200
-    });
+    const prependSessionTrashItem = createSessionTrashTestMethods(async () => ({}), {
+        sessionTrashListLimit: 500,
+        sessionTrashPageSize: 200
+    }).prependSessionTrashItem;
 
     const context = {
         sessionTrashItems: [{
@@ -1905,16 +1887,15 @@ test('restoreSessionPinnedMap normalizes cache without pruning stale entries bef
 });
 
 test('loadSessionTrash replays the latest queued refresh after an in-flight request is invalidated', async () => {
-    const loadSessionTrashSource = extractMethodAsFunction(appSource, 'loadSessionTrash');
     const pendingResponses = [];
     const apiCalls = [];
-    const loadSessionTrash = instantiateFunction(loadSessionTrashSource, 'loadSessionTrash', {
-        SESSION_TRASH_LIST_LIMIT: 500,
-        api: async (action, params) => await new Promise((resolve) => {
-            apiCalls.push({ action, params });
-            pendingResponses.push(resolve);
-        })
-    });
+    const loadSessionTrash = createSessionTrashTestMethods(async (action, params) => await new Promise((resolve) => {
+        apiCalls.push({ action, params });
+        pendingResponses.push(resolve);
+    }), {
+        sessionTrashListLimit: 500,
+        sessionTrashPageSize: 200
+    }).loadSessionTrash;
 
     const context = {
         sessionTrashItems: [],
@@ -1985,26 +1966,14 @@ test('loadSessionTrash replays the latest queued refresh after an in-flight requ
 
 test('session trash restore and purge share the same per-item busy guard', async () => {
     const apiCalls = [];
-    const restoreSessionTrash = instantiateFunction(
-        extractMethodAsFunction(appSource, 'restoreSessionTrash'),
-        'restoreSessionTrash',
-        {
-            api: async (action) => {
-                apiCalls.push(action);
-                return { success: true };
-            }
-        }
-    );
-    const purgeSessionTrash = instantiateFunction(
-        extractMethodAsFunction(appSource, 'purgeSessionTrash'),
-        'purgeSessionTrash',
-        {
-            api: async (action) => {
-                apiCalls.push(action);
-                return { success: true };
-            }
-        }
-    );
+    const restoreSessionTrash = createSessionTrashTestMethods(async (action) => {
+        apiCalls.push(action);
+        return { success: true };
+    }).restoreSessionTrash;
+    const purgeSessionTrash = createSessionTrashTestMethods(async (action) => {
+        apiCalls.push(action);
+        return { success: true };
+    }).purgeSessionTrash;
 
     let confirmCalls = 0;
     const context = {

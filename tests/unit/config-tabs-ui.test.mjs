@@ -143,6 +143,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
 test('web ui script defines provider mode metadata for codex only', () => {
     const appScript = readProjectFile('web-ui/app.js');
     const configModeComputed = readProjectFile('web-ui/modules/config-mode.computed.mjs');
+    const sessionTrashMethods = readProjectFile('web-ui/modules/session-trash.methods.mjs');
 
     assert.match(appScript, /CONFIG_MODE_SET/);
     assert.match(appScript, /getProviderConfigModeMeta/);
@@ -225,6 +226,8 @@ test('web ui script defines provider mode metadata for codex only', () => {
     assert.doesNotMatch(appScript, /skillsMarketRemoteLatestOnly:\s*true/);
     assert.doesNotMatch(appScript, /skillsMarketEcosystems:\s*\[\]/);
     assert.match(appScript, /sessionTrashItems:\s*\[\]/);
+    assert.match(appScript, /createSessionTrashMethods/);
+    assert.match(appScript, /\.\.\.createSessionTrashMethods\(/);
     assert.match(appScript, /sessionTrashVisibleCount:\s*SESSION_TRASH_PAGE_SIZE/);
     assert.match(appScript, /sessionTrashTotalCount:\s*0/);
     assert.match(appScript, /sessionTrashLoadedOnce:\s*false/);
@@ -233,21 +236,20 @@ test('web ui script defines provider mode metadata for codex only', () => {
     assert.match(appScript, /visibleSessionTrashItems\(\)/);
     assert.match(appScript, /sessionTrashHasMoreItems\(\)/);
     assert.match(appScript, /sessionTrashHiddenCount\(\)/);
-    assert.match(appScript, /normalizeSettingsTab\(tab\)/);
-    assert.match(appScript, /switchSettingsTab\(tab,\s*options = \{\}\)/);
-    assert.match(appScript, /loadSessionTrash\(options = \{\}\)/);
-    assert.match(appScript, /loadMoreSessionTrashItems\(\)/);
-    assert.match(appScript, /restoreSessionTrash\(item\)/);
-    assert.match(appScript, /purgeSessionTrash\(item\)/);
-    assert.match(appScript, /clearSessionTrash\(\)/);
-    assert.match(appScript, /buildSessionTrashItemFromSession\(session,\s*result = \{\}\)/);
-    assert.match(appScript, /prependSessionTrashItem\(item,\s*options = \{\}\)/);
-    assert.match(appScript, /resetSessionTrashVisibleCount\(\)/);
-    assert.match(appScript, /normalizeSessionTrashTotalCount\(totalCount,\s*fallbackItems = this\.sessionTrashItems\)/);
-    assert.match(appScript, /getSessionTrashViewState\(\)/);
-    assert.match(appScript, /this\.sessionTrashTotalCount = this\.normalizeSessionTrashTotalCount\(res\.totalCount,\s*nextItems\);/);
-    assert.match(appScript, /this\.sessionTrashTotalCount = this\.normalizeSessionTrashTotalCount\(\s*res && res\.totalCount !== undefined/);
-    assert.match(appScript, /messageCount:\s*Number\.isFinite\(Number\(result && result\.messageCount\)\)/);
+    assert.match(sessionTrashMethods, /normalizeSettingsTab\(tab\)/);
+    assert.match(sessionTrashMethods, /switchSettingsTab\(tab,\s*options = \{\}\)/);
+    assert.match(sessionTrashMethods, /loadSessionTrash\(options = \{\}\)/);
+    assert.match(sessionTrashMethods, /loadMoreSessionTrashItems\(\)/);
+    assert.match(sessionTrashMethods, /restoreSessionTrash\(item\)/);
+    assert.match(sessionTrashMethods, /purgeSessionTrash\(item\)/);
+    assert.match(sessionTrashMethods, /clearSessionTrash\(\)/);
+    assert.match(sessionTrashMethods, /buildSessionTrashItemFromSession\(session,\s*result = \{\}\)/);
+    assert.match(sessionTrashMethods, /prependSessionTrashItem\(item,\s*options = \{\}\)/);
+    assert.match(sessionTrashMethods, /resetSessionTrashVisibleCount\(\)/);
+    assert.match(sessionTrashMethods, /normalizeSessionTrashTotalCount\(totalCount,\s*fallbackItems = this\.sessionTrashItems\)/);
+    assert.match(sessionTrashMethods, /getSessionTrashViewState\(\)/);
+    assert.match(sessionTrashMethods, /this\.sessionTrashTotalCount = this\.normalizeSessionTrashTotalCount\(res\.totalCount,\s*nextItems\);/);
+    assert.match(sessionTrashMethods, /messageCount:\s*Number\.isFinite\(Number\(result && result\.messageCount\)\)/);
     assert.match(appScript, /clearActiveSessionState\(\)/);
     assert.match(appScript, /removeSessionFromCurrentList\(session\)/);
     assert.match(appScript, /await this\.removeSessionFromCurrentList\(session\);/);
