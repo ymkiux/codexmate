@@ -5,6 +5,7 @@ import path from 'path';
 import { pathToFileURL } from 'url';
 import { createRequire } from 'module';
 import {
+    projectRoot,
     readBundledWebUiCss,
     readBundledWebUiHtml,
     readBundledWebUiScript,
@@ -89,7 +90,16 @@ test('executable logic bundle preserves named exports without leaking split re-e
 });
 
 test('source bundle exports the expected entry readers', () => {
+    const files = sourceBundle.collectJavaScriptFiles(path.join(projectRoot, 'web-ui', 'app.js'))
+        .map(filePath => path.relative(projectRoot, filePath).replace(/\\/g, '/'));
+
+    assert.ok(files.length > 3);
+    assert.ok(files.includes('web-ui/modules/app.constants.mjs'));
+    assert.ok(files.includes('web-ui/modules/app.methods.index.mjs'));
+    assert.strictEqual(files[files.length - 1], 'web-ui/app.js');
+    assert.strictEqual(new Set(files).size, files.length);
     assert.strictEqual(typeof sourceBundle.readUtf8Text, 'function');
+    assert.strictEqual(typeof sourceBundle.collectJavaScriptFiles, 'function');
     assert.strictEqual(typeof sourceBundle.readBundledWebUiHtml, 'function');
     assert.strictEqual(typeof sourceBundle.readBundledWebUiCss, 'function');
     assert.strictEqual(typeof sourceBundle.readBundledWebUiScript, 'function');
