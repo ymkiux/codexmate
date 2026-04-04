@@ -1,0 +1,285 @@
+                <!-- 会话浏览模式 -->
+                <div
+                    v-show="mainTab === 'sessions'"
+                    class="mode-content"
+                    id="panel-sessions"
+                    role="tabpanel"
+                    :aria-labelledby="'tab-sessions'">
+                <div v-if="sessionStandalone" class="session-standalone-page">
+                    <div v-if="sessionStandaloneLoading" class="state-message">
+                        加载中...
+                    </div>
+                    <div v-else-if="sessionStandaloneError" class="state-message error">
+                        {{ sessionStandaloneError }}
+                    </div>
+                    <div v-else>
+                        <div class="session-standalone-title">
+                            {{ sessionStandaloneTitle }}
+                            <span v-if="sessionStandaloneSourceLabel"> · {{ sessionStandaloneSourceLabel }}</span>
+                        </div>
+                        <pre class="session-standalone-text">{{ sessionStandaloneText }}</pre>
+                    </div>
+                </div>
+
+                <div v-else>
+                <div v-if="!sessionStandalone" class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">会话来源</span>
+                        <div class="selector-actions">
+                            <button class="btn-tool btn-tool-compact" @click="loadSessions" :disabled="sessionsLoading">
+                                {{ sessionsLoading ? '刷新中...' : '刷新会话' }}
+                            </button>
+                        </div>
+                    </div>
+                    <div class="session-toolbar">
+                        <div class="session-toolbar-group">
+                            <select class="session-source-select" v-model="sessionFilterSource" @change="onSessionSourceChange" :disabled="sessionsLoading">
+                                <option value="all">全部</option>
+                                <option value="codex">Codex</option>
+                                <option value="claude">Claude Code</option>
+                            </select>
+                            <select
+                                class="session-path-select"
+                                v-model="sessionPathFilter"
+                                @change="onSessionPathFilterChange"
+                                :disabled="sessionsLoading">
+                                <option value="">全部路径</option>
+                                <option v-for="cwd in sessionPathOptions" :key="cwd" :value="cwd">{{ cwd }}</option>
+                            </select>
+                        </div>
+                        <div class="session-toolbar-group session-toolbar-grow">
+                            <input
+                                class="session-query-input"
+                                v-model="sessionQuery"
+                                @keyup.enter="loadSessions"
+                                :disabled="sessionsLoading || !isSessionQueryEnabled"
+                                :placeholder="sessionQueryPlaceholder">
+                        </div>
+                        <div class="session-toolbar-group">
+                            <select
+                                class="session-role-select"
+                                v-model="sessionRoleFilter"
+                                @change="onSessionFilterChange"
+                                disabled>
+                                <option value="all">全部角色</option>
+                                <option value="user">仅 User</option>
+                                <option value="assistant">仅 Assistant</option>
+                                <option value="system">仅 System</option>
+                            </select>
+                            <select
+                                class="session-time-select"
+                                v-model="sessionTimePreset"
+                                @change="onSessionFilterChange"
+                                disabled>
+                                <option value="all">全部时间</option>
+                                <option value="7d">近 7 天</option>
+                                <option value="30d">近 30 天</option>
+                                <option value="90d">近 90 天</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="session-toolbar-footer">
+                        <label class="quick-option">
+                            <input
+                                type="checkbox"
+                                v-model="sessionResumeWithYolo"
+                                @change="onSessionResumeYoloChange"
+                            >
+                            复制恢复命令附带 --yolo
+                        </label>
+                    </div>
+                </div>
+
+                <div v-if="!sessionStandalone && sessionsLoading" class="state-message">
+                    会话加载中...
+                </div>
+
+                <div v-else-if="!sessionStandalone && sessionsList.length === 0" class="session-empty">
+                    暂无可用会话记录
+                </div>
+
+                <div v-else :class="['session-layout', { 'session-standalone': sessionStandalone }]">
+                    <div v-if="!sessionStandalone && sessionListRenderEnabled" class="session-list">
+                        <div
+                            v-for="session in sortedSessionsList"
+                            :key="session.source + '-' + session.sessionId + '-' + session.filePath"
+                            v-memo="[activeSessionExportKey === getSessionExportKey(session), session.messageCount, session.updatedAt, session.title, session.sourceLabel, isSessionPinned(session), sessionsLoading]"
+                            :class="[
+                                'session-item',
+                                {
+                                    active: activeSessionExportKey === getSessionExportKey(session),
+                                    pinned: isSessionPinned(session)
+                                }
+                            ]"
+                            @click="selectSession(session)">
+                            <div class="session-item-header">
+                                <div class="session-item-main">
+                                    <div class="session-item-title">{{ session.title || session.sessionId }}</div>
+                                    <span class="session-count-badge">{{ session.messageCount ?? 0 }}</span>
+                                </div>
+                                <div class="session-item-actions">
+                                    <button
+                                        class="session-item-copy session-item-pin"
+                                        @click.stop="toggleSessionPin(session)"
+                                        :disabled="sessionsLoading"
+                                        :aria-label="isSessionPinned(session) ? '取消置顶' : '置顶'"
+                                        :title="isSessionPinned(session) ? '取消置顶' : '置顶'"
+                                        :aria-pressed="isSessionPinned(session)">
+                                        <svg v-if="isSessionPinned(session)" class="pin-icon" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.6">
+                                            <path d="M12 22s8-6 8-12a8 8 0 1 0-16 0c0 6 8 12 8 12z"></path>
+                                        </svg>
+                                        <svg v-else class="pin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                                            <path d="M12 22s8-6 8-12a8 8 0 1 0-16 0c0 6 8 12 8 12z"></path>
+                                        </svg>
+                                    </button>
+                                    <button
+                                        v-if="isResumeCommandAvailable(session)"
+                                        class="session-item-copy"
+                                        @click.stop="copyResumeCommand(session)"
+                                        :disabled="sessionsLoading"
+                                        aria-label="复制恢复命令"
+                                        title="复制恢复命令">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+                                            <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="session-item-meta">
+                                <span class="session-source">{{ session.sourceLabel }}</span>
+                                <span class="session-item-time">{{ session.updatedAt || 'unknown time' }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-else-if="!sessionStandalone" class="session-list session-list-placeholder"></div>
+
+                    <div :class="['session-preview', { active: !!activeSession }]" :ref="setSessionPreviewContainerRef">
+                        <template v-if="activeSession">
+                            <div class="session-preview-scroll" :ref="setSessionPreviewScrollRef" @scroll="onSessionPreviewScroll">
+                                <div class="session-preview-header" :ref="setSessionPreviewHeaderRef">
+                                    <div>
+                                        <div class="session-preview-title">{{ activeSession.title || activeSession.sessionId }}</div>
+                                        <div class="session-preview-meta">
+                                            <span class="session-preview-meta-item">{{ activeSession.sourceLabel }}</span>
+                                            <span class="session-preview-meta-item">{{ activeSession.updatedAt || 'unknown time' }}</span>
+                                        </div>
+                                        <div class="session-preview-meta" v-if="activeSession.cwd">
+                                            <span class="session-preview-meta-item">{{ activeSession.cwd }}</span>
+                                        </div>
+                                    </div>
+                                    <div v-if="!sessionStandalone" class="session-actions">
+                                        <button class="btn-session-refresh" @click="loadActiveSessionDetail" :disabled="sessionDetailLoading || !activeSession">
+                                            {{ sessionDetailLoading ? '加载中...' : '刷新内容' }}
+                                        </button>
+                                        <button
+                                            v-if="isDeleteAvailable(activeSession)"
+                                            class="btn-session-delete"
+                                            @click="deleteSession(activeSession)"
+                                            :disabled="!activeSession || sessionsLoading || sessionDeleting[getSessionExportKey(activeSession)]">
+                                            {{ (activeSession && sessionDeleting[getSessionExportKey(activeSession)]) ? '移入中...' : '移入回收站' }}
+                                        </button>
+                                        <button
+                                            class="btn-session-export"
+                                            @click="exportSession(activeSession)"
+                                            :disabled="!activeSession || sessionExporting[getSessionExportKey(activeSession)]">
+                                            {{ (activeSession && sessionExporting[getSessionExportKey(activeSession)]) ? '导出中...' : '导出记录' }}
+                                        </button>
+                                        <button
+                                            v-if="!sessionStandalone"
+                                            class="btn-session-open"
+                                            @click="openSessionStandalone(activeSession)"
+                                            :disabled="!activeSession">
+                                            新页查看
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div v-if="sessionDetailLoading && !sessionPreviewLoadingMore" class="session-preview-empty">
+                                    正在加载会话内容...
+                                </div>
+
+                                <div v-else-if="activeSessionDetailError" class="session-preview-empty">
+                                    {{ activeSessionDetailError }}
+                                </div>
+
+                                <div v-else-if="!activeSessionMessages.length" class="session-preview-empty">
+                                    当前会话暂无可展示消息
+                                </div>
+
+                                <div v-else-if="sessionPreviewRenderEnabled && !activeSessionVisibleMessages.length" class="session-preview-empty">
+                                    <span>正在渲染会话内容...</span>
+                                    <button class="btn-session-refresh" @click="primeSessionPreviewMessageRender" :disabled="sessionDetailLoading">
+                                        重新渲染
+                                    </button>
+                                </div>
+
+                                <div v-else-if="!sessionPreviewRenderEnabled" class="session-preview-empty">
+                                    正在准备会话内容...
+                                </div>
+
+                                <div v-else class="session-preview-body">
+                                    <div class="session-preview-messages">
+                                        <div v-if="activeSessionDetailClipped" class="session-item-sub session-item-wrap">
+                                            仅展示最近 {{ activeSessionMessages.length }} 条消息。
+                                        </div>
+                                        <div
+                                            v-if="canLoadMoreSessionMessages"
+                                            class="session-item-sub session-item-wrap"
+                                            style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                                            <span>已显示 {{ activeSessionVisibleMessages.length }} / {{ activeSessionMessages.length }} 条</span>
+                                            <button class="btn-session-refresh" @click="loadMoreSessionMessages()" :disabled="sessionDetailLoading || sessionPreviewLoadingMore">
+                                                {{ sessionPreviewLoadingMore ? '加载中...' : ('加载更多（剩余 ' + sessionPreviewRemainingCount + '）') }}
+                                            </button>
+                                        </div>
+                                        <div
+                                            v-if="sessionPreviewLoadingMore"
+                                            class="session-item-sub session-item-wrap">
+                                            正在加载更早消息...
+                                        </div>
+                                        <div
+                                            v-for="(msg, idx) in activeSessionVisibleMessages"
+                                            :key="getRecordRenderKey(msg, idx)"
+                                            v-memo="[msg.text, msg.timestamp, msg.roleLabel, msg.normalizedRole]"
+                                            :data-message-key="getRecordRenderKey(msg, idx)"
+                                            :ref="getSessionMessageRefBinder(getRecordRenderKey(msg, idx))"
+                                            :class="['session-msg', msg.normalizedRole === 'user' ? 'user' : (msg.normalizedRole === 'system' ? 'system' : 'assistant')]">
+                                            <div class="session-msg-header">
+                                                <div class="session-msg-meta">
+                                                    <span class="session-msg-role">{{ msg.roleLabel || (msg.normalizedRole === 'user' ? 'User' : (msg.normalizedRole === 'system' ? 'System' : 'Assistant')) }}</span>
+                                                    <span class="session-msg-time">{{ msg.timestamp || '' }}</span>
+                                                </div>
+                                            </div>
+                                            <div class="session-msg-content">{{ msg.text || '' }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <aside v-if="sessionPreviewRenderEnabled && sessionTimelineNodes.length" class="session-timeline" aria-label="会话时间轴">
+                                <div class="session-timeline-track"></div>
+                                <button
+                                    v-for="node in sessionTimelineNodes"
+                                    :key="'timeline-' + node.key"
+                                    v-memo="[sessionTimelineActiveKey === node.key, node.safePercent, node.title]"
+                                    type="button"
+                                    :class="['session-timeline-node', { active: sessionTimelineActiveKey === node.key }]"
+                                    :aria-current="sessionTimelineActiveKey === node.key ? 'true' : null"
+                                    :style="{ top: `${node.safePercent}%` }"
+                                    :title="node.title"
+                                    @click="jumpToSessionTimelineNode(node.key)">
+                                    <span class="sr-only">{{ node.title }}</span>
+                                </button>
+                                <div class="session-timeline-current" v-if="sessionTimelineActiveTitle">
+                                    {{ sessionTimelineActiveTitle }}
+                                </div>
+                            </aside>
+                        </template>
+
+                    <div v-else class="session-preview-empty">
+                        <span v-if="sessionStandaloneError">{{ sessionStandaloneError }}</span>
+                        <span v-else>请先在左侧选择一个会话</span>
+                    </div>
+                </div>
+                </div>
+                </div>
+            </div>

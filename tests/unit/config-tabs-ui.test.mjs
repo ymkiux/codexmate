@@ -1,18 +1,13 @@
 ﻿import assert from 'assert';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, '..', '..');
-
-function readProjectFile(relativePath) {
-    return fs.readFileSync(path.join(projectRoot, relativePath), 'utf8');
-}
+import {
+    readBundledWebUiCss,
+    readBundledWebUiHtml,
+    readBundledWebUiScript,
+    readProjectFile
+} from './helpers/web-ui-source.mjs';
 
 test('config template keeps expected config tabs in top and side navigation', () => {
-    const html = readProjectFile('web-ui/index.html');
+    const html = readBundledWebUiHtml();
     const topTabModes = [...html.matchAll(/id="tab-config-([a-z]+)"/g)]
         .map((match) => match[1]);
     const sideTabModes = [...html.matchAll(/id="side-tab-config-([a-z]+)"/g)]
@@ -141,7 +136,8 @@ test('config template keeps expected config tabs in top and side navigation', ()
 });
 
 test('web ui script defines provider mode metadata for codex only', () => {
-    const appScript = readProjectFile('web-ui/app.js');
+    const appScript = readBundledWebUiScript();
+    const constantsSource = readProjectFile('web-ui/modules/app.constants.mjs');
     const configModeComputed = readProjectFile('web-ui/modules/config-mode.computed.mjs');
 
     assert.match(appScript, /CONFIG_MODE_SET/);
@@ -203,8 +199,11 @@ test('web ui script defines provider mode metadata for codex only', () => {
     assert.match(appScript, /runLatestOnlyQueue\(/);
     assert.match(appScript, /providerSwitchInProgress:\s*false/);
     assert.match(appScript, /pendingProviderSwitch:\s*''/);
-    assert.match(appScript, /modelContextWindowInput:\s*'190000'/);
-    assert.match(appScript, /modelAutoCompactTokenLimitInput:\s*'185000'/);
+    assert.match(appScript, /providerSwitchDisplayTarget:\s*''/);
+    assert.match(appScript, /const switching = String\(this\.providerSwitchDisplayTarget \|\| ''\)\.trim\(\);/);
+    assert.match(appScript, /if \(switching\) return switching;/);
+    assert.match(appScript, /modelContextWindowInput:\s*String\(DEFAULT_MODEL_CONTEXT_WINDOW\)/);
+    assert.match(appScript, /modelAutoCompactTokenLimitInput:\s*String\(DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT\)/);
     assert.match(appScript, /editingCodexBudgetField:\s*''/);
     assert.match(appScript, /statusRes\.modelContextWindow/);
     assert.match(appScript, /statusRes\.modelAutoCompactTokenLimit/);
@@ -212,8 +211,8 @@ test('web ui script defines provider mode metadata for codex only', () => {
     assert.match(appScript, /onModelAutoCompactTokenLimitBlur\(\)/);
     assert.match(appScript, /resetCodexContextBudgetDefaults\(\)/);
     assert.match(appScript, /normalizePositiveIntegerInput\(/);
-    assert.match(appScript, /const SESSION_TRASH_LIST_LIMIT = 500;/);
-    assert.match(appScript, /const SESSION_TRASH_PAGE_SIZE = 200;/);
+    assert.match(constantsSource, /export const SESSION_TRASH_LIST_LIMIT = 500;/);
+    assert.match(constantsSource, /export const SESSION_TRASH_PAGE_SIZE = 200;/);
     assert.match(appScript, /settingsTab:\s*'backup'/);
     assert.match(appScript, /skillsTargetApp:\s*'codex'/);
     assert.match(appScript, /skillsMarketLoading:\s*false/);
@@ -281,7 +280,7 @@ test('session helper deferred claude refresh validates live tab and mode before 
 });
 
 test('trash item styles stay aligned with session card layout and keep mobile usability', () => {
-    const styles = readProjectFile('web-ui/styles.css');
+    const styles = readBundledWebUiCss();
     const mobile520Start = styles.indexOf('@media (max-width: 520px)');
     const mobile540Start = styles.indexOf('@media (max-width: 540px)');
 
@@ -326,7 +325,7 @@ test('trash item styles stay aligned with session card layout and keep mobile us
 });
 
 test('settings tab header actions keep compact tool buttons inline on wider screens', () => {
-    const styles = readProjectFile('web-ui/styles.css');
+    const styles = readBundledWebUiCss();
 
     assert.match(styles, /\.settings-tab-header\s*\{[\s\S]*justify-content:\s*flex-end;/);
     assert.match(styles, /\.settings-tab-header\s*\{[\s\S]*align-items:\s*center;/);

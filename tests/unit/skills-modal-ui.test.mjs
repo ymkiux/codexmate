@@ -1,18 +1,13 @@
 import assert from 'assert';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, '..', '..');
-
-function readProjectFile(relativePath) {
-    return fs.readFileSync(path.join(projectRoot, relativePath), 'utf8');
-}
+import {
+    readBundledWebUiCss,
+    readBundledWebUiHtml,
+    readBundledWebUiScript,
+    readProjectFile
+} from './helpers/web-ui-source.mjs';
 
 test('skills modal template includes overview counters and reset entry', () => {
-    const html = readProjectFile('web-ui/index.html');
+    const html = readBundledWebUiHtml();
     assert.match(html, /skills-summary-strip/);
     assert.match(html, /skillsConfiguredCount/);
     assert.match(html, /skillsMissingSkillFileCount/);
@@ -23,7 +18,7 @@ test('skills modal template includes overview counters and reset entry', () => {
 });
 
 test('skills modal script is modularized and exposes computed/methods from skills modules', () => {
-    const appScript = readProjectFile('web-ui/app.js');
+    const appScript = readBundledWebUiScript();
     const skillsComputed = readProjectFile('web-ui/modules/skills.computed.mjs');
     const skillsMethods = readProjectFile('web-ui/modules/skills.methods.mjs');
 
@@ -65,8 +60,8 @@ test('skills modal script is modularized and exposes computed/methods from skill
 });
 
 test('skills modal styles define summary and panel layout hooks', () => {
-    const styles = readProjectFile('web-ui/styles.css');
-    const html = readProjectFile('web-ui/index.html');
+    const styles = readBundledWebUiCss();
+    const html = readBundledWebUiHtml();
     assert.match(styles, /\.form-select/);
     assert.match(styles, /\.skills-summary-strip/);
     assert.match(styles, /\.skills-summary-item/);

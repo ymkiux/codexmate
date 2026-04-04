@@ -1,13 +1,7 @@
 ﻿import assert from 'assert';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { readBundledWebUiScript } from './helpers/web-ui-source.mjs';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const appPath = path.join(__dirname, '..', '..', 'web-ui', 'app.js');
-const appSource = fs.readFileSync(appPath, 'utf-8');
+const appSource = readBundledWebUiScript();
 
 function escapeRegExp(value) {
     return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

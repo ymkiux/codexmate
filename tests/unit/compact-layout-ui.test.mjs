@@ -1,18 +1,11 @@
 import assert from 'assert';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, '..', '..');
-
-function readProjectFile(relativePath) {
-    return fs.readFileSync(path.join(projectRoot, relativePath), 'utf8');
-}
+import {
+    readBundledWebUiCss,
+    readBundledWebUiScript
+} from './helpers/web-ui-source.mjs';
 
 test('app script includes compact layout detection and body class toggling', () => {
-    const appScript = readProjectFile('web-ui/app.js');
+    const appScript = readBundledWebUiScript();
     assert.match(appScript, /forceCompactLayout:\s*false/);
     assert.match(appScript, /updateCompactLayoutMode\(\)/);
     assert.match(appScript, /shouldForceCompactLayout\(\)/);
@@ -22,7 +15,7 @@ test('app script includes compact layout detection and body class toggling', () 
 });
 
 test('styles include force-compact fallback rules for readability on touch devices', () => {
-    const styles = readProjectFile('web-ui/styles.css');
+    const styles = readBundledWebUiCss();
     assert.match(styles, /\.card-trailing\s*\{[\s\S]*align-items:\s*start;[\s\S]*align-self:\s*flex-start;/);
     assert.match(styles, /\.card-trailing\s+\.card-actions\s*\{[\s\S]*justify-self:\s*end;/);
     assert.match(styles, /\.card-trailing\s+\.pill,\s*[\s\S]*justify-self:\s*end;/);
@@ -45,7 +38,7 @@ test('styles include force-compact fallback rules for readability on touch devic
 });
 
 test('styles keep desktop layout wide and session history readable on large screens', () => {
-    const styles = readProjectFile('web-ui/styles.css');
+    const styles = readBundledWebUiCss();
     assert.match(styles, /\.container\s*\{[\s\S]*max-width:\s*2200px;/);
     assert.match(styles, /\.session-layout\s*\{[\s\S]*grid-template-columns:\s*minmax\(260px,\s*360px\)\s*minmax\(0,\s*1fr\);/);
     assert.match(styles, /\.session-item\s*\{[\s\S]*min-height:\s*102px;/);

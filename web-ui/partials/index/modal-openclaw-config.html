@@ -1,0 +1,274 @@
+        <div v-if="showOpenclawConfigModal" class="modal-overlay" @click.self="closeOpenclawConfigModal">
+            <div class="modal modal-wide">
+                <div class="modal-title">{{ openclawEditorTitle }}</div>
+
+                <div class="form-group">
+                    <label class="form-label">配置名称</label>
+                    <input v-model="openclawEditing.name" class="form-input" :readonly="openclawEditing.lockName" placeholder="例如: 默认配置">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">目标文件</label>
+                    <div class="form-hint">
+                        {{ openclawConfigPath || '未加载' }}
+                        <span v-if="openclawConfigPath">
+                            （{{ openclawConfigExists ? '已存在' : '不存在，将在应用时创建' }}）
+                        </span>
+                    </div>
+                    <div class="btn-group" style="justify-content:flex-start;">
+                        <button class="btn btn-confirm secondary" @click="loadOpenclawConfigFromFile" :disabled="openclawFileLoading">
+                            {{ openclawFileLoading ? '加载中...' : '加载当前配置' }}
+                        </button>
+                    </div>
+                </div>
+
+                <div class="quick-section">
+                    <div class="quick-header">
+                        <div>
+                            <div class="quick-title">新手快速配置</div>
+                            <div class="form-hint">按 3 步完成：填 Provider 和模型，写入编辑器，保存并应用。</div>
+                        </div>
+                        <div class="quick-actions">
+                            <button class="btn-mini" @click="syncOpenclawQuickFromText">从编辑器读取</button>
+                            <button class="btn-mini" @click="resetOpenclawQuick">清空</button>
+                        </div>
+                    </div>
+                    <div class="quick-steps">
+                        <div class="quick-step"><span class="step-badge">1</span><span>填写 Provider 与模型</span></div>
+                        <div class="quick-step"><span class="step-badge">2</span><span>点击写入编辑器</span></div>
+                        <div class="quick-step"><span class="step-badge">3</span><span>保存并应用</span></div>
+                    </div>
+                    <div class="quick-grid">
+                        <div class="quick-card">
+                            <div class="structured-card-title">Provider</div>
+                            <div class="form-group">
+                                <label class="form-label">Provider 名称</label>
+                                <input v-model="openclawQuick.providerName" class="form-input" placeholder="例如: custom-myapi">
+                                <div class="form-hint">会拼成 provider/model 作为主模型标识。</div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Base URL</label>
+                                <input v-model="openclawQuick.baseUrl" class="form-input" placeholder="https://api.example.com/v1">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">API Key</label>
+                                <div class="list-row">
+                                    <input v-model="openclawQuick.apiKey" class="form-input" :type="openclawQuick.showKey ? 'text' : 'password'" placeholder="sk-...">
+                                    <button class="btn-mini" @click="toggleOpenclawQuickKey">
+                                        {{ openclawQuick.showKey ? '隐藏' : '显示' }}
+                                    </button>
+                                </div>
+                                <div class="form-hint">留空表示不覆盖现有 key。</div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">API 类型</label>
+                                <input v-model="openclawQuick.apiType" class="form-input" list="openclawApiTypeList" placeholder="例如: openai-responses">
+                                <datalist id="openclawApiTypeList">
+                                    <option value="openai-responses"></option>
+                                    <option value="openai-chat"></option>
+                                    <option value="anthropic"></option>
+                                    <option value="custom"></option>
+                                </datalist>
+                            </div>
+                        </div>
+
+                        <div class="quick-card">
+                            <div class="structured-card-title">模型</div>
+                            <div class="form-group">
+                                <label class="form-label">模型 ID</label>
+                                <input v-model="openclawQuick.modelId" class="form-input" placeholder="例如: gpt-4.1">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">展示名称</label>
+                                <input v-model="openclawQuick.modelName" class="form-input" placeholder="留空则使用模型 ID">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">上下文与最大输出</label>
+                                <div class="list-row">
+                                    <input v-model="openclawQuick.contextWindow" class="form-input" placeholder="上下文长度">
+                                    <input v-model="openclawQuick.maxTokens" class="form-input" placeholder="最大输出">
+                                </div>
+                                <div class="form-hint">留空表示不改动已有配置。</div>
+                            </div>
+                        </div>
+
+                        <div class="quick-card">
+                            <div class="structured-card-title">选项</div>
+                            <label class="quick-option">
+                                <input type="checkbox" v-model="openclawQuick.setPrimary">
+                                设为主模型
+                            </label>
+                            <label class="quick-option">
+                                <input type="checkbox" v-model="openclawQuick.overrideProvider">
+                                覆盖同名 Provider 基础信息
+                            </label>
+                            <label class="quick-option">
+                                <input type="checkbox" v-model="openclawQuick.overrideModels">
+                                覆盖同名模型列表
+                            </label>
+                            <div class="form-hint">关闭覆盖会只补空缺字段。</div>
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-confirm" @click="applyOpenclawQuickToText">写入编辑器</button>
+                    </div>
+                </div>
+
+                <div class="structured-section">
+                    <div class="structured-header">
+                        <span class="structured-title">结构化配置（高级）</span>
+                        <span class="form-hint">写入编辑器会重排 JSON，注释可能丢失。</span>
+                    </div>
+                    <div class="structured-grid">
+                        <div class="structured-card">
+                            <div class="structured-card-title">Agents Defaults</div>
+                            <div class="form-group">
+                                <label class="form-label">主模型</label>
+                                <input v-model="openclawStructured.agentPrimary" class="form-input" placeholder="例如: provider/model">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">备选模型</label>
+                                <div class="list-row" v-for="(item, index) in openclawStructured.agentFallbacks" :key="'fallback-' + index">
+                                    <input v-model="openclawStructured.agentFallbacks[index]" class="form-input" placeholder="例如: provider/model">
+                                    <button class="btn-mini delete" @click="removeOpenclawFallback(index)">删除</button>
+                                </div>
+                                <button class="btn-mini" @click="addOpenclawFallback">添加备选</button>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Workspace</label>
+                                <input v-model="openclawStructured.workspace" class="form-input" placeholder="例如: ~/.openclaw/workspace">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Timeout(s)</label>
+                                <input v-model="openclawStructured.timeout" class="form-input" placeholder="例如: 600">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Context Tokens</label>
+                                <input v-model="openclawStructured.contextTokens" class="form-input" placeholder="例如: 4096">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Max Concurrent</label>
+                                <input v-model="openclawStructured.maxConcurrent" class="form-input" placeholder="例如: 2">
+                            </div>
+                        </div>
+
+                        <div class="structured-card">
+                            <div class="structured-card-title">Env</div>
+                            <div class="form-group">
+                                <label class="form-label">环境变量</label>
+                                <div class="list-row" v-for="(item, index) in openclawStructured.envItems" :key="'env-' + index">
+                                    <input v-model="item.key" class="form-input" placeholder="KEY">
+                                    <input v-model="item.value" class="form-input" :type="item.show ? 'text' : 'password'" placeholder="VALUE">
+                                    <button class="btn-mini" @click="toggleOpenclawEnvItem(index)">
+                                        {{ item.show ? '隐藏' : '显示' }}
+                                    </button>
+                                    <button class="btn-mini delete" @click="removeOpenclawEnvItem(index)">删除</button>
+                                </div>
+                                <button class="btn-mini" @click="addOpenclawEnvItem">添加变量</button>
+                            </div>
+                        </div>
+
+                        <div class="structured-card">
+                            <div class="structured-card-title">Tools</div>
+                            <div class="form-group">
+                                <label class="form-label">Profile</label>
+                                <select v-model="openclawStructured.toolsProfile" class="form-input">
+                                    <option value="default">default</option>
+                                    <option value="strict">strict</option>
+                                    <option value="permissive">permissive</option>
+                                    <option value="custom">custom</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Allow</label>
+                                <div class="list-row" v-for="(item, index) in openclawStructured.toolsAllow" :key="'allow-' + index">
+                                    <input v-model="openclawStructured.toolsAllow[index]" class="form-input" placeholder="例如: fs.read*">
+                                    <button class="btn-mini delete" @click="removeOpenclawToolsAllow(index)">删除</button>
+                                </div>
+                                <button class="btn-mini" @click="addOpenclawToolsAllow">添加 allow</button>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Deny</label>
+                                <div class="list-row" v-for="(item, index) in openclawStructured.toolsDeny" :key="'deny-' + index">
+                                    <input v-model="openclawStructured.toolsDeny[index]" class="form-input" placeholder="例如: net.*">
+                                    <button class="btn-mini delete" @click="removeOpenclawToolsDeny(index)">删除</button>
+                                </div>
+                                <button class="btn-mini" @click="addOpenclawToolsDeny">添加 deny</button>
+                            </div>
+                        </div>
+
+                        <div class="structured-card">
+                            <div class="structured-card-title">Providers（只读）</div>
+                            <div v-if="openclawProviders.length === 0" class="form-hint">
+                                未发现 providers 配置（可能使用环境变量或外部配置）。
+                            </div>
+                            <div v-else class="provider-list">
+                                <div class="provider-item" v-for="(provider, index) in openclawProviders" :key="provider.key + '-' + provider.source + '-' + index">
+                                    <div class="provider-header">
+                                        <span class="provider-name">{{ provider.key }}</span>
+                                        <span class="provider-source">来源: {{ provider.source }}</span>
+                                        <span v-if="provider.isActive" class="pill configured">使用中</span>
+                                    </div>
+                                    <div v-if="provider.fields.length === 0" class="form-hint">未配置字段</div>
+                                    <div v-else class="provider-fields">
+                                        <div class="provider-field" v-for="field in provider.fields" :key="provider.key + '-' + field.key">
+                                            <span class="provider-field-key">{{ field.key }}</span>
+                                            <span class="provider-field-value">{{ field.value }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div v-if="openclawMissingProviders.length" class="form-hint">
+                                使用中的 provider 未在配置中显示：{{ openclawMissingProviders.join(', ') }}。
+                            </div>
+                        </div>
+
+                        <div class="structured-card">
+                            <div class="structured-card-title">Agents（只读）</div>
+                            <div v-if="openclawAgentsList.length === 0" class="form-hint">
+                                未发现 agents.list 配置。
+                            </div>
+                            <div v-else class="agent-list">
+                                <div class="agent-item" v-for="(agent, index) in openclawAgentsList" :key="agent.key + '-' + index">
+                                    <div class="agent-header">
+                                        <span class="agent-name">{{ agent.name }}</span>
+                                        <span class="agent-id">ID: {{ agent.id }}</span>
+                                    </div>
+                                    <div class="agent-meta" v-if="agent.theme || agent.emoji || agent.avatar">
+                                        <span v-if="agent.theme">主题: {{ agent.theme }}</span>
+                                        <span v-if="agent.emoji">表情: {{ agent.emoji }}</span>
+                                        <span v-if="agent.avatar">头像: {{ agent.avatar }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-confirm secondary" @click="syncOpenclawStructuredFromText">从文本刷新</button>
+                        <button class="btn btn-confirm" @click="applyOpenclawStructuredToText">写入编辑器</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">OpenClaw 配置（JSON5）</label>
+                    <textarea
+                        v-model="openclawEditing.content"
+                        class="form-input template-editor"
+                        spellcheck="false"
+                        placeholder="在这里编辑 OpenClaw 配置（JSON5）"></textarea>
+                    <div class="template-editor-warning">
+                        保存仅写入本地配置库。点击“保存并应用”后会写入 openclaw.json。
+                    </div>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-cancel" @click="closeOpenclawConfigModal">取消</button>
+                    <button class="btn btn-confirm" @click="saveOpenclawConfig" :disabled="openclawSaving">
+                        {{ openclawSaving ? '保存中...' : '保存' }}
+                    </button>
+                    <button class="btn btn-confirm secondary" @click="saveAndApplyOpenclawConfig" :disabled="openclawApplying">
+                        {{ openclawApplying ? '应用中...' : '保存并应用' }}
+                    </button>
+                </div>
+            </div>
+        </div>
