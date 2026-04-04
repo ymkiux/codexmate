@@ -81,12 +81,11 @@ export function createClaudeConfigMethods(options = {}) {
                 if (res.error || res.success === false) {
                     this.showMessage(res.error || '应用配置失败', 'error');
                 } else {
+                    this.currentClaudeConfig = name;
                     const targetTip = res.targetPath ? `（${res.targetPath}）` : '';
                     this.showMessage(`已保存并应用到 Claude 配置${targetTip}`, 'success');
                     this.closeEditConfigModal();
-                    if (name === this.currentClaudeConfig) {
-                        this.refreshClaudeModelContext();
-                    }
+                    this.refreshClaudeModelContext();
                 }
             } catch (_) {
                 this.showMessage('应用配置失败', 'error');

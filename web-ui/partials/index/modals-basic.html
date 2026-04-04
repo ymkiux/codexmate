@@ -1,7 +1,7 @@
         <!-- 添加提供商模态框 -->
-        <div v-if="showAddModal" class="modal-overlay" @click.self="showAddModal = false">
-            <div class="modal">
-                <div class="modal-title">添加提供商</div>
+        <div v-if="showAddModal" class="modal-overlay" @click.self="closeAddModal">
+            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="add-provider-modal-title">
+                <div class="modal-title" id="add-provider-modal-title">添加提供商</div>
 
                 <div class="form-group">
                     <label class="form-label">名称</label>
@@ -24,9 +24,9 @@
         </div>
 
         <div v-if="showInstallModal" class="modal-overlay" @click.self="closeInstallModal">
-            <div class="modal">
+            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="install-cli-modal-title">
                 <div class="modal-header">
-                    <div class="modal-title">安装 CLI</div>
+                    <div class="modal-title" id="install-cli-modal-title">安装 CLI</div>
                 </div>
 
                 <div class="list-row">
@@ -86,8 +86,8 @@
 
         <!-- 编辑提供商模态框 -->
         <div v-if="showEditModal" class="modal-overlay" @click.self="closeEditModal">
-            <div class="modal">
-                <div class="modal-title">编辑提供商</div>
+            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-provider-modal-title">
+                <div class="modal-title" id="edit-provider-modal-title">编辑提供商</div>
 
                 <div class="form-group">
                     <label class="form-label">名称</label>
@@ -111,9 +111,9 @@
         </div>
 
         <!-- 添加模型模态框 -->
-        <div v-if="showModelModal" class="modal-overlay" @click.self="showModelModal = false">
-            <div class="modal">
-                <div class="modal-title">添加模型</div>
+        <div v-if="showModelModal" class="modal-overlay" @click.self="closeModelModal">
+            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="add-model-modal-title">
+                <div class="modal-title" id="add-model-modal-title">添加模型</div>
 
                 <div class="form-group">
                     <label class="form-label">模型名称</label>
@@ -129,13 +129,13 @@
 
         <!-- 模型列表模态框 -->
         <div v-if="showModelListModal" class="modal-overlay" @click.self="showModelListModal = false">
-            <div class="modal">
-                <div class="modal-title">管理模型</div>
+            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="manage-models-modal-title">
+                <div class="modal-title" id="manage-models-modal-title">管理模型</div>
 
                 <div class="model-list">
                     <div v-for="model in models" :key="model" class="model-item">
                         <span>{{ model }}</span>
-                        <span class="btn-remove-model" @click="removeModel(model)">删除</span>
+                        <button type="button" class="btn-remove-model" @click="removeModel(model)">删除</button>
                     </div>
                 </div>
 
@@ -146,9 +146,9 @@
         </div>
 
         <!-- 添加Claude配置模态框 -->
-        <div v-if="showClaudeConfigModal" class="modal-overlay" @click.self="showClaudeConfigModal = false">
-            <div class="modal">
-                <div class="modal-title">添加 Claude Code 配置</div>
+        <div v-if="showClaudeConfigModal" class="modal-overlay" @click.self="closeClaudeConfigModal">
+            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="add-claude-config-modal-title">
+                <div class="modal-title" id="add-claude-config-modal-title">添加 Claude Code 配置</div>
 
                 <div class="form-group">
                     <label class="form-label">配置名称</label>
@@ -172,8 +172,8 @@
 
         <!-- 编辑Claude配置模态框 -->
         <div v-if="showEditConfigModal" class="modal-overlay" @click.self="closeEditConfigModal">
-            <div class="modal">
-                <div class="modal-title">编辑 Claude Code 配置</div>
+            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-claude-config-modal-title">
+                <div class="modal-title" id="edit-claude-config-modal-title">编辑 Claude Code 配置</div>
 
                 <div class="form-group">
                     <label class="form-label">配置名称</label>

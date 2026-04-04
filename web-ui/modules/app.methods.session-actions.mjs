@@ -418,8 +418,8 @@ export function createSessionActionMethods(options = {}) {
                     sessionId: session.sessionId,
                     filePath: session.filePath
                 });
-                if (res.error) {
-                    this.showMessage(res.error, 'error');
+                if (!res || res.error) {
+                    this.showMessage((res && res.error) || '删除失败', 'error');
                     return;
                 }
                 this.removeSessionPin(session);
