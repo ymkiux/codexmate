@@ -1,0 +1,196 @@
+        <!-- 添加提供商模态框 -->
+        <div v-if="showAddModal" class="modal-overlay" @click.self="showAddModal = false">
+            <div class="modal">
+                <div class="modal-title">添加提供商</div>
+
+                <div class="form-group">
+                    <label class="form-label">名称</label>
+                    <input v-model="newProvider.name" class="form-input" placeholder="例如: myapi">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">API 端点</label>
+                    <input v-model="newProvider.url" class="form-input" placeholder="https://api.example.com/v1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">认证密钥</label>
+                    <input v-model="newProvider.key" class="form-input" placeholder="sk-...">
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-cancel" @click="closeAddModal">取消</button>
+                    <button class="btn btn-confirm" @click="addProvider">添加</button>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="showInstallModal" class="modal-overlay" @click.self="closeInstallModal">
+            <div class="modal">
+                <div class="modal-header">
+                    <div class="modal-title">安装 CLI</div>
+                </div>
+
+                <div class="list-row">
+                    <label class="form-label">包管理器</label>
+                    <select class="form-input" v-model="installPackageManager">
+                        <option value="npm">npm</option>
+                        <option value="pnpm">pnpm</option>
+                        <option value="bun">bun</option>
+                    </select>
+                    <label class="form-label">镜像源</label>
+                    <div class="install-action-tabs">
+                        <button class="btn-mini" :class="{ active: installRegistryPreset === 'default' }" @click="setInstallRegistryPreset('default')">官方</button>
+                        <button class="btn-mini" :class="{ active: installRegistryPreset === 'npmmirror' }" @click="setInstallRegistryPreset('npmmirror')">npmmirror</button>
+                        <button class="btn-mini" :class="{ active: installRegistryPreset === 'tencent' }" @click="setInstallRegistryPreset('tencent')">腾讯云</button>
+                        <button class="btn-mini" :class="{ active: installRegistryPreset === 'custom' }" @click="setInstallRegistryPreset('custom')">自定义</button>
+                    </div>
+                    <input
+                        v-if="installRegistryPreset === 'custom'"
+                        v-model="installRegistryCustom"
+                        class="form-input install-registry-input"
+                        placeholder="https://registry.example.com">
+                    <div class="form-hint install-registry-hint" v-if="installRegistryPreview">
+                        当前命令会附加：--registry={{ installRegistryPreview }}
+                    </div>
+                    <div class="form-hint install-registry-hint" v-else-if="installRegistryPreset === 'custom'">
+                        请输入完整 URL（含 http/https）后将自动附加到安装/升级命令。
+                    </div>
+                    <label class="form-label">操作</label>
+                    <div class="install-action-tabs">
+                        <button class="btn-mini" :class="{ active: installCommandAction === 'install' }" @click="setInstallCommandAction('install')">安装</button>
+                        <button class="btn-mini" :class="{ active: installCommandAction === 'update' }" @click="setInstallCommandAction('update')">升级</button>
+                        <button class="btn-mini" :class="{ active: installCommandAction === 'uninstall' }" @click="setInstallCommandAction('uninstall')">卸载</button>
+                    </div>
+                </div>
+
+                <div class="install-list">
+                    <div
+                        class="install-row"
+                        v-for="target in installTargetCards"
+                        :key="'install-command-' + target.id + '-' + installCommandAction">
+                        <div class="install-row-main">
+                            <div class="install-row-title">{{ target.name }}</div>
+                            <code class="install-command">{{ target.command }}</code>
+                        </div>
+                        <button class="btn-mini" :disabled="!target.command" @click="copyInstallCommand(target.command)">复制</button>
+                    </div>
+                </div>
+
+                <div class="install-help">
+                    <div class="form-label">常见失败自救</div>
+                    <ul class="install-help-list">
+                        <li v-for="tip in installTroubleshootingTips" :key="tip">{{ tip }}</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- 编辑提供商模态框 -->
+        <div v-if="showEditModal" class="modal-overlay" @click.self="closeEditModal">
+            <div class="modal">
+                <div class="modal-title">编辑提供商</div>
+
+                <div class="form-group">
+                    <label class="form-label">名称</label>
+                    <input v-model="editingProvider.name" class="form-input" placeholder="提供商名称" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">API 端点</label>
+                    <input v-model="editingProvider.url" class="form-input" placeholder="https://api.example.com/v1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">认证密钥</label>
+                    <input v-model="editingProvider.key" class="form-input" placeholder="留空则保持不变">
+                    <div class="form-hint">留空表示不修改密钥</div>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-cancel" @click="closeEditModal">取消</button>
+                    <button class="btn btn-confirm" @click="updateProvider">保存</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 添加模型模态框 -->
+        <div v-if="showModelModal" class="modal-overlay" @click.self="showModelModal = false">
+            <div class="modal">
+                <div class="modal-title">添加模型</div>
+
+                <div class="form-group">
+                    <label class="form-label">模型名称</label>
+                    <input v-model="newModelName" class="form-input" placeholder="例如: gpt-5">
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-cancel" @click="closeModelModal">取消</button>
+                    <button class="btn btn-confirm" @click="addModel">添加</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 模型列表模态框 -->
+        <div v-if="showModelListModal" class="modal-overlay" @click.self="showModelListModal = false">
+            <div class="modal">
+                <div class="modal-title">管理模型</div>
+
+                <div class="model-list">
+                    <div v-for="model in models" :key="model" class="model-item">
+                        <span>{{ model }}</span>
+                        <span class="btn-remove-model" @click="removeModel(model)">删除</span>
+                    </div>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-confirm" @click="showModelListModal = false">关闭</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 添加Claude配置模态框 -->
+        <div v-if="showClaudeConfigModal" class="modal-overlay" @click.self="showClaudeConfigModal = false">
+            <div class="modal">
+                <div class="modal-title">添加 Claude Code 配置</div>
+
+                <div class="form-group">
+                    <label class="form-label">配置名称</label>
+                    <input v-model="newClaudeConfig.name" class="form-input" placeholder="例如: 智谱GLM">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">API Key</label>
+                    <input v-model="newClaudeConfig.apiKey" class="form-input" placeholder="sk-ant-...">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Base URL</label>
+                    <input v-model="newClaudeConfig.baseUrl" class="form-input" placeholder="https://open.bigmodel.cn/api/anthropic">
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-cancel" @click="closeClaudeConfigModal">取消</button>
+                    <button class="btn btn-confirm" @click="addClaudeConfig">添加</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 编辑Claude配置模态框 -->
+        <div v-if="showEditConfigModal" class="modal-overlay" @click.self="closeEditConfigModal">
+            <div class="modal">
+                <div class="modal-title">编辑 Claude Code 配置</div>
+
+                <div class="form-group">
+                    <label class="form-label">配置名称</label>
+                    <input v-model="editingConfig.name" class="form-input" placeholder="配置名称" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">API Key</label>
+                    <input v-model="editingConfig.apiKey" class="form-input" placeholder="sk-ant-...">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Base URL</label>
+                    <input v-model="editingConfig.baseUrl" class="form-input" placeholder="https://open.bigmodel.cn/api/anthropic">
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-cancel" @click="closeEditConfigModal">取消</button>
+                    <button class="btn btn-confirm" @click="saveAndApplyConfig">保存并应用</button>
+                </div>
+            </div>
+        </div>

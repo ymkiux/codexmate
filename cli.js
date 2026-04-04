@@ -62,6 +62,12 @@ const {
     validateWorkflowDefinition,
     executeWorkflowDefinition
 } = require('./lib/workflow-engine');
+const {
+    readBundledWebUiCss,
+    readBundledWebUiHtml,
+    readExecutableBundledJavaScriptModule,
+    readExecutableBundledWebUiScript
+} = require('./web-ui/source-bundle.cjs');
 
 const DEFAULT_WEB_PORT = 3737;
 const DEFAULT_WEB_HOST = '0.0.0.0';
@@ -9945,10 +9951,11 @@ function formatHostForUrl(host) {
     return value;
 }
 
+// #region watchPathsForRestart
 function watchPathsForRestart(targets, onChange) {
-    const disposers = [];
     const debounceMs = 300;
     let timer = null;
+    const watcherEntries = new Map();
 
     const trigger = (info) => {
         if (timer) clearTimeout(timer);
@@ -9958,35 +9965,133 @@ function watchPathsForRestart(targets, onChange) {
         }, debounceMs);
     };
 
-    const addWatcher = (target, recursive) => {
+    const closeWatcher = (watchKey) => {
+        const entry = watcherEntries.get(watchKey);
+        if (!entry) return;
+        watcherEntries.delete(watchKey);
+        try {
+            entry.watcher.close();
+        } catch (_) {}
+    };
+
+    const listDirectoryTree = (rootDir) => {
+        const queue = [rootDir];
+        const directories = [];
+        const seen = new Set();
+        while (queue.length) {
+            const current = queue.shift();
+            if (!current || seen.has(current) || !fs.existsSync(current)) {
+                continue;
+            }
+            seen.add(current);
+            let stat = null;
+            try {
+                stat = fs.statSync(current);
+            } catch (_) {
+                continue;
+            }
+            if (!stat || !stat.isDirectory()) {
+                continue;
+            }
+            directories.push(current);
+            let entries = [];
+            try {
+                entries = fs.readdirSync(current, { withFileTypes: true });
+            } catch (_) {
+                continue;
+            }
+            for (const entry of entries) {
+                if (entry && typeof entry.isDirectory === 'function' && entry.isDirectory()) {
+                    queue.push(path.join(current, entry.name));
+                }
+            }
+        }
+        return directories;
+    };
+
+    const isSameOrNestedPath = (candidate, rootDir) => {
+        return candidate === rootDir || candidate.startsWith(`${rootDir}${path.sep}`);
+    };
+
+    const addWatcher = (target, recursive, isDirectory = false) => {
         if (!fs.existsSync(target)) return;
+        const watchKey = `${recursive ? 'recursive' : 'plain'}:${target}`;
+        if (watcherEntries.has(watchKey)) {
+            return true;
+        }
         try {
             const watcher = fs.watch(target, { recursive }, (eventType, filename) => {
+                if (isDirectory && !recursive && eventType === 'rename') {
+                    syncDirectoryTree(target);
+                }
                 if (!filename) return;
                 const lower = filename.toLowerCase();
                 if (!(/\.(html|js|mjs|css)$/.test(lower))) return;
                 trigger({ target, eventType, filename });
             });
-            disposers.push(() => watcher.close());
+            watcherEntries.set(watchKey, {
+                watcher,
+                target,
+                recursive,
+                isDirectory
+            });
             return true;
         } catch (e) {
             return false;
         }
     };
 
+    const syncDirectoryTree = (rootDir) => {
+        const directories = listDirectoryTree(rootDir);
+        const existingDirectorySet = new Set(directories);
+        for (const [watchKey, entry] of Array.from(watcherEntries.entries())) {
+            if (!entry.isDirectory || entry.recursive) {
+                continue;
+            }
+            if (!isSameOrNestedPath(entry.target, rootDir)) {
+                continue;
+            }
+            if (!existingDirectorySet.has(entry.target)) {
+                closeWatcher(watchKey);
+            }
+        }
+        for (const directory of directories) {
+            addWatcher(directory, false, true);
+        }
+    };
+
     for (const target of targets) {
-        const ok = addWatcher(target, true);
+        if (!fs.existsSync(target)) continue;
+        let stat = null;
+        try {
+            stat = fs.statSync(target);
+        } catch (_) {
+            continue;
+        }
+        if (stat && stat.isDirectory()) {
+            const ok = addWatcher(target, true, true);
+            if (!ok) {
+                syncDirectoryTree(target);
+            }
+            continue;
+        }
+        const ok = addWatcher(target, true, false);
         if (!ok) {
-            addWatcher(target, false);
+            addWatcher(target, false, false);
         }
     }
 
     return () => {
-        for (const dispose of disposers) {
-            try { dispose(); } catch (_) {}
+        if (timer) {
+            clearTimeout(timer);
+            timer = null;
+        }
+        for (const watchKey of Array.from(watcherEntries.keys())) {
+            closeWatcher(watchKey);
         }
     };
 }
+// #endregion watchPathsForRestart
 
 function writeJsonResponse(res, statusCode, payload) {
     const body = JSON.stringify(payload, null, 2);
@@ -10130,6 +10235,32 @@ async function handleImportSkillsZipUpload(req, res, options = {}) {
         writeJsonResponse(res, 400, { error: message });
     }
 }
+
+const PUBLIC_WEB_UI_DYNAMIC_ASSETS = new Map([
+    ['app.js', {
+        mime: 'application/javascript; charset=utf-8',
+        reader: readExecutableBundledWebUiScript
+    }],
+    ['index.html', {
+        mime: 'text/html; charset=utf-8',
+        reader: readBundledWebUiHtml
+    }],
+    ['logic.mjs', {
+        mime: 'application/javascript; charset=utf-8',
+        reader: readExecutableBundledJavaScriptModule
+    }],
+    ['styles.css', {
+        mime: 'text/css; charset=utf-8',
+        reader: readBundledWebUiCss
+    }]
+]);
+
+const PUBLIC_WEB_UI_STATIC_ASSETS = new Set([
+    'modules/config-mode.computed.mjs',
+    'modules/skills.computed.mjs',
+    'modules/skills.methods.mjs',
+    'session-helpers.mjs'
+]);
 
 function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser }) {
     const connections = new Set();
@@ -10562,6 +10693,10 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                     res.end(errorBody, 'utf-8');
                 }
             });
+        } else if (requestPath === '/web-ui') {
+            const html = readBundledWebUiHtml(htmlPath);
+            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+            res.end(html);
         } else if (requestPath.startsWith('/web-ui/')) {
             const normalized = path.normalize(requestPath).replace(/^([\\.\\/])+/, '');
             const filePath = path.join(__dirname, normalized);
@@ -10570,7 +10705,19 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                 res.end('Forbidden');
                 return;
             }
+            const relativePath = path.relative(webDir, filePath).replace(/\\/g, '/');
             if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+                res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+                res.end('Not Found');
+                return;
+            }
+            const dynamicAsset = PUBLIC_WEB_UI_DYNAMIC_ASSETS.get(relativePath);
+            if (dynamicAsset) {
+                res.writeHead(200, { 'Content-Type': dynamicAsset.mime });
+                res.end(dynamicAsset.reader(filePath), 'utf-8');
+                return;
+            }
+            if (!PUBLIC_WEB_UI_STATIC_ASSETS.has(relativePath)) {
                 res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
                 res.end('Not Found');
                 return;
@@ -10642,7 +10789,7 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
             res.writeHead(200, { 'Content-Type': mime });
             fs.createReadStream(filePath).pipe(res);
         } else {
-            const html = fs.readFileSync(htmlPath, 'utf-8');
+            const html = readBundledWebUiHtml(htmlPath);
             res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
             res.end(html);
         }

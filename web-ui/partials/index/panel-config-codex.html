@@ -1,0 +1,248 @@
+                    <!-- Provider 配置模式（Codex） -->
+                    <div
+                        v-show="mainTab === 'config' && isProviderConfigMode"
+                        class="mode-content mode-cards"
+                        id="panel-config-provider"
+                        role="tabpanel"
+                        :aria-labelledby="'tab-config-' + configMode">
+                <!-- 添加提供商按钮 -->
+                <button class="btn-add" @click="showAddModal = true" v-if="!loading && !initError">
+                    <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10 4v12M4 10h12"/>
+                    </svg>
+                    添加提供商
+                </button>
+
+                <!-- 模型选择器 -->
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">模型</span>
+                        <div class="selector-actions">
+                            <button class="btn-icon" @click="showModelModal = true" title="添加模型" v-if="modelsSource === 'legacy'">+</button>
+                            <button class="btn-icon" @click="showModelListModal = true" title="管理模型" v-if="modelsSource === 'legacy'">≡</button>
+                        </div>
+                    </div>
+                    <select
+                        v-if="codexModelsLoading || modelsSource === 'remote'"
+                        class="model-select"
+                        v-model="currentModel"
+                        @change="onModelChange"
+                        :disabled="codexModelsLoading"
+                    >
+                        <option v-if="codexModelsLoading" value="">加载中...</option>
+                        <option v-else v-for="model in models" :key="model" :value="model">{{ model }}</option>
+                    </select>
+                    <input
+                        v-if="!codexModelsLoading && (modelsSource !== 'remote' || !modelsHasCurrent)"
+                        class="model-input"
+                        v-model="currentModel"
+                        @blur="onModelChange"
+                        :placeholder="activeProviderModelPlaceholder"
+                    >
+                    <div class="config-template-hint" v-if="modelsSource === 'unlimited'">
+                        当前提供商未提供模型列表，视为不限。模型可手动输入。
+                    </div>
+                    <div class="config-template-hint" v-if="modelsSource === 'error'">
+                        模型列表获取失败，请检查接口或手动输入。
+                    </div>
+                    <div class="config-template-hint" v-if="modelsSource === 'remote' && !modelsHasCurrent">
+                        {{ isCodexConfigMode ? '当前模型不在接口列表中，请手动输入或在模板中调整。' : '当前模型不在接口列表中，请手动输入。' }}
+                    </div>
+                    <div class="config-template-hint" v-if="isCodexConfigMode">
+                        Codex 配置需先改模板，再手动应用。
+                    </div>
+                    <div class="config-template-hint" v-else-if="activeProviderBridgeHint">
+                        {{ activeProviderBridgeHint }} 模板仅在 Codex 模式下可编辑。
+                    </div>
+                    <button class="btn-tool btn-template-editor" v-if="isCodexConfigMode" @click="openConfigTemplateEditor" :disabled="loading || !!initError">
+                        打开 Config 模板编辑器
+                    </button>
+                </div>
+
+                <template v-if="isCodexConfigMode">
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">服务档位</span>
+                    </div>
+                    <select class="model-select" v-model="serviceTier" @change="onServiceTierChange">
+                        <option value="fast">fast（默认）</option>
+                        <option value="standard">standard</option>
+                    </select>
+                    <div class="config-template-hint">
+                        仅 fast 会写入 <code>service_tier</code>。
+                    </div>
+                </div>
+
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">推理努力</span>
+                    </div>
+                    <select class="model-select" v-model="modelReasoningEffort" @change="onReasoningEffortChange">
+                        <option value="high">high（默认）</option>
+                        <option value="medium">medium</option>
+                        <option value="low">low</option>
+                        <option value="xhigh">xhigh</option>
+                    </select>
+                    <div class="config-template-hint">
+                        控制模型的推理深度，high 会更深入思考。
+                    </div>
+                </div>
+
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">上下文压缩阈值</span>
+                        <div class="selector-actions">
+                            <button
+                                class="btn-tool btn-tool-compact"
+                                @click="resetCodexContextBudgetDefaults"
+                                :disabled="loading || !!initError || codexApplying">
+                                重置默认值
+                            </button>
+                        </div>
+                    </div>
+                    <div class="codex-config-grid">
+                        <div class="form-group codex-config-field">
+                            <label class="form-label" for="codex-model-context-window">model_context_window</label>
+                            <input
+                                id="codex-model-context-window"
+                                v-model="modelContextWindowInput"
+                                class="form-input"
+                                inputmode="numeric"
+                                autocomplete="off"
+                                placeholder="例如: 190000"
+                                @focus="editingCodexBudgetField = 'modelContextWindowInput'"
+                                @input="sanitizePositiveIntegerDraft('modelContextWindowInput')"
+                                @blur="onModelContextWindowBlur"
+                                @keydown.enter.prevent="onModelContextWindowBlur">
+                            <div class="form-hint">控制上下文窗口上限，默认 190000。</div>
+                        </div>
+                        <div class="form-group codex-config-field">
+                            <label class="form-label" for="codex-model-auto-compact-token-limit">model_auto_compact_token_limit</label>
+                            <input
+                                id="codex-model-auto-compact-token-limit"
+                                v-model="modelAutoCompactTokenLimitInput"
+                                class="form-input"
+                                inputmode="numeric"
+                                autocomplete="off"
+                                placeholder="例如: 185000"
+                                @focus="editingCodexBudgetField = 'modelAutoCompactTokenLimitInput'"
+                                @input="sanitizePositiveIntegerDraft('modelAutoCompactTokenLimitInput')"
+                                @blur="onModelAutoCompactTokenLimitBlur"
+                                @keydown.enter.prevent="onModelAutoCompactTokenLimitBlur">
+                            <div class="form-hint">控制自动压缩触发阈值，默认 185000。</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">AGENTS.md</span>
+                    </div>
+                    <button class="btn-tool" @click="openAgentsEditor" :disabled="loading || !!initError || agentsLoading">
+                        {{ agentsLoading ? '加载中...' : '打开 AGENTS.md 编辑器' }}
+                    </button>
+                </div>
+
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">Skills 管理</span>
+                    </div>
+                    <div class="config-template-hint skills-hint-line">默认打开 Codex skills 管理；市场页已支持切换到 Claude Code 并查看本地概览与导入来源。</div>
+                    <button class="btn-tool" @click="openSkillsManager({ targetApp: 'codex' })" :disabled="loading || !!initError || skillsLoading || skillsDeleting || skillsScanningImports || skillsImporting || skillsZipImporting || skillsExporting">
+                        {{ skillsLoading ? '加载中...' : '打开 Skills 管理' }}
+                    </button>
+                </div>
+
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">配置维护</span>
+                    </div>
+                    <div class="config-template-hint">备份当前 config.toml 后写入默认配置。</div>
+                    <button class="btn-tool" @click="resetConfig" :disabled="resetConfigLoading || loading || !!initError">
+                        {{ resetConfigLoading ? '重装中...' : '一键重装配置' }}
+                    </button>
+                </div>
+
+                </template>
+
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">配置健康检查</span>
+                    </div>
+                    <button class="btn-tool" @click="runHealthCheck" :disabled="healthCheckLoading || loading || !!initError">
+                        {{ healthCheckLoading ? '检查中...' : '运行检查' }}
+                    </button>
+                </div>
+
+                <div v-if="!loading && !initError" class="card-list">
+                    <div v-for="provider in displayProvidersList" :key="provider.name"
+                         :class="['card', { active: displayCurrentProvider === provider.name }]"
+                         @click="switchProvider(provider.name)">
+                        <div class="card-leading">
+                            <div class="card-icon">{{ provider.name.charAt(0).toUpperCase() }}</div>
+                            <div class="card-content">
+                                <div class="card-title">
+                                    <span>{{ provider.name }}</span>
+                                    <span v-if="provider.readOnly" class="provider-readonly-badge">系统</span>
+                                </div>
+                                <div class="card-subtitle">
+                                    {{ provider.url || '未设置 URL' }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-trailing">
+                            <span :class="['pill', providerPillConfigured(provider) ? 'configured' : 'empty']">
+                                {{ providerPillText(provider) }}
+                            </span>
+                            <span v-if="speedResults[provider.name]" :class="['latency', speedResults[provider.name].ok ? 'ok' : 'error']">
+                                {{ formatLatency(speedResults[provider.name]) }}
+                            </span>
+                            <div class="card-actions" @click.stop>
+                                <button class="card-action-btn" :class="{ loading: speedLoading[provider.name] }" @click="runSpeedTest(provider.name)" title="Speed Test">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M13 2L3 14h7l-1 8 12-14h-7l-1-6z"/>
+                                    </svg>
+                                </button>
+                                <button
+                                    v-if="!provider.readOnly"
+                                    class="card-action-btn"
+                                    :class="{ loading: providerShareLoading[provider.name] }"
+                                    disabled
+                                    @click="copyProviderShareCommand(provider)"
+                                    title="分享导入命令（暂时禁用）"
+                                    aria-label="Share import command">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/>
+                                        <path d="M16 6l-4-4-4 4"/>
+                                        <path d="M12 2v14"/>
+                                    </svg>
+                                </button>
+                                <button
+                                    v-if="!provider.readOnly"
+                                    class="card-action-btn"
+                                    :class="{ disabled: !shouldShowProviderEdit(provider) }"
+                                    :disabled="!shouldShowProviderEdit(provider)"
+                                    @click="openEditModal(provider)"
+                                    :title="shouldShowProviderEdit(provider) ? '编辑' : '不可编辑'">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                    </svg>
+                                </button>
+                                <button
+                                    v-if="!provider.readOnly"
+                                    class="card-action-btn delete"
+                                    :class="{ disabled: !shouldShowProviderDelete(provider) }"
+                                    :disabled="!shouldShowProviderDelete(provider)"
+                                    @click="deleteProvider(provider.name)"
+                                    :title="shouldShowProviderDelete(provider) ? '删除' : '不可删除'">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M3 6h18"/>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>

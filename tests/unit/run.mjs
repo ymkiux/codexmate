@@ -17,16 +17,19 @@ await import(pathToFileURL(path.join(__dirname, 'skills-market-runtime.test.mjs'
 await import(pathToFileURL(path.join(__dirname, 'readme-docs-consistency.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'config-tabs-ui.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'compact-layout-ui.test.mjs')));
+await import(pathToFileURL(path.join(__dirname, 'web-ui-source-bundle.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'agents-diff-ui.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'text-diff.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'claude-settings-sync.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'unzip-ext.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'provider-share-command.test.mjs')));
+await import(pathToFileURL(path.join(__dirname, 'provider-switch-regression.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'codex-proxy-options.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'coderabbit-workflows.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'session-tab-switch-performance.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'session-trash-state.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'web-ui-restart.test.mjs')));
+await import(pathToFileURL(path.join(__dirname, 'web-ui-behavior-parity.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'web-run-host.test.mjs')));
 
 let failures = 0;

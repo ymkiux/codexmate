@@ -1,19 +1,16 @@
 ﻿import assert from 'assert';
-import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import {
+    readBundledWebUiCss,
+    readBundledWebUiHtml,
+    readBundledWebUiScript,
+    readProjectFile
+} from './helpers/web-ui-source.mjs';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const appPath = path.join(__dirname, '..', '..', 'web-ui', 'app.js');
-const cliPath = path.join(__dirname, '..', '..', 'cli.js');
-const indexHtmlPath = path.join(__dirname, '..', '..', 'web-ui', 'index.html');
-const stylesPath = path.join(__dirname, '..', '..', 'web-ui', 'styles.css');
-const appSource = fs.readFileSync(appPath, 'utf-8');
-const cliSource = fs.readFileSync(cliPath, 'utf-8');
-const indexHtmlSource = fs.readFileSync(indexHtmlPath, 'utf-8');
-const stylesSource = fs.readFileSync(stylesPath, 'utf-8');
+const appSource = readBundledWebUiScript();
+const cliSource = readProjectFile('cli.js');
+const indexHtmlSource = readBundledWebUiHtml();
+const stylesSource = readBundledWebUiCss();
 
 function escapeRegExp(value) {
     return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -663,7 +660,7 @@ test('loadSessionTrash and loadSessionTrashCount keep independent stale-response
         extractMethodAsFunction(appSource, 'loadSessionTrash'),
         'loadSessionTrash',
         {
-            SESSION_TRASH_LIST_LIMIT: 50,
+            sessionTrashListLimit: 50,
             api
         }
     );
@@ -763,7 +760,7 @@ test('loadSessionTrash marks latest failures as retryable and clears the failure
     let callCount = 0;
     const loadSessionTrashSource = extractMethodAsFunction(appSource, 'loadSessionTrash');
     const loadSessionTrash = instantiateFunction(loadSessionTrashSource, 'loadSessionTrash', {
-        SESSION_TRASH_LIST_LIMIT: 50,
+        sessionTrashListLimit: 50,
         api: async () => {
             callCount += 1;
             if (callCount === 1) {
@@ -1742,8 +1739,8 @@ test('deleteSession prefers authoritative trash totalCount from the backend resp
 test('prependSessionTrashItem prefers authoritative trash totalCount when provided', () => {
     const prependSessionTrashItemSource = extractMethodAsFunction(appSource, 'prependSessionTrashItem');
     const prependSessionTrashItem = instantiateFunction(prependSessionTrashItemSource, 'prependSessionTrashItem', {
-        SESSION_TRASH_LIST_LIMIT: 500,
-        SESSION_TRASH_PAGE_SIZE: 200
+        sessionTrashListLimit: 500,
+        sessionTrashPageSize: 200
     });
 
     const context = {
@@ -1909,7 +1906,7 @@ test('loadSessionTrash replays the latest queued refresh after an in-flight requ
     const pendingResponses = [];
     const apiCalls = [];
     const loadSessionTrash = instantiateFunction(loadSessionTrashSource, 'loadSessionTrash', {
-        SESSION_TRASH_LIST_LIMIT: 500,
+        sessionTrashListLimit: 500,
         api: async (action, params) => await new Promise((resolve) => {
             apiCalls.push({ action, params });
             pendingResponses.push(resolve);

@@ -1,17 +1,13 @@
 import assert from 'assert';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
+import {
+    readBundledWebUiScript,
+    readProjectFile
+} from './helpers/web-ui-source.mjs';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
-const fs = require('fs');
-
-const cliPath = path.join(__dirname, '..', '..', 'cli.js');
-const appPath = path.join(__dirname, '..', '..', 'web-ui', 'app.js');
-const cliSource = fs.readFileSync(cliPath, 'utf-8');
-const appSource = fs.readFileSync(appPath, 'utf-8');
+const cliSource = readProjectFile('cli.js');
+const appSource = readBundledWebUiScript();
 
 // NOTE: This extractor uses naive brace counting for speed in unit tests.
 // It assumes target snippets do not contain confusing braces in strings,
@@ -536,8 +532,8 @@ test('applyCodexConfigDirect queues the latest pending budget update while an ap
     const templateRequests = [];
     const appliedTemplates = [];
     const applyCodexConfigDirect = instantiateFunction(applyCodexConfigDirectSource, 'applyCodexConfigDirect', {
-        DEFAULT_MODEL_CONTEXT_WINDOW: 190000,
-        DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT: 185000,
+        defaultModelContextWindow: 190000,
+        defaultModelAutoCompactTokenLimit: 185000,
         api: async (action, params) => {
             if (action === 'get-config-template') {
                 templateRequests.push(params);
@@ -557,7 +553,7 @@ test('applyCodexConfigDirect queues the latest pending budget update while an ap
     });
 
     const messages = [];
-    let loadAllCalls = 0;
+    const loadAllCalls = [];
     const context = {
         codexApplying: false,
         _pendingCodexApplyOptions: null,
@@ -581,8 +577,8 @@ test('applyCodexConfigDirect queues the latest pending budget update while an ap
         showMessage(message, type) {
             messages.push({ message, type });
         },
-        async loadAll() {
-            loadAllCalls += 1;
+        async loadAll(refreshOptions = {}) {
+            loadAllCalls.push(refreshOptions);
         }
     };
     context.applyCodexConfigDirect = applyCodexConfigDirect;
@@ -611,7 +607,10 @@ test('applyCodexConfigDirect queues the latest pending budget update while an ap
     assert.strictEqual(appliedTemplates.length, 2);
     assert.strictEqual(appliedTemplates[0].template, 'template-1');
     assert.strictEqual(appliedTemplates[1].template, 'template-2');
-    assert.strictEqual(loadAllCalls, 2);
+    assert.deepStrictEqual(loadAllCalls, [
+        { preserveLoading: true },
+        { preserveLoading: true }
+    ]);
     assert.strictEqual(context._pendingCodexApplyOptions, null);
     assert.strictEqual(context.codexApplying, false);
     assert.deepStrictEqual(messages, []);
@@ -620,11 +619,11 @@ test('applyCodexConfigDirect queues the latest pending budget update while an ap
 test('loadAll preserves an unsaved codex budget draft while refreshing the sibling value', async () => {
     const loadAllSource = extractBlockBySignature(
         appSource,
-        'async loadAll() {'
+        'async loadAll(options = {}) {'
     ).replace(/^async loadAll/, 'async function loadAll');
     const loadAll = instantiateFunction(loadAllSource, 'loadAll', {
-        DEFAULT_MODEL_CONTEXT_WINDOW: 190000,
-        DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT: 185000,
+        defaultModelContextWindow: 190000,
+        defaultModelAutoCompactTokenLimit: 185000,
         api: async (action) => {
             if (action === 'status') {
                 return {
@@ -681,14 +680,91 @@ test('loadAll preserves an unsaved codex budget draft while refreshing the sibli
     assert.strictEqual(context.modelAutoCompactTokenLimitInput, '180000');
 });
 
+test('loadAll can refresh in background without flipping the global loading state', async () => {
+    const loadAllSource = extractBlockBySignature(
+        appSource,
+        'async loadAll(options = {}) {'
+    ).replace(/^async loadAll/, 'async function loadAll');
+    const loadAll = instantiateFunction(loadAllSource, 'loadAll', {
+        defaultModelContextWindow: 190000,
+        defaultModelAutoCompactTokenLimit: 185000,
+        api: async (action) => {
+            if (action === 'status') {
+                return {
+                    provider: 'alpha',
+                    model: 'alpha-model',
+                    serviceTier: 'fast',
+                    modelReasoningEffort: 'high',
+                    modelContextWindow: 200000,
+                    modelAutoCompactTokenLimit: 180000,
+                    configReady: true,
+                    initNotice: ''
+                };
+            }
+            if (action === 'list') {
+                return {
+                    providers: [{ name: 'alpha', url: 'https://api.example.com/v1', hasKey: true }]
+                };
+            }
+            throw new Error(`Unexpected api action: ${action}`);
+        }
+    });
+
+    let loadingState = false;
+    const loadingTransitions = [];
+    const context = {
+        get loading() {
+            return loadingState;
+        },
+        set loading(value) {
+            loadingTransitions.push(value);
+            loadingState = value;
+        },
+        initError: 'stale',
+        currentProvider: 'alpha',
+        currentModel: 'alpha-model',
+        serviceTier: 'fast',
+        modelReasoningEffort: 'high',
+        modelContextWindowInput: '190000',
+        modelAutoCompactTokenLimitInput: '185000',
+        editingCodexBudgetField: '',
+        providersList: [],
+        normalizePositiveIntegerInput(value, label, fallback = '') {
+            const raw = value === undefined || value === null || value === ''
+                ? String(fallback || '')
+                : String(value);
+            const text = raw.trim();
+            const numeric = Number.parseInt(text, 10);
+            if (!Number.isFinite(numeric) || numeric <= 0) {
+                return { ok: false, error: `${label} invalid` };
+            }
+            return { ok: true, value: numeric, text: String(numeric) };
+        },
+        showMessage() {},
+        maybeShowStarPrompt() {},
+        async loadModelsForProvider() {},
+        async loadCodexAuthProfiles() {}
+    };
+
+    await loadAll.call(context, { preserveLoading: true });
+
+    assert.deepStrictEqual(loadingTransitions, []);
+    assert.strictEqual(loadingState, false);
+    assert.strictEqual(context.currentProvider, 'alpha');
+    assert.strictEqual(context.currentModel, 'alpha-model');
+    assert.strictEqual(context.modelContextWindowInput, '200000');
+    assert.strictEqual(context.modelAutoCompactTokenLimitInput, '180000');
+    assert.strictEqual(context.initError, '');
+});
+
 test('applyCodexConfigDirect preserves a focused sibling budget draft across the loadAll refresh', async () => {
     const loadAllSource = extractBlockBySignature(
         appSource,
-        'async loadAll() {'
+        'async loadAll(options = {}) {'
     ).replace(/^async loadAll/, 'async function loadAll');
     const loadAll = instantiateFunction(loadAllSource, 'loadAll', {
-        DEFAULT_MODEL_CONTEXT_WINDOW: 190000,
-        DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT: 185000,
+        defaultModelContextWindow: 190000,
+        defaultModelAutoCompactTokenLimit: 185000,
         api: async (action) => {
             if (action === 'status') {
                 return {
@@ -719,8 +795,8 @@ test('applyCodexConfigDirect preserves a focused sibling budget draft across the
         applyCodexConfigDirectSource,
         'applyCodexConfigDirect',
         {
-            DEFAULT_MODEL_CONTEXT_WINDOW: 190000,
-            DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT: 185000,
+            defaultModelContextWindow: 190000,
+            defaultModelAutoCompactTokenLimit: 185000,
             api: async (action, params) => {
                 if (action === 'get-config-template') {
                     return await new Promise((resolve) => {
@@ -792,8 +868,8 @@ test('applyCodexConfigDirect surfaces backend validation details from direct app
     ).replace(/^async applyCodexConfigDirect/, 'async function applyCodexConfigDirect');
     const messages = [];
     const applyCodexConfigDirect = instantiateFunction(applyCodexConfigDirectSource, 'applyCodexConfigDirect', {
-        DEFAULT_MODEL_CONTEXT_WINDOW: 190000,
-        DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT: 185000,
+        defaultModelContextWindow: 190000,
+        defaultModelAutoCompactTokenLimit: 185000,
         api: async (action) => {
             if (action === 'get-config-template') {
                 return { error: '模板中的 model_context_window 必须是正整数' };
