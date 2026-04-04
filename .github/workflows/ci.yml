@@ -26,5 +26,5 @@ jobs:
         run: npm run lint --if-present
       - name: Test
         env:
-          WEB_UI_PARITY_BASE_REF: ${{ github.event_name == 'pull_request' && 'HEAD^2^' || 'HEAD^' }}
+          WEB_UI_PARITY_BASE_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
         run: npm run test --if-present

@@ -320,6 +320,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     const allowedExtraCurrentKeys = [
         'claudeModelsRequestSeq',
         'codexModelsRequestSeq',
+        'providerSwitchDisplayTarget',
         'sessionPathRequestSeqMap'
     ];
     const allowedMissingCurrentKeys = ['sessionPathRequestSeq'];
