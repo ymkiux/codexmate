@@ -177,7 +177,12 @@
                 <div v-if="!loading && !initError" class="card-list">
                     <div v-for="provider in displayProvidersList" :key="provider.name"
                          :class="['card', { active: displayCurrentProvider === provider.name }]"
-                         @click="switchProvider(provider.name)">
+                         @click="switchProvider(provider.name)"
+                         @keydown.enter.self.prevent="switchProvider(provider.name)"
+                         @keydown.space.self.prevent="switchProvider(provider.name)"
+                         tabindex="0"
+                         role="button"
+                         :aria-current="displayCurrentProvider === provider.name ? 'true' : null">
                         <div class="card-leading">
                             <div class="card-icon">{{ provider.name.charAt(0).toUpperCase() }}</div>
                             <div class="card-content">

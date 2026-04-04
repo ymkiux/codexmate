@@ -125,6 +125,10 @@ test('config template keeps expected config tabs in top and side navigation', ()
         sessionsPanel,
         /:class="\[[\s\S]*'session-item'[\s\S]*@click="selectSession\(session\)"[\s\S]*@keydown\.enter\.self\.prevent="selectSession\(session\)"[\s\S]*@keydown\.space\.self\.prevent="selectSession\(session\)"[\s\S]*tabindex="0"[\s\S]*role="button"[\s\S]*:aria-current="activeSessionExportKey === getSessionExportKey\(session\) \? 'true' : null"/
     );
+    assert.match(
+        html,
+        /:class="\['card', \{ active: displayCurrentProvider === provider\.name \}\]"[\s\S]*@click="switchProvider\(provider\.name\)"[\s\S]*@keydown\.enter\.self\.prevent="switchProvider\(provider\.name\)"[\s\S]*@keydown\.space\.self\.prevent="switchProvider\(provider\.name\)"[\s\S]*tabindex="0"[\s\S]*role="button"[\s\S]*:aria-current="displayCurrentProvider === provider\.name \? 'true' : null"/
+    );
     assert.match(html, /class="session-item-copy session-item-pin"/);
     assert.match(html, /class="pin-icon"/);
     assert.match(html, /:aria-selected="mainTab === 'sessions'"/);
@@ -154,7 +158,9 @@ test('config template keeps expected config tabs in top and side navigation', ()
         assert.match(modalsBasic, new RegExp(`aria-labelledby="${modalTitleId}"`));
         assert.match(modalsBasic, new RegExp(`id="${modalTitleId}"`));
     }
-    assert.doesNotMatch(modalsBasic, /type="password"/);
+    assert.match(modalsBasic, /<input v-model="newProvider\.key" class="form-input" type="password" placeholder="sk-\.\.\.">/);
+    assert.match(modalsBasic, /<input v-model="editingProvider\.key" class="form-input" type="password" placeholder="留空则保持不变">/);
+    assert.strictEqual([...modalsBasic.matchAll(/type="password"/g)].length, 2);
     assert.match(modalsBasic, /<button type="button" class="btn-remove-model" @click="removeModel\(model\)">删除<\/button>/);
     assert.doesNotMatch(modalsBasic, /<span class="btn-remove-model" @click="removeModel\(model\)">删除<\/span>/);
 });
