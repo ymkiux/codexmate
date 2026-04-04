@@ -339,6 +339,9 @@ export function createAgentsMethods(options = {}) {
 
         async closeAgentsModal(options = {}) {
             const force = !!(options && options.force);
+            if (!force && (this.agentsSaving || this.agentsDiffLoading)) {
+                return;
+            }
             const shouldConfirmClose = !force
                 && this.hasPendingAgentsDraft();
             if (shouldConfirmClose) {

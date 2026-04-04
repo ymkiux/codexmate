@@ -8,6 +8,8 @@ import {
 
 test('config template keeps expected config tabs in top and side navigation', () => {
     const html = readBundledWebUiHtml();
+    const modalsBasic = readProjectFile('web-ui/partials/index/modals-basic.html');
+    const sessionsPanel = readProjectFile('web-ui/partials/index/panel-sessions.html');
     const topTabModes = [...html.matchAll(/id="tab-config-([a-z]+)"/g)]
         .map((match) => match[1]);
     const sideTabModes = [...html.matchAll(/id="side-tab-config-([a-z]+)"/g)]
@@ -119,6 +121,10 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /isMainTabNavActive\('market'\)/);
     assert.match(html, /isConfigModeNavActive\('codex'\)/);
     assert.match(html, /:aria-pressed="isSessionPinned\(session\)"/);
+    assert.match(
+        sessionsPanel,
+        /:class="\[[\s\S]*'session-item'[\s\S]*@click="selectSession\(session\)"[\s\S]*@keydown\.enter\.self\.prevent="selectSession\(session\)"[\s\S]*@keydown\.space\.self\.prevent="selectSession\(session\)"[\s\S]*tabindex="0"[\s\S]*role="button"[\s\S]*:aria-current="activeSessionExportKey === getSessionExportKey\(session\) \? 'true' : null"/
+    );
     assert.match(html, /class="session-item-copy session-item-pin"/);
     assert.match(html, /class="pin-icon"/);
     assert.match(html, /:aria-selected="mainTab === 'sessions'"/);
@@ -133,6 +139,24 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(providerShareButton[0], /disabled/);
     assert.match(providerShareButton[0], /title="分享导入命令（暂时禁用）"/);
     assert.match(html, /<button class="card-action-btn"[^>]*@click="copyClaudeShareCommand\(name\)"[^>]*disabled[^>]*>/);
+    assert.match(modalsBasic, /<div v-if="showAddModal" class="modal-overlay" @click\.self="closeAddModal">/);
+    assert.match(modalsBasic, /<div v-if="showModelModal" class="modal-overlay" @click\.self="closeModelModal">/);
+    assert.match(modalsBasic, /<div v-if="showClaudeConfigModal" class="modal-overlay" @click\.self="closeClaudeConfigModal">/);
+    for (const modalTitleId of [
+        'add-provider-modal-title',
+        'install-cli-modal-title',
+        'edit-provider-modal-title',
+        'add-model-modal-title',
+        'manage-models-modal-title',
+        'add-claude-config-modal-title',
+        'edit-claude-config-modal-title'
+    ]) {
+        assert.match(modalsBasic, new RegExp(`aria-labelledby="${modalTitleId}"`));
+        assert.match(modalsBasic, new RegExp(`id="${modalTitleId}"`));
+    }
+    assert.doesNotMatch(modalsBasic, /type="password"/);
+    assert.match(modalsBasic, /<button type="button" class="btn-remove-model" @click="removeModel\(model\)">删除<\/button>/);
+    assert.doesNotMatch(modalsBasic, /<span class="btn-remove-model" @click="removeModel\(model\)">删除<\/span>/);
 });
 
 test('web ui script defines provider mode metadata for codex only', () => {
@@ -291,6 +315,7 @@ test('trash item styles stay aligned with session card layout and keep mobile us
 
     assert.match(styles, /\.session-source\s*\{/);
     assert.match(styles, /\.trash-item\.session-item\s*\{[\s\S]*height:\s*auto;/);
+    assert.match(styles, /\.session-item:focus-visible\s*\{[\s\S]*outline:\s*3px solid rgba\(201,\s*94,\s*75,\s*0\.25\);[\s\S]*outline-offset:\s*2px;/);
     assert.match(styles, /\.trash-item-title\s*\{[\s\S]*-webkit-line-clamp:\s*2;/);
     assert.match(styles, /\.trash-item-side\s*\{[\s\S]*min-width:\s*132px;/);
     assert.match(styles, /\.trash-item-actions\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(108px,\s*108px\)\);/);

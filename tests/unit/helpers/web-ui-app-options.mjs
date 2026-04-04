@@ -13,6 +13,12 @@ const require = createRequire(import.meta.url);
 const sourceBundle = require(path.join(projectRoot, 'web-ui', 'source-bundle.cjs'));
 
 const HEAD_WEB_UI_ENTRY = 'web-ui/app.js';
+const WEB_UI_ROOT = 'web-ui';
+const WEB_UI_SOURCE_RE = /\.(?:[cm]?js)$/i;
+const PARITY_SUPPORT_PATHS = [
+    'tests/unit/helpers/web-ui-app-options.mjs',
+    'tests/unit/web-ui-behavior-parity.test.mjs'
+];
 
 function setGlobalOverride(name, value) {
     const previous = Object.getOwnPropertyDescriptor(globalThis, name);
@@ -45,26 +51,109 @@ export async function withGlobalOverrides(overrides, callback) {
     }
 }
 
-function readHeadProjectFile(relativePath) {
-    return execFileSync('git', ['show', `HEAD:${relativePath}`], {
+function readGitProjectFile(ref, relativePath) {
+    return execFileSync('git', ['show', `${ref}:${relativePath}`], {
         cwd: projectRoot,
         encoding: 'utf8'
     });
 }
 
-function createHeadWebUiFixture() {
-    const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'codexmate-head-web-ui-'));
-    const entryPath = path.join(projectRoot, HEAD_WEB_UI_ENTRY);
-    const dependencyPaths = sourceBundle.collectJavaScriptFiles(entryPath);
+function listGitTreeFiles(ref, relativePath) {
+    const output = execFileSync('git', ['ls-tree', '-r', '--name-only', '-z', ref, '--', relativePath], {
+        cwd: projectRoot,
+        encoding: 'utf8'
+    });
+    return output
+        .split('\0')
+        .map((item) => item.trim())
+        .filter(Boolean);
+}
 
-    for (const sourcePath of dependencyPaths) {
-        const relativePath = path.relative(projectRoot, sourcePath).replace(/\\/g, '/');
-        if (!relativePath.startsWith('web-ui/')) {
-            throw new Error(`Unexpected head Web UI dependency outside web-ui/: ${relativePath}`);
+function listTrackedWebUiSourcePaths() {
+    const output = execFileSync('git', ['ls-files', '-z', '--', WEB_UI_ROOT], {
+        cwd: projectRoot,
+        encoding: 'utf8'
+    });
+    return output
+        .split('\0')
+        .map((item) => item.trim())
+        .filter((item) => item && WEB_UI_SOURCE_RE.test(item));
+}
+
+function walkProjectPaths(rootDir, paths = []) {
+    if (!fs.existsSync(rootDir)) {
+        return paths;
+    }
+    const entries = fs.readdirSync(rootDir, { withFileTypes: true });
+    for (const entry of entries) {
+        if (!entry) continue;
+        const entryPath = path.join(rootDir, entry.name);
+        if (entry.isDirectory()) {
+            walkProjectPaths(entryPath, paths);
+            continue;
         }
+        if (entry.isFile()) {
+            paths.push(path.relative(projectRoot, entryPath).replace(/\\/g, '/'));
+        }
+    }
+    return paths;
+}
+
+function listCurrentWebUiSourcePaths() {
+    return walkProjectPaths(path.join(projectRoot, WEB_UI_ROOT))
+        .filter((item) => WEB_UI_SOURCE_RE.test(item));
+}
+
+function getBehaviorParityTrackedPaths() {
+    return [...new Set([
+        ...listTrackedWebUiSourcePaths(),
+        ...listCurrentWebUiSourcePaths(),
+        ...PARITY_SUPPORT_PATHS
+    ])].sort();
+}
+
+function gitRefExists(ref) {
+    try {
+        execFileSync('git', ['rev-parse', '--verify', ref], {
+            cwd: projectRoot,
+            stdio: 'ignore'
+        });
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+function hasTrackedChanges(paths = []) {
+    const output = execFileSync('git', ['status', '--porcelain', '--untracked-files=all', '--', ...paths], {
+        cwd: projectRoot,
+        encoding: 'utf8'
+    });
+    return String(output || '').trim().length > 0;
+}
+
+function resolveBehaviorParityBaselineRef() {
+    const override = String(process.env.WEB_UI_PARITY_BASE_REF || '').trim();
+    if (override) {
+        return override;
+    }
+    if (hasTrackedChanges(getBehaviorParityTrackedPaths())) {
+        return 'HEAD';
+    }
+    if (gitRefExists('HEAD^')) {
+        return 'HEAD^';
+    }
+    return 'HEAD';
+}
+
+function createGitWebUiFixture(ref) {
+    const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'codexmate-head-web-ui-'));
+    const projectPaths = listGitTreeFiles(ref, 'web-ui');
+
+    for (const relativePath of projectPaths) {
         const targetPath = path.join(fixtureRoot, relativePath.replace(/^web-ui[\\/]/, ''));
         fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-        fs.writeFileSync(targetPath, readHeadProjectFile(relativePath), 'utf8');
+        fs.writeFileSync(targetPath, readGitProjectFile(ref, relativePath), 'utf8');
     }
     return fixtureRoot;
 }
@@ -232,14 +321,24 @@ export async function captureCurrentBundledAppOptions() {
     return captureAppOptionsFromScript(readExecutableBundledWebUiScript(), 'current');
 }
 
-export async function captureHeadBundledAppOptions() {
-    const fixtureRoot = createHeadWebUiFixture();
+export async function captureGitBundledAppOptions(ref) {
+    const fixtureRoot = createGitWebUiFixture(ref);
     try {
-        const scriptSource = sourceBundle.readExecutableBundledWebUiScript(path.join(fixtureRoot, 'app.js'));
-        return await captureAppOptionsFromScript(scriptSource, 'head');
+        const scriptSource = sourceBundle.readExecutableBundledWebUiScript(
+            path.join(fixtureRoot, HEAD_WEB_UI_ENTRY.replace(/^web-ui[\\/]/, ''))
+        );
+        return await captureAppOptionsFromScript(scriptSource, `git-${String(ref).replace(/[^\w.-]+/g, '-')}`);
     } finally {
         try {
             fs.rmSync(fixtureRoot, { recursive: true, force: true });
         } catch (_) {}
     }
+}
+
+export async function captureBehaviorParityBaselineAppOptions() {
+    const ref = resolveBehaviorParityBaselineRef();
+    return {
+        ref,
+        options: await captureGitBundledAppOptions(ref)
+    };
 }

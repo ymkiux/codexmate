@@ -111,7 +111,12 @@
                                     pinned: isSessionPinned(session)
                                 }
                             ]"
-                            @click="selectSession(session)">
+                            @click="selectSession(session)"
+                            @keydown.enter.self.prevent="selectSession(session)"
+                            @keydown.space.self.prevent="selectSession(session)"
+                            tabindex="0"
+                            role="button"
+                            :aria-current="activeSessionExportKey === getSessionExportKey(session) ? 'true' : null">
                             <div class="session-item-header">
                                 <div class="session-item-main">
                                     <div class="session-item-title">{{ session.title || session.sessionId }}</div>

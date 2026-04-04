@@ -246,6 +246,13 @@
     transform: translateY(-1px);
 }
 
+.session-item:focus-visible {
+    outline: 3px solid rgba(201, 94, 75, 0.25);
+    outline-offset: 2px;
+    border-color: var(--color-brand);
+    background: linear-gradient(to bottom, rgba(210, 107, 90, 0.08) 0%, rgba(255, 255, 255, 0.98) 100%);
+}
+
 .session-item::before {
     content: "";
     position: absolute;
@@ -405,4 +412,3 @@
     transform: translateX(4px);
     transition: transform var(--transition-normal) var(--ease-spring-soft), box-shadow var(--transition-normal) var(--ease-spring-soft);
 }
-

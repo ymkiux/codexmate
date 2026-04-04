@@ -23,5 +23,10 @@
         <!-- Toast通知 -->
         
         <!-- Toast -->
-        <div v-if="message" :class="['toast', messageType]">{{ message }}</div>
+        <div
+            v-if="message"
+            :class="['toast', messageType]"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true">{{ message }}</div>
     </div>

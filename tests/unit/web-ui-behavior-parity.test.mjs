@@ -1,12 +1,13 @@
 import assert from 'assert';
 import {
+    captureBehaviorParityBaselineAppOptions,
     captureCurrentBundledAppOptions,
-    captureHeadBundledAppOptions,
     withGlobalOverrides
 } from './helpers/web-ui-app-options.mjs';
 
 const currentAppOptions = await captureCurrentBundledAppOptions();
-const headAppOptions = await captureHeadBundledAppOptions();
+const parityBaseline = await captureBehaviorParityBaselineAppOptions();
+const headAppOptions = parityBaseline.options;
 const currentMethods = currentAppOptions.methods;
 const headMethods = headAppOptions.methods;
 const currentComputed = currentAppOptions.computed;
@@ -311,17 +312,28 @@ function createCopyActionContext(methods) {
     };
 }
 
-test('captured bundled app skeleton still matches HEAD', () => {
+test('captured bundled app skeleton only exposes expected data key drift versus parity baseline', () => {
     const currentDataKeys = Object.keys(currentAppOptions.data()).sort();
     const headDataKeys = Object.keys(headAppOptions.data()).sort();
     const extraCurrentKeys = currentDataKeys.filter((key) => !headDataKeys.includes(key)).sort();
     const missingCurrentKeys = headDataKeys.filter((key) => !currentDataKeys.includes(key)).sort();
-    assert.deepStrictEqual(extraCurrentKeys, [
+    const allowedExtraCurrentKeys = [
         'claudeModelsRequestSeq',
         'codexModelsRequestSeq',
         'sessionPathRequestSeqMap'
-    ]);
-    assert.deepStrictEqual(missingCurrentKeys, ['sessionPathRequestSeq']);
+    ];
+    const allowedMissingCurrentKeys = ['sessionPathRequestSeq'];
+    if (parityBaseline.ref === 'HEAD') {
+        const allowedExtraKeySet = new Set(allowedExtraCurrentKeys);
+        const allowedMissingKeySet = new Set(allowedMissingCurrentKeys);
+        const unexpectedExtraCurrentKeys = extraCurrentKeys.filter((key) => !allowedExtraKeySet.has(key));
+        const unexpectedMissingCurrentKeys = missingCurrentKeys.filter((key) => !allowedMissingKeySet.has(key));
+        assert.deepStrictEqual(unexpectedExtraCurrentKeys, [], `unexpected extra data keys against ${parityBaseline.ref}`);
+        assert.deepStrictEqual(unexpectedMissingCurrentKeys, [], `unexpected missing data keys against ${parityBaseline.ref}`);
+    } else {
+        assert.deepStrictEqual(extraCurrentKeys, allowedExtraCurrentKeys, `unexpected extra data keys against ${parityBaseline.ref}`);
+        assert.deepStrictEqual(missingCurrentKeys, allowedMissingCurrentKeys, `unexpected missing data keys against ${parityBaseline.ref}`);
+    }
     const normalizedCurrentKeys = currentDataKeys.filter((key) => !extraCurrentKeys.includes(key)).sort();
     const normalizedHeadKeys = headDataKeys.filter((key) => !missingCurrentKeys.includes(key)).sort();
     assert.deepStrictEqual(normalizedCurrentKeys, normalizedHeadKeys);
