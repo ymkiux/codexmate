@@ -216,7 +216,10 @@ function readExecutableBundledWebUiScript(entryPath = path.join(__dirname, 'app.
 }
 
 function readExecutableBundledJavaScriptModule(entryPath) {
-    return bundleExecutableJavaScriptFile(entryPath, { preserveExports: true });
+    const resolvedEntryPath = path.isAbsolute(entryPath)
+        ? entryPath
+        : path.resolve(__dirname, '..', entryPath);
+    return bundleExecutableJavaScriptFile(resolvedEntryPath, { preserveExports: true });
 }
 
 module.exports = {

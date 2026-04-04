@@ -20,13 +20,15 @@ export function createOpenclawPersistMethods(options = {}) {
         },
 
         openOpenclawEditModal(name) {
+            const existing = this.openclawConfigs[name];
             this.openclawEditorTitle = `编辑 OpenClaw 配置: ${name}`;
             this.openclawEditing = {
                 name,
-                content: '',
+                content: this.openclawHasContent(existing) ? existing.content : '',
                 lockName: true
             };
-            void this.loadOpenclawConfigFromFile({ silent: true, force: true, fallbackToTemplate: true });
+            this.syncOpenclawStructuredFromText({ silent: true });
+            void this.loadOpenclawConfigFromFile({ silent: true, force: false, fallbackToTemplate: false });
             this.showOpenclawConfigModal = true;
         },
 
@@ -164,17 +166,21 @@ export function createOpenclawPersistMethods(options = {}) {
             if (!this.openclawHasContent(config)) {
                 return this.showMessage('配置为空', 'error');
             }
-            const res = await api('apply-openclaw-config', {
-                content: config.content,
-                lineEnding: this.openclawLineEnding
-            });
-            if (res.error || res.success === false) {
-                this.showMessage(res.error || '应用配置失败', 'error');
-            } else {
-                this.openclawConfigPath = res.targetPath || this.openclawConfigPath;
-                this.openclawConfigExists = true;
-                const targetTip = res.targetPath ? `（${res.targetPath}）` : '';
-                this.showMessage(`已应用 OpenClaw 配置: ${name}${targetTip}`, 'success');
+            try {
+                const res = await api('apply-openclaw-config', {
+                    content: config.content,
+                    lineEnding: this.openclawLineEnding
+                });
+                if (res.error || res.success === false) {
+                    this.showMessage(res.error || '应用配置失败', 'error');
+                } else {
+                    this.openclawConfigPath = res.targetPath || this.openclawConfigPath;
+                    this.openclawConfigExists = true;
+                    const targetTip = res.targetPath ? `（${res.targetPath}）` : '';
+                    this.showMessage(`已应用 OpenClaw 配置: ${name}${targetTip}`, 'success');
+                }
+            } catch (_) {
+                this.showMessage('应用配置失败', 'error');
             }
         }
     };

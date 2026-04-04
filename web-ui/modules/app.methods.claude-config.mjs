@@ -76,16 +76,20 @@ export function createClaudeConfigMethods(options = {}) {
                 return;
             }
 
-            const res = await api('apply-claude-config', { config });
-            if (res.error || res.success === false) {
-                this.showMessage(res.error || '应用配置失败', 'error');
-            } else {
-                const targetTip = res.targetPath ? `（${res.targetPath}）` : '';
-                this.showMessage(`已保存并应用到 Claude 配置${targetTip}`, 'success');
-                this.closeEditConfigModal();
-                if (name === this.currentClaudeConfig) {
-                    this.refreshClaudeModelContext();
+            try {
+                const res = await api('apply-claude-config', { config });
+                if (res.error || res.success === false) {
+                    this.showMessage(res.error || '应用配置失败', 'error');
+                } else {
+                    const targetTip = res.targetPath ? `（${res.targetPath}）` : '';
+                    this.showMessage(`已保存并应用到 Claude 配置${targetTip}`, 'success');
+                    this.closeEditConfigModal();
+                    if (name === this.currentClaudeConfig) {
+                        this.refreshClaudeModelContext();
+                    }
                 }
+            } catch (_) {
+                this.showMessage('应用配置失败', 'error');
             }
         },
 
@@ -145,12 +149,16 @@ export function createClaudeConfigMethods(options = {}) {
                 return this.showMessage('请先配置 API Key', 'error');
             }
 
-            const res = await api('apply-claude-config', { config });
-            if (res.error || res.success === false) {
-                this.showMessage(res.error || '应用配置失败', 'error');
-            } else {
-                const targetTip = res.targetPath ? `（${res.targetPath}）` : '';
-                this.showMessage(`已应用配置到 Claude 设置: ${name}${targetTip}`, 'success');
+            try {
+                const res = await api('apply-claude-config', { config });
+                if (res.error || res.success === false) {
+                    this.showMessage(res.error || '应用配置失败', 'error');
+                } else {
+                    const targetTip = res.targetPath ? `（${res.targetPath}）` : '';
+                    this.showMessage(`已应用配置到 Claude 设置: ${name}${targetTip}`, 'success');
+                }
+            } catch (_) {
+                this.showMessage('应用配置失败', 'error');
             }
         },
 

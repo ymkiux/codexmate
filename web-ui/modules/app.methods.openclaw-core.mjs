@@ -223,9 +223,14 @@ export function createOpenclawCoreMethods() {
             const legacyAgent = config && config.agent && typeof config.agent === 'object' && !Array.isArray(config.agent)
                 ? config.agent
                 : {};
-            const fallbackList = Array.isArray(model.fallbacks)
-                ? model.fallbacks.filter(item => typeof item === 'string' && item.trim()).map(item => item.trim())
-                : [];
+            const fallbackSource = Array.isArray(model.fallbacks)
+                ? model.fallbacks
+                : (legacyAgent.model && typeof legacyAgent.model === 'object' && !Array.isArray(legacyAgent.model) && Array.isArray(legacyAgent.model.fallbacks)
+                    ? legacyAgent.model.fallbacks
+                    : []);
+            const fallbackList = fallbackSource
+                .filter(item => typeof item === 'string' && item.trim())
+                .map(item => item.trim());
             const env = config && config.env && typeof config.env === 'object' && !Array.isArray(config.env)
                 ? config.env
                 : {};
@@ -316,6 +321,19 @@ export function createOpenclawCoreMethods() {
                 }
             } else if (typeof model === 'string') {
                 addProvider(model);
+            }
+            const legacyAgent = config && config.agent && typeof config.agent === 'object' && !Array.isArray(config.agent)
+                ? config.agent
+                : {};
+            if (typeof legacyAgent.model === 'string') {
+                addProvider(legacyAgent.model);
+            } else if (legacyAgent.model && typeof legacyAgent.model === 'object' && !Array.isArray(legacyAgent.model)) {
+                addProvider(legacyAgent.model.primary);
+                if (Array.isArray(legacyAgent.model.fallbacks)) {
+                    for (const item of legacyAgent.model.fallbacks) {
+                        addProvider(item);
+                    }
+                }
             }
             const modelsDefaults = config && config.models && config.models.defaults
                 ? config.models.defaults

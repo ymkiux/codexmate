@@ -10,7 +10,7 @@ export function createDashboardComputed() {
             return added > 0 || removed > 0;
         },
         claudeModelHasList() {
-            return Array.isArray(this.claudeModels) && this.claudeModels.length > 0;
+            return this.claudeModelOptions.length > 0;
         },
         claudeModelOptions() {
             const list = Array.isArray(this.claudeModels) ? [...this.claudeModels] : [];

@@ -25,11 +25,7 @@ function normalizeDiffText(input) {
 }
 
 function splitDiffLines(input) {
-    let normalized = normalizeDiffText(input);
-    if (!normalized) return [];
-    if (normalized.endsWith('\n')) {
-        normalized = normalized.slice(0, -1);
-    }
+    const normalized = normalizeDiffText(input);
     if (!normalized) return [];
     return normalized.split('\n');
 }

@@ -92,15 +92,22 @@ export function createSessionBrowserMethods(options = {}) {
                 return;
             }
 
-            const requestSeq = ++this.sessionPathRequestSeq;
-            this.sessionPathOptionsLoading = true;
+            const nextSeqMap = {
+                ...(this.sessionPathRequestSeqMap || {})
+            };
+            const requestSeq = (Number(nextSeqMap[source]) || 0) + 1;
+            nextSeqMap[source] = requestSeq;
+            this.sessionPathRequestSeqMap = nextSeqMap;
+            if (source === this.sessionFilterSource) {
+                this.sessionPathOptionsLoading = true;
+            }
             try {
                 const res = await api('list-session-paths', {
                     source,
                     limit: 500,
                     forceRefresh
                 });
-                if (requestSeq !== this.sessionPathRequestSeq) {
+                if (requestSeq !== Number(((this.sessionPathRequestSeqMap || {})[source]) || 0)) {
                     return;
                 }
                 if (res && !res.error && Array.isArray(res.paths)) {
@@ -113,7 +120,10 @@ export function createSessionBrowserMethods(options = {}) {
             } catch (_) {
                 // 路径补全失败不影响会话主流程
             } finally {
-                if (requestSeq === this.sessionPathRequestSeq) {
+                if (
+                    source === this.sessionFilterSource
+                    && requestSeq === Number(((this.sessionPathRequestSeqMap || {})[source]) || 0)
+                ) {
                     this.sessionPathOptionsLoading = false;
                 }
             }
@@ -369,6 +379,8 @@ export function createSessionBrowserMethods(options = {}) {
 
         async loadSessionStandalonePlain() {
             if (!this.activeSession) {
+                this.sessionStandaloneRequestSeq += 1;
+                this.sessionStandaloneLoading = false;
                 this.sessionStandaloneText = '';
                 this.sessionStandaloneTitle = '会话';
                 this.sessionStandaloneSourceLabel = '';
@@ -377,13 +389,14 @@ export function createSessionBrowserMethods(options = {}) {
             }
 
             const requestSeq = ++this.sessionStandaloneRequestSeq;
+            const sessionSnapshot = this.activeSession;
             this.sessionStandaloneLoading = true;
             this.sessionStandaloneError = '';
             try {
                 const res = await api('session-plain', {
-                    source: this.activeSession.source,
-                    sessionId: this.activeSession.sessionId,
-                    filePath: this.activeSession.filePath
+                    source: sessionSnapshot.source,
+                    sessionId: sessionSnapshot.sessionId,
+                    filePath: sessionSnapshot.filePath
                 });
 
                 if (requestSeq !== this.sessionStandaloneRequestSeq) {
@@ -396,8 +409,8 @@ export function createSessionBrowserMethods(options = {}) {
                     return;
                 }
 
-                this.sessionStandaloneSourceLabel = res.sourceLabel || this.activeSession.sourceLabel || '';
-                this.sessionStandaloneTitle = res.sessionId || this.activeSession.title || '会话';
+                this.sessionStandaloneSourceLabel = res.sourceLabel || sessionSnapshot.sourceLabel || '';
+                this.sessionStandaloneTitle = res.sessionId || sessionSnapshot.title || '会话';
                 this.sessionStandaloneText = typeof res.text === 'string' ? res.text : '';
             } catch (e) {
                 if (requestSeq !== this.sessionStandaloneRequestSeq) {

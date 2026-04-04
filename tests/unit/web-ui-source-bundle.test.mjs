@@ -106,3 +106,10 @@ test('source bundle exports the expected entry readers', () => {
     assert.strictEqual(typeof sourceBundle.readExecutableBundledWebUiScript, 'function');
     assert.strictEqual(typeof sourceBundle.readExecutableBundledJavaScriptModule, 'function');
 });
+
+test('source bundle resolves relative module entry paths from the web-ui bundle root', () => {
+    const script = sourceBundle.readExecutableBundledJavaScriptModule('web-ui/logic.mjs');
+
+    assert.match(script, /export function normalizeClaudeValue/);
+    assert.match(script, /export function buildSessionTimelineNodes/);
+});

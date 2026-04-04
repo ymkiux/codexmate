@@ -33,10 +33,12 @@ export function buildSessionListParams(options = {}) {
         timeRangePreset = 'all',
         limit = 200
     } = options;
-    const queryValue = isSessionQueryEnabled(source) ? query : '';
+    const normalizedSource = normalizeSessionSource(source, 'all');
+    const normalizedPathFilter = normalizeSessionPathFilter(pathFilter);
+    const queryValue = isSessionQueryEnabled(normalizedSource) ? query : '';
     return {
-        source,
-        pathFilter,
+        source: normalizedSource,
+        pathFilter: normalizedPathFilter,
         query: queryValue,
         queryMode: 'and',
         queryScope: 'content',
