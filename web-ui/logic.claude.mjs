@@ -4,13 +4,18 @@ export function normalizeClaudeValue(value) {
 
 export function normalizeClaudeConfig(config) {
     const safe = config && typeof config === 'object' ? config : {};
+    const apiKey = normalizeClaudeValue(safe.apiKey);
+    const authToken = normalizeClaudeValue(safe.authToken);
+    const useKey = normalizeClaudeValue(safe.useKey);
+    const externalCredentialType = normalizeClaudeValue(safe.externalCredentialType)
+        || (apiKey ? '' : (authToken ? 'auth-token' : (useKey ? 'claude-code-use-key' : '')));
     return {
-        apiKey: normalizeClaudeValue(safe.apiKey),
+        apiKey,
         baseUrl: normalizeClaudeValue(safe.baseUrl),
         model: normalizeClaudeValue(safe.model),
-        authToken: normalizeClaudeValue(safe.authToken),
-        useKey: normalizeClaudeValue(safe.useKey),
-        externalCredentialType: normalizeClaudeValue(safe.externalCredentialType)
+        authToken,
+        useKey,
+        externalCredentialType
     };
 }
 

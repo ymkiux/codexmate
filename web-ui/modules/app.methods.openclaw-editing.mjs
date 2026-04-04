@@ -22,20 +22,32 @@ export function createOpenclawEditingMethods() {
             const fallbacks = this.normalizeStringList(this.openclawStructured.agentFallbacks);
             if (primary) {
                 model.primary = primary;
+            } else {
+                delete model.primary;
             }
             if (fallbacks.length) {
                 model.fallbacks = fallbacks;
+            } else {
+                delete model.fallbacks;
             }
-            if (primary || fallbacks.length) {
+            if (Object.keys(model).length > 0) {
                 defaults.model = model;
+            } else {
+                delete defaults.model;
             }
-            if (primary && config.agent && typeof config.agent === 'object' && !Array.isArray(config.agent)) {
-                config.agent.model = primary;
+            if (config.agent && typeof config.agent === 'object' && !Array.isArray(config.agent)) {
+                if (primary) {
+                    config.agent.model = primary;
+                } else {
+                    delete config.agent.model;
+                }
             }
 
             const workspace = (this.openclawStructured.workspace || '').trim();
             if (workspace) {
                 defaults.workspace = workspace;
+            } else {
+                delete defaults.workspace;
             }
 
             const timeout = this.parseOptionalNumber(this.openclawStructured.timeout, 'Timeout');
@@ -45,6 +57,8 @@ export function createOpenclawEditingMethods() {
             }
             if (timeout.value !== null) {
                 defaults.timeout = timeout.value;
+            } else {
+                delete defaults.timeout;
             }
 
             const contextTokens = this.parseOptionalNumber(this.openclawStructured.contextTokens, 'Context Tokens');
@@ -54,6 +68,8 @@ export function createOpenclawEditingMethods() {
             }
             if (contextTokens.value !== null) {
                 defaults.contextTokens = contextTokens.value;
+            } else {
+                delete defaults.contextTokens;
             }
 
             const maxConcurrent = this.parseOptionalNumber(this.openclawStructured.maxConcurrent, 'Max Concurrent');
@@ -63,11 +79,20 @@ export function createOpenclawEditingMethods() {
             }
             if (maxConcurrent.value !== null) {
                 defaults.maxConcurrent = maxConcurrent.value;
+            } else {
+                delete defaults.maxConcurrent;
             }
 
             if (Object.keys(defaults).length > 0) {
                 config.agents = agents;
                 config.agents.defaults = defaults;
+            } else if (agents.defaults) {
+                delete agents.defaults;
+                if (Object.keys(agents).length > 0) {
+                    config.agents = agents;
+                } else {
+                    delete config.agents;
+                }
             }
 
             const envResult = this.normalizeEnvItems(this.openclawStructured.envItems);
@@ -89,10 +114,26 @@ export function createOpenclawEditingMethods() {
                 const tools = config.tools && typeof config.tools === 'object' && !Array.isArray(config.tools)
                     ? config.tools
                     : {};
-                tools.profile = profile || tools.profile || 'default';
-                tools.allow = allowList;
-                tools.deny = denyList;
-                config.tools = tools;
+                if (profile) {
+                    tools.profile = profile;
+                } else {
+                    delete tools.profile;
+                }
+                if (allowList.length) {
+                    tools.allow = allowList;
+                } else {
+                    delete tools.allow;
+                }
+                if (denyList.length) {
+                    tools.deny = denyList;
+                } else {
+                    delete tools.deny;
+                }
+                if (Object.keys(tools).length > 0) {
+                    config.tools = tools;
+                } else {
+                    delete config.tools;
+                }
             }
 
             this.openclawEditing.content = this.stringifyOpenclawConfig(config);
@@ -284,7 +325,11 @@ export function createOpenclawEditingMethods() {
         },
 
         saveOpenclawConfigs() {
-            localStorage.setItem('openclawConfigs', JSON.stringify(this.openclawConfigs));
+            try {
+                localStorage.setItem('openclawConfigs', JSON.stringify(this.openclawConfigs));
+            } catch (_) {
+                this.showMessage('保存本地 OpenClaw 配置失败', 'error');
+            }
         }
     };
 }

@@ -3,10 +3,12 @@ export function createProvidersMethods(options = {}) {
 
     return {
         async addProvider() {
-            if (!this.newProvider.name || !this.newProvider.url) {
+            const rawName = typeof this.newProvider.name === 'string' ? this.newProvider.name : '';
+            const rawUrl = typeof this.newProvider.url === 'string' ? this.newProvider.url.trim() : '';
+            if (!rawName || !rawUrl) {
                 return this.showMessage('名称和URL必填', 'error');
             }
-            const name = this.newProvider.name.trim();
+            const name = rawName.trim();
             if (!name) {
                 return this.showMessage('名称不能为空', 'error');
             }
@@ -20,7 +22,7 @@ export function createProvidersMethods(options = {}) {
             try {
                 const res = await api('add-provider', {
                     name,
-                    url: this.newProvider.url.trim(),
+                    url: rawUrl,
                     key: this.newProvider.key || ''
                 });
                 if (res.error) {
@@ -119,17 +121,21 @@ export function createProvidersMethods(options = {}) {
                 this.showMessage('该 provider 为保留项，不可删除', 'info');
                 return;
             }
-            const res = await api('delete-provider', { name });
-            if (res.error) {
-                this.showMessage(res.error, 'error');
-                return;
+            try {
+                const res = await api('delete-provider', { name });
+                if (res.error) {
+                    this.showMessage(res.error, 'error');
+                    return;
+                }
+                if (res.switched && res.provider) {
+                    this.showMessage(`已删除提供商，自动切换到 ${res.provider}${res.model ? ` / ${res.model}` : ''}`, 'success');
+                } else {
+                    this.showMessage('操作成功', 'success');
+                }
+                await this.loadAll();
+            } catch (_) {
+                this.showMessage('删除失败', 'error');
             }
-            if (res.switched && res.provider) {
-                this.showMessage(`已删除提供商，自动切换到 ${res.provider}${res.model ? ` / ${res.model}` : ''}`, 'success');
-            } else {
-                this.showMessage('操作成功', 'success');
-            }
-            await this.loadAll();
         },
 
         openEditModal(provider) {
@@ -153,12 +159,12 @@ export function createProvidersMethods(options = {}) {
                 this.closeEditModal();
                 return;
             }
-            if (!this.editingProvider.url) {
+            const url = typeof this.editingProvider.url === 'string' ? this.editingProvider.url.trim() : '';
+            if (!url) {
                 return this.showMessage('URL 必填', 'error');
             }
 
             const name = this.editingProvider.name;
-            const url = this.editingProvider.url.trim();
             const key = this.editingProvider.key || '';
             this.closeEditModal();
             try {
@@ -202,23 +208,31 @@ export function createProvidersMethods(options = {}) {
             if (!this.newModelName || !this.newModelName.trim()) {
                 return this.showMessage('请输入模型', 'error');
             }
-            const res = await api('add-model', { model: this.newModelName.trim() });
-            if (res.error) {
-                this.showMessage(res.error, 'error');
-            } else {
-                this.showMessage('操作成功', 'success');
-                this.closeModelModal();
-                await this.loadAll();
+            try {
+                const res = await api('add-model', { model: this.newModelName.trim() });
+                if (res.error) {
+                    this.showMessage(res.error, 'error');
+                } else {
+                    this.showMessage('操作成功', 'success');
+                    this.closeModelModal();
+                    await this.loadAll();
+                }
+            } catch (_) {
+                this.showMessage('新增模型失败', 'error');
             }
         },
 
         async removeModel(model) {
-            const res = await api('delete-model', { model });
-            if (res.error) {
-                this.showMessage(res.error, 'error');
-            } else {
-                this.showMessage('操作成功', 'success');
-                await this.loadAll();
+            try {
+                const res = await api('delete-model', { model });
+                if (res.error) {
+                    this.showMessage(res.error, 'error');
+                } else {
+                    this.showMessage('操作成功', 'success');
+                    await this.loadAll();
+                }
+            } catch (_) {
+                this.showMessage('删除模型失败', 'error');
             }
         },
 

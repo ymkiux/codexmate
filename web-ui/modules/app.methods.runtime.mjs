@@ -188,6 +188,10 @@ export function createRuntimeMethods(options = {}) {
         async importBackupFile(type, file) {
             const maxSize = 200 * 1024 * 1024;
             const loadingKey = type === 'claude' ? 'claudeImportLoading' : 'codexImportLoading';
+            if (this[loadingKey]) {
+                this.resetImportInput(type);
+                return;
+            }
             if (file.size > maxSize) {
                 this.showMessage('备份文件过大，限制 200MB', 'error');
                 this.resetImportInput(type);
@@ -284,10 +288,14 @@ export function createRuntimeMethods(options = {}) {
         },
 
         showMessage(text, type) {
+            if (this._messageTimer) {
+                clearTimeout(this._messageTimer);
+            }
             this.message = text;
             this.messageType = type || 'info';
-            setTimeout(() => {
+            this._messageTimer = setTimeout(() => {
                 this.message = '';
+                this._messageTimer = null;
             }, 3000);
         }
     };

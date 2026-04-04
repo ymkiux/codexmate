@@ -191,10 +191,13 @@ async function captureAppOptionsFromScript(scriptSource, label) {
                 }
             }),
             requestAnimationFrame(callback) {
-                callback();
-                return 1;
+                return setTimeout(() => {
+                    callback();
+                }, 0);
             },
-            cancelAnimationFrame() {},
+            cancelAnimationFrame(id) {
+                clearTimeout(id);
+            },
             ResizeObserver: function ResizeObserver() {
                 this.observe = () => {};
                 this.disconnect = () => {};

@@ -1,5 +1,7 @@
-export const API_BASE = (location && location.origin && location.origin !== 'null')
-    ? location.origin
+const browserLocation = typeof location !== 'undefined' ? location : null;
+
+export const API_BASE = (browserLocation && browserLocation.origin && browserLocation.origin !== 'null')
+    ? browserLocation.origin
     : 'http://localhost:3737';
 
 async function postApi(action, params = {}) {

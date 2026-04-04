@@ -16,6 +16,7 @@ export function createStartupClaudeMethods(options = {}) {
     return {
         async loadAll(options = {}) {
             const preserveLoading = !!options.preserveLoading;
+            let startupOk = false;
             if (!preserveLoading) {
                 this.loading = true;
             }
@@ -23,9 +24,10 @@ export function createStartupClaudeMethods(options = {}) {
             try {
                 const [statusRes, listRes] = await Promise.all([api('status'), api('list')]);
 
-                if (statusRes.error) {
-                    this.initError = statusRes.error;
+                if (statusRes.error || (listRes && listRes.error)) {
+                    this.initError = statusRes.error || listRes.error;
                 } else {
+                    startupOk = true;
                     this.currentProvider = statusRes.provider;
                     this.currentModel = statusRes.model;
                     {
@@ -49,7 +51,7 @@ export function createStartupClaudeMethods(options = {}) {
                         if (this.editingCodexBudgetField !== 'modelContextWindowInput') {
                             this.modelContextWindowInput = contextWindow.ok && contextWindow.text
                                 ? contextWindow.text
-                                : '190000';
+                                : String(defaultModelContextWindow);
                         }
                     }
                     {
@@ -61,7 +63,7 @@ export function createStartupClaudeMethods(options = {}) {
                         if (this.editingCodexBudgetField !== 'modelAutoCompactTokenLimitInput') {
                             this.modelAutoCompactTokenLimitInput = autoCompactTokenLimit.ok && autoCompactTokenLimit.text
                                 ? autoCompactTokenLimit.text
-                                : '185000';
+                                : String(defaultModelAutoCompactTokenLimit);
                         }
                     }
                     this.providersList = listRes.providers;
@@ -81,9 +83,11 @@ export function createStartupClaudeMethods(options = {}) {
                 }
             }
 
-            try {
-                await this.loadModelsForProvider(this.currentProvider);
-            } catch (_) {}
+            if (startupOk) {
+                try {
+                    await this.loadModelsForProvider(this.currentProvider);
+                } catch (_) {}
+            }
 
             try {
                 await this.loadCodexAuthProfiles();
@@ -92,16 +96,27 @@ export function createStartupClaudeMethods(options = {}) {
 
         async loadModelsForProvider(providerName, options = {}) {
             const silentError = !!options.silentError;
+            const targetProvider = typeof providerName === 'string' ? providerName.trim() : '';
+            const requestSeq = (Number(this.codexModelsRequestSeq) || 0) + 1;
+            this.codexModelsRequestSeq = requestSeq;
             this.codexModelsLoading = true;
-            if (!providerName) {
+            if (!targetProvider) {
                 this.models = [];
                 this.modelsSource = 'unlimited';
                 this.modelsHasCurrent = true;
                 this.codexModelsLoading = false;
                 return;
             }
+            const isLatestRequest = () => {
+                const currentProvider = typeof this.currentProvider === 'string' ? this.currentProvider.trim() : '';
+                return requestSeq === Number(this.codexModelsRequestSeq || 0)
+                    && (!currentProvider || currentProvider === targetProvider);
+            };
             try {
-                const res = await api('models', { provider: providerName });
+                const res = await api('models', { provider: targetProvider });
+                if (!isLatestRequest()) {
+                    return;
+                }
                 if (res.unlimited) {
                     this.models = [];
                     this.modelsSource = 'unlimited';
@@ -129,7 +144,9 @@ export function createStartupClaudeMethods(options = {}) {
                 this.modelsSource = 'error';
                 this.modelsHasCurrent = true;
             } finally {
-                this.codexModelsLoading = false;
+                if (requestSeq === Number(this.codexModelsRequestSeq || 0)) {
+                    this.codexModelsLoading = false;
+                }
             }
         },
 
@@ -193,9 +210,13 @@ export function createStartupClaudeMethods(options = {}) {
             const preferredName = this.buildClaudeImportedConfigName(normalized.baseUrl);
             let candidateName = preferredName;
             let suffix = 2;
-            while (this.claudeConfigs[candidateName]) {
+            const maxAttempts = 1000;
+            while (this.claudeConfigs[candidateName] && suffix <= maxAttempts) {
                 candidateName = `${preferredName}-${suffix}`;
                 suffix += 1;
+            }
+            if (this.claudeConfigs[candidateName]) {
+                return '';
             }
 
             this.claudeConfigs[candidateName] = this.mergeClaudeConfig({}, normalized);
@@ -274,10 +295,13 @@ export function createStartupClaudeMethods(options = {}) {
         async loadClaudeModels(options = {}) {
             const silentError = !!options.silentError;
             const config = this.getCurrentClaudeConfig();
+            const requestSeq = (Number(this.claudeModelsRequestSeq) || 0) + 1;
+            this.claudeModelsRequestSeq = requestSeq;
             if (!config) {
                 this.resetClaudeModelsState();
                 return;
             }
+            const currentConfigName = typeof this.currentClaudeConfig === 'string' ? this.currentClaudeConfig.trim() : '';
             const baseUrl = (config.baseUrl || '').trim();
             const apiKey = (config.apiKey || '').trim();
             const externalCredentialType = typeof config.externalCredentialType === 'string'
@@ -296,8 +320,27 @@ export function createStartupClaudeMethods(options = {}) {
             }
 
             this.claudeModelsLoading = true;
+            const isLatestRequest = () => {
+                if (requestSeq !== Number(this.claudeModelsRequestSeq || 0)) {
+                    return false;
+                }
+                const liveConfigName = typeof this.currentClaudeConfig === 'string' ? this.currentClaudeConfig.trim() : '';
+                if (currentConfigName && liveConfigName && liveConfigName !== currentConfigName) {
+                    return false;
+                }
+                const latestConfig = this.getCurrentClaudeConfig();
+                if (!latestConfig) {
+                    return false;
+                }
+                return (latestConfig.baseUrl || '').trim() === baseUrl
+                    && (latestConfig.apiKey || '').trim() === apiKey
+                    && (typeof latestConfig.externalCredentialType === 'string' ? latestConfig.externalCredentialType.trim() : '') === externalCredentialType;
+            };
             try {
                 const res = await api('models-by-url', { baseUrl, apiKey });
+                if (!isLatestRequest()) {
+                    return;
+                }
                 if (res.unlimited) {
                     this.claudeModels = [];
                     this.claudeModelsSource = 'unlimited';
@@ -325,7 +368,9 @@ export function createStartupClaudeMethods(options = {}) {
                 this.claudeModelsSource = 'error';
                 this.claudeModelsHasCurrent = true;
             } finally {
-                this.claudeModelsLoading = false;
+                if (requestSeq === Number(this.claudeModelsRequestSeq || 0)) {
+                    this.claudeModelsLoading = false;
+                }
             }
         },
 
@@ -335,11 +380,15 @@ export function createStartupClaudeMethods(options = {}) {
 
         maybeShowStarPrompt() {
             const storageKey = 'codexmateStarPrompted';
-            if (localStorage.getItem(storageKey)) {
-                return;
+            try {
+                if (localStorage.getItem(storageKey)) {
+                    return;
+                }
+                this.showMessage('欢迎到 GitHub 点 Star', 'info');
+                localStorage.setItem(storageKey, '1');
+            } catch (_) {
+                this.showMessage('欢迎到 GitHub 点 Star', 'info');
             }
-            this.showMessage('欢迎到 GitHub 点 Star', 'info');
-            localStorage.setItem(storageKey, '1');
         }
     };
 }

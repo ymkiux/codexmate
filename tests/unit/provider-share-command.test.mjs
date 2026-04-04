@@ -757,6 +757,74 @@ test('loadAll can refresh in background without flipping the global loading stat
     assert.strictEqual(context.initError, '');
 });
 
+test('loadAll treats provider list fetch failures as startup errors and skips model refresh', async () => {
+    const loadAllSource = extractBlockBySignature(
+        appSource,
+        'async loadAll(options = {}) {'
+    ).replace(/^async loadAll/, 'async function loadAll');
+    const loadAll = instantiateFunction(loadAllSource, 'loadAll', {
+        defaultModelContextWindow: 190000,
+        defaultModelAutoCompactTokenLimit: 185000,
+        api: async (action) => {
+            if (action === 'status') {
+                return {
+                    provider: 'alpha',
+                    model: 'alpha-model',
+                    serviceTier: 'fast',
+                    modelReasoningEffort: 'high',
+                    modelContextWindow: 200000,
+                    modelAutoCompactTokenLimit: 180000
+                };
+            }
+            if (action === 'list') {
+                return { error: 'list failed' };
+            }
+            throw new Error(`Unexpected api action: ${action}`);
+        }
+    });
+
+    const calls = [];
+    const context = {
+        loading: false,
+        initError: '',
+        currentProvider: 'stale-provider',
+        currentModel: 'stale-model',
+        serviceTier: 'fast',
+        modelReasoningEffort: 'high',
+        modelContextWindowInput: '190000',
+        modelAutoCompactTokenLimitInput: '185000',
+        editingCodexBudgetField: '',
+        providersList: ['stale-provider'],
+        normalizePositiveIntegerInput(value, label, fallback = '') {
+            const raw = value === undefined || value === null || value === ''
+                ? String(fallback || '')
+                : String(value);
+            const text = raw.trim();
+            const numeric = Number.parseInt(text, 10);
+            if (!Number.isFinite(numeric) || numeric <= 0) {
+                return { ok: false, error: `${label} invalid` };
+            }
+            return { ok: true, value: numeric, text: String(numeric) };
+        },
+        showMessage() {},
+        maybeShowStarPrompt() {
+            calls.push('star');
+        },
+        async loadModelsForProvider() {
+            calls.push('models');
+        },
+        async loadCodexAuthProfiles() {
+            calls.push('auth');
+        }
+    };
+
+    await loadAll.call(context);
+
+    assert.strictEqual(context.initError, 'list failed');
+    assert.deepStrictEqual(context.providersList, ['stale-provider']);
+    assert.deepStrictEqual(calls, ['auth']);
+});
+
 test('applyCodexConfigDirect preserves a focused sibling budget draft across the loadAll refresh', async () => {
     const loadAllSource = extractBlockBySignature(
         appSource,

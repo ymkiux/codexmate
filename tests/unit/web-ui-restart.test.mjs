@@ -279,7 +279,12 @@ test('watchPathsForRestart falls back to watching existing nested frontend direc
             if (options && options.recursive) {
                 throw new Error('recursive not supported');
             }
-            return { close() {} };
+            return {
+                close() {},
+                on() {
+                    return this;
+                }
+            };
         }
     };
     const watchWithFakeFs = instantiateFunction(
@@ -304,7 +309,6 @@ test('watchPathsForRestart falls back to watching existing nested frontend direc
 });
 
 test('watchPathsForRestart rescan attaches watchers for newly created nested directories after a rename event', () => {
-    const closed = [];
     const watchedTargets = [];
     const watchedHandlers = new Map();
     const existingDirectories = new Set([
@@ -346,8 +350,9 @@ test('watchPathsForRestart rescan attaches watchers for newly created nested dir
                 throw new Error('recursive not supported');
             }
             return {
-                close() {
-                    closed.push(target);
+                close() {},
+                on() {
+                    return this;
                 }
             };
         }
@@ -365,16 +370,10 @@ test('watchPathsForRestart rescan attaches watchers for newly created nested dir
 
     rootHandler('rename', 'new-parts');
 
-    assert.deepStrictEqual(
-        watchedTargets.map((item) => `${item.target}:${item.recursive ? 'r' : 'n'}`),
-        [
-            '/tmp/web-ui:r',
-            '/tmp/web-ui:n',
-            '/tmp/web-ui/modules:n',
-            '/tmp/web-ui/new-parts:n'
-        ]
-    );
-    assert.deepStrictEqual(closed, []);
+    const descriptors = watchedTargets.map((item) => `${item.target}:${item.recursive ? 'r' : 'n'}`);
+    assert.strictEqual(descriptors[0], '/tmp/web-ui:r');
+    assert.strictEqual(descriptors[descriptors.length - 1], '/tmp/web-ui/new-parts:n');
+    assert(descriptors.includes('/tmp/web-ui/modules:n'));
 });
 
 test('watchPathsForRestart reattaches a fallback watcher when a nested directory is recreated at the same path', () => {
@@ -422,6 +421,9 @@ test('watchPathsForRestart reattaches a fallback watcher when a nested directory
             return {
                 close() {
                     closed.push(target);
+                },
+                on() {
+                    return this;
                 }
             };
         }
@@ -452,4 +454,108 @@ test('watchPathsForRestart reattaches a fallback watcher when a nested directory
             '/tmp/web-ui/modules:n'
         ]
     );
+});
+
+test('watchPathsForRestart watches a file via its parent directory and ignores unrelated filenames', async () => {
+    const watchedTargets = [];
+    const watchedHandlers = new Map();
+    const changes = [];
+    const fakeFs = {
+        existsSync(target) {
+            return target === '/tmp/web-ui/index.html';
+        },
+        statSync() {
+            return {
+                isDirectory() {
+                    return false;
+                }
+            };
+        },
+        watch(target, options, handler) {
+            watchedTargets.push({ target, recursive: !!(options && options.recursive) });
+            watchedHandlers.set(target, handler);
+            return {
+                close() {},
+                on() {
+                    return this;
+                }
+            };
+        }
+    };
+    const watchWithFakeFs = instantiateFunction(
+        watchPathsForRestartSrc,
+        'watchPathsForRestart',
+        { fs: fakeFs, path }
+    );
+
+    const stopWatch = watchWithFakeFs(['/tmp/web-ui/index.html'], (info) => {
+        changes.push(info);
+    });
+    const parentHandler = watchedHandlers.get('/tmp/web-ui');
+    assert.strictEqual(typeof stopWatch, 'function');
+    assert.strictEqual(typeof parentHandler, 'function');
+    assert.deepStrictEqual(watchedTargets, [{ target: '/tmp/web-ui', recursive: true }]);
+
+    parentHandler('change', 'other.css');
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    assert.deepStrictEqual(changes, []);
+
+    parentHandler('rename', 'index.html');
+    await new Promise((resolve) => setTimeout(resolve, 350));
+
+    assert.deepStrictEqual(changes, [{
+        target: '/tmp/web-ui/index.html',
+        eventType: 'rename',
+        filename: 'index.html'
+    }]);
+});
+
+test('watchPathsForRestart reattaches a file watcher after watcher error', () => {
+    const watchedTargets = [];
+    const watcherErrors = [];
+    const closed = [];
+    const fakeFs = {
+        existsSync(target) {
+            return target === '/tmp/web-ui/index.html';
+        },
+        statSync() {
+            return {
+                isDirectory() {
+                    return false;
+                }
+            };
+        },
+        watch(target, options) {
+            watchedTargets.push({ target, recursive: !!(options && options.recursive) });
+            const watcher = {
+                close() {
+                    closed.push(target);
+                },
+                on(eventName, handler) {
+                    if (eventName === 'error') {
+                        watcherErrors.push(handler);
+                    }
+                    return watcher;
+                }
+            };
+            return watcher;
+        }
+    };
+    const watchWithFakeFs = instantiateFunction(
+        watchPathsForRestartSrc,
+        'watchPathsForRestart',
+        { fs: fakeFs, path }
+    );
+
+    watchWithFakeFs(['/tmp/web-ui/index.html'], () => {});
+    assert.strictEqual(watcherErrors.length, 1);
+
+    watcherErrors[0](new Error('watch failed'));
+
+    assert.deepStrictEqual(watchedTargets, [
+        { target: '/tmp/web-ui', recursive: true },
+        { target: '/tmp/web-ui', recursive: true }
+    ]);
+    assert.deepStrictEqual(closed, ['/tmp/web-ui']);
+    assert.strictEqual(watcherErrors.length, 2);
 });

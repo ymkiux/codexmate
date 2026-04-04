@@ -429,13 +429,6 @@ export function createSessionActionMethods(options = {}) {
                     this.prependSessionTrashItem(this.buildSessionTrashItemFromSession(session, res), {
                         totalCount: res && res.totalCount !== undefined ? res.totalCount : undefined
                     });
-                } else if (this.sessionTrashCountLoadedOnce) {
-                    this.sessionTrashTotalCount = this.normalizeSessionTrashTotalCount(
-                        res && res.totalCount !== undefined
-                            ? res.totalCount
-                            : (this.normalizeSessionTrashTotalCount(this.sessionTrashTotalCount, this.sessionTrashItems) + 1),
-                        this.sessionTrashItems
-                    );
                 } else {
                     this.sessionTrashTotalCount = this.normalizeSessionTrashTotalCount(
                         res && res.totalCount !== undefined

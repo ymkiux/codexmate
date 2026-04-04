@@ -58,7 +58,10 @@ export function createInstallMethods() {
             if (!registry) {
                 return base;
             }
-            return `${base} --registry=${registry}`;
+            const quoteArg = typeof this.quoteShellArg === 'function'
+                ? this.quoteShellArg(registry)
+                : `'${registry.replace(/'/g, `'\\''`)}'`;
+            return `${base} --registry=${quoteArg}`;
         },
 
         resolveInstallPlatform() {

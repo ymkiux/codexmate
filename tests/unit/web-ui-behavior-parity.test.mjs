@@ -314,7 +314,17 @@ function createCopyActionContext(methods) {
 test('captured bundled app skeleton still matches HEAD', () => {
     const currentDataKeys = Object.keys(currentAppOptions.data()).sort();
     const headDataKeys = Object.keys(headAppOptions.data()).sort();
-    assert.deepStrictEqual(currentDataKeys, headDataKeys);
+    const extraCurrentKeys = currentDataKeys.filter((key) => !headDataKeys.includes(key)).sort();
+    const missingCurrentKeys = headDataKeys.filter((key) => !currentDataKeys.includes(key)).sort();
+    assert.deepStrictEqual(extraCurrentKeys, [
+        'claudeModelsRequestSeq',
+        'codexModelsRequestSeq',
+        'sessionPathRequestSeqMap'
+    ]);
+    assert.deepStrictEqual(missingCurrentKeys, ['sessionPathRequestSeq']);
+    const normalizedCurrentKeys = currentDataKeys.filter((key) => !extraCurrentKeys.includes(key)).sort();
+    const normalizedHeadKeys = headDataKeys.filter((key) => !missingCurrentKeys.includes(key)).sort();
+    assert.deepStrictEqual(normalizedCurrentKeys, normalizedHeadKeys);
     assert.deepStrictEqual(
         Object.keys(currentMethods).sort(),
         Object.keys(headMethods).sort()
@@ -467,7 +477,7 @@ test('loadAll keeps success and failure state transitions aligned with HEAD', as
             initError: currentFailureContext.initError,
             providersList: currentFailureContext.providersList,
             messages: currentFailureContext.messages,
-            calls: currentFailureContext.calls
+            calls: currentFailureContext.calls.filter(([name]) => name !== 'loadModelsForProvider')
         }
     }, {
         calls: headFailure.calls,
@@ -476,9 +486,10 @@ test('loadAll keeps success and failure state transitions aligned with HEAD', as
             initError: headFailureContext.initError,
             providersList: headFailureContext.providersList,
             messages: headFailureContext.messages,
-            calls: headFailureContext.calls
+            calls: headFailureContext.calls.filter(([name]) => name !== 'loadModelsForProvider')
         }
     });
+    assert.ok(!currentFailureContext.calls.some(([name]) => name === 'loadModelsForProvider'));
 });
 
 test('session trash list helpers stay aligned with HEAD for prepend and pagination', () => {

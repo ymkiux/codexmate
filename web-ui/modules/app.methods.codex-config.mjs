@@ -77,6 +77,9 @@ export function createCodexConfigMethods(options = {}) {
             await this.waitForCodexApplyIdle();
             this.currentProvider = name;
             await this.loadModelsForProvider(name);
+            if (this.modelsSource === 'error') {
+                return;
+            }
             if (this.modelsSource === 'remote' && this.models.length > 0 && !this.models.includes(this.currentModel)) {
                 this.currentModel = this.models[0];
                 this.modelsHasCurrent = true;
@@ -227,12 +230,15 @@ export function createCodexConfigMethods(options = {}) {
                     let remote = res.remote || null;
                     {
                         const providers = (this.providersList || [])
-                            .filter(provider => provider && provider.name);
+                            .map((provider) => typeof provider === 'string'
+                                ? provider.trim()
+                                : String((provider && provider.name) || '').trim())
+                            .filter(Boolean);
                         const tasks = providers.map(provider =>
-                            this.runSpeedTest(provider.name, { silent: true })
-                                .then(result => ({ name: provider.name, result }))
+                            this.runSpeedTest(provider, { silent: true })
+                                .then(result => ({ name: provider, result }))
                                 .catch(err => ({
-                                    name: provider.name,
+                                    name: provider,
                                     result: { ok: false, error: err && err.message ? err.message : 'Speed test failed' }
                                 }))
                         );

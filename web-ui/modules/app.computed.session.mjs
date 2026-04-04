@@ -109,12 +109,10 @@ export function createSessionComputed() {
             return items.slice(0, safeVisibleCount);
         },
         sessionTrashHasMoreItems() {
-            const totalItems = Array.isArray(this.sessionTrashItems) ? this.sessionTrashItems.length : 0;
-            return this.visibleSessionTrashItems.length < totalItems;
+            return this.visibleSessionTrashItems.length < this.sessionTrashCount;
         },
         sessionTrashHiddenCount() {
-            const totalItems = Array.isArray(this.sessionTrashItems) ? this.sessionTrashItems.length : 0;
-            return Math.max(0, totalItems - this.visibleSessionTrashItems.length);
+            return Math.max(0, this.sessionTrashCount - this.visibleSessionTrashItems.length);
         },
         sessionTrashCount() {
             const totalCount = Number(this.sessionTrashTotalCount);

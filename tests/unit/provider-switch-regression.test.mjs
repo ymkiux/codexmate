@@ -156,3 +156,23 @@ test('switchProvider reflects the first clicked target immediately while waiting
     assert.strictEqual(currentComputed.displayCurrentProvider.call(context), 'beta');
     assert.strictEqual(context.providerSwitchDisplayTarget, '');
 });
+
+test('performProviderSwitch skips config reapply when provider models fail to load', async () => {
+    const context = createProviderSwitchContext();
+    context.loadModelsForProvider = async function loadModelsForProvider(name) {
+        context.calls.push(['loadModelsForProvider', name]);
+        this.models = [];
+        this.modelsSource = 'error';
+        this.modelsHasCurrent = true;
+    };
+    context.waitForCodexApplyIdle = currentMethods.waitForCodexApplyIdle;
+
+    await currentMethods.performProviderSwitch.call(context, 'beta');
+
+    assert.strictEqual(context.currentProvider, 'beta');
+    assert.strictEqual(context.currentModel, 'alpha-model');
+    assert.strictEqual(context.modelsSource, 'error');
+    assert.deepStrictEqual(context.calls, [
+        ['loadModelsForProvider', 'beta']
+    ]);
+});

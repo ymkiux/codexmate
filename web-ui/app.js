@@ -1,4 +1,4 @@
-﻿import {
+import {
     DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT,
     DEFAULT_MODEL_CONTEXT_WINDOW,
     DEFAULT_OPENCLAW_TEMPLATE,
@@ -46,6 +46,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 claudeModelsSource: 'idle',
                 claudeModelsHasCurrent: true,
                 claudeModelsLoading: false,
+                codexModelsRequestSeq: 0,
+                claudeModelsRequestSeq: 0,
                 loading: true,
                 initError: '',
                 message: '',
@@ -135,7 +137,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     codex: false,
                     claude: false
                 },
-                sessionPathRequestSeq: 0,
+                sessionPathRequestSeqMap: {
+                    all: 0,
+                    codex: 0,
+                    claude: 0
+                },
                 sessionExporting: {},
                 sessionCloning: {},
                 sessionDeleting: {},

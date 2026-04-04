@@ -10020,14 +10020,32 @@ function watchPathsForRestart(targets, onChange) {
             return true;
         }
         try {
-            const watcher = fs.watch(target, { recursive }, (eventType, filename) => {
+            const basename = isDirectory ? '' : path.basename(target);
+            const watchTarget = isDirectory ? target : path.dirname(target);
+            const watcher = fs.watch(watchTarget, { recursive }, (eventType, filename) => {
                 if (isDirectory && !recursive && eventType === 'rename') {
                     syncDirectoryTree(target);
                 }
                 if (!filename) return;
-                const lower = filename.toLowerCase();
+                let normalizedFilename = String(filename).replace(/\\/g, '/');
+                if (!isDirectory) {
+                    const fileNameOnly = normalizedFilename.split('/').pop();
+                    if (fileNameOnly !== basename) {
+                        return;
+                    }
+                    normalizedFilename = basename;
+                }
+                const lower = normalizedFilename.toLowerCase();
                 if (!(/\.(html|js|mjs|css)$/.test(lower))) return;
-                trigger({ target, eventType, filename });
+                trigger({ target, eventType, filename: normalizedFilename });
+            });
+            watcher.on('error', () => {
+                closeWatcher(watchKey);
+                if (isDirectory && !recursive) {
+                    syncDirectoryTree(target);
+                } else if (fs.existsSync(target)) {
+                    addWatcher(target, recursive, isDirectory);
+                }
             });
             watcherEntries.set(watchKey, {
                 watcher,
@@ -10706,11 +10724,6 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                 return;
             }
             const relativePath = path.relative(webDir, filePath).replace(/\\/g, '/');
-            if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
-                res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-                res.end('Not Found');
-                return;
-            }
             const dynamicAsset = PUBLIC_WEB_UI_DYNAMIC_ASSETS.get(relativePath);
             if (dynamicAsset) {
                 res.writeHead(200, { 'Content-Type': dynamicAsset.mime });
@@ -10718,6 +10731,11 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                 return;
             }
             if (!PUBLIC_WEB_UI_STATIC_ASSETS.has(relativePath)) {
+                res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+                res.end('Not Found');
+                return;
+            }
+            if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
                 res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
                 res.end('Not Found');
                 return;

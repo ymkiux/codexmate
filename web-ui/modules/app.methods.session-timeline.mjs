@@ -16,6 +16,16 @@ export function createSessionTimelineMethods() {
             if (!this.sessionPreviewHeaderEl || typeof ResizeObserver !== 'function') return;
             this.sessionPreviewHeaderResizeObserver = new ResizeObserver(() => {
                 this.updateSessionTimelineOffset();
+                this.invalidateSessionTimelineMeasurementCache();
+                if (
+                    this.sessionTimelineEnabled
+                    && this.mainTab === 'sessions'
+                    && this.getMainTabForNav() === 'sessions'
+                    && this.sessionPreviewRenderEnabled
+                    && this.sessionTimelineNodes.length
+                ) {
+                    this.scheduleSessionTimelineSync();
+                }
             });
             this.sessionPreviewHeaderResizeObserver.observe(this.sessionPreviewHeaderEl);
         },
