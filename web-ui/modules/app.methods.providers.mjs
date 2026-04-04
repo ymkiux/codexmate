@@ -165,10 +165,13 @@ export function createProvidersMethods(options = {}) {
             }
 
             const name = this.editingProvider.name;
-            const key = this.editingProvider.key || '';
+            const params = { name, url };
+            if (typeof this.editingProvider.key === 'string' && this.editingProvider.key.trim()) {
+                params.key = this.editingProvider.key;
+            }
             this.closeEditModal();
             try {
-                const res = await api('update-provider', { name, url, key });
+                const res = await api('update-provider', params);
                 if (res.error) {
                     this.showMessage(res.error, 'error');
                     return;

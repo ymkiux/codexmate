@@ -75,9 +75,19 @@ export function createCodexConfigMethods(options = {}) {
 
         async performProviderSwitch(name) {
             await this.waitForCodexApplyIdle();
+            const previousProvider = this.currentProvider;
+            const previousModel = this.currentModel;
+            const previousModels = Array.isArray(this.models) ? [...this.models] : [];
+            const previousModelsSource = this.modelsSource;
+            const previousModelsHasCurrent = this.modelsHasCurrent;
             this.currentProvider = name;
             await this.loadModelsForProvider(name);
             if (this.modelsSource === 'error') {
+                this.currentProvider = previousProvider;
+                this.currentModel = previousModel;
+                this.models = previousModels;
+                this.modelsSource = previousModelsSource;
+                this.modelsHasCurrent = previousModelsHasCurrent;
                 return;
             }
             if (this.modelsSource === 'remote' && this.models.length > 0 && !this.models.includes(this.currentModel)) {
