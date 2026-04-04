@@ -11,10 +11,6 @@ const currentMethods = currentAppOptions.methods;
 const headMethods = headAppOptions.methods;
 const currentComputed = currentAppOptions.computed;
 const headComputed = headAppOptions.computed;
-const ALLOWED_CURRENT_ONLY_DATA_KEYS = new Set([
-    'providerSwitchDisplayTarget'
-]);
-
 function cloneJson(value) {
     return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
@@ -318,10 +314,7 @@ function createCopyActionContext(methods) {
 test('captured bundled app skeleton still matches HEAD', () => {
     const currentDataKeys = Object.keys(currentAppOptions.data()).sort();
     const headDataKeys = Object.keys(headAppOptions.data()).sort();
-    assert.deepStrictEqual(
-        currentDataKeys.filter((key) => !ALLOWED_CURRENT_ONLY_DATA_KEYS.has(key)),
-        headDataKeys
-    );
+    assert.deepStrictEqual(currentDataKeys, headDataKeys);
     assert.deepStrictEqual(
         Object.keys(currentMethods).sort(),
         Object.keys(headMethods).sort()

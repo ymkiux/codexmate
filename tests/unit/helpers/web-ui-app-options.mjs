@@ -12,14 +12,7 @@ import {
 const require = createRequire(import.meta.url);
 const sourceBundle = require(path.join(projectRoot, 'web-ui', 'source-bundle.cjs'));
 
-const HEAD_WEB_UI_FILES = [
-    'web-ui/app.js',
-    'web-ui/logic.mjs',
-    'web-ui/session-helpers.mjs',
-    'web-ui/modules/config-mode.computed.mjs',
-    'web-ui/modules/skills.computed.mjs',
-    'web-ui/modules/skills.methods.mjs'
-];
+const HEAD_WEB_UI_ENTRY = 'web-ui/app.js';
 
 function setGlobalOverride(name, value) {
     const previous = Object.getOwnPropertyDescriptor(globalThis, name);
@@ -61,7 +54,14 @@ function readHeadProjectFile(relativePath) {
 
 function createHeadWebUiFixture() {
     const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'codexmate-head-web-ui-'));
-    for (const relativePath of HEAD_WEB_UI_FILES) {
+    const entryPath = path.join(projectRoot, HEAD_WEB_UI_ENTRY);
+    const dependencyPaths = sourceBundle.collectJavaScriptFiles(entryPath);
+
+    for (const sourcePath of dependencyPaths) {
+        const relativePath = path.relative(projectRoot, sourcePath).replace(/\\/g, '/');
+        if (!relativePath.startsWith('web-ui/')) {
+            throw new Error(`Unexpected head Web UI dependency outside web-ui/: ${relativePath}`);
+        }
         const targetPath = path.join(fixtureRoot, relativePath.replace(/^web-ui[\\/]/, ''));
         fs.mkdirSync(path.dirname(targetPath), { recursive: true });
         fs.writeFileSync(targetPath, readHeadProjectFile(relativePath), 'utf8');

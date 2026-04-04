@@ -220,6 +220,7 @@ function readExecutableBundledJavaScriptModule(entryPath) {
 }
 
 module.exports = {
+    collectJavaScriptFiles,
     readUtf8Text,
     readBundledWebUiHtml,
     readBundledWebUiCss,
