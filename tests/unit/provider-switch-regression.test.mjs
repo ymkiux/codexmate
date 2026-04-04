@@ -255,3 +255,57 @@ test('updateProvider keeps existing key when edit key input is blank', async () 
         type: 'success'
     }]);
 });
+
+test('updateProvider sends explicit key when user enters a new key', async () => {
+    const context = createProviderUpdateContext();
+    context.editingProvider.key = 'sk-new';
+    const payloads = [];
+    const fetch = async (_url, init = {}) => {
+        payloads.push(JSON.parse(init.body));
+        return createJsonResponse({});
+    };
+
+    await withGlobalOverrides({ fetch }, async () => {
+        await currentMethods.updateProvider.call(context);
+    });
+
+    assert.deepStrictEqual(payloads, [{
+        action: 'update-provider',
+        params: {
+            name: 'alpha',
+            url: 'https://api.example.com/v1',
+            key: 'sk-new'
+        }
+    }]);
+    assert.strictEqual(context.showEditModal, false);
+    assert.strictEqual(context.loadAllCalls, 1);
+    assert.deepStrictEqual(context.messages, [{
+        text: '操作成功',
+        type: 'success'
+    }]);
+});
+
+test('updateProvider keeps edit modal open when request throws', async () => {
+    const context = createProviderUpdateContext();
+    const fetch = async () => {
+        throw new Error('network down');
+    };
+
+    await withGlobalOverrides({ fetch }, async () => {
+        await currentMethods.updateProvider.call(context);
+    });
+
+    assert.strictEqual(context.showEditModal, true);
+    assert.deepStrictEqual(context.editingProvider, {
+        name: 'alpha',
+        url: ' https://api.example.com/v1 ',
+        key: '',
+        readOnly: false,
+        nonEditable: false
+    });
+    assert.strictEqual(context.loadAllCalls, 0);
+    assert.deepStrictEqual(context.messages, [{
+        text: '更新失败',
+        type: 'error'
+    }]);
+});
