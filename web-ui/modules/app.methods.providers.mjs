@@ -169,13 +169,13 @@ export function createProvidersMethods(options = {}) {
             if (typeof this.editingProvider.key === 'string' && this.editingProvider.key.trim()) {
                 params.key = this.editingProvider.key;
             }
-            this.closeEditModal();
             try {
                 const res = await api('update-provider', params);
                 if (res.error) {
                     this.showMessage(res.error, 'error');
                     return;
                 }
+                this.closeEditModal();
                 this.showMessage('操作成功', 'success');
                 await this.loadAll();
             } catch (e) {
