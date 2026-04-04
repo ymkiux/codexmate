@@ -1,5 +1,8 @@
 import assert from 'assert';
-import { captureCurrentBundledAppOptions } from './helpers/web-ui-app-options.mjs';
+import {
+    captureCurrentBundledAppOptions,
+    withGlobalOverrides
+} from './helpers/web-ui-app-options.mjs';
 
 const currentAppOptions = await captureCurrentBundledAppOptions();
 const currentMethods = currentAppOptions.methods;
@@ -48,6 +51,52 @@ function createProviderSwitchContext() {
         },
         async applyCodexConfigDirect(options) {
             calls.push(['applyCodexConfigDirect', options]);
+        }
+    };
+}
+
+function createProviderUpdateContext() {
+    const messages = [];
+    return {
+        editingProvider: {
+            name: 'alpha',
+            url: ' https://api.example.com/v1 ',
+            key: '',
+            readOnly: false,
+            nonEditable: false
+        },
+        showEditModal: true,
+        messages,
+        loadAllCalls: 0,
+        showMessage(text, type) {
+            messages.push({
+                text: String(text),
+                type: type || 'info'
+            });
+        },
+        async loadAll() {
+            this.loadAllCalls += 1;
+        },
+        closeEditModal: currentMethods.closeEditModal
+    };
+}
+
+function createJsonResponse(result = {}) {
+    return {
+        ok: true,
+        status: 200,
+        headers: {
+            get(name) {
+                return String(name || '').toLowerCase() === 'content-type'
+                    ? 'application/json'
+                    : '';
+            }
+        },
+        async json() {
+            return result;
+        },
+        async text() {
+            return JSON.stringify(result);
         }
     };
 }
@@ -169,10 +218,40 @@ test('performProviderSwitch skips config reapply when provider models fail to lo
 
     await currentMethods.performProviderSwitch.call(context, 'beta');
 
-    assert.strictEqual(context.currentProvider, 'beta');
+    assert.strictEqual(context.currentProvider, 'alpha');
     assert.strictEqual(context.currentModel, 'alpha-model');
-    assert.strictEqual(context.modelsSource, 'error');
+    assert.deepStrictEqual(context.models, ['alpha-model']);
+    assert.strictEqual(context.modelsSource, 'remote');
+    assert.strictEqual(context.modelsHasCurrent, true);
     assert.deepStrictEqual(context.calls, [
         ['loadModelsForProvider', 'beta']
     ]);
+});
+
+test('updateProvider keeps existing key when edit key input is blank', async () => {
+    const context = createProviderUpdateContext();
+    const payloads = [];
+    const fetch = async (_url, init = {}) => {
+        payloads.push(JSON.parse(init.body));
+        return createJsonResponse({});
+    };
+
+    await withGlobalOverrides({ fetch }, async () => {
+        await currentMethods.updateProvider.call(context);
+    });
+
+    assert.deepStrictEqual(payloads, [{
+        action: 'update-provider',
+        params: {
+            name: 'alpha',
+            url: 'https://api.example.com/v1'
+        }
+    }]);
+    assert.strictEqual(context.showEditModal, false);
+    assert.deepStrictEqual(context.editingProvider, { name: '', url: '', key: '', readOnly: false, nonEditable: false });
+    assert.strictEqual(context.loadAllCalls, 1);
+    assert.deepStrictEqual(context.messages, [{
+        text: '操作成功',
+        type: 'success'
+    }]);
 });
