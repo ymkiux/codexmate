@@ -49,8 +49,10 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /class="codex-config-grid"/);
     assert.match(html, /onSettingsTabClick\('backup'\)/);
     assert.match(html, /onSettingsTabClick\('trash'\)/);
+    assert.match(html, /onSettingsTabClick\('device'\)/);
     assert.match(html, /settingsTab === 'backup'/);
     assert.match(html, /settingsTab === 'trash'/);
+    assert.match(html, /settingsTab === 'device'/);
     assert.match(html, /sessionTrashCount/);
     assert.match(html, /id="side-tab-market"/);
     assert.match(html, /id="tab-market"/);
@@ -107,17 +109,29 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.doesNotMatch(html, /class="market-ecosystem-grid"/);
     assert.match(html, /id="settings-tab-backup"/);
     assert.match(html, /id="settings-tab-trash"/);
+    assert.match(html, /id="settings-tab-device"/);
     assert.match(html, /role="tab"/);
     assert.match(html, /aria-controls="settings-panel-backup"/);
     assert.match(html, /aria-controls="settings-panel-trash"/);
+    assert.match(html, /aria-controls="settings-panel-device"/);
     assert.match(html, /:aria-selected="settingsTab === 'backup'"/);
     assert.match(html, /:aria-selected="settingsTab === 'trash'"/);
+    assert.match(html, /:aria-selected="settingsTab === 'device'"/);
     assert.match(html, /id="settings-tab-backup"[\s\S]*:tabindex="settingsTab === 'backup' \? 0 : -1"/);
     assert.match(html, /id="settings-tab-trash"[\s\S]*:tabindex="settingsTab === 'trash' \? 0 : -1"/);
+    assert.match(html, /id="settings-tab-device"[\s\S]*:tabindex="settingsTab === 'device' \? 0 : -1"/);
     assert.match(html, /id="settings-panel-backup"/);
     assert.match(html, /id="settings-panel-trash"/);
+    assert.match(html, /id="settings-panel-device"/);
     assert.match(html, /<div[\s\S]*v-show="settingsTab === 'backup'"[\s\S]*id="settings-panel-backup"[\s\S]*aria-labelledby="settings-tab-backup">/);
     assert.match(html, /<div[\s\S]*v-show="settingsTab === 'trash'"[\s\S]*id="settings-panel-trash"[\s\S]*aria-labelledby="settings-tab-trash">/);
+    assert.match(html, /<div[\s\S]*v-show="settingsTab === 'device'"[\s\S]*id="settings-panel-device"[\s\S]*aria-labelledby="settings-tab-device">/);
+    assert.match(html, /id="settings-panel-device"[\s\S]*?<span class="selector-title">配置重置<\/span>/);
+    assert.match(html, /id="settings-panel-device"[\s\S]*?@click="resetConfig"/);
+    assert.doesNotMatch(
+        html.match(/id="panel-config-provider"[\s\S]*?<\/template>/)?.[0] || '',
+        /<span class="selector-title">配置重置<\/span>/
+    );
     assert.match(html, /class="settings-tab-actions trash-header-actions"/);
     assert.match(html, /<button class="btn-tool btn-tool-compact" @click="loadSessionTrash\(\{ forceRefresh: true \}\)"/);
     assert.match(html, /<button class="btn-tool btn-tool-compact" @click="clearSessionTrash"/);
@@ -209,7 +223,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(templateAgentModals, /<div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="config-template-modal-title">/);
     assert.match(templateAgentModals, /<div class="modal-title" id="config-template-modal-title">Config 模板编辑器（手动确认应用）<\/div>/);
     assert.match(templateAgentModals, /<div v-if="showAgentsModal" class="modal-overlay" @click\.self="closeAgentsModal">/);
-    assert.match(templateAgentModals, /<div class="modal modal-wide modal-editor" role="dialog" aria-modal="true" aria-labelledby="agents-modal-title">/);
+    assert.match(templateAgentModals, /<div class="modal modal-wide modal-editor agents-modal" role="dialog" aria-modal="true" aria-labelledby="agents-modal-title">/);
     assert.match(templateAgentModals, /<div class="modal-title" id="agents-modal-title">{{ agentsModalTitle }}<\/div>/);
     assert.match(modalsBasic, /<button type="button" class="btn-remove-model" @click="removeModel\(model\)">删除<\/button>/);
     assert.doesNotMatch(modalsBasic, /<span class="btn-remove-model" @click="removeModel\(model\)">删除<\/span>/);
@@ -326,6 +340,7 @@ test('web ui script defines provider mode metadata for codex only', () => {
     assert.match(appScript, /sessionTrashHasMoreItems\(\)/);
     assert.match(appScript, /sessionTrashHiddenCount\(\)/);
     assert.match(appScript, /normalizeSettingsTab\(tab\)/);
+    assert.match(appScript, /tab === 'trash' \|\| tab === 'device'/);
     assert.match(appScript, /switchSettingsTab\(tab,\s*options = \{\}\)/);
     assert.match(appScript, /loadSessionTrash\(options = \{\}\)/);
     assert.match(appScript, /loadMoreSessionTrashItems\(\)/);
@@ -413,7 +428,7 @@ test('trash item styles stay aligned with session card layout and keep mobile us
         styles,
         /@media \(max-width: 540px\)\s*\{[\s\S]*\.session-item-copy\.session-item-pin svg,\s*[\s\S]*width:\s*16px;/
     );
-    assert.match(styles, /@media \(max-width: 540px\)\s*\{[\s\S]*\.session-item-copy\s*\{[\s\S]*width:\s*44px;[\s\S]*height:\s*44px;[\s\S]*min-width:\s*44px;[\s\S]*min-height:\s*44px;/);
+    assert.match(styles, /@media \(max-width: 540px\)\s*\{[\s\S]*\.session-item-copy\s*\{[\s\S]*width:\s*36px;[\s\S]*height:\s*36px;[\s\S]*min-width:\s*36px;[\s\S]*min-height:\s*36px;/);
     assert.match(styles, /\.codex-config-grid\s*\{/);
     assert.match(styles, /\.codex-config-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(240px,\s*100%\),\s*1fr\)\);/);
     assert.match(styles, /\.codex-config-field\s*\{/);

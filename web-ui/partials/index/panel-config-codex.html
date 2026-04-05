@@ -143,16 +143,6 @@
                     </button>
                 </div>
 
-                <div class="selector-section">
-                    <div class="selector-header">
-                        <span class="selector-title">配置重置</span>
-                    </div>
-                    <div class="config-template-hint">先备份 config.toml，再写默认配置。</div>
-                    <button class="btn-tool" @click="resetConfig" :disabled="resetConfigLoading || loading || !!initError">
-                        {{ resetConfigLoading ? '重装中...' : '重装配置' }}
-                    </button>
-                </div>
-
                 </template>
 
                 <div class="selector-section">
