@@ -10041,6 +10041,11 @@ function watchPathsForRestart(targets, onChange) {
             });
             watcher.on('error', () => {
                 closeWatcher(watchKey);
+                if (isDirectory && recursive && !fs.existsSync(target)) {
+                    syncDirectoryTree(target);
+                    addMissingDirectoryWatcher(target);
+                    return;
+                }
                 if (isDirectory && !recursive) {
                     syncDirectoryTree(target);
                 } else if (fs.existsSync(target)) {
@@ -10055,6 +10060,51 @@ function watchPathsForRestart(targets, onChange) {
             });
             return true;
         } catch (e) {
+            return false;
+        }
+    };
+
+    const addMissingDirectoryWatcher = (target) => {
+        const parentDir = path.dirname(target);
+        if (!parentDir || parentDir === target || !fs.existsSync(parentDir)) {
+            return false;
+        }
+        const watchKey = `missing-dir:${target}`;
+        if (watcherEntries.has(watchKey)) {
+            return true;
+        }
+        const basename = path.basename(target);
+        try {
+            const watcher = fs.watch(parentDir, { recursive: false }, (_eventType, filename) => {
+                if (!filename) return;
+                const fileNameOnly = String(filename).replace(/\\/g, '/').split('/').pop();
+                if (fileNameOnly !== basename) {
+                    return;
+                }
+                if (!fs.existsSync(target)) {
+                    syncDirectoryTree(target);
+                    return;
+                }
+                closeWatcher(watchKey);
+                const ok = addWatcher(target, true, true);
+                if (!ok) {
+                    syncDirectoryTree(target);
+                }
+            });
+            watcher.on('error', () => {
+                closeWatcher(watchKey);
+                if (fs.existsSync(parentDir) && !fs.existsSync(target)) {
+                    addMissingDirectoryWatcher(target);
+                }
+            });
+            watcherEntries.set(watchKey, {
+                watcher,
+                target: parentDir,
+                recursive: false,
+                isDirectory: false
+            });
+            return true;
+        } catch (_) {
             return false;
         }
     };

@@ -120,6 +120,65 @@ test('openOpenclawWorkspaceEditor rejects invalid workspace filenames before loa
     }]);
 });
 
+test('latest agents editor request keeps loading state until the newest response lands', async () => {
+    const resolvers = [];
+    const methods = createAgentsMethods({
+        api: async (action) => new Promise((resolve) => {
+            resolvers.push({ action, resolve });
+        })
+    });
+    const context = {
+        ...methods,
+        shownMessages: [],
+        resetCalls: 0,
+        showMessage(message, type) {
+            this.shownMessages.push({ message, type });
+        },
+        resetAgentsDiffState() {
+            this.resetCalls += 1;
+        }
+    };
+
+    const firstOpen = methods.openAgentsEditor.call(context);
+    const secondOpen = methods.openOpenclawAgentsEditor.call(context);
+
+    assert.strictEqual(context.agentsLoading, true);
+    assert.deepStrictEqual(
+        resolvers.map((entry) => entry.action),
+        ['get-agents-file', 'get-openclaw-agents-file']
+    );
+
+    resolvers[0].resolve({
+        content: 'codex-agents',
+        path: '/tmp/AGENTS.md',
+        exists: true,
+        lineEnding: '\n'
+    });
+    await firstOpen;
+
+    assert.strictEqual(context.agentsLoading, true);
+    assert.strictEqual(context.showAgentsModal, undefined);
+    assert.strictEqual(context.agentsContent, undefined);
+    assert.strictEqual(context.resetCalls, 0);
+
+    resolvers[1].resolve({
+        content: 'openclaw-agents',
+        path: '/tmp/openclaw/AGENTS.md',
+        exists: true,
+        lineEnding: '\r\n'
+    });
+    await secondOpen;
+
+    assert.strictEqual(context.agentsLoading, false);
+    assert.strictEqual(context.showAgentsModal, true);
+    assert.strictEqual(context.agentsContext, 'openclaw');
+    assert.strictEqual(context.agentsContent, 'openclaw-agents');
+    assert.strictEqual(context.agentsPath, '/tmp/openclaw/AGENTS.md');
+    assert.strictEqual(context.agentsLineEnding, '\r\n');
+    assert.strictEqual(context.resetCalls, 1);
+    assert.deepStrictEqual(context.shownMessages, []);
+});
+
 test('applyAgentsContent rejects invalid workspace filenames before save api', async () => {
     let apiCalls = 0;
     const methods = createAgentsMethods({
@@ -157,5 +216,70 @@ test('applyAgentsContent rejects invalid workspace filenames before save api', a
     assert.deepStrictEqual(context.shownMessages, [{
         message: '仅支持 OpenClaw Workspace 内的 `.md` 文件',
         type: 'error'
+    }]);
+});
+
+test('applyAgentsContent ignores duplicate save attempts while a save is already running', async () => {
+    const resolvers = [];
+    const apiCalls = [];
+    const methods = createAgentsMethods({
+        api: async (action, params) => {
+            apiCalls.push({ action, params });
+            return new Promise((resolve) => {
+                resolvers.push(resolve);
+            });
+        }
+    });
+    const closeCalls = [];
+    const context = {
+        ...methods,
+        agentsContext: 'codex',
+        agentsDiffVisible: true,
+        agentsDiffLoading: false,
+        agentsDiffError: '',
+        agentsDiffHasChanges: true,
+        agentsDiffHasChangesValue: true,
+        agentsDiffFingerprint: 'same',
+        agentsContent: 'after',
+        agentsOriginalContent: 'before',
+        agentsLineEnding: '\n',
+        shownMessages: [],
+        showMessage(message, type) {
+            this.shownMessages.push({ message, type });
+        },
+        buildAgentsDiffFingerprint() {
+            return 'same';
+        },
+        closeAgentsModal(options) {
+            closeCalls.push(options);
+        }
+    };
+
+    const firstApply = methods.applyAgentsContent.call(context);
+    assert.strictEqual(context.agentsSaving, true);
+
+    const secondApply = methods.applyAgentsContent.call(context);
+    assert.strictEqual(apiCalls.length, 1);
+
+    resolvers[0]({ success: true });
+    if (resolvers[1]) {
+        resolvers[1]({ success: true });
+    }
+
+    await firstApply;
+    await secondApply;
+
+    assert.deepStrictEqual(apiCalls, [{
+        action: 'apply-agents-file',
+        params: {
+            content: 'after',
+            lineEnding: '\n'
+        }
+    }]);
+    assert.strictEqual(context.agentsSaving, false);
+    assert.deepStrictEqual(closeCalls, [{ force: true }]);
+    assert.deepStrictEqual(context.shownMessages, [{
+        message: 'AGENTS.md 已保存',
+        type: 'success'
     }]);
 });
