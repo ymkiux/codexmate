@@ -92,3 +92,70 @@ test('handleBeforeUnload keeps the agents unsaved-change guard active while savi
     assert.strictEqual(event.preventDefaultCalled, true);
     assert.strictEqual(event.returnValue, '');
 });
+
+test('openOpenclawWorkspaceEditor rejects invalid workspace filenames before loading', async () => {
+    let apiCalls = 0;
+    const methods = createAgentsMethods({
+        api: async () => {
+            apiCalls += 1;
+            return {};
+        }
+    });
+    const context = {
+        ...methods,
+        openclawWorkspaceFileName: '../escape.md',
+        shownMessages: [],
+        showMessage(message, type) {
+            this.shownMessages.push({ message, type });
+        }
+    };
+
+    await methods.openOpenclawWorkspaceEditor.call(context);
+
+    assert.strictEqual(apiCalls, 0);
+    assert.strictEqual(context.agentsLoading, undefined);
+    assert.deepStrictEqual(context.shownMessages, [{
+        message: '仅支持 OpenClaw Workspace 内的 `.md` 文件',
+        type: 'error'
+    }]);
+});
+
+test('applyAgentsContent rejects invalid workspace filenames before save api', async () => {
+    let apiCalls = 0;
+    const methods = createAgentsMethods({
+        api: async () => {
+            apiCalls += 1;
+            return { success: true };
+        }
+    });
+    const context = {
+        ...methods,
+        agentsContext: 'openclaw-workspace',
+        agentsWorkspaceFileName: '../escape.md',
+        agentsDiffVisible: true,
+        agentsDiffLoading: false,
+        agentsDiffError: '',
+        agentsDiffHasChanges: true,
+        agentsDiffHasChangesValue: true,
+        agentsDiffFingerprint: 'same',
+        agentsContent: 'after',
+        agentsOriginalContent: 'before',
+        agentsLineEnding: '\n',
+        shownMessages: [],
+        showMessage(message, type) {
+            this.shownMessages.push({ message, type });
+        },
+        buildAgentsDiffFingerprint() {
+            return 'same';
+        }
+    };
+
+    await methods.applyAgentsContent.call(context);
+
+    assert.strictEqual(apiCalls, 0);
+    assert.strictEqual(context.agentsSaving, undefined);
+    assert.deepStrictEqual(context.shownMessages, [{
+        message: '仅支持 OpenClaw Workspace 内的 `.md` 文件',
+        type: 'error'
+    }]);
+});

@@ -11,7 +11,7 @@
                             role="tab"
                             aria-controls="settings-panel-backup"
                             :aria-selected="settingsTab === 'backup'"
-                            tabindex="0"
+                            :tabindex="settingsTab === 'backup' ? 0 : -1"
                             :class="['config-subtab', { active: settingsTab === 'backup' }]"
                             @click="onSettingsTabClick('backup')">
                             备份与导入
@@ -21,7 +21,7 @@
                             role="tab"
                             aria-controls="settings-panel-trash"
                             :aria-selected="settingsTab === 'trash'"
-                            tabindex="0"
+                            :tabindex="settingsTab === 'trash' ? 0 : -1"
                             :class="['config-subtab', { active: settingsTab === 'trash' }]"
                             @click="onSettingsTabClick('trash')">
                             回收站

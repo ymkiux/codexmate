@@ -5,6 +5,20 @@ import {
     shouldApplyAgentsDiffPreviewResponse
 } from '../logic.mjs';
 
+function isValidOpenclawWorkspaceFileName(fileName) {
+    if (typeof fileName !== 'string') {
+        return false;
+    }
+    const normalized = fileName.trim();
+    if (!normalized || !normalized.endsWith('.md')) {
+        return false;
+    }
+    if (normalized.startsWith('/') || normalized.includes('\\') || normalized.includes('/') || normalized.includes('..')) {
+        return false;
+    }
+    return true;
+}
+
 export function createAgentsMethods(options = {}) {
     const {
         api,
@@ -65,6 +79,10 @@ export function createAgentsMethods(options = {}) {
             const fileName = (this.openclawWorkspaceFileName || '').trim();
             if (!fileName) {
                 this.showMessage('请输入文件名', 'error');
+                return;
+            }
+            if (!isValidOpenclawWorkspaceFileName(fileName)) {
+                this.showMessage('仅支持 OpenClaw Workspace 内的 `.md` 文件', 'error');
                 return;
             }
             this.setAgentsModalContext('openclaw-workspace', { fileName });
@@ -394,6 +412,10 @@ export function createAgentsMethods(options = {}) {
             }
             if (!this.agentsDiffHasChanges) {
                 this.showMessage('未检测到改动', 'info');
+                return;
+            }
+            if (this.agentsContext === 'openclaw-workspace' && !isValidOpenclawWorkspaceFileName(this.agentsWorkspaceFileName)) {
+                this.showMessage('仅支持 OpenClaw Workspace 内的 `.md` 文件', 'error');
                 return;
             }
             this.agentsSaving = true;

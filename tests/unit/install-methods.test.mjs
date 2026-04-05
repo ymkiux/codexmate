@@ -27,6 +27,11 @@ test('normalizeInstallRegistryUrl rejects scheme-only values', () => {
     assert.strictEqual(methods.normalizeInstallRegistryUrl(' https:// '), '');
 });
 
+test('normalizeInstallRegistryUrl rejects hostless urls', () => {
+    assert.strictEqual(methods.normalizeInstallRegistryUrl('https:///npm'), '');
+    assert.strictEqual(methods.normalizeInstallRegistryUrl('https://?x=1'), '');
+});
+
 test('normalizeInstallRegistryUrl accepts valid registries and trims trailing slashes', () => {
     assert.strictEqual(
         methods.normalizeInstallRegistryUrl('https://registry.example.com/'),

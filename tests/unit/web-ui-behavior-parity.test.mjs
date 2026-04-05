@@ -324,7 +324,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'sessionPathRequestSeqMap'
     ];
     const allowedMissingCurrentKeys = ['sessionPathRequestSeq'];
-    if (parityBaseline.ref === 'HEAD') {
+    if (String(parityBaseline.ref || '').startsWith('HEAD')) {
         const allowedExtraKeySet = new Set(allowedExtraCurrentKeys);
         const allowedMissingKeySet = new Set(allowedMissingCurrentKeys);
         const unexpectedExtraCurrentKeys = extraCurrentKeys.filter((key) => !allowedExtraKeySet.has(key));

@@ -53,7 +53,12 @@
                 <div class="card-list">
                     <div v-for="(config, name) in claudeConfigs" :key="name"
                          :class="['card', { active: currentClaudeConfig === name }]"
-                         @click="applyClaudeConfig(name)">
+                         @click="applyClaudeConfig(name)"
+                         @keydown.enter.self.prevent="applyClaudeConfig(name)"
+                         @keydown.space.self.prevent="applyClaudeConfig(name)"
+                         tabindex="0"
+                         role="button"
+                         :aria-current="currentClaudeConfig === name ? 'true' : null">
                         <div class="card-leading">
                             <div class="card-icon">{{ name.charAt(0).toUpperCase() }}</div>
                             <div class="card-content">
@@ -69,7 +74,7 @@
                                 {{ formatLatency(claudeSpeedResults[name]) }}
                             </span>
                             <div class="card-actions" @click.stop>
-                                <button class="card-action-btn" @click="openEditConfigModal(name)" title="编辑">
+                                <button class="card-action-btn" @click="openEditConfigModal(name)" :aria-label="`Edit Claude config ${name}`" title="编辑">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -82,7 +87,7 @@
                                         <path d="M12 2v14"/>
                                     </svg>
                                 </button>
-                                <button class="card-action-btn delete" @click="deleteClaudeConfig(name)" title="删除">
+                                <button class="card-action-btn delete" @click="deleteClaudeConfig(name)" :aria-label="`Delete Claude config ${name}`" title="删除">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M3 6h18"/>
                                         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
