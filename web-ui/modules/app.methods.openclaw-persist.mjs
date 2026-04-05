@@ -48,8 +48,9 @@ export function createOpenclawPersistMethods(options = {}) {
             });
         },
 
-        closeOpenclawConfigModal() {
-            if (this.openclawSaving || this.openclawApplying) {
+        closeOpenclawConfigModal(options = {}) {
+            const force = !!options.force;
+            if (!force && (this.openclawSaving || this.openclawApplying)) {
                 return;
             }
             this.openclawModalLoadToken = Number(this.openclawModalLoadToken || 0) + 1;
@@ -138,13 +139,24 @@ export function createOpenclawPersistMethods(options = {}) {
                 return '';
             }
 
+            const hadPreviousConfig = Object.prototype.hasOwnProperty.call(this.openclawConfigs, name);
+            const previousConfig = hadPreviousConfig ? this.openclawConfigs[name] : undefined;
+            const previousCurrentConfig = this.currentOpenclawConfig;
             this.openclawConfigs[name] = {
                 content: this.openclawEditing.content
             };
             this.currentOpenclawConfig = name;
-            this.saveOpenclawConfigs();
+            if (this.saveOpenclawConfigs() === false) {
+                if (hadPreviousConfig) {
+                    this.openclawConfigs[name] = previousConfig;
+                } else {
+                    delete this.openclawConfigs[name];
+                }
+                this.currentOpenclawConfig = previousCurrentConfig;
+                return '';
+            }
             if (closeModal) {
-                this.closeOpenclawConfigModal();
+                this.closeOpenclawConfigModal({ force: true });
             }
             return name;
         },
@@ -178,7 +190,7 @@ export function createOpenclawPersistMethods(options = {}) {
                 this.openclawConfigExists = true;
                 const targetTip = res.targetPath ? `（${res.targetPath}）` : '';
                 this.showMessage(`已保存并应用 OpenClaw 配置${targetTip}`, 'success');
-                this.closeOpenclawConfigModal();
+                this.closeOpenclawConfigModal({ force: true });
             } catch (e) {
                 this.showMessage('应用配置失败', 'error');
             } finally {
