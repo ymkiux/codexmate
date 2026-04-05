@@ -27,6 +27,16 @@
                             回收站
                             <span class="settings-tab-badge">{{ sessionTrashCount }}</span>
                         </button>
+                        <button
+                            id="settings-tab-device"
+                            role="tab"
+                            aria-controls="settings-panel-device"
+                            :aria-selected="settingsTab === 'device'"
+                            :tabindex="settingsTab === 'device' ? 0 : -1"
+                            :class="['config-subtab', { active: settingsTab === 'device' }]"
+                            @click="onSettingsTabClick('device')">
+                            设备
+                        </button>
                     </div>
 
                     <div
@@ -135,6 +145,22 @@
                                     </button>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <div
+                        v-show="settingsTab === 'device'"
+                        id="settings-panel-device"
+                        role="tabpanel"
+                        aria-labelledby="settings-tab-device">
+                        <div class="selector-section">
+                            <div class="selector-header">
+                                <span class="selector-title">配置重置</span>
+                            </div>
+                            <div class="config-template-hint">先备份 config.toml，再写默认配置。</div>
+                            <button class="btn-tool" @click="resetConfig" :disabled="resetConfigLoading || loading || !!initError">
+                                {{ resetConfigLoading ? '重装中...' : '重装配置' }}
+                            </button>
                         </div>
                     </div>
                 </div>
