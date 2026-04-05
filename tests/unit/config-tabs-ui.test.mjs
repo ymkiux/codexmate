@@ -9,9 +9,11 @@ import {
 test('config template keeps expected config tabs in top and side navigation', () => {
     const html = readBundledWebUiHtml();
     const modalsBasic = readProjectFile('web-ui/partials/index/modals-basic.html');
+    const templateAgentModals = readProjectFile('web-ui/partials/index/modal-config-template-agents.html');
     const openclawModal = readProjectFile('web-ui/partials/index/modal-openclaw-config.html');
     const sessionsPanel = readProjectFile('web-ui/partials/index/panel-sessions.html');
     const baseTheme = readProjectFile('web-ui/styles/base-theme.css');
+    const controlsForms = readProjectFile('web-ui/styles/controls-forms.css');
     const sideRail = html.match(/<aside class="side-rail"[\s\S]*?<\/aside>/)?.[0] || '';
     const topTabModes = [...html.matchAll(/id="tab-config-([a-z]+)"/g)]
         .map((match) => match[1]);
@@ -89,8 +91,8 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /class="side-section" role="navigation" aria-label="设置"/);
     assert.doesNotMatch(sideRail, /role="tablist"/);
     assert.doesNotMatch(sideRail, /role="tab"/);
-    assert.match(sideRail, /id="side-tab-config-codex"[\s\S]*:aria-current="isConfigModeNavActive\('codex'\) \? 'page' : null"/);
-    assert.match(sideRail, /id="side-tab-settings"[\s\S]*:aria-current="isMainTabNavActive\('settings'\) \? 'page' : null"/);
+    assert.match(sideRail, /id="side-tab-config-codex"[\s\S]*:aria-current="mainTab === 'config' && configMode === 'codex' \? 'page' : null"/);
+    assert.match(sideRail, /id="side-tab-settings"[\s\S]*:aria-current="mainTab === 'settings' \? 'page' : null"/);
     assert.match(html, /skillsDefaultRootPath/);
     assert.match(html, /可直接导入/);
     assert.doesNotMatch(html, /在线生态目录/);
@@ -170,6 +172,11 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert(providerShareButton, 'provider share button should exist');
     assert.match(providerShareButton[0], /disabled/);
     assert.match(providerShareButton[0], /title="分享导入命令（暂时禁用）"/);
+    assert.match(html, /<button class="btn-icon" @click="showModelModal = true" aria-label="Add model" title="添加模型" v-if="modelsSource === 'legacy'">\+<\/button>/);
+    assert.match(html, /<button class="btn-icon" @click="showModelListModal = true" aria-label="Manage models" title="管理模型" v-if="modelsSource === 'legacy'">≡<\/button>/);
+    assert.match(html, /<button class="card-action-btn"[^>]*@click="runSpeedTest\(provider\.name\)"[^>]*:aria-label="`Run speed test for \$\{provider\.name\}`"[^>]*title="Speed Test">/);
+    assert.match(html, /<button[\s\S]*?@click="openEditModal\(provider\)"[\s\S]*?:aria-label="`Edit provider \$\{provider\.name\}`"[\s\S]*?:title="shouldShowProviderEdit\(provider\) \? '编辑' : '不可编辑'">/);
+    assert.match(html, /<button[\s\S]*?@click="deleteProvider\(provider\.name\)"[\s\S]*?:aria-label="`Delete provider \$\{provider\.name\}`"[\s\S]*?:title="shouldShowProviderDelete\(provider\) \? '删除' : '不可删除'">/);
     assert.match(html, /<button class="card-action-btn"[^>]*@click="openEditConfigModal\(name\)"[^>]*:aria-label="`Edit Claude config \$\{name\}`"[^>]*title="编辑">/);
     assert.match(html, /<button class="card-action-btn delete"[^>]*@click="deleteClaudeConfig\(name\)"[^>]*:aria-label="`Delete Claude config \$\{name\}`"[^>]*title="删除">/);
     assert.match(html, /<button class="card-action-btn"[^>]*@click="copyClaudeShareCommand\(name\)"[^>]*disabled[^>]*>/);
@@ -192,7 +199,15 @@ test('config template keeps expected config tabs in top and side navigation', ()
     }
     assert.match(modalsBasic, /<input v-model="newProvider\.key" class="form-input" type="password" placeholder="sk-\.\.\.">/);
     assert.match(modalsBasic, /<input v-model="editingProvider\.key" class="form-input" type="password" placeholder="留空则保持不变">/);
-    assert.strictEqual([...modalsBasic.matchAll(/type="password"/g)].length, 2);
+    assert.match(modalsBasic, /<input v-model="newClaudeConfig\.apiKey" class="form-input" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-\.\.\.">/);
+    assert.match(modalsBasic, /<input v-model="editingConfig\.apiKey" class="form-input" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-\.\.\.">/);
+    assert.strictEqual([...modalsBasic.matchAll(/type="password"/g)].length, 4);
+    assert.match(templateAgentModals, /<div v-if="showConfigTemplateModal" class="modal-overlay" @click\.self="!configTemplateApplying && closeConfigTemplateModal\(\)">/);
+    assert.match(templateAgentModals, /<div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="config-template-modal-title">/);
+    assert.match(templateAgentModals, /<div class="modal-title" id="config-template-modal-title">Config 模板编辑器（手动确认应用）<\/div>/);
+    assert.match(templateAgentModals, /<div v-if="showAgentsModal" class="modal-overlay" @click\.self="closeAgentsModal">/);
+    assert.match(templateAgentModals, /<div class="modal modal-wide modal-editor" role="dialog" aria-modal="true" aria-labelledby="agents-modal-title">/);
+    assert.match(templateAgentModals, /<div class="modal-title" id="agents-modal-title">{{ agentsModalTitle }}<\/div>/);
     assert.match(modalsBasic, /<button type="button" class="btn-remove-model" @click="removeModel\(model\)">删除<\/button>/);
     assert.doesNotMatch(modalsBasic, /<span class="btn-remove-model" @click="removeModel\(model\)">删除<\/span>/);
     assert.match(openclawModal, /<div v-if="showOpenclawConfigModal" class="modal-overlay" @click\.self="!\(openclawSaving \|\| openclawApplying\) && closeOpenclawConfigModal\(\)">/);
@@ -203,6 +218,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(openclawModal, /<button class="btn btn-confirm" @click="saveOpenclawConfig" :disabled="openclawSaving \|\| openclawApplying">/);
     assert.match(openclawModal, /<button class="btn btn-confirm secondary" @click="saveAndApplyOpenclawConfig" :disabled="openclawSaving \|\| openclawApplying">/);
     assert.doesNotMatch(baseTheme, /fonts\.googleapis\.com/);
+    assert.match(controlsForms, /\.btn-tool-compact:disabled:hover,\s*\.btn-tool-compact\[disabled\]:hover/);
 });
 
 test('web ui script defines provider mode metadata for codex only', () => {
@@ -426,9 +442,9 @@ test('settings tab header actions keep compact tool buttons inline on wider scre
     assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact\s*\{[\s\S]*top:\s*0;/);
     assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact\s*\{[\s\S]*white-space:\s*nowrap;/);
     assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool \+ \.btn-tool\s*\{[\s\S]*margin-top:\s*0;/);
-    assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool:hover,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact:hover\s*\{[\s\S]*transform:\s*none;/);
+    assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool:not\(:disabled\):hover,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact:not\(:disabled\):hover\s*\{[\s\S]*transform:\s*none;/);
     assert.match(styles, /\.btn-tool:disabled,\s*\.btn-tool\[disabled\]\s*\{[\s\S]*cursor:\s*not-allowed;/);
-    assert.match(styles, /\.btn-tool:disabled:hover,\s*\.btn-tool\[disabled\]:hover\s*\{[\s\S]*transform:\s*none;/);
+    assert.match(styles, /\.btn-tool:disabled:hover,\s*\.btn-tool\[disabled\]:hover,\s*\.btn-tool:disabled:active,\s*\.btn-tool\[disabled\]:active,\s*\.btn-tool-compact:disabled:hover,\s*\.btn-tool-compact\[disabled\]:hover,\s*\.btn-tool-compact:disabled:active,\s*\.btn-tool-compact\[disabled\]:active\s*\{[\s\S]*transform:\s*none;/);
     assert.match(styles, /\.market-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
     assert.match(styles, /\.market-action-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/);
     assert.match(styles, /\.market-target-switch\s*\{/);

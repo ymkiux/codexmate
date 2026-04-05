@@ -1,5 +1,28 @@
 import { runLatestOnlyQueue } from '../logic.mjs';
 
+function hasResponseError(response) {
+    if (!response || typeof response !== 'object') {
+        return false;
+    }
+    if (typeof response.error === 'string') {
+        return response.error.trim().length > 0;
+    }
+    return response.error !== undefined && response.error !== null && response.error !== false;
+}
+
+function getResponseMessage(response, fallback) {
+    if (!response || typeof response !== 'object') {
+        return fallback;
+    }
+    for (const key of ['error', 'message', 'detail']) {
+        const value = response[key];
+        if (typeof value === 'string' && value.trim()) {
+            return value.trim();
+        }
+    }
+    return fallback;
+}
+
 export function createCodexConfigMethods(options = {}) {
     const {
         api,
@@ -231,11 +254,16 @@ export function createCodexConfigMethods(options = {}) {
         async runHealthCheck() {
             this.healthCheckLoading = true;
             this.healthCheckResult = null;
+            let shouldRunClaudeSpeedTests = false;
             try {
                 const res = await api('config-health-check', {
                     remote: false
                 });
-                if (res && typeof res === 'object') {
+                if (hasResponseError(res)) {
+                    this.healthCheckResult = null;
+                    this.showMessage(getResponseMessage(res, '检查失败'), 'error');
+                } else if (res && typeof res === 'object') {
+                    shouldRunClaudeSpeedTests = true;
                     const issues = Array.isArray(res.issues) ? [...res.issues] : [];
                     let remote = res.remote || null;
                     {
@@ -283,7 +311,7 @@ export function createCodexConfigMethods(options = {}) {
                 this.healthCheckResult = null;
                 this.showMessage('检查失败', 'error');
             } finally {
-                if (this.configMode === 'claude') {
+                if (shouldRunClaudeSpeedTests && this.configMode === 'claude') {
                     try {
                         const entries = Object.entries(this.claudeConfigs || {});
                         await Promise.all(entries.map(([name, config]) => this.runClaudeSpeedTest(name, config)));
@@ -428,7 +456,11 @@ export function createCodexConfigMethods(options = {}) {
                 const refreshOptions = options.silent === true
                     ? { preserveLoading: true }
                     : {};
-                await this.loadAll(refreshOptions);
+                try {
+                    await this.loadAll(refreshOptions);
+                } catch (_) {
+                    this.showMessage('配置已应用，但界面刷新失败，请手动刷新', 'error');
+                }
             } catch (e) {
                 this.showMessage('应用失败', 'error');
             } finally {
@@ -470,7 +502,11 @@ export function createCodexConfigMethods(options = {}) {
                 }
                 this.showMessage('模板已应用', 'success');
                 this.closeConfigTemplateModal({ force: true });
-                await this.loadAll();
+                try {
+                    await this.loadAll();
+                } catch (_) {
+                    this.showMessage('模板已应用，但界面刷新失败，请手动刷新', 'error');
+                }
             } catch (e) {
                 this.showMessage('应用模板失败', 'error');
             } finally {

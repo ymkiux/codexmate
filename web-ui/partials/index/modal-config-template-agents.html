@@ -1,6 +1,6 @@
         <div v-if="showConfigTemplateModal" class="modal-overlay" @click.self="!configTemplateApplying && closeConfigTemplateModal()">
-            <div class="modal modal-wide">
-                <div class="modal-title">Config 模板编辑器（手动确认应用）</div>
+            <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="config-template-modal-title">
+                <div class="modal-title" id="config-template-modal-title">Config 模板编辑器（手动确认应用）</div>
 
                 <div class="form-group">
                     <label class="form-label">config.toml 模板</label>
@@ -25,9 +25,9 @@
         </div>
 
         <div v-if="showAgentsModal" class="modal-overlay" @click.self="closeAgentsModal">
-            <div class="modal modal-wide modal-editor">
+            <div class="modal modal-wide modal-editor" role="dialog" aria-modal="true" aria-labelledby="agents-modal-title">
                 <div class="modal-header modal-editor-header">
-                    <div class="modal-title">{{ agentsModalTitle }}</div>
+                    <div class="modal-title" id="agents-modal-title">{{ agentsModalTitle }}</div>
                     <div class="modal-header-actions">
                         <button
                             class="btn-mini btn-modal-copy"

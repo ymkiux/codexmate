@@ -1,10 +1,13 @@
 export function createOpenclawCoreMethods() {
     return {
         getOpenclawParser() {
-            if (window.JSON5 && typeof window.JSON5.parse === 'function' && typeof window.JSON5.stringify === 'function') {
+            const globalWindow = typeof window !== 'undefined' ? window : null;
+            if (globalWindow && globalWindow.JSON5
+                && typeof globalWindow.JSON5.parse === 'function'
+                && typeof globalWindow.JSON5.stringify === 'function') {
                 return {
-                    parse: window.JSON5.parse,
-                    stringify: window.JSON5.stringify
+                    parse: globalWindow.JSON5.parse,
+                    stringify: globalWindow.JSON5.stringify
                 };
             }
             return {

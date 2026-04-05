@@ -18,8 +18,8 @@
                     <div class="selector-header">
                         <span class="selector-title">模型</span>
                         <div class="selector-actions">
-                            <button class="btn-icon" @click="showModelModal = true" title="添加模型" v-if="modelsSource === 'legacy'">+</button>
-                            <button class="btn-icon" @click="showModelListModal = true" title="管理模型" v-if="modelsSource === 'legacy'">≡</button>
+                            <button class="btn-icon" @click="showModelModal = true" aria-label="Add model" title="添加模型" v-if="modelsSource === 'legacy'">+</button>
+                            <button class="btn-icon" @click="showModelListModal = true" aria-label="Manage models" title="管理模型" v-if="modelsSource === 'legacy'">≡</button>
                         </div>
                     </div>
                     <select
@@ -203,7 +203,7 @@
                                 {{ formatLatency(speedResults[provider.name]) }}
                             </span>
                             <div class="card-actions" @click.stop>
-                                <button class="card-action-btn" :class="{ loading: speedLoading[provider.name] }" @click="runSpeedTest(provider.name)" title="Speed Test">
+                                <button class="card-action-btn" :class="{ loading: speedLoading[provider.name] }" @click="runSpeedTest(provider.name)" :aria-label="`Run speed test for ${provider.name}`" title="Speed Test">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M13 2L3 14h7l-1 8 12-14h-7l-1-6z"/>
                                     </svg>
@@ -228,6 +228,7 @@
                                     :class="{ disabled: !shouldShowProviderEdit(provider) }"
                                     :disabled="!shouldShowProviderEdit(provider)"
                                     @click="openEditModal(provider)"
+                                    :aria-label="`Edit provider ${provider.name}`"
                                     :title="shouldShowProviderEdit(provider) ? '编辑' : '不可编辑'">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -240,6 +241,7 @@
                                     :class="{ disabled: !shouldShowProviderDelete(provider) }"
                                     :disabled="!shouldShowProviderDelete(provider)"
                                     @click="deleteProvider(provider.name)"
+                                    :aria-label="`Delete provider ${provider.name}`"
                                     :title="shouldShowProviderDelete(provider) ? '删除' : '不可删除'">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M3 6h18"/>

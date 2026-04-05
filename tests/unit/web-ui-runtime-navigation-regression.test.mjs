@@ -212,6 +212,32 @@ test('newer touch nav preselection replaces the previous stale reset timer', asy
     assert.strictEqual(context.fastHidden, false);
 });
 
+test('touch config-tab preselection updates the active item before the committed switch lands', async () => {
+    const timers = createTimerHarness();
+    const methods = createNavigationMethods({
+        configModeSet: new Set(['codex', 'claude', 'openclaw']),
+        switchMainTabHelper(tab) {
+            this.mainTab = tab;
+        },
+        loadMoreSessionMessagesHelper() {}
+    });
+    const context = createNavigationContext(methods);
+
+    await withGlobalOverrides({
+        setTimeout: timers.setTimeout,
+        clearTimeout: timers.clearTimeout
+    }, async () => {
+        context.onConfigTabPointerDown('claude', {
+            button: 0,
+            pointerType: 'touch'
+        });
+    });
+
+    assert.strictEqual(context.isMainTabNavActive('config'), true);
+    assert.strictEqual(context.isConfigModeNavActive('claude'), true);
+    assert.strictEqual(context.isConfigModeNavActive('codex'), false);
+});
+
 test('download directory actions clear stale delayed progress resets before scheduling a new one', async () => {
     await verifyDownloadProgressResetCleanup({
         methodName: 'downloadClaudeDirectory',
@@ -232,4 +258,46 @@ test('download directory actions clear stale delayed progress resets before sche
         resetKey: '__codexDownloadResetTimer',
         fileName: 'codex-backup.zip'
     });
+});
+
+test('importBackupFile keeps a successful import result when only the refresh fails', async () => {
+    const methods = createRuntimeMethods({
+        api: async () => ({
+            success: true,
+            backupPath: '/tmp/codex-backup.toml'
+        })
+    });
+    const messages = [];
+    const resets = [];
+    const context = {
+        ...methods,
+        codexImportLoading: false,
+        showMessage(message, type) {
+            messages.push({ message, type });
+        },
+        async readFileAsBase64() {
+            return 'ZmFrZS1iYXNlNjQ=';
+        },
+        async loadAll() {
+            throw new Error('refresh failed');
+        },
+        resetImportInput(type) {
+            resets.push(type);
+        }
+    };
+
+    await methods.importBackupFile.call(context, 'codex', {
+        size: 1024,
+        name: 'codex.zip'
+    });
+
+    assert.strictEqual(context.codexImportLoading, false);
+    assert.deepStrictEqual(resets, ['codex']);
+    assert.deepStrictEqual(messages, [{
+        message: '导入成功，原配置已备份到临时文件：/tmp/codex-backup.toml',
+        type: 'success'
+    }, {
+        message: '导入已完成，但界面刷新失败，请手动刷新',
+        type: 'error'
+    }]);
 });
