@@ -193,7 +193,7 @@ textarea:focus-visible {
 
     .btn-icon,
     .session-item-copy {
-        min-width: 44px;
+        min-width: 36px;
     }
 
     .session-item {
@@ -214,10 +214,10 @@ textarea:focus-visible {
     }
 
     .session-item-copy {
-        width: 44px;
-        height: 44px;
-        min-width: 44px;
-        min-height: 44px;
+        width: 36px;
+        height: 36px;
+        min-width: 36px;
+        min-height: 36px;
         border-radius: 6px;
         padding: 2px;
         display: inline-flex;
@@ -227,8 +227,8 @@ textarea:focus-visible {
     }
 
     .session-item-copy svg {
-        width: 12px;
-        height: 12px;
+        width: 10px;
+        height: 10px;
     }
 
     .session-item-title {

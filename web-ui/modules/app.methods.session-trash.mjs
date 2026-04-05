@@ -206,7 +206,10 @@ export function createSessionTrashMethods(options = {}) {
         },
 
         normalizeSettingsTab(tab) {
-            return tab === 'trash' ? 'trash' : 'backup';
+            if (tab === 'trash' || tab === 'device') {
+                return tab;
+            }
+            return 'backup';
         },
 
         async onSettingsTabClick(tab) {
