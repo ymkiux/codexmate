@@ -1,6 +1,7 @@
 import assert from 'assert';
 import {
     readBundledWebUiCss,
+    readProjectFile,
     readBundledWebUiScript
 } from './helpers/web-ui-source.mjs';
 
@@ -16,14 +17,21 @@ test('app script includes compact layout detection and body class toggling', () 
 
 test('styles include force-compact fallback rules for readability on touch devices', () => {
     const styles = readBundledWebUiCss();
+    const layoutShell = readProjectFile('web-ui/styles/layout-shell.css');
     assert.match(styles, /\.card-trailing\s*\{[\s\S]*align-items:\s*start;[\s\S]*align-self:\s*flex-start;/);
     assert.match(styles, /\.card-trailing\s+\.card-actions\s*\{[\s\S]*justify-self:\s*end;/);
     assert.match(styles, /\.card-trailing\s+\.pill,\s*[\s\S]*justify-self:\s*end;/);
+    assert.match(styles, /\.card-actions\s*\{[\s\S]*pointer-events:\s*none;/);
+    assert.match(styles, /\.card:focus-within\s+\.card-actions\s*\{[\s\S]*opacity:\s*1;[\s\S]*transform:\s*translateX\(0\);/);
+    assert.match(styles, /\.card:hover\s+\.card-actions\s*\{[\s\S]*pointer-events:\s*auto;/);
+    assert.match(styles, /\.card:focus-within\s+\.card-actions\s*\{[\s\S]*pointer-events:\s*auto;/);
     assert.match(styles, /body\.force-compact\s*\{/);
     assert.match(styles, /body\.force-compact\s+\.app-shell\s*\{/);
     assert.match(styles, /body\.force-compact\s+\.status-inspector\s*\{[\s\S]*display:\s*none;/);
     assert.match(styles, /body\.force-compact\s+\.top-tabs\s*\{[\s\S]*display:\s*grid\s*!important;[\s\S]*grid-template-columns:\s*repeat\(1,\s*minmax\(0,\s*1fr\)\);/);
     assert.match(styles, /@media\s*\(min-width:\s*541px\)\s*\{[\s\S]*body\.force-compact\s+\.top-tabs\s*\{[\s\S]*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
+    assert.match(layoutShell, /@media\s*\(min-width:\s*961px\)\s*\{[\s\S]*body:not\(.force-compact\)\s+#app\s*>\s*\.top-tabs\s*\{[\s\S]*display:\s*none;/);
+    assert.doesNotMatch(layoutShell, /^\s*\.top-tabs\s*\{[\s\S]*display:\s*none\s*!important;/m);
     assert.match(styles, /body\.force-compact\s+\.card-subtitle/);
     const compactSubtitleBlock = styles.match(/body\.force-compact\s+\.card-subtitle\s*\{[^}]*\}/);
     assert.ok(compactSubtitleBlock, 'missing compact subtitle block');

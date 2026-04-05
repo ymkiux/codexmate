@@ -1,8 +1,8 @@
         <div v-if="showSkillsModal" class="modal-overlay" @click.self="closeSkillsModal">
-            <div class="modal modal-wide skills-modal">
+            <div class="modal modal-wide skills-modal" role="dialog" aria-modal="true" aria-labelledby="skills-modal-title">
                 <div class="modal-header skills-modal-header">
                     <div>
-                        <div class="modal-title">Skills 管理</div>
+                        <div class="modal-title" id="skills-modal-title">Skills 管理</div>
                         <div class="skills-modal-subtitle">集中管理当前宿主的本地技能目录，支持检索筛选、多选删除、跨应用导入、ZIP 导入与导出。</div>
                     </div>
                     <div class="modal-header-actions skills-modal-actions">
@@ -166,7 +166,7 @@
                     <button class="btn btn-confirm" @click="exportSelectedSkills" :disabled="skillsExporting || skillsSelectedCount === 0 || skillsDeleting || skillsImporting || skillsScanningImports || skillsZipImporting">
                         {{ skillsExporting ? '导出中...' : '导出选中' }}
                     </button>
-                    <button class="btn btn-confirm" @click="importSelectedSkills" :disabled="skillsImporting || skillsImportSelectedCount === 0 || skillsZipImporting || skillsExporting || skillsDeleting">
+                    <button class="btn btn-confirm" @click="importSelectedSkills" :disabled="skillsImporting || skillsScanningImports || skillsImportSelectedCount === 0 || skillsZipImporting || skillsExporting || skillsDeleting">
                         {{ skillsImporting ? '导入中...' : '导入选中' }}
                     </button>
                     <button class="btn btn-confirm btn-danger" @click="deleteSelectedSkills" :disabled="skillsDeleting || skillsSelectedCount === 0 || skillsImporting || skillsZipImporting || skillsExporting">
@@ -182,4 +182,3 @@
             accept=".zip,application/zip"
             style="display:none"
             @change="handleSkillsZipImportChange">
-

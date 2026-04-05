@@ -137,16 +137,13 @@
                     </a>
                 </div>
 
-                <div class="side-section" role="tablist" aria-label="配置管理">
+                <div class="side-section" role="navigation" aria-label="配置管理">
                     <div class="side-section-title">配置管理</div>
                     <button
-                        role="tab"
                         id="side-tab-config-codex"
                         data-main-tab="config"
                         data-config-mode="codex"
-                        aria-controls="panel-config-provider"
-                        :tabindex="mainTab === 'config' && configMode === 'codex' ? 0 : -1"
-                        :aria-selected="mainTab === 'config' && configMode === 'codex'"
+                        :aria-current="isConfigModeNavActive('codex') ? 'page' : null"
                         :class="['side-item', { active: isConfigModeNavActive('codex') }]"
                         @pointerdown="onConfigTabPointerDown('codex', $event)"
                         @click="onConfigTabClick('codex', $event)">
@@ -157,13 +154,10 @@
                         </div>
                     </button>
                     <button
-                        role="tab"
                         id="side-tab-config-claude"
                         data-main-tab="config"
                         data-config-mode="claude"
-                        aria-controls="panel-config-claude"
-                        :tabindex="mainTab === 'config' && configMode === 'claude' ? 0 : -1"
-                        :aria-selected="mainTab === 'config' && configMode === 'claude'"
+                        :aria-current="isConfigModeNavActive('claude') ? 'page' : null"
                         :class="['side-item', { active: isConfigModeNavActive('claude') }]"
                         @pointerdown="onConfigTabPointerDown('claude', $event)"
                         @click="onConfigTabClick('claude', $event)">
@@ -174,13 +168,10 @@
                         </div>
                     </button>
                     <button
-                        role="tab"
                         id="side-tab-config-openclaw"
                         data-main-tab="config"
                         data-config-mode="openclaw"
-                        aria-controls="panel-config-openclaw"
-                        :tabindex="mainTab === 'config' && configMode === 'openclaw' ? 0 : -1"
-                        :aria-selected="mainTab === 'config' && configMode === 'openclaw'"
+                        :aria-current="isConfigModeNavActive('openclaw') ? 'page' : null"
                         :class="['side-item', { active: isConfigModeNavActive('openclaw') }]"
                         @pointerdown="onConfigTabPointerDown('openclaw', $event)"
                         @click="onConfigTabClick('openclaw', $event)">
@@ -192,15 +183,12 @@
                     </button>
                 </div>
 
-                <div class="side-section" role="tablist" aria-label="会话管理">
+                <div class="side-section" role="navigation" aria-label="会话管理">
                     <div class="side-section-title">会话管理</div>
                     <button
-                        role="tab"
                         id="side-tab-sessions"
                         data-main-tab="sessions"
-                        aria-controls="panel-sessions"
-                        :tabindex="mainTab === 'sessions' ? 0 : -1"
-                        :aria-selected="mainTab === 'sessions'"
+                        :aria-current="isMainTabNavActive('sessions') ? 'page' : null"
                         :class="['side-item', { active: isMainTabNavActive('sessions') }]"
                         @pointerdown="onMainTabPointerDown('sessions', $event)"
                         @click="onMainTabClick('sessions', $event)">
@@ -212,15 +200,12 @@
                     </button>
                 </div>
 
-                <div class="side-section" role="tablist" aria-label="技能市场">
+                <div class="side-section" role="navigation" aria-label="技能市场">
                     <div class="side-section-title">技能市场</div>
                     <button
-                        role="tab"
                         id="side-tab-market"
                         data-main-tab="market"
-                        aria-controls="panel-market"
-                        :tabindex="mainTab === 'market' ? 0 : -1"
-                        :aria-selected="mainTab === 'market'"
+                        :aria-current="isMainTabNavActive('market') ? 'page' : null"
                         :class="['side-item', { active: isMainTabNavActive('market') }]"
                         @pointerdown="onMainTabPointerDown('market', $event)"
                         @click="onMainTabClick('market', $event)">
@@ -232,15 +217,12 @@
                     </button>
                 </div>
 
-                <div class="side-section" role="tablist" aria-label="设置">
+                <div class="side-section" role="navigation" aria-label="设置">
                     <div class="side-section-title">设置</div>
                     <button
-                        role="tab"
                         id="side-tab-settings"
                         data-main-tab="settings"
-                        aria-controls="panel-settings"
-                        :tabindex="mainTab === 'settings' ? 0 : -1"
-                        :aria-selected="mainTab === 'settings'"
+                        :aria-current="isMainTabNavActive('settings') ? 'page' : null"
                         :class="['side-item', { active: isMainTabNavActive('settings') }]"
                         @pointerdown="onMainTabPointerDown('settings', $event)"
                         @click="onMainTabClick('settings', $event)">

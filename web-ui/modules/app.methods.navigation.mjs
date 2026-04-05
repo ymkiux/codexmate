@@ -10,6 +10,7 @@ export function createNavigationMethods(options = {}) {
             const normalizedMode = typeof mode === 'string'
                 ? mode.trim().toLowerCase()
                 : '';
+            this.cancelTouchNavIntentReset();
             this.configMode = configModeSet.has(normalizedMode) ? normalizedMode : 'codex';
             if (this.mainTab === 'config') {
                 if (this.configMode === 'claude') {
@@ -78,6 +79,36 @@ export function createNavigationMethods(options = {}) {
             if (!normalizedTab) return;
             const state = this.ensureMainTabSwitchState();
             state.intent = normalizedTab;
+        },
+        cancelTouchNavIntentReset() {
+            if (this.__touchNavIntentResetTimer) {
+                clearTimeout(this.__touchNavIntentResetTimer);
+                this.__touchNavIntentResetTimer = null;
+            }
+            this.__touchNavIntentResetToken = 0;
+        },
+        scheduleTouchNavIntentReset(kind, value) {
+            const normalizedKind = typeof kind === 'string' ? kind.trim().toLowerCase() : '';
+            const normalizedValue = typeof value === 'string' ? value.trim().toLowerCase() : '';
+            if (!normalizedKind || !normalizedValue) {
+                return;
+            }
+            const expectedIntent = normalizedKind === 'config' ? 'config' : normalizedValue;
+            this.cancelTouchNavIntentReset();
+            const token = (Number(this.__touchNavIntentResetToken) || 0) + 1;
+            this.__touchNavIntentResetToken = token;
+            this.__touchNavIntentResetTimer = setTimeout(() => {
+                if (this.__touchNavIntentResetToken !== token) {
+                    return;
+                }
+                this.__touchNavIntentResetTimer = null;
+                this.__touchNavIntentResetToken = 0;
+                const liveIntent = String(this.ensureMainTabSwitchState().intent || '').trim().toLowerCase();
+                if (liveIntent !== expectedIntent) {
+                    return;
+                }
+                this.clearMainTabSwitchIntent(expectedIntent);
+            }, 1000);
         },
         applyImmediateNavIntent(tab, configMode = '') {
             if (typeof document === 'undefined') return;
@@ -162,6 +193,7 @@ export function createNavigationMethods(options = {}) {
                 ? event.pointerType.trim().toLowerCase()
                 : '';
             if (pointerType === 'touch') {
+                this.scheduleTouchNavIntentReset('main', normalizedTab);
                 return;
             }
             this.recordPointerNavCommit('main', normalizedTab);
@@ -182,6 +214,7 @@ export function createNavigationMethods(options = {}) {
                 ? event.pointerType.trim().toLowerCase()
                 : '';
             if (pointerType === 'touch') {
+                this.scheduleTouchNavIntentReset('config', normalizedMode);
                 return;
             }
             this.recordPointerNavCommit('config', normalizedMode);
@@ -204,6 +237,7 @@ export function createNavigationMethods(options = {}) {
             if (expectedTab && state.intent && state.intent !== expectedTab) {
                 return;
             }
+            this.cancelTouchNavIntentReset();
             state.intent = '';
             state.pendingTarget = '';
             this.clearImmediateNavIntent();
@@ -225,6 +259,7 @@ export function createNavigationMethods(options = {}) {
                 : '';
             const targetTab = normalizedTab || tab;
             if (!targetTab) return;
+            this.cancelTouchNavIntentReset();
             if (targetTab === 'sessions') {
                 this.cancelScheduledSessionTabDeferredTeardown();
             }

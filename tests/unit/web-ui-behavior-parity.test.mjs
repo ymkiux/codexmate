@@ -78,6 +78,7 @@ function createSwitchConfigContext() {
         configMode: 'codex',
         calls,
         scheduled,
+        cancelTouchNavIntentReset() {},
         scheduleAfterFrame(fn) {
             scheduled.push(fn);
         },
@@ -338,9 +339,19 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     const normalizedCurrentKeys = currentDataKeys.filter((key) => !extraCurrentKeys.includes(key)).sort();
     const normalizedHeadKeys = headDataKeys.filter((key) => !missingCurrentKeys.includes(key)).sort();
     assert.deepStrictEqual(normalizedCurrentKeys, normalizedHeadKeys);
+    const currentMethodKeys = Object.keys(currentMethods).sort();
+    const headMethodKeys = Object.keys(headMethods).sort();
+    const extraCurrentMethodKeys = currentMethodKeys.filter((key) => !headMethodKeys.includes(key)).sort();
+    const missingCurrentMethodKeys = headMethodKeys.filter((key) => !currentMethodKeys.includes(key)).sort();
+    const allowedExtraCurrentMethodKeys = [
+        'cancelTouchNavIntentReset',
+        'scheduleTouchNavIntentReset'
+    ];
+    assert.deepStrictEqual(extraCurrentMethodKeys, allowedExtraCurrentMethodKeys);
+    assert.deepStrictEqual(missingCurrentMethodKeys, []);
     assert.deepStrictEqual(
-        Object.keys(currentMethods).sort(),
-        Object.keys(headMethods).sort()
+        currentMethodKeys.filter((key) => !extraCurrentMethodKeys.includes(key)).sort(),
+        headMethodKeys
     );
     assert.deepStrictEqual(
         Object.keys(currentComputed).sort(),
@@ -375,6 +386,7 @@ test('switchConfigMode keeps config and navigation behavior aligned with HEAD', 
         mainTab: 'sessions',
         configMode: 'claude',
         calls: [],
+        cancelTouchNavIntentReset() {},
         switchMainTab(tab) {
             this.calls.push(['switchMainTab', tab]);
         }
