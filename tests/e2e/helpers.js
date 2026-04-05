@@ -4,7 +4,12 @@ const http = require('http');
 const os = require('os');
 const { spawnSync, spawn } = require('child_process');
 const { writeJsonAtomic } = require('../../lib/cli-file-utils');
-const { normalizeWireApi, buildModelProbeSpec } = require('../../lib/cli-models-utils');
+const {
+    normalizeWireApi,
+    buildModelProbeSpec,
+    buildModelConversationSpecs,
+    extractModelResponseText
+} = require('../../lib/cli-models-utils');
 
 const debug = (...args) => {
     if (process.env.E2E_DEBUG) {
@@ -149,9 +154,16 @@ function startLocalServer(options = {}) {
     const mode = options.mode || 'list';
     const modelsPath = options.modelsPath || '/models';
     const status = options.status || 200;
+    const responseBody = options.responseBody || { ok: true };
+    const responsePaths = Array.isArray(options.responsePaths)
+        ? options.responsePaths.map(item => String(item || ''))
+        : null;
+    const requests = [];
     return new Promise((resolve, reject) => {
         const server = http.createServer((req, res) => {
-            if (req.url && req.url.startsWith(modelsPath)) {
+            const requestPath = String(req.url || '').split('?')[0];
+            requests.push(requestPath);
+            if (requestPath && requestPath.startsWith(modelsPath)) {
                 if (mode === 'none') {
                     const errorBody = JSON.stringify({ error: 'not found' });
                     res.writeHead(404, {
@@ -183,7 +195,16 @@ function startLocalServer(options = {}) {
                 res.end(jsonBody, 'utf-8');
                 return;
             }
-            const okBody = JSON.stringify({ ok: true });
+            if (responsePaths && !responsePaths.includes(requestPath)) {
+                const errorBody = JSON.stringify({ error: 'not found' });
+                res.writeHead(404, {
+                    'Content-Type': 'application/json; charset=utf-8',
+                    'Content-Length': Buffer.byteLength(errorBody, 'utf-8')
+                });
+                res.end(errorBody, 'utf-8');
+                return;
+            }
+            const okBody = JSON.stringify(responseBody);
             res.writeHead(status, {
                 'Content-Type': 'application/json; charset=utf-8',
                 'Content-Length': Buffer.byteLength(okBody, 'utf-8')
@@ -193,7 +214,7 @@ function startLocalServer(options = {}) {
         server.on('error', reject);
         server.listen(0, '127.0.0.1', () => {
             const address = server.address();
-            resolve({ server, port: address.port });
+            resolve({ server, port: address.port, requests });
         });
     });
 }
@@ -226,5 +247,7 @@ module.exports = {
     closeServer,
     writeJsonAtomic,
     normalizeWireApi,
-    buildModelProbeSpec
+    buildModelProbeSpec,
+    buildModelConversationSpecs,
+    extractModelResponseText
 };

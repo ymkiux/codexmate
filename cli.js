@@ -42,12 +42,15 @@ const { buildLineDiff } = require('./lib/text-diff');
 const {
     extractModelNames,
     hasModelsListPayload,
-    extractModelIds,
-    buildModelsProbeUrl,
+    buildModelsCacheKey,
     buildModelProbeSpec,
-    buildModelsCacheKey
+    buildModelConversationSpecs,
+    extractModelResponseText
 } = require('./lib/cli-models-utils');
-const { probeUrl, probeJsonPost } = require('./lib/cli-network-utils');
+const {
+    probeUrl,
+    probeJsonPost
+} = require('./lib/cli-network-utils');
 const {
     toIsoTime,
     updateLatestIso,
@@ -62,6 +65,7 @@ const {
     validateWorkflowDefinition,
     executeWorkflowDefinition
 } = require('./lib/workflow-engine');
+const { buildConfigHealthReport: buildConfigHealthReportCore } = require('./cli/config-health');
 const {
     readBundledWebUiCss,
     readBundledWebUiHtml,
@@ -105,7 +109,6 @@ const CODEX_BACKUP_NAME = 'codex-config';
 
 const DEFAULT_MODELS = ['gpt-5.3-codex', 'gpt-5.1-codex-max', 'gpt-4-turbo', 'gpt-4'];
 const SPEED_TEST_TIMEOUT_MS = 8000;
-const HEALTH_CHECK_TIMEOUT_MS = 6000;
 const MAX_SESSION_LIST_SIZE = 300;
 const MAX_SESSION_TRASH_LIST_SIZE = 500;
 const MAX_EXPORT_MESSAGES = 1000;
@@ -2817,358 +2820,11 @@ function recordRecentConfig(provider, model) {
     writeRecentConfigs(trimmed);
 }
 
-async function runRemoteHealthCheck(provider, modelName, options = {}) {
-    const issues = [];
-    const results = {};
-    const baseUrl = normalizeBaseUrl(provider && provider.base_url ? provider.base_url : '');
-    if (!baseUrl) {
-        issues.push({
-            code: 'remote-skip-base-url',
-            message: '无法进行远程探测：base_url 为空',
-            suggestion: '补全 base_url 或关闭远程探测'
-        });
-        return { issues, results };
-    }
-
-    const requiresAuth = provider && provider.requires_openai_auth !== false;
-    const apiKey = typeof provider.preferred_auth_method === 'string'
-        ? provider.preferred_auth_method.trim()
-        : '';
-    const authValue = requiresAuth ? apiKey : (apiKey || '');
-    const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : HEALTH_CHECK_TIMEOUT_MS;
-
-    const baseProbe = await probeUrl(baseUrl, { apiKey: authValue, timeoutMs });
-    results.base = {
-        url: baseUrl,
-        status: baseProbe.status || 0,
-        ok: baseProbe.ok,
-        durationMs: baseProbe.durationMs || 0
-    };
-
-    if (!baseProbe.ok) {
-        issues.push({
-            code: 'remote-unreachable',
-            message: `远程探测失败：${baseProbe.error || '无法连接'}`,
-            suggestion: '检查网络与 base_url 可达性'
-        });
-        return { issues, results };
-    }
-
-    if (baseProbe.status === 401 || baseProbe.status === 403) {
-        issues.push({
-            code: 'remote-auth-failed',
-            message: '远程探测鉴权失败（401/403）',
-            suggestion: '检查 API Key 或认证方式'
-        });
-    } else if (baseProbe.status >= 400) {
-        issues.push({
-            code: 'remote-http-error',
-            message: `远程探测返回异常状态: ${baseProbe.status}`,
-            suggestion: '检查 base_url 是否正确'
-        });
-    }
-
-    const modelsUrl = buildModelsProbeUrl(baseUrl);
-    if (modelsUrl) {
-        const modelsProbe = await probeUrl(modelsUrl, { apiKey: authValue, timeoutMs, maxBytes: 256 * 1024 });
-        results.models = {
-            url: modelsUrl,
-            status: modelsProbe.status || 0,
-            ok: modelsProbe.ok,
-            durationMs: modelsProbe.durationMs || 0
-        };
-
-        if (!modelsProbe.ok) {
-            issues.push({
-                code: 'remote-models-unreachable',
-                message: `模型列表探测失败：${modelsProbe.error || '无法连接'}`,
-                suggestion: '检查 base_url 是否包含 /v1 或关闭远程探测'
-            });
-        } else if (modelsProbe.status === 401 || modelsProbe.status === 403) {
-            issues.push({
-                code: 'remote-models-auth-failed',
-                message: '模型列表鉴权失败（401/403）',
-                suggestion: '检查 API Key 或认证方式'
-            });
-        } else if (modelsProbe.status >= 400) {
-            issues.push({
-                code: 'remote-models-http-error',
-                message: `模型列表返回异常状态: ${modelsProbe.status}`,
-                suggestion: '确认 /v1/models 可用'
-            });
-        } else {
-            let payload = null;
-            try {
-                payload = modelsProbe.body ? JSON.parse(modelsProbe.body) : null;
-            } catch (e) {
-                issues.push({
-                    code: 'remote-models-parse',
-                    message: '模型列表解析失败（非 JSON）',
-                    suggestion: '确认 /v1/models 返回 JSON'
-                });
-            }
-
-            if (payload) {
-                const ids = extractModelIds(payload);
-                if (ids.length === 0) {
-                    issues.push({
-                        code: 'remote-models-empty',
-                        message: '模型列表为空或结构无法识别',
-                        suggestion: '确认 provider 是否兼容 /v1/models'
-                    });
-                } else if (modelName && !ids.includes(modelName)) {
-                    issues.push({
-                        code: 'remote-model-unavailable',
-                        message: `远程模型列表中未找到: ${modelName}`,
-                        suggestion: '切换模型或确认模型名称'
-                    });
-                }
-            }
-        }
-    }
-
-    const modelProbeSpec = buildModelProbeSpec(provider, modelName, baseUrl);
-    if (modelProbeSpec && modelProbeSpec.url) {
-        const modelProbe = await probeJsonPost(modelProbeSpec.url, modelProbeSpec.body, {
-            apiKey: authValue,
-            timeoutMs,
-            maxBytes: 256 * 1024
-        });
-
-        results.modelProbe = {
-            url: modelProbeSpec.url,
-            status: modelProbe.status || 0,
-            ok: modelProbe.ok,
-            durationMs: modelProbe.durationMs || 0
-        };
-
-        if (!modelProbe.ok) {
-            issues.push({
-                code: 'remote-model-probe-unreachable',
-                message: `模型可用性探测失败：${modelProbe.error || '无法连接'}`,
-                suggestion: '检查网络或模型接口是否可用'
-            });
-        } else if (modelProbe.status === 401 || modelProbe.status === 403) {
-            issues.push({
-                code: 'remote-model-probe-auth-failed',
-                message: '模型可用性探测鉴权失败（401/403）',
-                suggestion: '检查 API Key 或认证方式'
-            });
-        } else if (modelProbe.status >= 400) {
-            issues.push({
-                code: 'remote-model-probe-http-error',
-                message: `模型可用性探测返回异常状态: ${modelProbe.status}`,
-                suggestion: '检查模型或接口路径'
-            });
-        } else {
-            let payload = null;
-            try {
-                payload = modelProbe.body ? JSON.parse(modelProbe.body) : null;
-            } catch (e) {
-                issues.push({
-                    code: 'remote-model-probe-parse',
-                    message: '模型可用性探测解析失败（非 JSON）',
-                    suggestion: '确认模型接口返回 JSON'
-                });
-            }
-            if (payload && payload.error) {
-                const message = typeof payload.error.message === 'string'
-                    ? payload.error.message
-                    : '模型接口返回错误';
-                issues.push({
-                    code: 'remote-model-probe-error',
-                    message: `模型可用性探测失败：${message}`,
-                    suggestion: '检查模型名与权限'
-                });
-            }
-        }
-    }
-
-    return { issues, results };
-}
-
 async function buildConfigHealthReport(params = {}) {
-    const issues = [];
-    const status = readConfigOrVirtualDefault();
-    const config = status.config || {};
-
-    if (status.isVirtual) {
-        const parseFailed = status.errorType === 'parse';
-        const readFailed = status.errorType === 'read';
-        issues.push({
-            code: parseFailed ? 'config-parse-failed' : (readFailed ? 'config-read-failed' : 'config-missing'),
-            message: status.reason || (parseFailed
-                ? 'config.toml 解析失败'
-                : (readFailed ? '读取 config.toml 失败' : '未检测到 config.toml')),
-            suggestion: parseFailed
-                ? '修复 config.toml 语法错误后重试'
-                : (readFailed ? '检查文件权限后重试' : '在模板编辑器中确认应用配置，生成可用的 config.toml')
-        });
-        if (parseFailed || readFailed) {
-            return {
-                ok: false,
-                issues,
-                summary: {
-                    currentProvider: '',
-                    currentModel: ''
-                },
-                remote: null
-            };
-        }
-    }
-
-    const providerName = typeof config.model_provider === 'string' ? config.model_provider.trim() : '';
-    const modelName = typeof config.model === 'string' ? config.model.trim() : '';
-    if (!providerName) {
-        issues.push({
-            code: 'provider-missing',
-            message: '当前 provider 未设置',
-            suggestion: '在模板中设置 model_provider'
-        });
-    }
-
-    if (!modelName) {
-        issues.push({
-            code: 'model-missing',
-            message: '当前模型未设置',
-            suggestion: '在模板中设置 model'
-        });
-    }
-
-    const providers = config.model_providers && typeof config.model_providers === 'object'
-        ? config.model_providers
-        : {};
-    const provider = providerName ? providers[providerName] : null;
-    if (providerName && !provider) {
-        issues.push({
-            code: 'provider-not-found',
-            message: `当前 provider 未在配置中找到: ${providerName}`,
-            suggestion: '检查 model_providers 是否包含该 provider 配置块'
-        });
-    }
-
-    if (provider && typeof provider === 'object') {
-        const baseUrl = typeof provider.base_url === 'string' ? provider.base_url.trim() : '';
-        if (!isValidHttpUrl(baseUrl)) {
-            issues.push({
-                code: 'base-url-invalid',
-                message: '当前 provider 的 base_url 无效',
-                suggestion: '请设置为 http/https 的完整 URL'
-            });
-        }
-
-        const requiresAuth = provider.requires_openai_auth;
-        if (requiresAuth !== false) {
-            const apiKey = typeof provider.preferred_auth_method === 'string'
-                ? provider.preferred_auth_method.trim()
-                : '';
-            if (!apiKey) {
-                issues.push({
-                    code: 'api-key-missing',
-                    message: '当前 provider 未配置 API Key',
-                    suggestion: '在模板中设置 preferred_auth_method'
-                });
-            }
-        }
-    }
-
-    if (modelName) {
-        const models = readModels();
-        if (!models.includes(modelName)) {
-            issues.push({
-                code: 'model-unavailable',
-                message: `模型未在可用列表中找到: ${modelName}`,
-                suggestion: '在模型列表中添加该模型或切换到已有模型'
-            });
-        }
-    }
-
-    const remoteEnabled = !!params.remote;
-    let remote = null;
-    if (remoteEnabled) {
-        const baseUrl = provider && typeof provider.base_url === 'string' ? provider.base_url.trim() : '';
-        if (!provider) {
-            issues.push({
-                code: 'remote-skip-provider',
-                message: '无法进行远程探测：provider 未找到',
-                suggestion: '检查 model_provider 配置或关闭远程探测'
-            });
-        } else if (!isValidHttpUrl(baseUrl)) {
-            issues.push({
-                code: 'remote-skip-base-url',
-                message: '无法进行远程探测：base_url 无效',
-                suggestion: '补全 base_url 或关闭远程探测'
-            });
-        } else {
-            const timeoutMs = Number.isFinite(params.timeoutMs)
-                ? Math.max(1000, Number(params.timeoutMs))
-                : undefined;
-            const apiKey = typeof provider.preferred_auth_method === 'string'
-                ? provider.preferred_auth_method.trim()
-                : '';
-            const speedResult = await runSpeedTest(baseUrl, apiKey, { timeoutMs });
-            const status = speedResult && typeof speedResult.status === 'number'
-                ? speedResult.status
-                : 0;
-            const durationMs = speedResult && typeof speedResult.durationMs === 'number'
-                ? speedResult.durationMs
-                : 0;
-            const error = speedResult && speedResult.error ? String(speedResult.error) : '';
-            remote = {
-                type: 'speed-test',
-                url: baseUrl,
-                ok: !!speedResult.ok,
-                status,
-                durationMs,
-                error
-            };
-
-            if (!speedResult.ok) {
-                const errorLower = error.toLowerCase();
-                if (errorLower.includes('timeout')) {
-                    issues.push({
-                        code: 'remote-speedtest-timeout',
-                        message: '远程测速超时',
-                        suggestion: '检查网络或 base_url 是否可达'
-                    });
-                } else if (errorLower.includes('invalid url')) {
-                    issues.push({
-                        code: 'remote-speedtest-invalid-url',
-                        message: '远程测速失败：base_url 无效',
-                        suggestion: '请设置为 http/https 的完整 URL'
-                    });
-                } else {
-                    issues.push({
-                        code: 'remote-speedtest-unreachable',
-                        message: `远程测速失败：${error || '无法连接'}`,
-                        suggestion: '检查网络或 base_url 是否可用'
-                    });
-                }
-            } else if (status === 401 || status === 403) {
-                issues.push({
-                    code: 'remote-speedtest-auth-failed',
-                    message: '远程测速鉴权失败（401/403）',
-                    suggestion: '检查 API Key 或认证方式'
-                });
-            } else if (status >= 400) {
-                issues.push({
-                    code: 'remote-speedtest-http-error',
-                    message: `远程测速返回异常状态: ${status}`,
-                    suggestion: '检查 base_url 或服务状态'
-                });
-            }
-        }
-    }
-
-    return {
-        ok: issues.length === 0,
-        issues,
-        summary: {
-            currentProvider: providerName,
-            currentModel: modelName
-        },
-        remote
-    };
+    return buildConfigHealthReportCore(params, {
+        readConfigOrVirtualDefault,
+        readModels
+    });
 }
 
 function buildDefaultConfigContent(initializedAt) {
@@ -7678,63 +7334,210 @@ function resolveSpeedTestTarget(params) {
         if (!provider.base_url) {
             return { error: 'Provider missing URL' };
         }
+        const currentModel = typeof config.model === 'string' ? config.model.trim() : '';
+        const probeSpec = buildModelProbeSpec(provider, currentModel, provider.base_url);
+        if (probeSpec && probeSpec.url) {
+            return {
+                method: 'POST',
+                url: probeSpec.url,
+                body: probeSpec.body,
+                apiKey: provider.preferred_auth_method || ''
+            };
+        }
         return {
+            method: 'GET',
             url: provider.base_url,
             apiKey: provider.preferred_auth_method || ''
         };
     }
 
     if (params.url) {
-        return { url: params.url, apiKey: '' };
+        return {
+            method: 'GET',
+            url: params.url,
+            apiKey: typeof params.apiKey === 'string' ? params.apiKey : ''
+        };
     }
 
     return { error: 'Missing name or url' };
 }
 
-function runSpeedTest(targetUrl, apiKey, options = {}) {
-    return new Promise((resolve) => {
-        let parsed;
-        try {
-            parsed = new URL(targetUrl);
-        } catch (e) {
-            return resolve({ ok: false, error: 'Invalid URL' });
-        }
+function extractApiPayloadErrorMessage(payload) {
+    if (!payload || typeof payload !== 'object') {
+        return '';
+    }
+    if (typeof payload.error === 'string' && payload.error.trim()) {
+        return payload.error.trim();
+    }
+    if (!payload.error || typeof payload.error !== 'object') {
+        return '';
+    }
+    if (typeof payload.error.message === 'string' && payload.error.message.trim()) {
+        return payload.error.message.trim();
+    }
+    if (typeof payload.error.code === 'string' && payload.error.code.trim()) {
+        return payload.error.code.trim();
+    }
+    return '';
+}
 
-        const timeoutMs = Number.isFinite(options.timeoutMs)
-            ? Math.max(1000, Number(options.timeoutMs))
-            : SPEED_TEST_TIMEOUT_MS;
+function resolveProviderChatTarget(params) {
+    const providerName = typeof (params && params.name) === 'string' ? params.name.trim() : '';
+    const prompt = typeof (params && params.prompt) === 'string' ? params.prompt.trim() : '';
+    if (!providerName) {
+        return { error: 'Provider name is required' };
+    }
+    if (!prompt) {
+        return { error: 'Prompt is required' };
+    }
 
-        const transport = parsed.protocol === 'https:' ? https : http;
-        const headers = {
-            'User-Agent': 'codexmate-speed-test',
-            'Accept': 'application/json'
-        };
-        if (apiKey) {
-            headers['Authorization'] = `Bearer ${apiKey}`;
-        }
+    const { config } = readConfigOrVirtualDefault();
+    const providers = config.model_providers || {};
+    const provider = providers[providerName];
+    if (!provider || typeof provider !== 'object') {
+        return { error: `Provider not found: ${providerName}` };
+    }
 
-        const start = Date.now();
-        const req = transport.request(parsed, { method: 'GET', headers }, (res) => {
-            res.on('data', () => {});
-            res.on('end', () => {
-                resolve({
-                    ok: true,
-                    status: res.statusCode || 0,
-                    durationMs: Date.now() - start
-                });
-            });
-        });
+    const baseUrl = typeof provider.base_url === 'string' ? provider.base_url.trim() : '';
+    if (!baseUrl) {
+        return { error: `Provider ${providerName} missing URL` };
+    }
 
-        req.setTimeout(timeoutMs, () => {
-            req.destroy(new Error('timeout'));
-        });
+    const currentModels = readCurrentModels();
+    const savedModel = currentModels && typeof currentModels[providerName] === 'string'
+        ? currentModels[providerName].trim()
+        : '';
+    const activeProvider = typeof config.model_provider === 'string' ? config.model_provider.trim() : '';
+    const activeModel = typeof config.model === 'string' ? config.model.trim() : '';
+    const model = savedModel || (activeProvider === providerName ? activeModel : '');
+    if (!model) {
+        return { error: `Provider ${providerName} missing current model` };
+    }
 
-        req.on('error', (err) => {
-            resolve({ ok: false, error: err.message, durationMs: Date.now() - start });
-        });
-
-        req.end();
+    const specs = buildModelConversationSpecs(provider, model, baseUrl, prompt, {
+        maxOutputTokens: 256
     });
+    if (!specs.length) {
+        return { error: `Provider ${providerName} missing available conversation endpoint` };
+    }
+
+    return {
+        providerName,
+        provider,
+        model,
+        prompt,
+        specs,
+        apiKey: typeof provider.preferred_auth_method === 'string'
+            ? provider.preferred_auth_method.trim()
+            : ''
+    };
+}
+
+async function runProviderChatCheck(params = {}) {
+    const target = resolveProviderChatTarget(params);
+    if (target.error) {
+        return { ok: false, error: target.error };
+    }
+
+    const timeoutMs = Number.isFinite(params.timeoutMs)
+        ? Math.max(1000, Number(params.timeoutMs))
+        : 30000;
+    let finalSpec = target.specs[0];
+    let result = null;
+
+    for (let index = 0; index < target.specs.length; index += 1) {
+        const candidate = target.specs[index];
+        const probeResult = await probeJsonPost(candidate.url, candidate.body, {
+            apiKey: target.apiKey,
+            timeoutMs,
+            maxBytes: 512 * 1024
+        });
+        finalSpec = candidate;
+        result = probeResult;
+        const shouldTryNextCandidate = index < target.specs.length - 1
+            && (!probeResult.ok || probeResult.status === 404);
+        if (!shouldTryNextCandidate) {
+            break;
+        }
+    }
+
+    if (!result || !result.ok) {
+        return {
+            ok: false,
+            provider: target.providerName,
+            model: target.model,
+            url: finalSpec.url,
+            status: Number.isFinite(result && result.status) ? result.status : 0,
+            durationMs: Number.isFinite(result && result.durationMs) ? result.durationMs : 0,
+            reply: '',
+            rawPreview: '',
+            error: result && result.error ? result.error : 'request failed'
+        };
+    }
+
+    let payload = null;
+    try {
+        payload = result.body ? JSON.parse(result.body) : null;
+    } catch (e) {
+        payload = null;
+    }
+
+    const payloadError = extractApiPayloadErrorMessage(payload);
+    if (result.status >= 400 || payloadError) {
+        return {
+            ok: false,
+            provider: target.providerName,
+            model: target.model,
+            url: finalSpec.url,
+            status: Number.isFinite(result.status) ? result.status : 0,
+            durationMs: Number.isFinite(result.durationMs) ? result.durationMs : 0,
+            reply: '',
+            rawPreview: result.body ? truncateText(result.body, 600) : '',
+            error: payloadError || `HTTP ${result.status}`
+        };
+    }
+
+    const reply = extractModelResponseText(payload);
+    return {
+        ok: true,
+        provider: target.providerName,
+        model: target.model,
+        url: finalSpec.url,
+        status: Number.isFinite(result.status) ? result.status : 0,
+        durationMs: Number.isFinite(result.durationMs) ? result.durationMs : 0,
+        reply,
+        rawPreview: reply ? '' : (result.body ? truncateText(result.body, 600) : ''),
+        error: ''
+    };
+}
+
+function runSpeedTest(targetUrl, apiKey, options = {}) {
+    const timeoutMs = Number.isFinite(options.timeoutMs)
+        ? Math.max(1000, Number(options.timeoutMs))
+        : SPEED_TEST_TIMEOUT_MS;
+    const method = typeof options.method === 'string' ? options.method.toUpperCase() : 'GET';
+    if (method === 'POST') {
+        return probeJsonPost(targetUrl, options.body || {}, {
+            apiKey,
+            timeoutMs,
+            maxBytes: 256 * 1024
+        }).then((result) => ({
+            ok: !!result.ok,
+            status: Number.isFinite(result.status) ? result.status : 0,
+            durationMs: Number.isFinite(result.durationMs) ? result.durationMs : 0,
+            error: result.ok ? '' : (result.error || '')
+        }));
+    }
+    return probeUrl(targetUrl, {
+        apiKey,
+        timeoutMs,
+        maxBytes: 256 * 1024
+    }).then((result) => ({
+        ok: !!result.ok,
+        status: Number.isFinite(result.status) ? result.status : 0,
+        durationMs: Number.isFinite(result.durationMs) ? result.durationMs : 0,
+        error: result.ok ? '' : (result.error || '')
+    }));
 }
 
 // ============================================================================
@@ -10592,7 +10395,11 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                                 result = { error: target.error };
                                 break;
                             }
-                            result = await runSpeedTest(target.url, target.apiKey);
+                            result = await runSpeedTest(target.url, target.apiKey, target);
+                            break;
+                        }
+                        case 'provider-chat-check': {
+                            result = await runProviderChatCheck(params || {});
                             break;
                         }
                         case 'list-sessions':

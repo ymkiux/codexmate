@@ -257,7 +257,7 @@ export function createCodexConfigMethods(options = {}) {
             let shouldRunClaudeSpeedTests = false;
             try {
                 const res = await api('config-health-check', {
-                    remote: false
+                    remote: this.configMode === 'codex'
                 });
                 if (hasResponseError(res)) {
                     this.healthCheckResult = null;
@@ -287,10 +287,17 @@ export function createCodexConfigMethods(options = {}) {
                             const issue = this.buildSpeedTestIssue(pair.name, pair.result);
                             if (issue) issues.push(issue);
                         }
-                        remote = {
-                            type: 'speed-test',
-                            results
-                        };
+                        if (remote && typeof remote === 'object') {
+                            remote = {
+                                ...remote,
+                                speedTests: results
+                            };
+                        } else {
+                            remote = {
+                                type: 'speed-test',
+                                speedTests: results
+                            };
+                        }
                     }
 
                     const ok = issues.length === 0;
@@ -318,6 +325,122 @@ export function createCodexConfigMethods(options = {}) {
                     } catch (e) {}
                 }
                 this.healthCheckLoading = false;
+            }
+        },
+
+        buildDefaultHealthCheckPrompt() {
+            return '请简短回复：当前提供商连接正常。';
+        },
+
+        openHealthCheckDialog(options = {}) {
+            const providerName = typeof options.providerName === 'string'
+                ? options.providerName.trim()
+                : '';
+            const locked = !!options.locked && !!providerName;
+            const nextProvider = providerName
+                || String(this.healthCheckDialogSelectedProvider || '').trim()
+                || String(this.currentProvider || '').trim()
+                || String(((this.displayProvidersList || [])[0] || {}).name || '').trim();
+
+            this.showHealthCheckDialog = true;
+            this.healthCheckDialogLockedProvider = locked ? nextProvider : '';
+            this.healthCheckDialogSelectedProvider = nextProvider;
+            this.healthCheckDialogPrompt = this.buildDefaultHealthCheckPrompt();
+            this.healthCheckDialogMessages = [];
+            this.healthCheckDialogLastResult = null;
+        },
+
+        closeHealthCheckDialog(options = {}) {
+            if (this.healthCheckDialogSending && !options.force) {
+                return;
+            }
+            this.showHealthCheckDialog = false;
+            this.healthCheckDialogLockedProvider = '';
+            this.healthCheckDialogSelectedProvider = '';
+            this.healthCheckDialogPrompt = this.buildDefaultHealthCheckPrompt();
+            this.healthCheckDialogMessages = [];
+            this.healthCheckDialogLastResult = null;
+        },
+
+        async sendHealthCheckDialogMessage() {
+            if (this.healthCheckDialogSending) {
+                return;
+            }
+
+            const provider = String(
+                this.healthCheckDialogLockedProvider || this.healthCheckDialogSelectedProvider || ''
+            ).trim();
+            const prompt = String(this.healthCheckDialogPrompt || '').trim();
+            if (!provider) {
+                this.showMessage('请先选择提供商', 'error');
+                return;
+            }
+            if (!prompt) {
+                this.showMessage('请输入对话内容', 'error');
+                return;
+            }
+
+            this.healthCheckDialogMessages.push({
+                id: `user-${Date.now()}`,
+                role: 'user',
+                text: prompt
+            });
+            this.healthCheckDialogSending = true;
+            this.healthCheckDialogLastResult = null;
+
+            try {
+                const res = await api('provider-chat-check', {
+                    name: provider,
+                    prompt
+                });
+                this.healthCheckDialogLastResult = res;
+
+                if (hasResponseError(res) || res.ok === false) {
+                    const message = getResponseMessage(res, '健康检测失败');
+                    this.healthCheckDialogMessages.push({
+                        id: `assistant-${Date.now()}`,
+                        role: 'assistant',
+                        text: message,
+                        ok: false,
+                        status: Number.isFinite(res && res.status) ? res.status : 0,
+                        durationMs: Number.isFinite(res && res.durationMs) ? res.durationMs : 0,
+                        model: typeof (res && res.model) === 'string' ? res.model : '',
+                        rawPreview: typeof (res && res.rawPreview) === 'string' ? res.rawPreview : ''
+                    });
+                    this.showMessage(message, 'error');
+                    return;
+                }
+
+                const reply = typeof res.reply === 'string' && res.reply.trim()
+                    ? res.reply.trim()
+                    : '已收到响应，但未解析到可展示文本。';
+                this.healthCheckDialogMessages.push({
+                    id: `assistant-${Date.now()}`,
+                    role: 'assistant',
+                    text: reply,
+                    ok: true,
+                    status: Number.isFinite(res.status) ? res.status : 0,
+                    durationMs: Number.isFinite(res.durationMs) ? res.durationMs : 0,
+                    model: typeof res.model === 'string' ? res.model : '',
+                    rawPreview: typeof res.rawPreview === 'string' ? res.rawPreview : ''
+                });
+                this.healthCheckDialogPrompt = '';
+            } catch (e) {
+                const message = e && e.message ? e.message : '健康检测失败';
+                this.healthCheckDialogMessages.push({
+                    id: `assistant-${Date.now()}`,
+                    role: 'assistant',
+                    text: message,
+                    ok: false,
+                    status: 0,
+                    durationMs: 0,
+                    model: '',
+                    rawPreview: ''
+                });
+                this.healthCheckDialogLastResult = { ok: false, error: message };
+                this.showMessage(message, 'error');
+            } finally {
+                this.healthCheckDialogSending = false;
             }
         },
 

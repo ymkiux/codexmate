@@ -1,0 +1,144 @@
+.health-check-dialog {
+    width: min(88vw, 720px);
+    max-width: 720px;
+    padding: 20px;
+}
+
+.health-check-dialog-subtitle {
+    margin-top: -6px;
+    color: var(--color-text-tertiary);
+    font-size: var(--font-size-secondary);
+}
+
+.health-check-dialog-lock {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(201, 94, 75, 0.12);
+    color: var(--color-text-primary);
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-secondary);
+}
+
+.health-check-dialog-controls {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.health-check-dialog-provider {
+    flex: 1 1 260px;
+    margin-bottom: 0;
+}
+
+.health-check-dialog-result {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    min-height: 42px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border-soft);
+    background: rgba(255, 255, 255, 0.72);
+    font-size: var(--font-size-caption);
+    color: var(--color-text-secondary);
+}
+
+.health-check-dialog-result.ok {
+    border-color: rgba(57, 181, 97, 0.25);
+    background: rgba(57, 181, 97, 0.08);
+    color: #2b6a3b;
+}
+
+.health-check-dialog-result.error {
+    border-color: rgba(220, 95, 108, 0.28);
+    background: rgba(220, 95, 108, 0.08);
+    color: #8a2f36;
+}
+
+.health-check-dialog-thread {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 12px;
+    padding: 10px;
+    border: 1px solid var(--color-border-soft);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.92) 0%, rgba(246, 240, 232, 0.9) 100%);
+}
+
+.health-check-dialog-empty {
+    padding: 16px;
+    border: 1px dashed var(--color-border-soft);
+    border-radius: var(--radius-sm);
+    color: var(--color-text-tertiary);
+    text-align: center;
+    background: rgba(255, 255, 255, 0.7);
+}
+
+.health-check-message + .health-check-message {
+    margin-top: 10px;
+}
+
+.health-check-message {
+    padding: 10px 12px;
+    border-radius: 16px;
+    border: 1px solid rgba(201, 94, 75, 0.12);
+    background: rgba(255, 255, 255, 0.84);
+    box-shadow: var(--shadow-subtle);
+}
+
+.health-check-message.user {
+    margin-left: auto;
+    max-width: 82%;
+    background: linear-gradient(to bottom, rgba(201, 94, 75, 0.12) 0%, rgba(201, 94, 75, 0.06) 100%);
+}
+
+.health-check-message.assistant {
+    margin-right: auto;
+    max-width: 88%;
+}
+
+.health-check-message.error {
+    border-color: rgba(220, 95, 108, 0.24);
+    background: rgba(220, 95, 108, 0.08);
+}
+
+.health-check-message-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+    color: var(--color-text-tertiary);
+    font-size: var(--font-size-caption);
+}
+
+.health-check-message-text {
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--color-text-primary);
+    line-height: 1.65;
+}
+
+.health-check-message-raw {
+    margin: 8px 0 0;
+    padding: 10px;
+    border-radius: var(--radius-sm);
+    background: rgba(31, 26, 23, 0.04);
+    border: 1px dashed var(--color-border-soft);
+    color: var(--color-text-secondary);
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 12px;
+    font-family: var(--font-family-mono);
+}
+
+.health-check-dialog-textarea {
+    min-height: 88px;
+    resize: vertical;
+}

@@ -180,6 +180,133 @@ test('runHealthCheck skips Claude speed tests when the primary health check alre
     }]);
 });
 
+test('runHealthCheck preserves backend remote health result while appending speed test summaries', async () => {
+    const methods = createCodexConfigMethods({
+        api: async () => ({
+            ok: true,
+            issues: [],
+            remote: {
+                type: 'remote-health-check',
+                provider: 'alpha',
+                endpoint: 'https://example.com/v1',
+                statusCode: 200,
+                ok: true,
+                message: 'ok'
+            }
+        }),
+        getProviderConfigModeMeta() {
+            return null;
+        }
+    });
+    const context = {
+        ...methods,
+        providersList: ['alpha', 'beta'],
+        speedResults: {},
+        speedLoading: {},
+        healthCheckLoading: false,
+        healthCheckResult: null,
+        configMode: 'codex',
+        shownMessages: [],
+        showMessage(message, type) {
+            this.shownMessages.push({ message, type });
+        },
+        async runSpeedTest(name) {
+            return { ok: true, durationMs: name === 'alpha' ? 10 : 20, status: 200 };
+        },
+        buildSpeedTestIssue() {
+            return null;
+        }
+    };
+
+    await methods.runHealthCheck.call(context);
+
+    assert.strictEqual(context.healthCheckLoading, false);
+    assert.strictEqual(context.healthCheckResult.remote.type, 'remote-health-check');
+    assert.strictEqual(context.healthCheckResult.remote.statusCode, 200);
+    assert.deepStrictEqual(context.healthCheckResult.remote.speedTests, {
+        alpha: { ok: true, durationMs: 10, status: 200 },
+        beta: { ok: true, durationMs: 20, status: 200 }
+    });
+});
+
+test('openHealthCheckDialog opens unlocked selector by default and locks when provider is specified', () => {
+    const methods = createCodexConfigMethods({
+        api: async () => ({}),
+        getProviderConfigModeMeta() {
+            return null;
+        }
+    });
+    const context = {
+        ...methods,
+        currentProvider: 'alpha',
+        displayProvidersList: [{ name: 'alpha' }, { name: 'beta' }],
+        showHealthCheckDialog: false,
+        healthCheckDialogLockedProvider: '',
+        healthCheckDialogSelectedProvider: '',
+        healthCheckDialogPrompt: '',
+        healthCheckDialogMessages: [{ id: 'stale' }],
+        healthCheckDialogLastResult: { ok: false }
+    };
+
+    methods.openHealthCheckDialog.call(context);
+    assert.strictEqual(context.showHealthCheckDialog, true);
+    assert.strictEqual(context.healthCheckDialogLockedProvider, '');
+    assert.strictEqual(context.healthCheckDialogSelectedProvider, 'alpha');
+    assert.deepStrictEqual(context.healthCheckDialogMessages, []);
+
+    methods.openHealthCheckDialog.call(context, { providerName: 'beta', locked: true });
+    assert.strictEqual(context.healthCheckDialogLockedProvider, 'beta');
+    assert.strictEqual(context.healthCheckDialogSelectedProvider, 'beta');
+});
+
+test('sendHealthCheckDialogMessage appends transcript and clears prompt after success', async () => {
+    const apiCalls = [];
+    const methods = createCodexConfigMethods({
+        api: async (action, params) => {
+            apiCalls.push({ action, params });
+            return {
+                ok: true,
+                provider: params.name,
+                model: 'alpha-model',
+                status: 200,
+                durationMs: 12,
+                reply: 'provider is healthy'
+            };
+        },
+        getProviderConfigModeMeta() {
+            return null;
+        }
+    });
+    const context = {
+        ...methods,
+        healthCheckDialogLockedProvider: '',
+        healthCheckDialogSelectedProvider: 'alpha',
+        healthCheckDialogPrompt: 'say ok',
+        healthCheckDialogMessages: [],
+        healthCheckDialogSending: false,
+        healthCheckDialogLastResult: null,
+        shownMessages: [],
+        showMessage(message, type) {
+            this.shownMessages.push({ message, type });
+        }
+    };
+
+    await methods.sendHealthCheckDialogMessage.call(context);
+
+    assert.deepStrictEqual(apiCalls, [{
+        action: 'provider-chat-check',
+        params: {
+            name: 'alpha',
+            prompt: 'say ok'
+        }
+    }]);
+    assert.strictEqual(context.healthCheckDialogPrompt, '');
+    assert.strictEqual(context.healthCheckDialogSending, false);
+    assert.strictEqual(context.healthCheckDialogMessages.length, 2);
+    assert.strictEqual(context.healthCheckDialogMessages[0].role, 'user');
+    assert.strictEqual(context.healthCheckDialogMessages[1].text, 'provider is healthy');
+});
+
 test('applyCodexConfigDirect keeps the successful apply result when only the refresh fails', async () => {
     const apiCalls = [];
     const methods = createCodexConfigMethods({
