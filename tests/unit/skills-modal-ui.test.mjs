@@ -1,18 +1,13 @@
 import assert from 'assert';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, '..', '..');
-
-function readProjectFile(relativePath) {
-    return fs.readFileSync(path.join(projectRoot, relativePath), 'utf8');
-}
+import {
+    readBundledWebUiCss,
+    readBundledWebUiHtml,
+    readBundledWebUiScript,
+    readProjectFile
+} from './helpers/web-ui-source.mjs';
 
 test('skills modal template includes overview counters and reset entry', () => {
-    const html = readProjectFile('web-ui/index.html');
+    const html = readBundledWebUiHtml();
     assert.match(html, /skills-summary-strip/);
     assert.match(html, /skillsConfiguredCount/);
     assert.match(html, /skillsMissingSkillFileCount/);
@@ -20,10 +15,13 @@ test('skills modal template includes overview counters and reset entry', () => {
     assert.match(html, /triggerSkillsZipImport/);
     assert.match(html, /exportSelectedSkills/);
     assert.match(html, /skillsZipImportInput/);
+    assert.match(html, /<div class="modal modal-wide skills-modal" role="dialog" aria-modal="true" aria-labelledby="skills-modal-title">/);
+    assert.match(html, /<div class="modal-title" id="skills-modal-title">Skills 管理<\/div>/);
+    assert.match(html, /@click="importSelectedSkills" :disabled="skillsImporting \|\| skillsScanningImports \|\| skillsImportSelectedCount === 0 \|\| skillsZipImporting \|\| skillsExporting \|\| skillsDeleting"/);
 });
 
 test('skills modal script is modularized and exposes computed/methods from skills modules', () => {
-    const appScript = readProjectFile('web-ui/app.js');
+    const appScript = readBundledWebUiScript();
     const skillsComputed = readProjectFile('web-ui/modules/skills.computed.mjs');
     const skillsMethods = readProjectFile('web-ui/modules/skills.methods.mjs');
 
@@ -65,8 +63,8 @@ test('skills modal script is modularized and exposes computed/methods from skill
 });
 
 test('skills modal styles define summary and panel layout hooks', () => {
-    const styles = readProjectFile('web-ui/styles.css');
-    const html = readProjectFile('web-ui/index.html');
+    const styles = readBundledWebUiCss();
+    const html = readBundledWebUiHtml();
     assert.match(styles, /\.form-select/);
     assert.match(styles, /\.skills-summary-strip/);
     assert.match(styles, /\.skills-summary-item/);
@@ -77,6 +75,10 @@ test('skills modal styles define summary and panel layout hooks', () => {
     assert.match(styles, /\.skill-list::\-webkit-scrollbar-thumb/);
     assert.match(styles, /\.confirm-dialog/);
     assert.match(styles, /\.confirm-dialog-message/);
+    assert.match(styles, /@keyframes modalFadeIn/);
+    assert.match(styles, /@keyframes modalSlideUp/);
+    assert.match(styles, /\.modal-overlay\s*\{[\s\S]*animation:\s*modalFadeIn/);
+    assert.match(styles, /\.modal\s*\{[\s\S]*animation:\s*modalSlideUp/);
     assert.match(styles, /\.market-target-chip/);
     assert.match(styles, /\.market-target-chip:disabled,\s*\.market-target-chip\[disabled\]/);
     assert.doesNotMatch(styles, /\.market-online-toolbar/);

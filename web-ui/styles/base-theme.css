@@ -1,0 +1,373 @@
+﻿/* Use local font stacks only; avoid third-party font fetches. */
+
+/* ============================================
+   设计系统 - Design Tokens
+   ============================================ */
+:root {
+    /* 色彩系统：去除杂纹，强调干净留白与温柔橙红 */
+    --color-brand: #D0583A;
+    --color-brand-dark: #B8442B;
+    --color-brand-light: rgba(208, 88, 58, 0.14);
+    --color-brand-subtle: rgba(201, 94, 75, 0.2);
+
+    --color-bg: #F8F2EA;
+    --color-surface: #FFFDFC;
+    --color-surface-alt: #FFF8F2;
+    --color-surface-elevated: #FFFFFF;
+    --color-surface-tint: rgba(255, 255, 255, 0.84);
+    --color-text-primary: #1B1714;
+    --color-text-secondary: #473C34;
+    --color-text-tertiary: #6F6054;
+    --color-text-muted: #6C5B50;
+    --color-border: #D8C9B8;
+    --color-border-soft: rgba(216, 201, 184, 0.38);
+    --color-border-strong: rgba(216, 201, 184, 0.68);
+
+    --color-success: #4B8B6A;
+    --color-error: #C44536;
+
+    --bg-warm-gradient:
+        linear-gradient(180deg, #F8F2EA 0%, #F8F2EA 100%);
+
+    /* 字体系统 */
+    --font-family-body: 'JetBrainsMono Nerd Font Mono', 'OPPO Sans 4.0', 'Fira Mono', 'JetBrains Mono', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', monospace;
+    --font-family-display: 'JetBrainsMono Nerd Font Mono', 'OPPO Sans 4.0', 'Fira Mono', 'JetBrains Mono', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', monospace;
+    --font-family-mono: 'JetBrainsMono Nerd Font Mono', 'OPPO Sans 4.0', 'Fira Mono', 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+    --font-family: var(--font-family-body);
+
+    --font-size-display: 52px;
+    --font-size-title: 18px;
+    --font-size-large: 20px;
+    --font-size-body: 15px;
+    --font-size-secondary: 13px;
+    --font-size-caption: 11px;
+
+    --font-weight-display: 600;
+    --font-weight-primary: 600;
+    --font-weight-title: 600;
+    --font-weight-body: 400;
+    --font-weight-secondary: 500;
+    --font-weight-caption: 500;
+
+    --line-height-tight: 1.12;
+    --line-height-normal: 1.5;
+
+    /* 间距系统 */
+    --spacing-xs: 8px;
+    --spacing-sm: 16px;
+    --spacing-md: 24px;
+    --spacing-lg: 40px;
+    --spacing-xl: 64px;
+
+    /* 圆角系统 */
+    --radius-sm: 8px;
+    --radius-md: 10px;
+    --radius-lg: 12px;
+    --radius-xl: 18px;
+    --radius-full: 50px;
+
+    /* 阴影系统 - 多层叠加提升真实感 */
+    --shadow-subtle: 0 1px 2px rgba(31, 26, 23, 0.03);
+    --shadow-card: 0 6px 18px rgba(31, 26, 23, 0.06);
+    --shadow-card-hover: 0 10px 24px rgba(31, 26, 23, 0.08);
+    --shadow-float: 0 12px 26px rgba(31, 26, 23, 0.12);
+    --shadow-raised: 0 10px 20px rgba(31, 26, 23, 0.1);
+    --shadow-modal:
+        0 8px 24px rgba(31, 26, 23, 0.08),
+        0 24px 64px rgba(31, 26, 23, 0.06);
+    --shadow-input-focus:
+        0 0 0 3px var(--color-brand-light),
+        0 1px 3px rgba(31, 26, 23, 0.04);
+
+    /* 动画 - 更细腻的曲线 */
+    --transition-instant: 100ms;
+    --transition-fast: 120ms;
+    --transition-normal: 200ms;
+    --transition-slow: 300ms;
+    --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-spring-soft: cubic-bezier(0.25, 1, 0.5, 1);
+    --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+/* ============================================
+   手机桌面 UA 兜底：触控设备强制紧凑排版
+   ============================================ */
+body.force-compact {
+    --font-size-title: 20px;
+    --font-size-body: 16px;
+    --font-size-secondary: 14px;
+    --font-size-caption: 12px;
+}
+
+body.force-compact .container {
+    max-width: 760px;
+    padding: 10px 10px 16px;
+}
+
+body.force-compact .provider-fast-switch {
+    position: sticky;
+    top: 8px;
+    z-index: 16;
+}
+
+body.force-compact .provider-fast-switch-select {
+    min-height: 44px;
+    font-size: 16px;
+}
+
+body.force-compact .app-shell {
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+
+body.force-compact .main-panel {
+    position: relative;
+    top: auto;
+    align-self: stretch;
+    width: 100%;
+    height: auto;
+}
+
+body.force-compact .side-rail,
+body.force-compact .status-inspector {
+    display: none;
+}
+
+body.force-compact .top-tabs {
+    display: grid !important;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+@media (min-width: 541px) {
+    body.force-compact .top-tabs {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+body.force-compact .hero-logo {
+    display: block;
+}
+
+body.force-compact .hero-github {
+    display: flex;
+}
+
+body.force-compact .main-panel {
+    padding: 14px 12px;
+}
+
+body.force-compact .hero-title {
+    font-size: 34px;
+}
+
+body.force-compact .card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 12px;
+    gap: 8px;
+}
+
+body.force-compact .card-leading {
+    align-items: flex-start;
+    width: 100%;
+}
+
+body.force-compact .card-content {
+    width: 100%;
+}
+
+body.force-compact .card-title,
+body.force-compact .card-title > span:first-child {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+}
+
+body.force-compact .card-subtitle {
+    white-space: normal;
+    overflow: hidden;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+body.force-compact .card-trailing {
+    width: 100%;
+    margin-top: 0;
+    grid-auto-flow: row;
+    grid-auto-columns: 1fr;
+    justify-content: stretch;
+    justify-items: end;
+}
+
+body.force-compact .card-trailing .card-actions {
+    width: 100%;
+    justify-content: flex-end;
+    justify-self: stretch;
+    flex-wrap: wrap;
+}
+
+body.force-compact .card-actions {
+    opacity: 1;
+    transform: none;
+}
+
+body.force-compact .card-trailing .pill,
+body.force-compact .card-trailing .latency {
+    justify-self: end;
+}
+
+body.force-compact .btn-add,
+body.force-compact .btn-tool,
+body.force-compact .card-action-btn {
+    min-height: 44px;
+}
+
+/* ============================================
+   基础重置
+   ============================================ */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* 仅屏幕阅读器可见 */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+body {
+    font-family: var(--font-family-body);
+    background-color: var(--color-bg);
+    background: var(--bg-warm-gradient);
+    color: var(--color-text-primary);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: var(--spacing-lg) var(--spacing-md);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    position: relative;
+    overflow-x: hidden;
+}
+
+.fab-install {
+    position: fixed;
+    left: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    z-index: 90;
+    display: inline-grid;
+    place-items: center;
+    width: 50px;
+    height: 50px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.04) 100%),
+        linear-gradient(135deg, var(--color-brand) 0%, var(--color-brand-dark) 100%);
+    color: #fff;
+    font-size: var(--font-size-secondary);
+    font-weight: var(--font-weight-secondary);
+    letter-spacing: 0.015em;
+    box-shadow: var(--shadow-float);
+    cursor: pointer;
+    overflow: hidden;
+    transition:
+        transform var(--transition-fast) var(--ease-spring),
+        box-shadow var(--transition-fast) var(--ease-spring),
+        filter var(--transition-fast) var(--ease-smooth);
+    animation: fabPulse 3.2s ease-in-out infinite;
+}
+
+.fab-install::after {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    border-radius: inherit;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    pointer-events: none;
+}
+
+.fab-install-icon {
+    width: 20px;
+    height: 20px;
+    display: inline-grid;
+    place-items: center;
+    color: #fff;
+    background: transparent;
+    box-shadow: none;
+    flex-shrink: 0;
+}
+
+.fab-install-icon svg {
+    width: 18px;
+    height: 18px;
+}
+
+.fab-install:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-raised);
+    filter: saturate(1.04);
+}
+
+.fab-install:active {
+    transform: translateY(0);
+    filter: saturate(0.98);
+}
+
+@media (max-width: 640px) {
+    .fab-install {
+        left: 12px;
+        bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+        width: 44px;
+        height: 44px;
+        padding: 0;
+        font-size: var(--font-size-secondary);
+    }
+
+    .fab-install-icon {
+        width: 18px;
+        height: 18px;
+    }
+
+    .fab-install-icon svg {
+        width: 16px;
+        height: 16px;
+    }
+}
+
+@keyframes fabPulse {
+    0%,
+    100% {
+        box-shadow: var(--shadow-float);
+    }
+    50% {
+        box-shadow: 0 14px 30px rgba(31, 26, 23, 0.14);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fab-install {
+        animation: none;
+        transition: none;
+    }
+}

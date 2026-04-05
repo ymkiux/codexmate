@@ -1,19 +1,16 @@
 ﻿import assert from 'assert';
-import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import {
+    readBundledWebUiCss,
+    readBundledWebUiHtml,
+    readBundledWebUiScript,
+    readProjectFile
+} from './helpers/web-ui-source.mjs';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const appPath = path.join(__dirname, '..', '..', 'web-ui', 'app.js');
-const cliPath = path.join(__dirname, '..', '..', 'cli.js');
-const indexHtmlPath = path.join(__dirname, '..', '..', 'web-ui', 'index.html');
-const stylesPath = path.join(__dirname, '..', '..', 'web-ui', 'styles.css');
-const appSource = fs.readFileSync(appPath, 'utf-8');
-const cliSource = fs.readFileSync(cliPath, 'utf-8');
-const indexHtmlSource = fs.readFileSync(indexHtmlPath, 'utf-8');
-const stylesSource = fs.readFileSync(stylesPath, 'utf-8');
+const appSource = readBundledWebUiScript();
+const cliSource = readProjectFile('cli.js');
+const indexHtmlSource = readBundledWebUiHtml();
+const stylesSource = readBundledWebUiCss();
 
 function escapeRegExp(value) {
     return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -663,7 +660,7 @@ test('loadSessionTrash and loadSessionTrashCount keep independent stale-response
         extractMethodAsFunction(appSource, 'loadSessionTrash'),
         'loadSessionTrash',
         {
-            SESSION_TRASH_LIST_LIMIT: 50,
+            sessionTrashListLimit: 50,
             api
         }
     );
@@ -763,7 +760,7 @@ test('loadSessionTrash marks latest failures as retryable and clears the failure
     let callCount = 0;
     const loadSessionTrashSource = extractMethodAsFunction(appSource, 'loadSessionTrash');
     const loadSessionTrash = instantiateFunction(loadSessionTrashSource, 'loadSessionTrash', {
-        SESSION_TRASH_LIST_LIMIT: 50,
+        sessionTrashListLimit: 50,
         api: async () => {
             callCount += 1;
             if (callCount === 1) {
@@ -1739,11 +1736,159 @@ test('deleteSession prefers authoritative trash totalCount from the backend resp
     }]);
 });
 
+test('deleteSession keeps success message when list cleanup fails after trash succeeds', async () => {
+    const deleteSessionSource = extractMethodAsFunction(appSource, 'deleteSession');
+    const deleteSession = instantiateFunction(deleteSessionSource, 'deleteSession', {
+        api: async () => ({
+            trashId: 'trash-1',
+            deletedAt: '2025-03-30T00:00:00.000Z',
+            messageCount: 2
+        })
+    });
+
+    const messages = [];
+    const context = {
+        sessionDeleting: {},
+        sessionTrashLoadedOnce: false,
+        sessionTrashCountLoadedOnce: true,
+        sessionTrashTotalCount: 5,
+        sessionTrashItems: [],
+        sessionTrashCountRequestToken: 0,
+        sessionTrashListRequestToken: 0,
+        removeSessionPinCalls: [],
+        isDeleteAvailable: () => true,
+        getSessionExportKey(session) {
+            return `${session.source}:${session.sessionId}:${session.filePath}`;
+        },
+        invalidateSessionTrashRequests() {
+            this.sessionTrashCountRequestToken += 1;
+            this.sessionTrashListRequestToken += 1;
+            return this.sessionTrashListRequestToken;
+        },
+        normalizeSessionTrashTotalCount(totalCount, fallbackItems = this.sessionTrashItems) {
+            const fallbackCount = Array.isArray(fallbackItems) ? fallbackItems.length : 0;
+            const numericTotal = Number(totalCount);
+            if (!Number.isFinite(numericTotal) || numericTotal < 0) {
+                return fallbackCount;
+            }
+            return Math.max(fallbackCount, Math.floor(numericTotal));
+        },
+        prependSessionTrashItem() {
+            throw new Error('list hydration path should not run when only count is loaded');
+        },
+        buildSessionTrashItemFromSession() {
+            throw new Error('list hydration path should not run when only count is loaded');
+        },
+        removeSessionPin(session) {
+            this.removeSessionPinCalls.push(session);
+        },
+        async removeSessionFromCurrentList() {
+            throw new Error('selection refresh failed');
+        },
+        showMessage(message, tone) {
+            messages.push({ message, tone });
+        }
+    };
+
+    await deleteSession.call(context, {
+        source: 'codex',
+        sessionId: 'session-1',
+        filePath: '/tmp/session-1.jsonl'
+    });
+
+    assert.strictEqual(context.sessionTrashTotalCount, 6);
+    assert.strictEqual(context.sessionDeleting['codex:session-1:/tmp/session-1.jsonl'], false);
+    assert.deepStrictEqual(context.removeSessionPinCalls, [{
+        source: 'codex',
+        sessionId: 'session-1',
+        filePath: '/tmp/session-1.jsonl'
+    }]);
+    assert.deepStrictEqual(messages, [{ message: '已移入回收站', tone: 'success' }]);
+});
+
+test('cloneSession keeps success message when refresh fails after clone succeeds', async () => {
+    const cloneSessionSource = extractMethodAsFunction(appSource, 'cloneSession');
+    const cloneSession = instantiateFunction(cloneSessionSource, 'cloneSession', {
+        api: async () => ({
+            sessionId: 'clone-1'
+        })
+    });
+
+    const messages = [];
+    const context = {
+        sessionCloning: {},
+        sessionsList: [],
+        isCloneAvailable: () => true,
+        getSessionExportKey(session) {
+            return `${session.source}:${session.sessionId}:${session.filePath}`;
+        },
+        async loadSessions() {
+            throw new Error('refresh failed');
+        },
+        async selectSession() {
+            throw new Error('select should not run when refresh fails');
+        },
+        showMessage(message, tone) {
+            messages.push({ message, tone });
+        }
+    };
+
+    await cloneSession.call(context, {
+        source: 'codex',
+        sessionId: 'session-1',
+        filePath: '/tmp/session-1.jsonl'
+    });
+
+    assert.strictEqual(context.sessionCloning['codex:session-1:/tmp/session-1.jsonl'], false);
+    assert.deepStrictEqual(messages, [{ message: '操作成功', tone: 'success' }]);
+});
+
+test('cloneSession keeps success message when selecting the cloned session fails', async () => {
+    const cloneSessionSource = extractMethodAsFunction(appSource, 'cloneSession');
+    const cloneSession = instantiateFunction(cloneSessionSource, 'cloneSession', {
+        api: async () => ({
+            sessionId: 'clone-1'
+        })
+    });
+
+    const messages = [];
+    const context = {
+        sessionCloning: {},
+        sessionsList: [],
+        isCloneAvailable: () => true,
+        getSessionExportKey(session) {
+            return `${session.source}:${session.sessionId}:${session.filePath}`;
+        },
+        async loadSessions() {
+            this.sessionsList = [{
+                source: 'codex',
+                sessionId: 'clone-1',
+                filePath: '/tmp/clone-1.jsonl'
+            }];
+        },
+        async selectSession() {
+            throw new Error('selection failed');
+        },
+        showMessage(message, tone) {
+            messages.push({ message, tone });
+        }
+    };
+
+    await cloneSession.call(context, {
+        source: 'codex',
+        sessionId: 'session-1',
+        filePath: '/tmp/session-1.jsonl'
+    });
+
+    assert.strictEqual(context.sessionCloning['codex:session-1:/tmp/session-1.jsonl'], false);
+    assert.deepStrictEqual(messages, [{ message: '操作成功', tone: 'success' }]);
+});
+
 test('prependSessionTrashItem prefers authoritative trash totalCount when provided', () => {
     const prependSessionTrashItemSource = extractMethodAsFunction(appSource, 'prependSessionTrashItem');
     const prependSessionTrashItem = instantiateFunction(prependSessionTrashItemSource, 'prependSessionTrashItem', {
-        SESSION_TRASH_LIST_LIMIT: 500,
-        SESSION_TRASH_PAGE_SIZE: 200
+        sessionTrashListLimit: 500,
+        sessionTrashPageSize: 200
     });
 
     const context = {
@@ -1909,7 +2054,7 @@ test('loadSessionTrash replays the latest queued refresh after an in-flight requ
     const pendingResponses = [];
     const apiCalls = [];
     const loadSessionTrash = instantiateFunction(loadSessionTrashSource, 'loadSessionTrash', {
-        SESSION_TRASH_LIST_LIMIT: 500,
+        sessionTrashListLimit: 500,
         api: async (action, params) => await new Promise((resolve) => {
             apiCalls.push({ action, params });
             pendingResponses.push(resolve);

@@ -13,6 +13,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -23,4 +25,6 @@ jobs:
       - name: Lint
         run: npm run lint --if-present
       - name: Test
+        env:
+          WEB_UI_PARITY_BASE_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
         run: npm run test --if-present

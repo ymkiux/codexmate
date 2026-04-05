@@ -1,18 +1,12 @@
 ﻿import assert from 'assert';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, '..', '..');
-
-function readProjectFile(relativePath) {
-    return fs.readFileSync(path.join(projectRoot, relativePath), 'utf8');
-}
+import {
+    readBundledWebUiHtml,
+    readBundledWebUiScript,
+    readProjectFile
+} from './helpers/web-ui-source.mjs';
 
 test('agents modal exposes diff preview hooks in template and script', () => {
-    const template = readProjectFile('web-ui/index.html');
+    const template = readBundledWebUiHtml();
     assert.match(template, /agentsDiffVisible/);
     assert.match(template, /agentsDiffLines/);
     assert.match(template, /agents-diff/);
@@ -23,7 +17,10 @@ test('agents modal exposes diff preview hooks in template and script', () => {
     assert.match(template, /检测到未保存改动/);
     assert.match(template, /快捷键：Esc/);
     assert.match(template, /agentsDiffTruncated/);
-    assert.match(template, /:readonly="agentsLoading"/);
+    assert.match(template, /@click\.self="!configTemplateApplying && closeConfigTemplateModal\(\)"/);
+    assert.match(template, /:readonly="configTemplateApplying"/);
+    assert.match(template, /<button class="btn btn-cancel" @click="closeConfigTemplateModal" :disabled="configTemplateApplying">取消<\/button>/);
+    assert.match(template, /:readonly="agentsLoading \|\| agentsSaving"/);
     assert.match(template, /agentsDiffVisible \? '应用'/);
     assert.match(template, /应用中\.\.\./);
     assert.match(template, /showConfirmDialog/);
@@ -33,7 +30,7 @@ test('agents modal exposes diff preview hooks in template and script', () => {
     assert.match(template, /id="confirm-dialog-title"/);
     assert.match(template, /id="confirm-dialog-message"/);
 
-    const script = readProjectFile('web-ui/app.js');
+    const script = readBundledWebUiScript();
     assert.match(script, /agentsDiffVisible:\s*false/);
     assert.match(script, /prepareAgentsDiff\(/);
     assert.match(script, /resetAgentsDiffState\(/);
@@ -56,7 +53,7 @@ test('agents diff preview avoids extra file reads and caps api payload size', ()
     assert.match(cliSource, /bodySize\s*>\s*MAX_API_BODY_SIZE/);
     assert.match(cliSource, /buildAgentsDiff[\s\S]*metaOnly/);
 
-    const appSource = readProjectFile('web-ui/app.js');
+    const appSource = readBundledWebUiScript();
     assert.match(appSource, /buildAgentsDiffPreviewRequest\(/);
     assert.match(appSource, /previewRequest\.exceedsBodyLimit/);
     assert.match(appSource, /applyPreviewState\(buildAgentsDiffPreview\(/);

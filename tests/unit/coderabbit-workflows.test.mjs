@@ -27,5 +27,7 @@ test('coderabbit review workflow only comments when commit count changes and use
     assert.match(workflow, /github\.rest\.issues\.createComment/);
     assert.match(workflow, /@coderabbitai re-review/);
     assert.match(workflow, /Stop making breaking changes, do a proper review!/);
+    assert.match(workflow, /If I merge this directly, will it introduce any regressions\? Please list only the impacted issues\./);
+    assert.match(workflow, /Do not include style suggestions, speculative concerns, or already-resolved items\./);
     assert.doesNotMatch(workflow, /！/);
 });

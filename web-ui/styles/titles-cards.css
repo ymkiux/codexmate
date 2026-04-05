@@ -1,0 +1,407 @@
+/* ============================================
+   主标题
+   ============================================ */
+.main-title {
+    font-size: var(--font-size-display);
+    font-weight: var(--font-weight-display);
+    line-height: var(--line-height-tight);
+    letter-spacing: -0.03em;
+    margin-bottom: 10px;
+    color: var(--color-text-primary);
+    font-family: var(--font-family-display);
+    background: linear-gradient(135deg, var(--color-text-primary) 0%, rgba(27, 23, 20, 0.78) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.main-title .accent {
+    color: var(--color-brand);
+    -webkit-text-fill-color: var(--color-brand);
+    position: relative;
+}
+
+.subtitle {
+    font-size: var(--font-size-body);
+    color: var(--color-text-tertiary);
+    line-height: var(--line-height-normal);
+    margin-bottom: 20px;
+    max-width: 640px;
+    letter-spacing: 0.01em;
+}
+
+/* ============================================
+   模式切换器 - Segmented Control
+   ============================================ */
+.segmented-control {
+    display: flex;
+    background: rgba(255, 255, 255, 0.92);
+    border-radius: var(--radius-xl);
+    padding: 6px;
+    margin-bottom: 20px;
+    position: relative;
+    box-shadow: inset 0 1px 2px rgba(31, 26, 23, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(6px);
+}
+
+.segment {
+    flex: 1;
+    padding: 11px 16px;
+    border: none;
+    background: transparent;
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-secondary);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    border-radius: 10px;
+    transition: all var(--transition-normal) var(--ease-spring);
+    position: relative;
+    z-index: 2;
+    letter-spacing: 0.01em;
+}
+
+.segment:hover {
+    color: var(--color-text-primary);
+}
+
+.segment.active {
+    color: var(--color-text-primary);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.8) 100%);
+    box-shadow: var(--shadow-subtle), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+/* ============================================
+   卡片列表
+   ============================================ */
+.card-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+/* ============================================
+   卡片
+   ============================================ */
+.card {
+    background: linear-gradient(180deg, #fffdf9 0%, #fff8f2 100%);
+    border-radius: var(--radius-lg);
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition:
+        transform var(--transition-normal) var(--ease-spring),
+        box-shadow var(--transition-normal) var(--ease-spring),
+        background-color var(--transition-fast) var(--ease-smooth);
+    box-shadow: 0 10px 24px rgba(27, 23, 20, 0.08);
+    user-select: none;
+    will-change: transform;
+    border: 1px solid rgba(216, 201, 184, 0.55);
+    position: relative;
+    overflow: hidden;
+}
+
+.card:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-card-hover);
+}
+
+.card::before,
+.card::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+}
+
+.card::before {
+    left: 0;
+    top: 10px;
+    bottom: 10px;
+    width: 3px;
+    border-radius: 999px;
+    background: transparent;
+    transition: background var(--transition-fast) var(--ease-smooth);
+}
+
+.card::after {
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(120deg, rgba(255, 255, 255, 0.7) 0%, transparent 55%);
+    opacity: 0;
+    transition: opacity var(--transition-normal) var(--ease-smooth);
+}
+
+.card:active {
+    transform: translateY(0);
+    transition: transform var(--transition-instant) var(--ease-smooth);
+}
+
+.card.active {
+    background: linear-gradient(to bottom, rgba(210, 107, 90, 0.14) 0%, rgba(255, 255, 255, 0.98) 100%);
+    border-color: rgba(201, 94, 75, 0.55);
+    box-shadow: 0 10px 28px rgba(210, 107, 90, 0.14);
+}
+
+.card.active::before {
+    background: linear-gradient(180deg, rgba(201, 94, 75, 0.95) 0%, rgba(201, 94, 75, 0.35) 100%);
+}
+
+.card:hover::after {
+    opacity: 0.6;
+}
+
+.card.active .card-icon {
+    transform: scale(1.05);
+}
+
+.card-leading {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex: 1;
+    min-width: 0;
+}
+
+.card-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(247, 241, 232, 0.65) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-size-title);
+    font-weight: var(--font-weight-title);
+    color: var(--color-text-secondary);
+    flex-shrink: 0;
+    transition: all var(--transition-normal) var(--ease-spring-soft);
+    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.7);
+}
+
+.card.active .card-icon {
+    background: linear-gradient(135deg, var(--color-brand) 0%, var(--color-brand-dark) 100%);
+    color: white;
+    box-shadow: 0 2px 8px rgba(210, 107, 90, 0.3);
+}
+
+.card-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-secondary);
+    color: var(--color-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: -0.01em;
+}
+
+.card-title > span:first-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.provider-readonly-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    font-size: 11px;
+    line-height: 1;
+    color: #6f4b00;
+    background: linear-gradient(135deg, rgba(246, 211, 106, 0.32) 0%, rgba(246, 211, 106, 0.2) 100%);
+    border: 1px solid rgba(191, 151, 40, 0.35);
+    flex-shrink: 0;
+}
+
+.card-subtitle {
+    font-size: var(--font-size-secondary);
+    color: var(--color-text-tertiary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0.8;
+}
+
+.card-trailing {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    column-gap: var(--spacing-xs);
+    row-gap: 6px;
+    align-items: center;
+    justify-content: end;
+    align-self: center;
+}
+
+.card-trailing .card-actions {
+    margin-left: 0;
+    justify-self: end;
+}
+
+.card-trailing .pill,
+.card-trailing .latency {
+    justify-self: end;
+}
+
+/* 卡片操作按钮 - hover 显示 */
+.card-actions {
+    display: flex;
+    gap: 8px;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(4px);
+    transition: all var(--transition-normal) var(--ease-spring);
+}
+
+.card:hover .card-actions {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+}
+
+.card:focus-within .card-actions {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+}
+
+.mode-cards .card-actions {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+}
+
+.card-action-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    border: 1px solid rgba(70, 86, 110, 0.22);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.9));
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast) var(--ease-spring);
+    box-shadow: inset 0 1px 2px rgba(31, 26, 23, 0.04);
+}
+
+.card-action-btn:hover {
+    background: linear-gradient(135deg, rgba(210, 107, 90, 0.08) 0%, rgba(255, 255, 255, 0.95) 100%);
+    color: var(--color-text-primary);
+    transform: translateY(-1px);
+}
+
+.card-action-btn.delete:hover {
+    background: linear-gradient(135deg, rgba(200, 74, 58, 0.1) 0%, rgba(200, 74, 58, 0.05) 100%);
+    color: var(--color-error);
+}
+
+.card-action-btn:disabled,
+.card-action-btn.disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+    filter: grayscale(0.1);
+}
+
+.card-action-btn.delete:disabled:hover,
+.card-action-btn.delete.disabled:hover {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.9));
+    color: var(--color-text-secondary);
+}
+
+.card-action-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* ============================================
+   状态徽章
+   ============================================ */
+.pill {
+    padding: 5px 11px;
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-caption);
+    background-color: rgba(255, 255, 255, 0.8);
+    color: var(--color-text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    transition: all var(--transition-fast) var(--ease-smooth);
+    box-shadow: inset 0 0.5px 1px rgba(0, 0, 0, 0.04);
+}
+
+.pill.configured {
+    background: linear-gradient(135deg, rgba(90, 139, 106, 0.15) 0%, rgba(90, 139, 106, 0.08) 100%);
+    color: var(--color-success);
+    box-shadow: inset 0 0.5px 1px rgba(90, 139, 106, 0.2);
+}
+
+.pill.empty {
+    background: linear-gradient(135deg, rgba(200, 74, 58, 0.1) 0%, rgba(200, 74, 58, 0.05) 100%);
+    color: var(--color-error);
+    box-shadow: inset 0 0.5px 1px rgba(200, 74, 58, 0.15);
+}
+
+.latency {
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-caption);
+    background: var(--color-bg);
+    color: var(--color-text-tertiary);
+    letter-spacing: 0.02em;
+    min-width: 64px;
+    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.latency.ok {
+    color: var(--color-success);
+    background: rgba(90, 139, 106, 0.1);
+}
+
+.latency.error {
+    color: var(--color-error);
+    background: rgba(200, 74, 58, 0.08);
+}
+
+.card-action-btn.loading svg {
+    animation: spin 0.9s linear infinite;
+}
+
+/* ============================================
+   图标 - SVG 优化
+   ============================================ */
+.icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.icon-chevron-right {
+    color: var(--color-text-tertiary);
+    opacity: 0.5;
+}

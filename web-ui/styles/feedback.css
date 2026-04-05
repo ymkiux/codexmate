@@ -1,0 +1,108 @@
+/* ============================================
+   Toast - 顶部横幅
+   ============================================ */
+.toast {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.95) 100%);
+    padding: 12px 24px;
+    border-radius: var(--radius-full);
+    box-shadow: var(--shadow-raised);
+    z-index: 200;
+    animation: slideDown var(--transition-slow) var(--ease-spring);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-body);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.toast.error {
+    border-left: 3px solid var(--color-error);
+}
+
+.toast.success {
+    border-left: 3px solid var(--color-success);
+}
+
+/* ============================================
+   状态消息
+   ============================================ */
+.state-message {
+    text-align: center;
+    padding: 60px var(--spacing-md);
+    color: var(--color-text-tertiary);
+    font-size: var(--font-size-body);
+    opacity: 0.7;
+    letter-spacing: -0.005em;
+}
+
+.state-message.error {
+    color: var(--color-error);
+}
+
+/* 空状态 */
+.empty-state {
+    text-align: center;
+    padding: 48px var(--spacing-md);
+    color: var(--color-text-tertiary);
+}
+
+.empty-state-icon {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto var(--spacing-sm);
+    opacity: 0.3;
+}
+
+.empty-state-title {
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-secondary);
+    color: var(--color-text-secondary);
+    margin-bottom: 4px;
+}
+
+.empty-state-subtitle {
+    font-size: var(--font-size-secondary);
+    color: var(--color-text-tertiary);
+    opacity: 0.8;
+}
+
+/* ============================================
+   动画
+   ============================================ */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from { transform: translateY(24px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideDown {
+    from { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+    to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+[v-cloak] {
+    display: none !important;
+}
+
+/* 模式内容容器 */
+.mode-content {
+    animation: fadeIn var(--transition-normal) var(--ease-spring);
+}
+
+/* TODO: 内容区域包裹器当前不需要额外稳定高度样式，保留注释避免误判为缺失规则。 */

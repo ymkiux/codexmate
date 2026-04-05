@@ -1,0 +1,32 @@
+        <div v-if="showConfirmDialog" class="modal-overlay" @click.self="closeConfirmDialog">
+            <div
+                class="modal confirm-dialog"
+                role="alertdialog"
+                aria-modal="true"
+                aria-describedby="confirm-dialog-message"
+                :aria-labelledby="confirmDialogTitle ? 'confirm-dialog-title' : null"
+                :aria-label="confirmDialogTitle ? null : '确认操作'">
+                <div id="confirm-dialog-title" class="modal-title">{{ confirmDialogTitle }}</div>
+                <div id="confirm-dialog-message" class="confirm-dialog-message">{{ confirmDialogMessage }}</div>
+                <div class="btn-group confirm-dialog-actions">
+                    <button class="btn btn-cancel" @click="closeConfirmDialog">{{ confirmDialogCancelText }}</button>
+                    <button
+                        :class="['btn', 'btn-confirm', confirmDialogDanger ? 'btn-danger' : '']"
+                        :disabled="isConfirmDialogDisabled()"
+                        @click="resolveConfirmDialog(true)">
+                        {{ confirmDialogConfirmText }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast通知 -->
+        
+        <!-- Toast -->
+        <div
+            v-if="message"
+            :class="['toast', messageType]"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true">{{ message }}</div>
+    </div>

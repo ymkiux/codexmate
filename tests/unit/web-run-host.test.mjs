@@ -324,10 +324,200 @@ const handleImportSkillsZipUploadSource = extractFunctionBySignature(
     'async function handleImportSkillsZipUpload(req, res, options = {}) {',
     'handleImportSkillsZipUpload'
 );
+const createWebServerSource = extractFunctionBySignature(
+    cliContent,
+    'function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser }) {',
+    'createWebServer'
+);
+
+function createMockResponse() {
+    return {
+        headersSent: false,
+        statusCode: null,
+        headers: null,
+        body: '',
+        destroyedWith: null,
+        writeHead(statusCode, headers) {
+            this.statusCode = statusCode;
+            this.headers = headers;
+            this.headersSent = true;
+        },
+        end(body = '') {
+            this.body = body;
+            this.ended = true;
+        },
+        destroy(error) {
+            this.destroyedWith = error;
+        }
+    };
+}
+
+function createWebServerHarness({
+    htmlReader = () => '<!doctype html>',
+    dynamicAssets = new Map()
+} = {}) {
+    let requestHandler = null;
+    const errors = [];
+    const server = {
+        listening: false,
+        on() {},
+        once() {},
+        listen() {},
+        close(callback) {
+            this.listening = false;
+            if (typeof callback === 'function') {
+                callback();
+            }
+        }
+    };
+    const createWebServer = instantiateFunction(createWebServerSource, 'createWebServer', {
+        http: {
+            createServer(handler) {
+                requestHandler = handler;
+                return server;
+            }
+        },
+        path,
+        __dirname: '/repo',
+        readBundledWebUiHtml: htmlReader,
+        PUBLIC_WEB_UI_DYNAMIC_ASSETS: dynamicAssets,
+        PUBLIC_WEB_UI_STATIC_ASSETS: new Set(),
+        isPathInside() {
+            return true;
+        },
+        fs: {
+            existsSync() {
+                return false;
+            },
+            statSync() {
+                return {
+                    isFile() {
+                        return false;
+                    }
+                };
+            },
+            createReadStream() {
+                throw new Error('unexpected static asset read');
+            }
+        },
+        formatHostForUrl(value) {
+            return value;
+        },
+        DEFAULT_WEB_OPEN_HOST: '127.0.0.1',
+        isAnyAddressHost() {
+            return false;
+        },
+        process: { env: {} },
+        exec() {},
+        console: {
+            log() {},
+            warn() {},
+            error(...args) {
+                errors.push(args);
+            }
+        }
+    });
+
+    createWebServer({
+        htmlPath: '/repo/web-ui/index.html',
+        assetsDir: '/repo/res',
+        webDir: '/repo/web-ui',
+        host: '127.0.0.1',
+        port: 3737,
+        openBrowser: false
+    });
+
+    return { requestHandler, errors };
+}
+
+function assertInternalServerErrorResponse(response) {
+    assert.strictEqual(response.statusCode, 500);
+    assert.deepStrictEqual(response.headers, {
+        'Content-Type': 'text/plain; charset=utf-8'
+    });
+    assert.strictEqual(response.body, 'Internal Server Error');
+    assert.strictEqual(response.destroyedWith, null);
+}
+
+function assertNotFoundResponse(response) {
+    assert.strictEqual(response.statusCode, 404);
+    assert.deepStrictEqual(response.headers, {
+        'Content-Type': 'text/plain; charset=utf-8'
+    });
+    assert.strictEqual(response.body, 'Not Found');
+    assert.strictEqual(response.destroyedWith, null);
+}
 
 test('resolveSkillTarget still falls back to default target when target is omitted', () => {
     assert.deepStrictEqual(resolveSkillTarget({}), SKILL_TARGETS[0]);
     assert.deepStrictEqual(resolveSkillTarget({ items: [] }), SKILL_TARGETS[0]);
+});
+
+test('createWebServer returns 500 when bundled /web-ui html generation throws', () => {
+    const { requestHandler, errors } = createWebServerHarness({
+        htmlReader() {
+            throw new Error('bundled html failed');
+        }
+    });
+    const response = createMockResponse();
+
+    requestHandler({ url: '/web-ui' }, response);
+
+    assertInternalServerErrorResponse(response);
+    assert.deepStrictEqual(errors, [
+        ['! Web UI 资源读取失败 [/web-ui]:', 'bundled html failed']
+    ]);
+});
+
+test('createWebServer preserves the legacy 404 contract for /web-ui/', () => {
+    const { requestHandler, errors } = createWebServerHarness({
+        htmlReader() {
+            throw new Error('bundled html failed');
+        }
+    });
+    const response = createMockResponse();
+
+    requestHandler({ url: '/web-ui/' }, response);
+
+    assertNotFoundResponse(response);
+    assert.deepStrictEqual(errors, []);
+});
+
+test('createWebServer returns 500 when bundled dynamic asset generation throws', () => {
+    const { requestHandler, errors } = createWebServerHarness({
+        dynamicAssets: new Map([
+            ['index.html', {
+                mime: 'text/html; charset=utf-8',
+                reader() {
+                    throw new Error('bundled index failed');
+                }
+            }]
+        ])
+    });
+    const response = createMockResponse();
+
+    requestHandler({ url: '/web-ui/index.html' }, response);
+
+    assertInternalServerErrorResponse(response);
+    assert.deepStrictEqual(errors, [
+        ['! Web UI 资源读取失败 [/web-ui/index.html]:', 'bundled index failed']
+    ]);
+});
+
+test('createWebServer returns 500 when fallback bundled html generation throws', () => {
+    const { requestHandler, errors } = createWebServerHarness({
+        htmlReader() {
+            throw new Error('fallback html failed');
+        }
+    });
+    const response = createMockResponse();
+
+    requestHandler({ url: '/' }, response);
+
+    assertInternalServerErrorResponse(response);
+    assert.deepStrictEqual(errors, [
+        ['! Web UI 资源读取失败 [/]:', 'fallback html failed']
+    ]);
 });
 
 test('resolveSkillTarget rejects explicit unsupported targets instead of falling back', () => {

@@ -1,7 +1,10 @@
 import assert from 'assert';
-import fs from 'fs';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
+import {
+    readBundledWebUiHtml,
+    readBundledWebUiScript
+} from './helpers/web-ui-source.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,10 +17,6 @@ const {
     loadActiveSessionDetail,
     loadMoreSessionMessages
 } = helpers;
-
-function readProjectFile(relativePath) {
-    return fs.readFileSync(path.join(projectRoot, relativePath), 'utf8');
-}
 
 test('switchMainTab tears down session heavy render state when leaving sessions tab', () => {
     const calls = {
@@ -345,13 +344,13 @@ test('deferred teardown is skipped when user quickly switches back to sessions',
 });
 
 test('session timeline stays always-on and no longer exposes toggle handler', () => {
-    const appScript = readProjectFile('web-ui/app.js');
+    const appScript = readBundledWebUiScript();
     assert.match(appScript, /sessionTimelineEnabled:\s*true,/);
     assert.doesNotMatch(appScript, /toggleSessionTimeline\(\)/);
 });
 
 test('session template removes timeline switch button and binds refs by timeline node keys', () => {
-    const template = readProjectFile('web-ui/index.html');
+    const template = readBundledWebUiHtml();
     assert.doesNotMatch(template, /@click="toggleSessionTimeline"/);
     assert.doesNotMatch(template, /开启时间轴|关闭时间轴/);
     assert.match(template, /:ref="getSessionMessageRefBinder\(getRecordRenderKey\(msg,\s*idx\)\)"/);

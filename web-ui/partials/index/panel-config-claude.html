@@ -1,0 +1,100 @@
+                <!-- Claude Code 配置模式 -->
+                <div
+                    v-show="mainTab === 'config' && configMode === 'claude'"
+                    class="mode-content mode-cards"
+                    id="panel-config-claude"
+                    role="tabpanel"
+                    :aria-labelledby="'tab-config-claude'">
+                <!-- 添加提供商按钮 -->
+                <button class="btn-add" @click="openClaudeConfigModal" v-if="!loading && !initError">
+                    <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10 4v12M4 10h12"/>
+                    </svg>
+                    添加提供商
+                </button>
+                <div class="config-template-hint">
+                    默认应用到 <code>~/.claude/settings.json</code>。
+                </div>
+
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">模型</span>
+                    </div>
+                    <select
+                        v-if="claudeModelHasList"
+                        class="model-select"
+                        v-model="currentClaudeModel"
+                        @change="onClaudeModelChange"
+                    >
+                        <option v-for="model in claudeModelOptions" :key="model" :value="model">{{ model }}</option>
+                    </select>
+                    <input
+                        v-else
+                        class="model-input"
+                        v-model="currentClaudeModel"
+                        @blur="onClaudeModelChange"
+                        @keyup.enter="onClaudeModelChange"
+                        placeholder="例如: claude-3-7-sonnet"
+                    >
+                    <div class="config-template-hint">
+                        模型修改后会自动保存并应用到当前配置。
+                    </div>
+                </div>
+
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">配置健康检查</span>
+                    </div>
+                    <button class="btn-tool" @click="runHealthCheck" :disabled="healthCheckLoading || loading || !!initError">
+                        {{ healthCheckLoading ? '检查中...' : '运行检查' }}
+                    </button>
+                </div>
+
+                <div class="card-list">
+                    <div v-for="(config, name) in claudeConfigs" :key="name"
+                         :class="['card', { active: currentClaudeConfig === name }]"
+                         @click="applyClaudeConfig(name)"
+                         @keydown.enter.self.prevent="applyClaudeConfig(name)"
+                         @keydown.space.self.prevent="applyClaudeConfig(name)"
+                         tabindex="0"
+                         role="button"
+                         :aria-current="currentClaudeConfig === name ? 'true' : null">
+                        <div class="card-leading">
+                            <div class="card-icon">{{ name.charAt(0).toUpperCase() }}</div>
+                            <div class="card-content">
+                                <div class="card-title">{{ name }}</div>
+                                <div class="card-subtitle">{{ config.model || '未设置模型' }}</div>
+                            </div>
+                        </div>
+                        <div class="card-trailing">
+                            <span :class="['pill', config.hasKey ? 'configured' : 'empty']">
+                                {{ config.hasKey ? '已配置' : '未配置' }}
+                            </span>
+                            <span v-if="claudeSpeedResults[name]" :class="['latency', claudeSpeedResults[name].ok ? 'ok' : 'error']">
+                                {{ formatLatency(claudeSpeedResults[name]) }}
+                            </span>
+                            <div class="card-actions" @click.stop>
+                                <button class="card-action-btn" @click="openEditConfigModal(name)" :aria-label="`Edit Claude config ${name}`" title="编辑">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                    </svg>
+                                </button>
+                                <button class="card-action-btn" :class="{ loading: claudeShareLoading[name] }" @click="copyClaudeShareCommand(name)" disabled title="分享导入命令（暂时禁用）" aria-label="Share import command">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/>
+                                        <path d="M16 6l-4-4-4 4"/>
+                                        <path d="M12 2v14"/>
+                                    </svg>
+                                </button>
+                                <button class="card-action-btn delete" @click="deleteClaudeConfig(name)" :aria-label="`Delete Claude config ${name}`" title="删除">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M3 6h18"/>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
