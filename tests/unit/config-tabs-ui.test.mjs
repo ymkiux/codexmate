@@ -98,8 +98,8 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /aria-controls="settings-panel-trash"/);
     assert.match(html, /:aria-selected="settingsTab === 'backup'"/);
     assert.match(html, /:aria-selected="settingsTab === 'trash'"/);
-    assert.match(html, /id="settings-tab-backup"[\s\S]*tabindex="0"/);
-    assert.match(html, /id="settings-tab-trash"[\s\S]*tabindex="0"/);
+    assert.match(html, /id="settings-tab-backup"[\s\S]*:tabindex="settingsTab === 'backup' \? 0 : -1"/);
+    assert.match(html, /id="settings-tab-trash"[\s\S]*:tabindex="settingsTab === 'trash' \? 0 : -1"/);
     assert.match(html, /id="settings-panel-backup"/);
     assert.match(html, /id="settings-panel-trash"/);
     assert.match(html, /<div[\s\S]*v-show="settingsTab === 'backup'"[\s\S]*id="settings-panel-backup"[\s\S]*aria-labelledby="settings-tab-backup">/);
@@ -134,6 +134,14 @@ test('config template keeps expected config tabs in top and side navigation', ()
         html,
         /:class="\['card', \{ active: displayCurrentProvider === provider\.name \}\]"[\s\S]*@click="switchProvider\(provider\.name\)"[\s\S]*@keydown\.enter\.self\.prevent="switchProvider\(provider\.name\)"[\s\S]*@keydown\.space\.self\.prevent="switchProvider\(provider\.name\)"[\s\S]*tabindex="0"[\s\S]*role="button"[\s\S]*:aria-current="displayCurrentProvider === provider\.name \? 'true' : null"/
     );
+    assert.match(
+        html,
+        /:class="\['card', \{ active: currentClaudeConfig === name \}\]"[\s\S]*@click="applyClaudeConfig\(name\)"[\s\S]*@keydown\.enter\.self\.prevent="applyClaudeConfig\(name\)"[\s\S]*@keydown\.space\.self\.prevent="applyClaudeConfig\(name\)"[\s\S]*tabindex="0"[\s\S]*role="button"[\s\S]*:aria-current="currentClaudeConfig === name \? 'true' : null"/
+    );
+    assert.match(
+        html,
+        /:class="\['card', \{ active: currentOpenclawConfig === name \}\]"[\s\S]*@click="applyOpenclawConfig\(name\)"[\s\S]*@keydown\.enter\.self\.prevent="applyOpenclawConfig\(name\)"[\s\S]*@keydown\.space\.self\.prevent="applyOpenclawConfig\(name\)"[\s\S]*tabindex="0"[\s\S]*role="button"[\s\S]*:aria-current="currentOpenclawConfig === name \? 'true' : null"/
+    );
     assert.match(html, /class="session-item-copy session-item-pin"/);
     assert.match(html, /class="pin-icon"/);
     assert.match(html, /:aria-selected="mainTab === 'sessions'"/);
@@ -147,7 +155,11 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert(providerShareButton, 'provider share button should exist');
     assert.match(providerShareButton[0], /disabled/);
     assert.match(providerShareButton[0], /title="分享导入命令（暂时禁用）"/);
+    assert.match(html, /<button class="card-action-btn"[^>]*@click="openEditConfigModal\(name\)"[^>]*:aria-label="`Edit Claude config \$\{name\}`"[^>]*title="编辑">/);
+    assert.match(html, /<button class="card-action-btn delete"[^>]*@click="deleteClaudeConfig\(name\)"[^>]*:aria-label="`Delete Claude config \$\{name\}`"[^>]*title="删除">/);
     assert.match(html, /<button class="card-action-btn"[^>]*@click="copyClaudeShareCommand\(name\)"[^>]*disabled[^>]*>/);
+    assert.match(html, /<button class="card-action-btn"[^>]*@click="openOpenclawEditModal\(name\)"[^>]*:aria-label="`Edit OpenClaw config \$\{name\}`"[^>]*title="编辑">/);
+    assert.match(html, /<button class="card-action-btn delete"[^>]*@click="deleteOpenclawConfig\(name\)"[^>]*:aria-label="`Delete OpenClaw config \$\{name\}`"[^>]*title="删除">/);
     assert.match(modalsBasic, /<div v-if="showAddModal" class="modal-overlay" @click\.self="closeAddModal">/);
     assert.match(modalsBasic, /<div v-if="showModelModal" class="modal-overlay" @click\.self="closeModelModal">/);
     assert.match(modalsBasic, /<div v-if="showClaudeConfigModal" class="modal-overlay" @click\.self="closeClaudeConfigModal">/);
@@ -362,6 +374,7 @@ test('trash item styles stay aligned with session card layout and keep mobile us
         styles,
         /@media \(max-width: 540px\)\s*\{[\s\S]*\.session-item-copy\.session-item-pin svg,\s*[\s\S]*width:\s*16px;/
     );
+    assert.match(styles, /@media \(max-width: 540px\)\s*\{[\s\S]*\.session-item-copy\s*\{[\s\S]*width:\s*44px;[\s\S]*height:\s*44px;[\s\S]*min-width:\s*44px;[\s\S]*min-height:\s*44px;/);
     assert.match(styles, /\.codex-config-grid\s*\{/);
     assert.match(styles, /\.codex-config-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(240px,\s*100%\),\s*1fr\)\);/);
     assert.match(styles, /\.codex-config-field\s*\{/);

@@ -10036,7 +10036,7 @@ function watchPathsForRestart(targets, onChange) {
                     normalizedFilename = basename;
                 }
                 const lower = normalizedFilename.toLowerCase();
-                if (!(/\.(html|js|mjs|css)$/.test(lower))) return;
+                if (!(/\.(html|js|mjs|cjs|css)$/.test(lower))) return;
                 trigger({ target, eventType, filename: normalizedFilename });
             });
             watcher.on('error', () => {
@@ -10282,6 +10282,18 @@ const PUBLIC_WEB_UI_STATIC_ASSETS = new Set([
 
 function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser }) {
     const connections = new Set();
+    const writeWebUiAssetError = (res, requestPath, error) => {
+        const message = error && error.message ? error.message : String(error);
+        console.error(`! Web UI 资源读取失败 [${requestPath}]:`, message);
+        if (res.headersSent) {
+            try {
+                res.destroy(error);
+            } catch (_) {}
+            return;
+        }
+        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Internal Server Error');
+    };
 
     const server = http.createServer((req, res) => {
         const requestPath = (req.url || '/').split('?')[0];
@@ -10712,9 +10724,13 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                 }
             });
         } else if (requestPath === '/web-ui') {
-            const html = readBundledWebUiHtml(htmlPath);
-            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-            res.end(html);
+            try {
+                const html = readBundledWebUiHtml(htmlPath);
+                res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+                res.end(html);
+            } catch (error) {
+                writeWebUiAssetError(res, requestPath, error);
+            }
         } else if (requestPath.startsWith('/web-ui/')) {
             const normalized = path.normalize(requestPath).replace(/^([\\.\\/])+/, '');
             const filePath = path.join(__dirname, normalized);
@@ -10726,8 +10742,13 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
             const relativePath = path.relative(webDir, filePath).replace(/\\/g, '/');
             const dynamicAsset = PUBLIC_WEB_UI_DYNAMIC_ASSETS.get(relativePath);
             if (dynamicAsset) {
-                res.writeHead(200, { 'Content-Type': dynamicAsset.mime });
-                res.end(dynamicAsset.reader(filePath), 'utf-8');
+                try {
+                    const assetBody = dynamicAsset.reader(filePath);
+                    res.writeHead(200, { 'Content-Type': dynamicAsset.mime });
+                    res.end(assetBody, 'utf-8');
+                } catch (error) {
+                    writeWebUiAssetError(res, requestPath, error);
+                }
                 return;
             }
             if (!PUBLIC_WEB_UI_STATIC_ASSETS.has(relativePath)) {
@@ -10807,9 +10828,13 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
             res.writeHead(200, { 'Content-Type': mime });
             fs.createReadStream(filePath).pipe(res);
         } else {
-            const html = readBundledWebUiHtml(htmlPath);
-            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-            res.end(html);
+            try {
+                const html = readBundledWebUiHtml(htmlPath);
+                res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+                res.end(html);
+            } catch (error) {
+                writeWebUiAssetError(res, requestPath, error);
+            }
         }
     });
 

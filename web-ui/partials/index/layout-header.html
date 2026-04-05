@@ -351,17 +351,5 @@
                     </select>
                 </div>
 
-                <div v-if="false && mainTab === 'config' && !sessionStandalone" class="config-subtabs">
-                    <button :class="['config-subtab', { active: configMode === 'codex' }]" @click="onConfigTabClick('codex', $event)">
-                        Codex 配置
-                    </button>
-                    <button :class="['config-subtab', { active: configMode === 'claude' }]" @click="onConfigTabClick('claude', $event)">
-                        Claude Code 配置
-                    </button>
-                    <button :class="['config-subtab', { active: configMode === 'openclaw' }]" @click="onConfigTabClick('openclaw', $event)">
-                        OpenClaw 配置
-                    </button>
-                </div>
-
                 <!-- 内容包裹器 - 稳定布局 -->
                 <div class="content-wrapper">

@@ -30,8 +30,17 @@ export function createInstallMethods() {
             if (!/^https?:\/\//i.test(normalized)) {
                 return '';
             }
+            const afterScheme = normalized.replace(/^https?:\/\//i, '');
+            if (!afterScheme || /^[/?#]/.test(afterScheme)) {
+                return '';
+            }
             const trimmed = normalized.replace(/\/+$/, '');
-            if (/^https?:$/i.test(trimmed)) {
+            try {
+                const parsed = new URL(trimmed);
+                if (!/^https?:$/i.test(parsed.protocol) || !parsed.hostname) {
+                    return '';
+                }
+            } catch {
                 return '';
             }
             return trimmed;

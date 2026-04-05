@@ -214,10 +214,10 @@ textarea:focus-visible {
     }
 
     .session-item-copy {
-        width: 20px;
-        height: 20px;
-        min-width: 20px;
-        min-height: 20px;
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        min-height: 44px;
         border-radius: 6px;
         padding: 2px;
         display: inline-flex;

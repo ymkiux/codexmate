@@ -510,6 +510,60 @@ test('watchPathsForRestart watches a file via its parent directory and ignores u
     }]);
 });
 
+test('watchPathsForRestart watches .cjs helper files via the parent directory', async () => {
+    const watchedTargets = [];
+    const watchedHandlers = new Map();
+    const changes = [];
+    const fakeFs = {
+        existsSync(target) {
+            return target === '/tmp/web-ui/source-bundle.cjs';
+        },
+        statSync() {
+            return {
+                isDirectory() {
+                    return false;
+                }
+            };
+        },
+        watch(target, options, handler) {
+            watchedTargets.push({ target, recursive: !!(options && options.recursive) });
+            watchedHandlers.set(target, handler);
+            return {
+                close() {},
+                on() {
+                    return this;
+                }
+            };
+        }
+    };
+    const watchWithFakeFs = instantiateFunction(
+        watchPathsForRestartSrc,
+        'watchPathsForRestart',
+        { fs: fakeFs, path }
+    );
+
+    watchWithFakeFs(['/tmp/web-ui/source-bundle.cjs'], (info) => {
+        changes.push(info);
+    });
+
+    const parentHandler = watchedHandlers.get('/tmp/web-ui');
+    assert.strictEqual(typeof parentHandler, 'function');
+    assert.deepStrictEqual(watchedTargets, [{ target: '/tmp/web-ui', recursive: true }]);
+
+    parentHandler('change', 'index.html');
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    assert.deepStrictEqual(changes, []);
+
+    parentHandler('change', 'source-bundle.cjs');
+    await new Promise((resolve) => setTimeout(resolve, 350));
+
+    assert.deepStrictEqual(changes, [{
+        target: '/tmp/web-ui/source-bundle.cjs',
+        eventType: 'change',
+        filename: 'source-bundle.cjs'
+    }]);
+});
+
 test('watchPathsForRestart reattaches a file watcher after watcher error', () => {
     const watchedTargets = [];
     const watcherErrors = [];

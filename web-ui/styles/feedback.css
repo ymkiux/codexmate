@@ -105,4 +105,4 @@
     animation: fadeIn var(--transition-normal) var(--ease-spring);
 }
 
-/* 内容区域包裹器 - 稳定高度 */
+/* TODO: 内容区域包裹器当前不需要额外稳定高度样式，保留注释避免误判为缺失规则。 */
