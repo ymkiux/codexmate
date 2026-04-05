@@ -23,7 +23,7 @@ export function createClaudeConfigMethods(options = {}) {
             this.claudeConfigs[name] = this.mergeClaudeConfig(existing, { model });
             this.saveClaudeConfigs();
             this.updateClaudeModelsCurrent();
-            if (!this.claudeConfigs[name].apiKey) {
+            if (!this.claudeConfigs[name].apiKey && !this.claudeConfigs[name].externalCredentialType) {
                 this.showMessage('请先配置 API Key', 'error');
                 return;
             }

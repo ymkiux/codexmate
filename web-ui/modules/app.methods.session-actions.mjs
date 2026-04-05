@@ -388,12 +388,16 @@ export function createSessionActionMethods(options = {}) {
                 }
 
                 this.showMessage('操作成功', 'success');
-                await this.loadSessions();
-                if (res.sessionId) {
-                    const matched = this.sessionsList.find(item => item.source === 'codex' && item.sessionId === res.sessionId);
-                    if (matched) {
-                        await this.selectSession(matched);
+                try {
+                    await this.loadSessions();
+                    if (res.sessionId) {
+                        const matched = this.sessionsList.find(item => item.source === 'codex' && item.sessionId === res.sessionId);
+                        if (matched) {
+                            await this.selectSession(matched);
+                        }
                     }
+                } catch (_) {
+                    // The clone already succeeded remotely; keep the success result.
                 }
             } catch (_) {
                 this.showMessage('克隆失败', 'error');
@@ -437,7 +441,11 @@ export function createSessionActionMethods(options = {}) {
                         this.sessionTrashItems
                     );
                 }
-                await this.removeSessionFromCurrentList(session);
+                try {
+                    await this.removeSessionFromCurrentList(session);
+                } catch (_) {
+                    // The delete already succeeded remotely; keep the success result.
+                }
             } catch (_) {
                 this.showMessage('删除失败', 'error');
             } finally {
