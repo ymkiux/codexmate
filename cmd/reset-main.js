@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
  * Reset working tree to origin/main:
+ * - fetch origin/main
  * - checkout main
- * - hard reset to HEAD
+ * - hard reset to origin/main
  * - clean untracked files/dirs
- * - pull latest
+ * - print final status
  *
  * Cross-platform: requires Node.js and git in PATH.
  */
@@ -23,17 +24,22 @@ function main() {
     process.exit(1);
   }
 
-  console.log('[1/4] Checkout main');
+  console.log('[1/5] Fetch origin/main');
+  run('git fetch origin main --prune');
+
+  console.log('[2/5] Checkout main');
   run('git checkout main');
 
-  console.log('[2/4] Reset local changes');
-  run('git reset --hard HEAD');
+  console.log('[3/5] Reset local changes to origin/main');
+  run('git reset --hard origin/main');
+
+  console.log('[4/5] Remove untracked files');
   run('git clean -fd');
 
-  console.log('[3/4] Fetch & pull origin/main');
-  run('git pull origin main');
+  console.log('[5/5] Final status');
+  run('git status --short --branch');
 
-  console.log('[4/4] Done. Working tree synced to origin/main.');
+  console.log('Done. Working tree synced to origin/main.');
 }
 
 main();
