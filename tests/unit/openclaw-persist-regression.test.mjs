@@ -155,3 +155,195 @@ test('stale openclaw loads from an earlier modal session are ignored after reope
     assert.strictEqual(context.openclawConfigPath, '/tmp/edited.json');
     assert.strictEqual(context.openclawFileLoading, false);
 });
+
+test('saveOpenclawConfig does not report success or close modal when local persistence fails', async () => {
+    const methods = createOpenclawPersistMethods();
+    let closeCalls = 0;
+    const context = createContext(methods, {
+        currentOpenclawConfig: 'saved',
+        showOpenclawConfigModal: true,
+        openclawEditing: {
+            name: 'draft',
+            content: 'draft-content',
+            lockName: false
+        },
+        closeOpenclawConfigModal() {
+            closeCalls += 1;
+        },
+        saveOpenclawConfigs() {
+            this.showMessage('保存本地 OpenClaw 配置失败', 'error');
+            return false;
+        }
+    });
+
+    await methods.saveOpenclawConfig.call(context);
+
+    assert.strictEqual(closeCalls, 0);
+    assert.strictEqual(context.showOpenclawConfigModal, true);
+    assert.strictEqual(context.openclawSaving, false);
+    assert.strictEqual(context.currentOpenclawConfig, 'saved');
+    assert.deepStrictEqual(context.openclawConfigs, {
+        saved: {
+            content: 'saved-local'
+        }
+    });
+    assert.deepStrictEqual(context.openclawEditing, {
+        name: 'draft',
+        content: 'draft-content',
+        lockName: false
+    });
+    assert.deepStrictEqual(context.shownMessages, [{
+        message: '保存本地 OpenClaw 配置失败',
+        type: 'error'
+    }]);
+});
+
+test('saveOpenclawConfig closes modal after a successful save while save state is busy', async () => {
+    const methods = createOpenclawPersistMethods();
+    const context = createContext(methods, {
+        showOpenclawConfigModal: true,
+        openclawEditing: {
+            name: 'draft',
+            content: 'draft-content',
+            lockName: false
+        },
+        saveOpenclawConfigs() {
+            return true;
+        }
+    });
+
+    await methods.saveOpenclawConfig.call(context);
+
+    assert.strictEqual(context.showOpenclawConfigModal, false);
+    assert.strictEqual(context.openclawSaving, false);
+    assert.deepStrictEqual(context.openclawEditing, {
+        name: '',
+        content: '',
+        lockName: false
+    });
+    assert.strictEqual(context.resetOpenclawStructuredCalls, 1);
+    assert.strictEqual(context.resetOpenclawQuickCalls, 1);
+    assert.deepStrictEqual(context.shownMessages, [{
+        message: '操作成功',
+        type: 'success'
+    }]);
+});
+
+test('saveAndApplyOpenclawConfig does not call apply api when local persistence fails', async () => {
+    let applyCalls = 0;
+    const methods = createOpenclawPersistMethods({
+        api: async () => {
+            applyCalls += 1;
+            return { success: true };
+        }
+    });
+    let closeCalls = 0;
+    const context = createContext(methods, {
+        currentOpenclawConfig: 'saved',
+        showOpenclawConfigModal: true,
+        openclawEditing: {
+            name: 'draft',
+            content: 'draft-content',
+            lockName: false
+        },
+        closeOpenclawConfigModal() {
+            closeCalls += 1;
+        },
+        saveOpenclawConfigs() {
+            this.showMessage('保存本地 OpenClaw 配置失败', 'error');
+            return false;
+        }
+    });
+
+    await methods.saveAndApplyOpenclawConfig.call(context);
+
+    assert.strictEqual(applyCalls, 0);
+    assert.strictEqual(closeCalls, 0);
+    assert.strictEqual(context.showOpenclawConfigModal, true);
+    assert.strictEqual(context.openclawApplying, false);
+    assert.strictEqual(context.currentOpenclawConfig, 'saved');
+    assert.deepStrictEqual(context.openclawConfigs, {
+        saved: {
+            content: 'saved-local'
+        }
+    });
+    assert.deepStrictEqual(context.openclawEditing, {
+        name: 'draft',
+        content: 'draft-content',
+        lockName: false
+    });
+    assert.deepStrictEqual(context.shownMessages, [{
+        message: '保存本地 OpenClaw 配置失败',
+        type: 'error'
+    }]);
+});
+
+test('saveAndApplyOpenclawConfig closes modal after a successful apply while apply state is busy', async () => {
+    const methods = createOpenclawPersistMethods({
+        api: async () => ({
+            success: true,
+            targetPath: '/tmp/openclaw.json'
+        })
+    });
+    const context = createContext(methods, {
+        showOpenclawConfigModal: true,
+        openclawEditing: {
+            name: 'draft',
+            content: 'draft-content',
+            lockName: false
+        },
+        saveOpenclawConfigs() {
+            return true;
+        }
+    });
+
+    await methods.saveAndApplyOpenclawConfig.call(context);
+
+    assert.strictEqual(context.showOpenclawConfigModal, false);
+    assert.strictEqual(context.openclawApplying, false);
+    assert.strictEqual(context.openclawConfigExists, true);
+    assert.strictEqual(context.openclawConfigPath, '/tmp/openclaw.json');
+    assert.deepStrictEqual(context.openclawEditing, {
+        name: '',
+        content: '',
+        lockName: false
+    });
+    assert.strictEqual(context.resetOpenclawStructuredCalls, 1);
+    assert.strictEqual(context.resetOpenclawQuickCalls, 1);
+    assert.deepStrictEqual(context.shownMessages, [{
+        message: '已保存并应用 OpenClaw 配置（/tmp/openclaw.json）',
+        type: 'success'
+    }]);
+});
+
+test('persistOpenclawConfig restores the previous config content when saving an existing item fails', () => {
+    const methods = createOpenclawPersistMethods();
+    const context = createContext(methods, {
+        currentOpenclawConfig: 'saved',
+        showOpenclawConfigModal: true,
+        openclawEditing: {
+            name: 'saved',
+            content: 'draft-content',
+            lockName: true
+        },
+        saveOpenclawConfigs() {
+            this.showMessage('保存本地 OpenClaw 配置失败', 'error');
+            return false;
+        }
+    });
+
+    const result = methods.persistOpenclawConfig.call(context);
+
+    assert.strictEqual(result, '');
+    assert.strictEqual(context.currentOpenclawConfig, 'saved');
+    assert.deepStrictEqual(context.openclawConfigs, {
+        saved: {
+            content: 'saved-local'
+        }
+    });
+    assert.strictEqual(context.showOpenclawConfigModal, true);
+    assert.deepStrictEqual(context.shownMessages, [{
+        message: '保存本地 OpenClaw 配置失败',
+        type: 'error'
+    }]);
+});
