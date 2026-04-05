@@ -54,6 +54,11 @@
     padding: 0;
 }
 
+.agents-modal {
+    width: min(92vw, 900px);
+    max-height: calc(100vh - 56px);
+}
+
 .modal-editor-header {
     margin-bottom: 0;
     padding: var(--spacing-md) var(--spacing-md) 0;
@@ -383,6 +388,12 @@
 .agents-diff-editor {
     min-height: min(60vh, 520px);
     max-height: min(65vh, 620px);
+}
+
+.agents-modal .template-editor,
+.agents-modal .agents-diff-editor {
+    min-height: min(52vh, 460px);
+    max-height: min(58vh, 540px);
 }
 
 .agents-diff-line {
