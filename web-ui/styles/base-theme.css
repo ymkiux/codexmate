@@ -1,4 +1,4 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=Fira+Mono:wght@400;500&family=JetBrains+Mono:wght@400;500&family=Source+Sans+3:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+﻿/* Use local font stacks only; avoid third-party font fetches. */
 
 /* ============================================
    设计系统 - Design Tokens
@@ -371,4 +371,3 @@ body {
         transition: none;
     }
 }
-

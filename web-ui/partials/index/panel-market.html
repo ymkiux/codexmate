@@ -11,10 +11,10 @@
                                 <div class="skills-panel-note">当前市场页只保留本地 skills 能力：切换 Codex / Claude Code 安装目标，查看已安装项，执行跨应用导入与 ZIP 分发。</div>
                             </div>
                             <div class="settings-tab-actions market-header-actions">
-                                <button class="btn-tool btn-tool-compact" @click="loadSkillsMarketOverview({ forceRefresh: true, silent: false })" :disabled="loading || !!initError || skillsMarketBusy">
+                                <button type="button" class="btn-tool btn-tool-compact" @click="loadSkillsMarketOverview({ forceRefresh: true, silent: false })" :disabled="loading || !!initError || skillsMarketBusy">
                                     {{ skillsMarketLoading ? '刷新中...' : '刷新概览' }}
                                 </button>
-                                <button class="btn-tool btn-tool-compact" @click="openSkillsManager" :disabled="loading || !!initError || skillsMarketBusy">
+                                <button type="button" class="btn-tool btn-tool-compact" @click="openSkillsManager" :disabled="loading || !!initError || skillsMarketBusy">
                                     打开 Skills 管理
                                 </button>
                             </div>
@@ -76,7 +76,7 @@
                                     <div class="skills-panel-title">已安装 Skills</div>
                                     <div class="skills-panel-note">展示当前已落地到 <code>{{ skillsRootPath || skillsDefaultRootPath }}</code> 的前 6 个目录，可继续进入管理弹窗做筛选、导出和删除。</div>
                                 </div>
-                                <button class="btn-mini" @click="refreshSkillsList({ silent: false })" :disabled="loading || !!initError || skillsMarketBusy">
+                                <button type="button" class="btn-mini" @click="refreshSkillsList({ silent: false })" :disabled="loading || !!initError || skillsMarketBusy">
                                     {{ skillsLoading ? '刷新中...' : '刷新本地' }}
                                 </button>
                             </div>
@@ -101,7 +101,7 @@
                                     <div class="skills-panel-title">可导入来源</div>
                                     <div class="skills-panel-note">扫描其他应用下未托管的 skill，先确认来源和目录，再批量导入到当前 {{ skillsTargetLabel }} skills 目录。</div>
                                 </div>
-                                <button class="btn-mini" @click="scanImportableSkills({ silent: false })" :disabled="loading || !!initError || skillsMarketBusy">
+                                <button type="button" class="btn-mini" @click="scanImportableSkills({ silent: false })" :disabled="loading || !!initError || skillsMarketBusy">
                                     {{ skillsScanningImports ? '扫描中...' : '扫描来源' }}
                                 </button>
                             </div>
@@ -128,15 +128,15 @@
                                 </div>
                             </div>
                             <div class="market-action-grid">
-                                <button class="market-action-card" @click="openSkillsManager" :disabled="loading || !!initError || skillsMarketBusy">
+                                <button type="button" class="market-action-card" @click="openSkillsManager" :disabled="loading || !!initError || skillsMarketBusy">
                                     <span class="market-action-title">本地 Skills 管理</span>
                                     <span class="market-action-copy">查看、筛选、导出、删除当前 {{ skillsTargetLabel }} 已安装 skills</span>
                                 </button>
-                                <button class="market-action-card" @click="scanImportableSkills({ silent: false })" :disabled="loading || !!initError || skillsMarketBusy">
+                                <button type="button" class="market-action-card" @click="scanImportableSkills({ silent: false })" :disabled="loading || !!initError || skillsMarketBusy">
                                     <span class="market-action-title">跨应用导入</span>
                                     <span class="market-action-copy">扫描其他应用目录并导入到当前 {{ skillsTargetLabel }}</span>
                                 </button>
-                                <button class="market-action-card" @click="triggerSkillsZipImport" :disabled="loading || !!initError || skillsMarketBusy">
+                                <button type="button" class="market-action-card" @click="triggerSkillsZipImport" :disabled="loading || !!initError || skillsMarketBusy">
                                     <span class="market-action-title">ZIP 导入</span>
                                     <span class="market-action-copy">从压缩包分发并安装到当前目标宿主</span>
                                 </button>

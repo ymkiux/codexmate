@@ -493,7 +493,11 @@ export function createOpenclawCoreMethods() {
         },
 
         parseOptionalNumber(value, label) {
-            const text = typeof value === 'string' ? value.trim() : String(value || '').trim();
+            const text = typeof value === 'string'
+                ? value.trim()
+                : typeof value === 'number'
+                    ? String(value).trim()
+                    : String(value || '').trim();
             if (!text) {
                 return { ok: true, value: null };
             }

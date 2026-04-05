@@ -1,6 +1,6 @@
         <div v-if="showOpenclawConfigModal" class="modal-overlay" @click.self="closeOpenclawConfigModal">
-            <div class="modal modal-wide">
-                <div class="modal-title">{{ openclawEditorTitle }}</div>
+            <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="openclaw-config-modal-title">
+                <div class="modal-title" id="openclaw-config-modal-title">{{ openclawEditorTitle }}</div>
 
                 <div class="form-group">
                     <label class="form-label">配置名称</label>
@@ -255,6 +255,7 @@
                         v-model="openclawEditing.content"
                         class="form-input template-editor"
                         spellcheck="false"
+                        :readonly="openclawSaving || openclawApplying"
                         placeholder="在这里编辑 OpenClaw 配置（JSON5）"></textarea>
                     <div class="template-editor-warning">
                         保存仅写入本地配置库。点击“保存并应用”后会写入 openclaw.json。

@@ -89,6 +89,9 @@ export function createSessionBrowserMethods(options = {}) {
             const forceRefresh = !!options.forceRefresh;
             const loaded = !!this.sessionPathOptionsLoadedMap[source];
             if (!forceRefresh && loaded) {
+                if (source === this.sessionFilterSource) {
+                    this.sessionPathOptionsLoading = false;
+                }
                 return;
             }
 

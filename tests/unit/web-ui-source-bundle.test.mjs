@@ -39,6 +39,16 @@ test('bundled web ui css inlines split styles without leaving local import direc
     assert.notStrictEqual(css.charCodeAt(0), 0xFEFF);
 });
 
+test('bundled web ui css keeps session preview headers visible', () => {
+    const css = readBundledWebUiCss();
+
+    assert.match(css, /\.session-item-sub\.session-item-snippet\s*\{/);
+    assert.doesNotMatch(
+        css,
+        /\.session-item-sub\.session-item-snippet,\s*\.session-preview-meta,\s*\.session-preview-title\s*\{/s
+    );
+});
+
 test('bundled web ui script includes split modules once and strips a leading BOM', () => {
     const script = readBundledWebUiScript();
     const constantsMarkers = script.match(/FILE: web-ui\/modules\/app\.constants\.mjs/g) || [];

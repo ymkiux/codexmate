@@ -30,7 +30,11 @@ export function createInstallMethods() {
             if (!/^https?:\/\//i.test(normalized)) {
                 return '';
             }
-            return normalized.replace(/\/+$/, '');
+            const trimmed = normalized.replace(/\/+$/, '');
+            if (/^https?:$/i.test(trimmed)) {
+                return '';
+            }
+            return trimmed;
         },
 
         resolveInstallRegistryUrl(presetValue, customValue) {

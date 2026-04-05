@@ -6,6 +6,8 @@ export function createOpenclawPersistMethods(options = {}) {
 
     return {
         openOpenclawAddModal() {
+            const modalToken = (Number(this.openclawModalLoadToken || 0) + 1);
+            this.openclawModalLoadToken = modalToken;
             this.openclawEditorTitle = '添加 OpenClaw 配置';
             this.openclawEditing = {
                 name: '',
@@ -15,12 +17,20 @@ export function createOpenclawPersistMethods(options = {}) {
             this.openclawConfigPath = '';
             this.openclawConfigExists = false;
             this.openclawLineEnding = '\n';
-            void this.loadOpenclawConfigFromFile({ silent: true, force: true, fallbackToTemplate: true });
             this.showOpenclawConfigModal = true;
+            void this.loadOpenclawConfigFromFile({
+                silent: true,
+                force: true,
+                fallbackToTemplate: true,
+                modalToken,
+                expectedEditorContent: ''
+            });
         },
 
         openOpenclawEditModal(name) {
             const existing = this.openclawConfigs[name];
+            const modalToken = (Number(this.openclawModalLoadToken || 0) + 1);
+            this.openclawModalLoadToken = modalToken;
             this.openclawEditorTitle = `编辑 OpenClaw 配置: ${name}`;
             this.openclawEditing = {
                 name,
@@ -28,11 +38,21 @@ export function createOpenclawPersistMethods(options = {}) {
                 lockName: true
             };
             this.syncOpenclawStructuredFromText({ silent: true });
-            void this.loadOpenclawConfigFromFile({ silent: true, force: false, fallbackToTemplate: false });
             this.showOpenclawConfigModal = true;
+            void this.loadOpenclawConfigFromFile({
+                silent: true,
+                force: false,
+                fallbackToTemplate: false,
+                modalToken,
+                expectedEditorContent: this.openclawEditing.content
+            });
         },
 
         closeOpenclawConfigModal() {
+            if (this.openclawSaving || this.openclawApplying) {
+                return;
+            }
+            this.openclawModalLoadToken = Number(this.openclawModalLoadToken || 0) + 1;
             this.showOpenclawConfigModal = false;
             this.openclawEditing = { name: '', content: '', lockName: false };
             this.openclawSaving = false;
@@ -45,9 +65,21 @@ export function createOpenclawPersistMethods(options = {}) {
             const silent = !!options.silent;
             const force = !!options.force;
             const fallbackToTemplate = options.fallbackToTemplate !== false;
+            const modalToken = Number(options.modalToken || this.openclawModalLoadToken || 0);
+            const expectedEditorContent = typeof options.expectedEditorContent === 'string'
+                ? options.expectedEditorContent
+                : (typeof this.openclawEditing.content === 'string' ? this.openclawEditing.content : '');
+            const requestSeq = (Number(this.openclawFileLoadRequestSeq || 0) + 1);
+            this.openclawFileLoadRequestSeq = requestSeq;
             this.openclawFileLoading = true;
             try {
                 const res = await api('get-openclaw-config');
+                if (
+                    requestSeq !== Number(this.openclawFileLoadRequestSeq || 0)
+                    || modalToken !== Number(this.openclawModalLoadToken || 0)
+                ) {
+                    return;
+                }
                 if (res.error) {
                     if (!silent) {
                         this.showMessage(res.error, 'error');
@@ -58,7 +90,13 @@ export function createOpenclawPersistMethods(options = {}) {
                 this.openclawConfigExists = !!res.exists;
                 this.openclawLineEnding = res.lineEnding === '\r\n' ? '\r\n' : '\n';
                 const hasContent = !!(res.content && res.content.trim());
-                const shouldOverride = force || !this.openclawEditing.content || !this.openclawEditing.content.trim();
+                const currentContent = typeof this.openclawEditing.content === 'string'
+                    ? this.openclawEditing.content
+                    : '';
+                const editorChangedSinceRequest = currentContent !== expectedEditorContent;
+                const shouldOverride = force
+                    ? (!currentContent.trim() || !editorChangedSinceRequest)
+                    : (!currentContent || !currentContent.trim());
                 if (hasContent && shouldOverride) {
                     this.openclawEditing.content = res.content;
                 } else if (!hasContent && shouldOverride && fallbackToTemplate) {
@@ -69,11 +107,19 @@ export function createOpenclawPersistMethods(options = {}) {
                     this.showMessage('加载完成', 'success');
                 }
             } catch (e) {
+                if (
+                    requestSeq !== Number(this.openclawFileLoadRequestSeq || 0)
+                    || modalToken !== Number(this.openclawModalLoadToken || 0)
+                ) {
+                    return;
+                }
                 if (!silent) {
                     this.showMessage('加载配置失败', 'error');
                 }
             } finally {
-                this.openclawFileLoading = false;
+                if (requestSeq === Number(this.openclawFileLoadRequestSeq || 0)) {
+                    this.openclawFileLoading = false;
+                }
             }
         },
 
