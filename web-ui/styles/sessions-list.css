@@ -314,8 +314,8 @@
     border: 1px solid rgba(70, 86, 110, 0.35);
     background: rgba(70, 86, 110, 0.08);
     color: var(--color-text-secondary);
-    width: 28px;
-    height: 28px;
+    width: 22px;
+    height: 22px;
     border-radius: 8px;
     display: inline-flex;
     align-items: center;
@@ -339,8 +339,8 @@
 }
 
 .session-item-copy svg {
-    width: 16px;
-    height: 16px;
+    width: 10px;
+    height: 10px;
 }
 
 .session-item-pin {
@@ -349,6 +349,8 @@
 
 .session-item-pin .pin-icon,
 .session-item-pin svg {
+    width: 9px;
+    height: 9px;
     color: rgba(208, 88, 58, 0.78);
 }
 
