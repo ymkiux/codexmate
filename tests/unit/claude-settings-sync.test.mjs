@@ -385,6 +385,98 @@ test('applyClaudeConfig reports informative message for external credential only
     assert.deepStrictEqual(result, messages[0]);
 });
 
+test('onClaudeModelChange applies external credential config without api key', () => {
+    const source = extractMethodAsFunction(appSource, 'onClaudeModelChange');
+    const onClaudeModelChange = instantiateFunction(source, 'onClaudeModelChange');
+
+    let saveCount = 0;
+    let updateCount = 0;
+    const applyCalls = [];
+    const messages = [];
+    const context = {
+        currentClaudeConfig: 'imported',
+        currentClaudeModel: ' claude-opus-4-6 ',
+        claudeConfigs: {
+            imported: {
+                apiKey: '',
+                baseUrl: 'https://api.anthropic.com',
+                model: 'claude-3-7-sonnet',
+                externalCredentialType: 'auth-token'
+            }
+        },
+        mergeClaudeConfig(existing, updates) {
+            return { ...existing, ...updates };
+        },
+        saveClaudeConfigs() {
+            saveCount += 1;
+        },
+        updateClaudeModelsCurrent() {
+            updateCount += 1;
+        },
+        applyClaudeConfig(name) {
+            applyCalls.push(name);
+        },
+        showMessage(msg, type) {
+            messages.push({ msg, type });
+        }
+    };
+
+    onClaudeModelChange.call(context);
+
+    assert.strictEqual(saveCount, 1);
+    assert.strictEqual(updateCount, 1);
+    assert.deepStrictEqual(applyCalls, ['imported']);
+    assert.deepStrictEqual(messages, []);
+    assert.strictEqual(context.currentClaudeModel, 'claude-opus-4-6');
+    assert.strictEqual(context.claudeConfigs.imported.model, 'claude-opus-4-6');
+});
+
+test('onClaudeModelChange still requires api key when no external credential is present', () => {
+    const source = extractMethodAsFunction(appSource, 'onClaudeModelChange');
+    const onClaudeModelChange = instantiateFunction(source, 'onClaudeModelChange');
+
+    let saveCount = 0;
+    let updateCount = 0;
+    const applyCalls = [];
+    const messages = [];
+    const context = {
+        currentClaudeConfig: 'local',
+        currentClaudeModel: ' claude-opus-4-6 ',
+        claudeConfigs: {
+            local: {
+                apiKey: '',
+                baseUrl: 'https://api.anthropic.com',
+                model: 'claude-3-7-sonnet',
+                externalCredentialType: ''
+            }
+        },
+        mergeClaudeConfig(existing, updates) {
+            return { ...existing, ...updates };
+        },
+        saveClaudeConfigs() {
+            saveCount += 1;
+        },
+        updateClaudeModelsCurrent() {
+            updateCount += 1;
+        },
+        applyClaudeConfig(name) {
+            applyCalls.push(name);
+        },
+        showMessage(msg, type) {
+            messages.push({ msg, type });
+        }
+    };
+
+    onClaudeModelChange.call(context);
+
+    assert.strictEqual(saveCount, 1);
+    assert.strictEqual(updateCount, 1);
+    assert.deepStrictEqual(applyCalls, []);
+    assert.deepStrictEqual(messages, [{ msg: '请先配置 API Key', type: 'error' }]);
+    assert.strictEqual(context.currentClaudeModel, 'claude-opus-4-6');
+    assert.strictEqual(context.claudeConfigs.local.model, 'claude-opus-4-6');
+});
+
 test('mergeClaudeConfig preserves externalCredentialType across edits without api key', () => {
     const source = extractMethodAsFunction(appSource, 'mergeClaudeConfig');
     const mergeClaudeConfig = instantiateFunction(source, 'mergeClaudeConfig');
