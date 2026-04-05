@@ -113,3 +113,17 @@ test('source bundle resolves relative module entry paths from the web-ui bundle 
     assert.match(script, /export function normalizeClaudeValue/);
     assert.match(script, /export function buildSessionTimelineNodes/);
 });
+
+test('readUtf8Text normalizes lone carriage returns', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codexmate-source-bundle-'));
+    const tempFile = path.join(tempDir, 'legacy-cr.txt');
+
+    try {
+        fs.writeFileSync(tempFile, 'alpha\rbeta\r', 'utf8');
+        assert.strictEqual(sourceBundle.readUtf8Text(tempFile), 'alpha\nbeta\n');
+    } finally {
+        try {
+            fs.rmSync(tempDir, { recursive: true, force: true });
+        } catch (_) {}
+    }
+});

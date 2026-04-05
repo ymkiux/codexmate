@@ -13,7 +13,7 @@ function stripBom(content) {
 }
 
 function readUtf8Text(filePath) {
-    return stripBom(fs.readFileSync(filePath, 'utf8').replace(/\r\n/g, '\n'));
+    return stripBom(fs.readFileSync(filePath, 'utf8').replace(/\r\n?/g, '\n'));
 }
 
 function normalizeIncludeTarget(rawTarget) {
