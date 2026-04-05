@@ -1,0 +1,72 @@
+        <div v-if="showHealthCheckDialog" class="modal-overlay" @click.self="closeHealthCheckDialog()">
+            <div class="modal modal-wide health-check-dialog" role="dialog" aria-modal="true" aria-labelledby="health-check-dialog-title">
+                <div class="modal-header">
+                    <div>
+                        <div class="modal-title" id="health-check-dialog-title">健康检测对话</div>
+                        <div class="health-check-dialog-subtitle">发一轮真实对话，直看可用性。</div>
+                    </div>
+                    <div v-if="healthCheckDialogLockedProvider" class="health-check-dialog-lock">
+                        已锁定：{{ healthCheckDialogLockedProvider }}
+                    </div>
+                </div>
+
+                <div class="health-check-dialog-controls">
+                    <div class="form-group health-check-dialog-provider">
+                        <label class="form-label">提供商</label>
+                        <select
+                            v-model="healthCheckDialogSelectedProvider"
+                            class="form-select"
+                            :disabled="!!healthCheckDialogLockedProvider || healthCheckDialogSending">
+                            <option value="" disabled>请选择提供商</option>
+                            <option v-for="provider in displayProvidersList" :key="'health-check-provider-' + provider.name" :value="provider.name">
+                                {{ provider.name }}
+                            </option>
+                        </select>
+                    </div>
+                    <div v-if="healthCheckDialogLastResult" class="health-check-dialog-result" :class="healthCheckDialogLastResult.ok ? 'ok' : 'error'">
+                        <span>{{ healthCheckDialogLastResult.ok ? '已收到回复' : '本轮失败' }}</span>
+                        <span v-if="healthCheckDialogLastResult.model">模型：{{ healthCheckDialogLastResult.model }}</span>
+                        <span v-if="healthCheckDialogLastResult.status">HTTP {{ healthCheckDialogLastResult.status }}</span>
+                        <span v-if="healthCheckDialogLastResult.durationMs">{{ healthCheckDialogLastResult.durationMs }} ms</span>
+                    </div>
+                </div>
+
+                <div class="health-check-dialog-thread">
+                    <div v-if="healthCheckDialogMessages.length === 0" class="health-check-dialog-empty">
+                        发一句话，看是否正常回复。
+                    </div>
+                    <div
+                        v-for="item in healthCheckDialogMessages"
+                        :key="item.id"
+                        :class="['health-check-message', item.role, item.ok === false ? 'error' : '']">
+                        <div class="health-check-message-meta">
+                            <span>{{ item.role === 'user' ? '你' : '提供商' }}</span>
+                            <span v-if="item.model">{{ item.model }}</span>
+                            <span v-if="item.status">HTTP {{ item.status }}</span>
+                            <span v-if="item.durationMs">{{ item.durationMs }} ms</span>
+                        </div>
+                        <div class="health-check-message-text">{{ item.text }}</div>
+                        <pre v-if="item.rawPreview" class="health-check-message-raw">{{ item.rawPreview }}</pre>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">消息</label>
+                    <textarea
+                        v-model="healthCheckDialogPrompt"
+                        class="form-input health-check-dialog-textarea"
+                        rows="4"
+                        :disabled="healthCheckDialogSending"
+                        placeholder="例如：请回复“连接正常”。"
+                        @keydown.ctrl.enter.prevent="sendHealthCheckDialogMessage"></textarea>
+                    <div class="form-hint">真实接口，单轮发送，不带历史。</div>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-cancel" @click="closeHealthCheckDialog()" :disabled="healthCheckDialogSending">关闭</button>
+                    <button class="btn btn-confirm" @click="sendHealthCheckDialogMessage" :disabled="healthCheckDialogSending">
+                        {{ healthCheckDialogSending ? '发送中...' : '发送检测' }}
+                    </button>
+                </div>
+            </div>
+        </div>
