@@ -55,17 +55,27 @@ async function main() {
     let noModelsProvider;
     let htmlModelsProvider;
     let authFailProvider;
+    let routedProvider;
     let webServer;
     try {
         mockProvider = await startLocalServer({ mode: 'list', modelsPath: '/v1/models' });
         noModelsProvider = await startLocalServer({ mode: 'none', modelsPath: '/v1/models' });
         htmlModelsProvider = await startLocalServer({ mode: 'html', modelsPath: '/v1/models' });
         authFailProvider = await startLocalServer({ mode: 'list', modelsPath: '/v1/models', status: 401 });
+        routedProvider = await startLocalServer({
+            mode: 'list',
+            modelsPath: '/project/ym/models',
+            responsePaths: ['/project/ym/responses'],
+            responseBody: {
+                output_text: 'routed provider is healthy'
+            }
+        });
 
         const mockProviderUrl = `http://127.0.0.1:${mockProvider.port}`;
         const noModelsUrl = `http://127.0.0.1:${noModelsProvider.port}`;
         const htmlModelsUrl = `http://127.0.0.1:${htmlModelsProvider.port}`;
         const authFailUrl = `http://127.0.0.1:${authFailProvider.port}`;
+        const routedProviderUrl = `http://127.0.0.1:${routedProvider.port}/project/ym`;
 
         const ctx = {
             env,
@@ -75,7 +85,9 @@ async function main() {
             mockProviderUrl,
             noModelsUrl,
             htmlModelsUrl,
-            authFailUrl
+            authFailUrl,
+            routedProviderUrl,
+            routedProviderRequests: routedProvider.requests
         };
 
         await testSetup(ctx);
@@ -149,6 +161,7 @@ async function main() {
         await closeServer(noModelsProvider && noModelsProvider.server);
         await closeServer(htmlModelsProvider && htmlModelsProvider.server);
         await closeServer(authFailProvider && authFailProvider.server);
+        await closeServer(routedProvider && routedProvider.server);
 
         for (const state of realFileStates) {
             const label = state && state.path ? path.basename(state.path) : 'real file';

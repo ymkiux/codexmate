@@ -3,12 +3,14 @@ const {
     assert,
     normalizeWireApi,
     buildModelProbeSpec,
+    buildModelConversationSpecs,
+    extractModelResponseText,
     fileMode,
     writeJsonAtomic
 } = require('./helpers');
 
 module.exports = async function testHealthAndSpeed(ctx) {
-    const { api, mockProviderUrl, authFailUrl, tmpHome } = ctx;
+    const { api, mockProviderUrl, authFailUrl, routedProviderUrl, routedProviderRequests, tmpHome } = ctx;
 
     // ========== Speed Test Tests - Provider ==========
     const speedResult = await api('speed-test', { name: 'e2e2' });
@@ -56,6 +58,7 @@ module.exports = async function testHealthAndSpeed(ctx) {
     const healthRemote = await api('config-health-check', { remote: true });
     assert('ok' in healthRemote, 'config-health-check(remote) missing ok');
     assert('remote' in healthRemote, 'config-health-check(remote) missing remote');
+    assert(healthRemote.remote.type === 'remote-health-check', 'config-health-check(remote) should use remote-health-check');
 
     // ========== Config Health Check Tests - Invalid Config ==========
     const configPath = path.join(tmpHome, '.codex', 'config.toml');
@@ -104,6 +107,81 @@ module.exports = async function testHealthAndSpeed(ctx) {
 
     const probeSpecDefault = buildModelProbeSpec({}, 'e2e-default', mockProviderUrl);
     assert(probeSpecDefault && probeSpecDefault.url.endsWith('/responses'), 'buildModelProbeSpec should default to responses endpoint');
+
+    const probeSpecRouted = buildModelProbeSpec({ wire_api: 'responses' }, 'e2e-routed', routedProviderUrl);
+    assert(
+        probeSpecRouted && probeSpecRouted.url === `${routedProviderUrl}/responses`,
+        'buildModelProbeSpec should keep direct provider routes ahead of /v1 fallback'
+    );
+
+    const routedConfig = [
+        'model_provider = "routed"',
+        'model = "e2e-model"',
+        '',
+        '[model_providers.routed]',
+        `base_url = "${routedProviderUrl}"`,
+        'wire_api = "responses"',
+        'preferred_auth_method = "sk-routed"',
+        ''
+    ].join('\n');
+    require('fs').writeFileSync(configPath, routedConfig, 'utf-8');
+    routedProviderRequests.length = 0;
+    const routedHealth = await api('config-health-check', { remote: true, timeoutMs: 3000 });
+    assert(routedHealth.ok === true, 'health-check(remote) should pass for direct provider route');
+    assert(
+        routedHealth.remote &&
+        routedHealth.remote.checks &&
+        routedHealth.remote.checks.modelProbe &&
+        routedHealth.remote.checks.modelProbe.url === `${routedProviderUrl}/responses`,
+        'health-check(remote) should probe the direct responses path'
+    );
+    assert(
+        routedProviderRequests.includes('/project/ym/responses'),
+        'health-check(remote) should hit the direct routed responses endpoint'
+    );
+    assert(
+        !routedProviderRequests.includes('/project/ym/v1/responses'),
+        'health-check(remote) should not inject /v1 before direct routed responses'
+    );
+
+    routedProviderRequests.length = 0;
+    const routedSpeed = await api('speed-test', { name: 'routed' });
+    assert(routedSpeed.ok === true, 'speed-test(provider) should pass for direct provider route');
+    assert(
+        routedProviderRequests.includes('/project/ym/responses'),
+        'speed-test(provider) should hit the direct routed responses endpoint'
+    );
+    assert(
+        !routedProviderRequests.includes('/project/ym/v1/responses'),
+        'speed-test(provider) should not inject /v1 before direct routed responses'
+    );
+
+    const conversationSpecs = buildModelConversationSpecs({ wire_api: 'responses' }, 'e2e-routed', routedProviderUrl, 'hello');
+    assert(Array.isArray(conversationSpecs) && conversationSpecs.length > 0, 'buildModelConversationSpecs should build candidate endpoints');
+    assert(
+        conversationSpecs[0].url === `${routedProviderUrl}/responses`,
+        'buildModelConversationSpecs should keep direct provider routes ahead of /v1 fallback'
+    );
+
+    const conversationResult = await api('provider-chat-check', {
+        name: 'routed',
+        prompt: '请回复连接正常'
+    }, 5000);
+    assert(conversationResult.ok === true, 'provider-chat-check should succeed');
+    assert(conversationResult.reply === 'routed provider is healthy', 'provider-chat-check should parse assistant text');
+    assert(
+        routedProviderRequests.includes('/project/ym/responses'),
+        'provider-chat-check should hit the direct routed responses endpoint'
+    );
+
+    const parsedText = extractModelResponseText({
+        choices: [{
+            message: {
+                content: [{ type: 'text', text: 'chat completion ok' }]
+            }
+        }]
+    });
+    assert(parsedText === 'chat completion ok', 'extractModelResponseText should parse chat completion content');
 
     // ========== File Permission Tests ==========
     const permDir = require('fs').mkdtempSync(path.join(tmpHome, 'perm-'));
