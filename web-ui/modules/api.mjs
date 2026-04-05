@@ -12,9 +12,32 @@ async function postApi(action, params = {}) {
     });
 }
 
+function buildApiResponseContext(action, res, contentType) {
+    return `${action} (${res.status} ${res.statusText}, content-type: ${contentType || 'unknown'})`;
+}
+
+function withPayloadTooLargeErrorCode(res, payload) {
+    if (res.status !== 413 || (payload && typeof payload === 'object' && payload.errorCode)) {
+        return payload;
+    }
+    return { ...payload, errorCode: 'payload-too-large' };
+}
+
 export async function api(action, params = {}) {
     const res = await postApi(action, params);
-    return await res.json();
+    const contentType = String(res.headers.get('content-type') || '').toLowerCase();
+    if (contentType && !contentType.includes('application/json')) {
+        const body = await res.text();
+        const errorDetails = buildApiResponseContext(action, res, contentType);
+        const bodyDetails = body ? `: ${body}` : '';
+        throw new Error(`Unexpected non-JSON API response for ${errorDetails}${bodyDetails}`);
+    }
+    try {
+        return await res.json();
+    } catch (error) {
+        const errorDetails = buildApiResponseContext(action, res, contentType);
+        throw new Error(`Failed to parse API response for ${errorDetails}: ${error.message}`);
+    }
 }
 
 export async function apiWithMeta(action, params = {}) {
@@ -24,9 +47,11 @@ export async function apiWithMeta(action, params = {}) {
         try {
             const payload = await res.json();
             if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
-                return { ...payload, ok: res.ok, status: res.status };
+                return { ...withPayloadTooLargeErrorCode(res, payload), ok: res.ok, status: res.status };
             }
-            return { ok: res.ok, status: res.status, data: payload };
+            return res.status === 413
+                ? { ok: res.ok, status: res.status, data: payload, errorCode: 'payload-too-large' }
+                : { ok: res.ok, status: res.status, data: payload };
         } catch (error) {
             if (res.status === 413) {
                 return { ok: false, status: 413, errorCode: 'payload-too-large' };
