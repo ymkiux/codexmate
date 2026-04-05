@@ -428,7 +428,7 @@ test('trash item styles stay aligned with session card layout and keep mobile us
         styles,
         /@media \(max-width: 540px\)\s*\{[\s\S]*\.session-item-copy\.session-item-pin svg,\s*[\s\S]*width:\s*16px;/
     );
-    assert.match(styles, /@media \(max-width: 540px\)\s*\{[\s\S]*\.session-item-copy\s*\{[\s\S]*width:\s*44px;[\s\S]*height:\s*44px;[\s\S]*min-width:\s*44px;[\s\S]*min-height:\s*44px;/);
+    assert.match(styles, /@media \(max-width: 540px\)\s*\{[\s\S]*\.session-item-copy\s*\{[\s\S]*width:\s*36px;[\s\S]*height:\s*36px;[\s\S]*min-width:\s*36px;[\s\S]*min-height:\s*36px;/);
     assert.match(styles, /\.codex-config-grid\s*\{/);
     assert.match(styles, /\.codex-config-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(240px,\s*100%\),\s*1fr\)\);/);
     assert.match(styles, /\.codex-config-field\s*\{/);
