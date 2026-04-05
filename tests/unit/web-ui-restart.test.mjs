@@ -613,3 +613,72 @@ test('watchPathsForRestart reattaches a file watcher after watcher error', () =>
     assert.deepStrictEqual(closed, ['/tmp/web-ui']);
     assert.strictEqual(watcherErrors.length, 2);
 });
+
+test('watchPathsForRestart reattaches a root directory watcher after the root is recreated', () => {
+    const watchedTargets = [];
+    const watchedHandlers = new Map();
+    const watcherErrors = new Map();
+    const existingDirectories = new Set([
+        '/tmp',
+        '/tmp/web-ui'
+    ]);
+    const fakeFs = {
+        existsSync(target) {
+            return existingDirectories.has(target);
+        },
+        statSync() {
+            return {
+                isDirectory() {
+                    return true;
+                }
+            };
+        },
+        readdirSync(target, options) {
+            assert.deepStrictEqual(options, { withFileTypes: true });
+            if (target === '/tmp/web-ui') {
+                return [];
+            }
+            return [];
+        },
+        watch(target, options, handler) {
+            const key = `${target}:${options && options.recursive ? 'r' : 'n'}`;
+            watchedTargets.push(key);
+            watchedHandlers.set(key, handler);
+            const watcher = {
+                close() {},
+                on(eventName, errorHandler) {
+                    if (eventName === 'error') {
+                        watcherErrors.set(key, errorHandler);
+                    }
+                    return watcher;
+                }
+            };
+            return watcher;
+        }
+    };
+    const watchWithFakeFs = instantiateFunction(
+        watchPathsForRestartSrc,
+        'watchPathsForRestart',
+        { fs: fakeFs, path }
+    );
+
+    watchWithFakeFs(['/tmp/web-ui'], () => {});
+    const rootErrorHandler = watcherErrors.get('/tmp/web-ui:r');
+    assert.strictEqual(typeof rootErrorHandler, 'function');
+
+    existingDirectories.delete('/tmp/web-ui');
+    rootErrorHandler(new Error('root missing'));
+
+    assert.ok(watchedTargets.includes('/tmp:n'));
+    const parentHandler = watchedHandlers.get('/tmp:n');
+    assert.strictEqual(typeof parentHandler, 'function');
+
+    existingDirectories.add('/tmp/web-ui');
+    parentHandler('rename', 'web-ui');
+
+    assert.deepStrictEqual(watchedTargets, [
+        '/tmp/web-ui:r',
+        '/tmp:n',
+        '/tmp/web-ui:r'
+    ]);
+});

@@ -19,6 +19,16 @@ function isValidOpenclawWorkspaceFileName(fileName) {
     return true;
 }
 
+function issueLatestRequestToken(context, key) {
+    const token = (Number(context[key]) || 0) + 1;
+    context[key] = token;
+    return token;
+}
+
+function isLatestRequestToken(context, key, token) {
+    return !!context && context[key] === token;
+}
+
 export function createAgentsMethods(options = {}) {
     const {
         api,
@@ -28,9 +38,13 @@ export function createAgentsMethods(options = {}) {
     return {
         async openAgentsEditor() {
             this.setAgentsModalContext('codex');
+            const requestToken = issueLatestRequestToken(this, '_agentsOpenRequestToken');
             this.agentsLoading = true;
             try {
                 const res = await api('get-agents-file');
+                if (!isLatestRequestToken(this, '_agentsOpenRequestToken', requestToken)) {
+                    return;
+                }
                 if (res.error) {
                     this.showMessage(res.error, 'error');
                     return;
@@ -43,17 +57,26 @@ export function createAgentsMethods(options = {}) {
                 this.resetAgentsDiffState();
                 this.showAgentsModal = true;
             } catch (e) {
+                if (!isLatestRequestToken(this, '_agentsOpenRequestToken', requestToken)) {
+                    return;
+                }
                 this.showMessage('加载文件失败', 'error');
             } finally {
-                this.agentsLoading = false;
+                if (isLatestRequestToken(this, '_agentsOpenRequestToken', requestToken)) {
+                    this.agentsLoading = false;
+                }
             }
         },
 
         async openOpenclawAgentsEditor() {
             this.setAgentsModalContext('openclaw');
+            const requestToken = issueLatestRequestToken(this, '_agentsOpenRequestToken');
             this.agentsLoading = true;
             try {
                 const res = await api('get-openclaw-agents-file');
+                if (!isLatestRequestToken(this, '_agentsOpenRequestToken', requestToken)) {
+                    return;
+                }
                 if (res.error) {
                     this.showMessage(res.error, 'error');
                     return;
@@ -69,9 +92,14 @@ export function createAgentsMethods(options = {}) {
                 this.resetAgentsDiffState();
                 this.showAgentsModal = true;
             } catch (e) {
+                if (!isLatestRequestToken(this, '_agentsOpenRequestToken', requestToken)) {
+                    return;
+                }
                 this.showMessage('加载文件失败', 'error');
             } finally {
-                this.agentsLoading = false;
+                if (isLatestRequestToken(this, '_agentsOpenRequestToken', requestToken)) {
+                    this.agentsLoading = false;
+                }
             }
         },
 
@@ -86,9 +114,13 @@ export function createAgentsMethods(options = {}) {
                 return;
             }
             this.setAgentsModalContext('openclaw-workspace', { fileName });
+            const requestToken = issueLatestRequestToken(this, '_agentsOpenRequestToken');
             this.agentsLoading = true;
             try {
                 const res = await api('get-openclaw-workspace-file', { fileName });
+                if (!isLatestRequestToken(this, '_agentsOpenRequestToken', requestToken)) {
+                    return;
+                }
                 if (res.error) {
                     this.showMessage(res.error, 'error');
                     return;
@@ -104,9 +136,14 @@ export function createAgentsMethods(options = {}) {
                 this.resetAgentsDiffState();
                 this.showAgentsModal = true;
             } catch (e) {
+                if (!isLatestRequestToken(this, '_agentsOpenRequestToken', requestToken)) {
+                    return;
+                }
                 this.showMessage('加载文件失败', 'error');
             } finally {
-                this.agentsLoading = false;
+                if (isLatestRequestToken(this, '_agentsOpenRequestToken', requestToken)) {
+                    this.agentsLoading = false;
+                }
             }
         },
 
@@ -390,6 +427,9 @@ export function createAgentsMethods(options = {}) {
         },
 
         async applyAgentsContent() {
+            if (this.agentsSaving) {
+                return;
+            }
             if (!this.agentsDiffVisible) {
                 if (!this.hasAgentsContentChanged()) {
                     this.showMessage('未检测到改动', 'info');

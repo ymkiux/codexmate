@@ -439,6 +439,15 @@ function assertInternalServerErrorResponse(response) {
     assert.strictEqual(response.destroyedWith, null);
 }
 
+function assertNotFoundResponse(response) {
+    assert.strictEqual(response.statusCode, 404);
+    assert.deepStrictEqual(response.headers, {
+        'Content-Type': 'text/plain; charset=utf-8'
+    });
+    assert.strictEqual(response.body, 'Not Found');
+    assert.strictEqual(response.destroyedWith, null);
+}
+
 test('resolveSkillTarget still falls back to default target when target is omitted', () => {
     assert.deepStrictEqual(resolveSkillTarget({}), SKILL_TARGETS[0]);
     assert.deepStrictEqual(resolveSkillTarget({ items: [] }), SKILL_TARGETS[0]);
@@ -458,6 +467,20 @@ test('createWebServer returns 500 when bundled /web-ui html generation throws', 
     assert.deepStrictEqual(errors, [
         ['! Web UI 资源读取失败 [/web-ui]:', 'bundled html failed']
     ]);
+});
+
+test('createWebServer preserves the legacy 404 contract for /web-ui/', () => {
+    const { requestHandler, errors } = createWebServerHarness({
+        htmlReader() {
+            throw new Error('bundled html failed');
+        }
+    });
+    const response = createMockResponse();
+
+    requestHandler({ url: '/web-ui/' }, response);
+
+    assertNotFoundResponse(response);
+    assert.deepStrictEqual(errors, []);
 });
 
 test('createWebServer returns 500 when bundled dynamic asset generation throws', () => {

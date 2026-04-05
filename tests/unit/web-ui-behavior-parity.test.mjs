@@ -12,6 +12,7 @@ const currentMethods = currentAppOptions.methods;
 const headMethods = headAppOptions.methods;
 const currentComputed = currentAppOptions.computed;
 const headComputed = headAppOptions.computed;
+const parityAgainstHead = String(parityBaseline.ref || '').startsWith('HEAD');
 function cloneJson(value) {
     return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
@@ -325,7 +326,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'sessionPathRequestSeqMap'
     ];
     const allowedMissingCurrentKeys = ['sessionPathRequestSeq'];
-    if (String(parityBaseline.ref || '').startsWith('HEAD')) {
+    if (parityAgainstHead) {
         const allowedExtraKeySet = new Set(allowedExtraCurrentKeys);
         const allowedMissingKeySet = new Set(allowedMissingCurrentKeys);
         const unexpectedExtraCurrentKeys = extraCurrentKeys.filter((key) => !allowedExtraKeySet.has(key));
@@ -347,8 +348,15 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'cancelTouchNavIntentReset',
         'scheduleTouchNavIntentReset'
     ];
-    assert.deepStrictEqual(extraCurrentMethodKeys, allowedExtraCurrentMethodKeys);
-    assert.deepStrictEqual(missingCurrentMethodKeys, []);
+    if (parityAgainstHead) {
+        const allowedExtraMethodKeySet = new Set(allowedExtraCurrentMethodKeys);
+        const unexpectedExtraCurrentMethodKeys = extraCurrentMethodKeys.filter((key) => !allowedExtraMethodKeySet.has(key));
+        assert.deepStrictEqual(unexpectedExtraCurrentMethodKeys, [], `unexpected extra method keys against ${parityBaseline.ref}`);
+        assert.deepStrictEqual(missingCurrentMethodKeys, [], `unexpected missing method keys against ${parityBaseline.ref}`);
+    } else {
+        assert.deepStrictEqual(extraCurrentMethodKeys, allowedExtraCurrentMethodKeys);
+        assert.deepStrictEqual(missingCurrentMethodKeys, []);
+    }
     assert.deepStrictEqual(
         currentMethodKeys.filter((key) => !extraCurrentMethodKeys.includes(key)).sort(),
         headMethodKeys
@@ -397,6 +405,7 @@ test('switchConfigMode keeps config and navigation behavior aligned with HEAD', 
         mainTab: 'sessions',
         configMode: 'claude',
         calls: [],
+        cancelTouchNavIntentReset() {},
         switchMainTab(tab) {
             this.calls.push(['switchMainTab', tab]);
         }
