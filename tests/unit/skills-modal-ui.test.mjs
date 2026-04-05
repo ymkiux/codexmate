@@ -15,6 +15,9 @@ test('skills modal template includes overview counters and reset entry', () => {
     assert.match(html, /triggerSkillsZipImport/);
     assert.match(html, /exportSelectedSkills/);
     assert.match(html, /skillsZipImportInput/);
+    assert.match(html, /<div class="modal modal-wide skills-modal" role="dialog" aria-modal="true" aria-labelledby="skills-modal-title">/);
+    assert.match(html, /<div class="modal-title" id="skills-modal-title">Skills 管理<\/div>/);
+    assert.match(html, /@click="importSelectedSkills" :disabled="skillsImporting \|\| skillsScanningImports \|\| skillsImportSelectedCount === 0 \|\| skillsZipImporting \|\| skillsExporting \|\| skillsDeleting"/);
 });
 
 test('skills modal script is modularized and exposes computed/methods from skills modules', () => {
@@ -72,6 +75,10 @@ test('skills modal styles define summary and panel layout hooks', () => {
     assert.match(styles, /\.skill-list::\-webkit-scrollbar-thumb/);
     assert.match(styles, /\.confirm-dialog/);
     assert.match(styles, /\.confirm-dialog-message/);
+    assert.match(styles, /@keyframes modalFadeIn/);
+    assert.match(styles, /@keyframes modalSlideUp/);
+    assert.match(styles, /\.modal-overlay\s*\{[\s\S]*animation:\s*modalFadeIn/);
+    assert.match(styles, /\.modal\s*\{[\s\S]*animation:\s*modalSlideUp/);
     assert.match(styles, /\.market-target-chip/);
     assert.match(styles, /\.market-target-chip:disabled,\s*\.market-target-chip\[disabled\]/);
     assert.doesNotMatch(styles, /\.market-online-toolbar/);

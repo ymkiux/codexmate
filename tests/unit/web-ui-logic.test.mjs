@@ -328,6 +328,8 @@ test('formatLatency formats success and errors', () => {
     assert.strictEqual(formatLatency(null), '');
     assert.strictEqual(formatLatency({ ok: true, durationMs: undefined }), '0ms');
     assert.strictEqual(formatLatency({ ok: true, durationMs: '12' }), '0ms');
+    assert.strictEqual(formatLatency({ ok: true, durationMs: Number.NaN }), '0ms');
+    assert.strictEqual(formatLatency({ ok: true, durationMs: Number.POSITIVE_INFINITY }), '0ms');
 });
 
 test('buildSpeedTestIssue maps errors and status codes', () => {
@@ -365,6 +367,7 @@ test('buildSpeedTestIssue maps errors and status codes', () => {
     const http400 = buildSpeedTestIssue('p1', { ok: false, status: 400 });
     assert.strictEqual(http400.code, 'remote-speedtest-http-error');
 });
+
 
 test('runLatestOnlyQueue drains pending targets in order', async () => {
     let pending = '';

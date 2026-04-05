@@ -1,7 +1,9 @@
 export function formatLatency(result) {
     if (!result) return '';
     if (!result.ok) return result.status ? `ERR ${result.status}` : 'ERR';
-    const ms = typeof result.durationMs === 'number' ? result.durationMs : 0;
+    const ms = (typeof result.durationMs === 'number' && Number.isFinite(result.durationMs))
+        ? result.durationMs
+        : 0;
     return `${ms}ms`;
 }
 

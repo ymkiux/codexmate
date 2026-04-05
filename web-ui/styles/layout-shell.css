@@ -151,8 +151,10 @@ body::after {
     word-break: break-word;
 }
 
-.top-tabs {
-    display: none !important;
+@media (min-width: 961px) {
+    body:not(.force-compact) #app > .top-tabs {
+        display: none;
+    }
 }
 
 .brand-block {
@@ -326,4 +328,3 @@ body::after {
     transform: translateY(-1px);
     border-color: rgba(201, 94, 75, 0.5);
 }
-

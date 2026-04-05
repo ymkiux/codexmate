@@ -12,6 +12,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     const openclawModal = readProjectFile('web-ui/partials/index/modal-openclaw-config.html');
     const sessionsPanel = readProjectFile('web-ui/partials/index/panel-sessions.html');
     const baseTheme = readProjectFile('web-ui/styles/base-theme.css');
+    const sideRail = html.match(/<aside class="side-rail"[\s\S]*?<\/aside>/)?.[0] || '';
     const topTabModes = [...html.matchAll(/id="tab-config-([a-z]+)"/g)]
         .map((match) => match[1]);
     const sideTabModes = [...html.matchAll(/id="side-tab-config-([a-z]+)"/g)]
@@ -82,6 +83,14 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /class="market-target-switch market-target-switch-compact" role="group" aria-label="选择 Skills 管理目标"/);
     assert.doesNotMatch(html, /class="market-target-switch" role="tablist" aria-label="选择 Skills 安装目标"/);
     assert.doesNotMatch(html, /class="market-target-switch market-target-switch-compact" role="tablist" aria-label="选择 Skills 管理目标"/);
+    assert.match(html, /class="side-section" role="navigation" aria-label="配置管理"/);
+    assert.match(html, /class="side-section" role="navigation" aria-label="会话管理"/);
+    assert.match(html, /class="side-section" role="navigation" aria-label="技能市场"/);
+    assert.match(html, /class="side-section" role="navigation" aria-label="设置"/);
+    assert.doesNotMatch(sideRail, /role="tablist"/);
+    assert.doesNotMatch(sideRail, /role="tab"/);
+    assert.match(sideRail, /id="side-tab-config-codex"[\s\S]*:aria-current="isConfigModeNavActive\('codex'\) \? 'page' : null"/);
+    assert.match(sideRail, /id="side-tab-settings"[\s\S]*:aria-current="isMainTabNavActive\('settings'\) \? 'page' : null"/);
     assert.match(html, /skillsDefaultRootPath/);
     assert.match(html, /可直接导入/);
     assert.doesNotMatch(html, /在线生态目录/);
@@ -129,6 +138,12 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(
         sessionsPanel,
         /:class="\[[\s\S]*'session-item'[\s\S]*@click="selectSession\(session\)"[\s\S]*@keydown\.enter\.self\.prevent="selectSession\(session\)"[\s\S]*@keydown\.space\.self\.prevent="selectSession\(session\)"[\s\S]*tabindex="0"[\s\S]*role="button"[\s\S]*:aria-current="activeSessionExportKey === getSessionExportKey\(session\) \? 'true' : null"/
+    );
+    assert.doesNotMatch(sessionsPanel, /!sessionStandalone/);
+    assert.doesNotMatch(sessionsPanel, /<span v-if="sessionStandaloneError">{{ sessionStandaloneError }}<\/span>/);
+    assert.match(
+        sessionsPanel,
+        /<div v-else class="session-preview-empty">[\s\S]*?<span>请先在左侧选择一个会话<\/span>[\s\S]*?<\/div>/
     );
     assert.match(
         html,
@@ -352,6 +367,7 @@ test('trash item styles stay aligned with session card layout and keep mobile us
     assert.match(styles, /\.trash-item-actions\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(108px,\s*108px\)\);/);
     assert.match(styles, /\.trash-item-actions \.btn-mini\s*\{[\s\S]*min-height:\s*36px;/);
     assert.match(styles, /\.trash-item-path\s*\{[\s\S]*grid-template-columns:\s*48px\s+minmax\(0,\s*1fr\);/);
+    assert.match(styles, /\.session-toolbar-grow\s*\{[\s\S]*grid-column:\s*1\s*\/\s*-1;/);
     assert.match(mobile520Block, /\.trash-item-header\s*\{[\s\S]*flex-direction:\s*column;/);
     assert.match(mobile520Block, /\.trash-item-actions\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
     assert.match(mobile520Block, /\.trash-item-actions \.btn-mini\s*\{[\s\S]*min-height:\s*40px;/);
@@ -411,11 +427,17 @@ test('settings tab header actions keep compact tool buttons inline on wider scre
     assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact\s*\{[\s\S]*white-space:\s*nowrap;/);
     assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool \+ \.btn-tool\s*\{[\s\S]*margin-top:\s*0;/);
     assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool:hover,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact:hover\s*\{[\s\S]*transform:\s*none;/);
+    assert.match(styles, /\.btn-tool:disabled,\s*\.btn-tool\[disabled\]\s*\{[\s\S]*cursor:\s*not-allowed;/);
+    assert.match(styles, /\.btn-tool:disabled:hover,\s*\.btn-tool\[disabled\]:hover\s*\{[\s\S]*transform:\s*none;/);
     assert.match(styles, /\.market-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
     assert.match(styles, /\.market-action-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/);
     assert.match(styles, /\.market-target-switch\s*\{/);
     assert.match(styles, /\.market-target-chip\.active\s*\{/);
     assert.match(styles, /\.market-target-chip:disabled,\s*\.market-target-chip\[disabled\]\s*\{/);
+    assert.match(styles, /@keyframes modalFadeIn/);
+    assert.match(styles, /@keyframes modalSlideUp/);
+    assert.match(styles, /\.modal-overlay\s*\{[\s\S]*animation:\s*modalFadeIn/);
+    assert.match(styles, /\.modal\s*\{[\s\S]*animation:\s*modalSlideUp/);
     assert.match(styles, /\.market-panel-wide\s*\{/);
     assert.match(styles, /--radius-md:\s*[0-9.]+(?:px|rem);/);
     assert.match(styles, /--font-weight-primary:\s*[0-9]+;/);

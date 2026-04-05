@@ -264,17 +264,26 @@
     display: flex;
     gap: 8px;
     opacity: 0;
+    pointer-events: none;
     transform: translateX(4px);
     transition: all var(--transition-normal) var(--ease-spring);
 }
 
 .card:hover .card-actions {
     opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+}
+
+.card:focus-within .card-actions {
+    opacity: 1;
+    pointer-events: auto;
     transform: translateX(0);
 }
 
 .mode-cards .card-actions {
     opacity: 1;
+    pointer-events: auto;
     transform: translateX(0);
 }
 
@@ -396,4 +405,3 @@
     color: var(--color-text-tertiary);
     opacity: 0.5;
 }
-

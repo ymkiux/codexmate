@@ -3,6 +3,25 @@ import {
     formatLatency
 } from '../logic.mjs';
 
+function clearProgressResetTimer(context, timerKey) {
+    if (!context || !timerKey || !context[timerKey]) {
+        return;
+    }
+    clearTimeout(context[timerKey]);
+    context[timerKey] = null;
+}
+
+function scheduleProgressResetTimer(context, timerKey, progressKey, delayMs = 800) {
+    if (!context || !timerKey || !progressKey) {
+        return;
+    }
+    clearProgressResetTimer(context, timerKey);
+    context[timerKey] = setTimeout(() => {
+        context[progressKey] = 0;
+        context[timerKey] = null;
+    }, delayMs);
+}
+
 export function createRuntimeMethods(options = {}) {
     const { api } = options;
 
@@ -73,6 +92,7 @@ export function createRuntimeMethods(options = {}) {
 
         async downloadClaudeDirectory() {
             if (this.claudeDownloadLoading) return;
+            clearProgressResetTimer(this, '__claudeDownloadResetTimer');
             this.claudeDownloadLoading = true;
             this.claudeDownloadProgress = 5;
             this.claudeDownloadTimer = setInterval(() => {
@@ -107,14 +127,13 @@ export function createRuntimeMethods(options = {}) {
                     this.claudeDownloadTimer = null;
                 }
                 this.claudeDownloadLoading = false;
-                setTimeout(() => {
-                    this.claudeDownloadProgress = 0;
-                }, 800);
+                scheduleProgressResetTimer(this, '__claudeDownloadResetTimer', 'claudeDownloadProgress');
             }
         },
 
         async downloadCodexDirectory() {
             if (this.codexDownloadLoading) return;
+            clearProgressResetTimer(this, '__codexDownloadResetTimer');
             this.codexDownloadLoading = true;
             this.codexDownloadProgress = 5;
             this.codexDownloadTimer = setInterval(() => {
@@ -149,9 +168,7 @@ export function createRuntimeMethods(options = {}) {
                     this.codexDownloadTimer = null;
                 }
                 this.codexDownloadLoading = false;
-                setTimeout(() => {
-                    this.codexDownloadProgress = 0;
-                }, 800);
+                scheduleProgressResetTimer(this, '__codexDownloadResetTimer', 'codexDownloadProgress');
             }
         },
 

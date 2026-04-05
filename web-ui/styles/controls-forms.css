@@ -321,6 +321,20 @@
     box-shadow: 0 4px 8px rgba(210, 107, 90, 0.12);
 }
 
+.btn-tool:disabled,
+.btn-tool[disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-tool:disabled:hover,
+.btn-tool[disabled]:hover {
+    border-color: var(--color-border-soft);
+    color: var(--color-text-secondary);
+    transform: none;
+    box-shadow: var(--shadow-subtle);
+}
+
 .btn-tool-compact {
     padding: 9px 12px;
     font-size: var(--font-size-secondary);
@@ -332,4 +346,3 @@
     line-height: 1.1;
     box-shadow: var(--shadow-subtle);
 }
-
