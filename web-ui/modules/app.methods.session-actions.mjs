@@ -86,7 +86,8 @@ export function createSessionActionMethods(options = {}) {
             if (!sessionId && !filePath) return '';
             const origin = window.location.origin && window.location.origin !== 'null'
                 ? window.location.origin
-                : apiBase;
+                : (typeof apiBase === 'string' ? apiBase.trim() : '');
+            if (!origin) return '';
             const params = new URLSearchParams();
             params.set('source', source);
             if (sessionId) params.set('sessionId', sessionId);
