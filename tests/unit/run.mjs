@@ -19,6 +19,7 @@ await import(pathToFileURL(path.join(__dirname, 'readme-docs-consistency.test.mj
 await import(pathToFileURL(path.join(__dirname, 'config-tabs-ui.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'compact-layout-ui.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'web-ui-source-bundle.test.mjs')));
+await import(pathToFileURL(path.join(__dirname, 'startup-claude-star-prompt.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'agents-diff-ui.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'text-diff.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'claude-settings-sync.test.mjs')));

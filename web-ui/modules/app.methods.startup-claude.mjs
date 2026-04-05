@@ -380,14 +380,18 @@ export function createStartupClaudeMethods(options = {}) {
 
         maybeShowStarPrompt() {
             const storageKey = 'codexmateStarPrompted';
+            let shown = false;
             try {
                 if (localStorage.getItem(storageKey)) {
                     return;
                 }
                 this.showMessage('欢迎到 GitHub 点 Star', 'info');
+                shown = true;
                 localStorage.setItem(storageKey, '1');
             } catch (_) {
-                this.showMessage('欢迎到 GitHub 点 Star', 'info');
+                if (!shown) {
+                    this.showMessage('欢迎到 GitHub 点 Star', 'info');
+                }
             }
         }
     };
