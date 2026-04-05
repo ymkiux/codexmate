@@ -143,7 +143,7 @@
                         id="side-tab-config-codex"
                         data-main-tab="config"
                         data-config-mode="codex"
-                        :aria-current="isConfigModeNavActive('codex') ? 'page' : null"
+                        :aria-current="mainTab === 'config' && configMode === 'codex' ? 'page' : null"
                         :class="['side-item', { active: isConfigModeNavActive('codex') }]"
                         @pointerdown="onConfigTabPointerDown('codex', $event)"
                         @click="onConfigTabClick('codex', $event)">
@@ -157,7 +157,7 @@
                         id="side-tab-config-claude"
                         data-main-tab="config"
                         data-config-mode="claude"
-                        :aria-current="isConfigModeNavActive('claude') ? 'page' : null"
+                        :aria-current="mainTab === 'config' && configMode === 'claude' ? 'page' : null"
                         :class="['side-item', { active: isConfigModeNavActive('claude') }]"
                         @pointerdown="onConfigTabPointerDown('claude', $event)"
                         @click="onConfigTabClick('claude', $event)">
@@ -171,7 +171,7 @@
                         id="side-tab-config-openclaw"
                         data-main-tab="config"
                         data-config-mode="openclaw"
-                        :aria-current="isConfigModeNavActive('openclaw') ? 'page' : null"
+                        :aria-current="mainTab === 'config' && configMode === 'openclaw' ? 'page' : null"
                         :class="['side-item', { active: isConfigModeNavActive('openclaw') }]"
                         @pointerdown="onConfigTabPointerDown('openclaw', $event)"
                         @click="onConfigTabClick('openclaw', $event)">
@@ -188,7 +188,7 @@
                     <button
                         id="side-tab-sessions"
                         data-main-tab="sessions"
-                        :aria-current="isMainTabNavActive('sessions') ? 'page' : null"
+                        :aria-current="mainTab === 'sessions' ? 'page' : null"
                         :class="['side-item', { active: isMainTabNavActive('sessions') }]"
                         @pointerdown="onMainTabPointerDown('sessions', $event)"
                         @click="onMainTabClick('sessions', $event)">
@@ -205,7 +205,7 @@
                     <button
                         id="side-tab-market"
                         data-main-tab="market"
-                        :aria-current="isMainTabNavActive('market') ? 'page' : null"
+                        :aria-current="mainTab === 'market' ? 'page' : null"
                         :class="['side-item', { active: isMainTabNavActive('market') }]"
                         @pointerdown="onMainTabPointerDown('market', $event)"
                         @click="onMainTabClick('market', $event)">
@@ -222,7 +222,7 @@
                     <button
                         id="side-tab-settings"
                         data-main-tab="settings"
-                        :aria-current="isMainTabNavActive('settings') ? 'page' : null"
+                        :aria-current="mainTab === 'settings' ? 'page' : null"
                         :class="['side-item', { active: isMainTabNavActive('settings') }]"
                         @pointerdown="onMainTabPointerDown('settings', $event)"
                         @click="onMainTabClick('settings', $event)">

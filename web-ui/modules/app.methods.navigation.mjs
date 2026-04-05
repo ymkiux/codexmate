@@ -11,6 +11,9 @@ export function createNavigationMethods(options = {}) {
                 ? mode.trim().toLowerCase()
                 : '';
             this.cancelTouchNavIntentReset();
+            if (typeof this.ensureMainTabSwitchState === 'function') {
+                this.ensureMainTabSwitchState().pendingConfigMode = '';
+            }
             this.configMode = configModeSet.has(normalizedMode) ? normalizedMode : 'codex';
             if (this.mainTab === 'config') {
                 if (this.configMode === 'claude') {
@@ -43,6 +46,7 @@ export function createNavigationMethods(options = {}) {
             this.__mainTabSwitchState = {
                 intent: '',
                 pendingTarget: '',
+                pendingConfigMode: '',
                 ticket: 0
             };
             return this.__mainTabSwitchState;
@@ -207,6 +211,9 @@ export function createNavigationMethods(options = {}) {
             const normalizedMode = typeof mode === 'string' ? mode.trim().toLowerCase() : '';
             if (!normalizedMode) return;
             this.setMainTabSwitchIntent('config');
+            if (typeof this.ensureMainTabSwitchState === 'function') {
+                this.ensureMainTabSwitchState().pendingConfigMode = normalizedMode;
+            }
             this.applyImmediateNavIntent('config', normalizedMode);
             const shouldHideSessionPanel = this.mainTab === 'sessions';
             this.setSessionPanelFastHidden(shouldHideSessionPanel);
@@ -240,6 +247,7 @@ export function createNavigationMethods(options = {}) {
             this.cancelTouchNavIntentReset();
             state.intent = '';
             state.pendingTarget = '';
+            state.pendingConfigMode = '';
             this.clearImmediateNavIntent();
             this.setSessionPanelFastHidden(false);
         },
@@ -251,7 +259,17 @@ export function createNavigationMethods(options = {}) {
             return this.getMainTabForNav() === tab;
         },
         isConfigModeNavActive(mode) {
-            return this.isMainTabNavActive('config') && this.configMode === mode;
+            if (!this.isMainTabNavActive('config')) {
+                return false;
+            }
+            const state = this.ensureMainTabSwitchState();
+            const pendingMode = typeof state.pendingConfigMode === 'string'
+                ? state.pendingConfigMode.trim().toLowerCase()
+                : '';
+            if (state.intent === 'config' && pendingMode) {
+                return pendingMode === mode;
+            }
+            return this.configMode === mode;
         },
         switchMainTab(tab) {
             const normalizedTab = typeof tab === 'string'
@@ -273,6 +291,9 @@ export function createNavigationMethods(options = {}) {
 
             const previousTab = this.mainTab;
             const switchState = this.ensureMainTabSwitchState();
+            if (targetTab !== 'config') {
+                switchState.pendingConfigMode = '';
+            }
             if (targetTab === previousTab) {
                 switchState.ticket += 1;
                 switchState.pendingTarget = '';

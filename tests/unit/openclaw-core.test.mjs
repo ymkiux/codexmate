@@ -15,3 +15,19 @@ test('parseOptionalNumber preserves numeric zero values', () => {
     assert.deepStrictEqual(methods.parseOptionalNumber(0, 'Timeout'), { ok: true, value: 0 });
     assert.deepStrictEqual(methods.parseOptionalNumber('0', 'Timeout'), { ok: true, value: 0 });
 });
+
+test('getOpenclawParser falls back to JSON helpers when window is unavailable', () => {
+    const previousWindow = globalThis.window;
+    try {
+        delete globalThis.window;
+        const parser = methods.getOpenclawParser();
+        assert.strictEqual(parser.parse, JSON.parse);
+        assert.strictEqual(parser.stringify, JSON.stringify);
+    } finally {
+        if (previousWindow === undefined) {
+            delete globalThis.window;
+        } else {
+            globalThis.window = previousWindow;
+        }
+    }
+});

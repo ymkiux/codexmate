@@ -603,6 +603,39 @@ test('loadModelsForProvider ignores stale responses after provider selection cha
     assert.strictEqual(context.modelsHasCurrent, true);
 });
 
+test('loadModelsForProvider ignores stale failures after provider selection changes', async () => {
+    let rejectApi = null;
+    const source = extractMethodAsFunction(appSource, 'loadModelsForProvider');
+    const loadModelsForProvider = instantiateFunction(source, 'loadModelsForProvider', {
+        api: async () => await new Promise((_, reject) => {
+            rejectApi = reject;
+        })
+    });
+
+    const context = {
+        currentProvider: 'alpha',
+        codexModelsRequestSeq: 0,
+        codexModelsLoading: false,
+        models: ['old-model'],
+        modelsSource: 'remote',
+        modelsHasCurrent: true,
+        currentModel: 'old-model',
+        showMessage() {
+            throw new Error('stale failure should not emit toast');
+        }
+    };
+
+    const pending = loadModelsForProvider.call(context, 'alpha');
+    context.currentProvider = 'beta';
+    rejectApi(new Error('network failed'));
+    await pending;
+
+    assert.strictEqual(context.codexModelsLoading, false);
+    assert.deepStrictEqual(context.models, ['old-model']);
+    assert.strictEqual(context.modelsSource, 'remote');
+    assert.strictEqual(context.modelsHasCurrent, true);
+});
+
 test('loadClaudeModels keeps error state but suppresses toast in silent mode', async () => {
     const source = extractMethodAsFunction(appSource, 'loadClaudeModels');
     const loadClaudeModels = instantiateFunction(source, 'loadClaudeModels', {
@@ -690,6 +723,59 @@ test('loadClaudeModels ignores stale responses after Claude config selection cha
     assert.strictEqual(context.claudeModelsHasCurrent, true);
 });
 
+test('loadClaudeModels ignores stale failures after Claude config selection changes', async () => {
+    let rejectApi = null;
+    const source = extractMethodAsFunction(appSource, 'loadClaudeModels');
+    const loadClaudeModels = instantiateFunction(source, 'loadClaudeModels', {
+        api: async () => await new Promise((_, reject) => {
+            rejectApi = reject;
+        })
+    });
+
+    const configs = {
+        alpha: {
+            baseUrl: 'https://alpha.example.com',
+            apiKey: 'alpha-key',
+            model: 'alpha-model'
+        },
+        beta: {
+            baseUrl: 'https://beta.example.com',
+            apiKey: 'beta-key',
+            model: 'beta-model'
+        }
+    };
+    const context = {
+        currentClaudeConfig: 'alpha',
+        claudeModelsRequestSeq: 0,
+        claudeModelsLoading: false,
+        claudeModels: ['old-model'],
+        claudeModelsSource: 'remote',
+        claudeModelsHasCurrent: true,
+        getCurrentClaudeConfig() {
+            return configs[this.currentClaudeConfig] || null;
+        },
+        resetClaudeModelsState() {
+            throw new Error('config exists during stale failure test');
+        },
+        updateClaudeModelsCurrent() {
+            throw new Error('stale failure should not update current state');
+        },
+        showMessage() {
+            throw new Error('stale failure should not emit toast');
+        }
+    };
+
+    const pending = loadClaudeModels.call(context);
+    context.currentClaudeConfig = 'beta';
+    rejectApi(new Error('network failed'));
+    await pending;
+
+    assert.strictEqual(context.claudeModelsLoading, false);
+    assert.deepStrictEqual(context.claudeModels, ['old-model']);
+    assert.strictEqual(context.claudeModelsSource, 'remote');
+    assert.strictEqual(context.claudeModelsHasCurrent, true);
+});
+
 test('loadClaudeModels skips remote fetch for external-credential config without api key', async () => {
     const source = extractMethodAsFunction(appSource, 'loadClaudeModels');
     const loadClaudeModels = instantiateFunction(source, 'loadClaudeModels', {
@@ -700,7 +786,7 @@ test('loadClaudeModels skips remote fetch for external-credential config without
 
     const messages = [];
     const context = {
-        claudeModelsLoading: false,
+        claudeModelsLoading: true,
         claudeModels: ['old-model'],
         claudeModelsSource: 'remote',
         claudeModelsHasCurrent: false,

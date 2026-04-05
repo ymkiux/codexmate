@@ -66,6 +66,179 @@ test('applyConfigTemplate force closes the modal after a successful apply', asyn
     }]);
 });
 
+test('applyConfigTemplate keeps the successful apply result when only the refresh fails', async () => {
+    const methods = createCodexConfigMethods({
+        api: async () => ({ success: true }),
+        getProviderConfigModeMeta() {
+            return null;
+        }
+    });
+    const context = {
+        ...methods,
+        showConfigTemplateModal: true,
+        configTemplateApplying: false,
+        configTemplateContent: 'draft-template',
+        shownMessages: [],
+        showMessage(message, type) {
+            this.shownMessages.push({ message, type });
+        },
+        async loadAll() {
+            throw new Error('refresh failed');
+        }
+    };
+
+    await methods.applyConfigTemplate.call(context);
+
+    assert.strictEqual(context.showConfigTemplateModal, false);
+    assert.strictEqual(context.configTemplateContent, '');
+    assert.strictEqual(context.configTemplateApplying, false);
+    assert.deepStrictEqual(context.shownMessages, [{
+        message: '模板已应用',
+        type: 'success'
+    }, {
+        message: '模板已应用，但界面刷新失败，请手动刷新',
+        type: 'error'
+    }]);
+});
+
+test('runHealthCheck treats backend error payloads as failures', async () => {
+    const methods = createCodexConfigMethods({
+        api: async () => ({ error: 'health failed' }),
+        getProviderConfigModeMeta() {
+            return null;
+        }
+    });
+    const context = {
+        ...methods,
+        providersList: ['alpha'],
+        speedResults: {},
+        speedLoading: {},
+        healthCheckLoading: false,
+        healthCheckResult: { ok: true },
+        configMode: 'codex',
+        shownMessages: [],
+        showMessage(message, type) {
+            this.shownMessages.push({ message, type });
+        },
+        async runSpeedTest() {
+            throw new Error('speed tests should be skipped when health check already failed');
+        }
+    };
+
+    await methods.runHealthCheck.call(context);
+
+    assert.strictEqual(context.healthCheckLoading, false);
+    assert.strictEqual(context.healthCheckResult, null);
+    assert.deepStrictEqual(context.shownMessages, [{
+        message: 'health failed',
+        type: 'error'
+    }]);
+});
+
+test('runHealthCheck skips Claude speed tests when the primary health check already failed', async () => {
+    const methods = createCodexConfigMethods({
+        api: async () => ({ error: 'health failed' }),
+        getProviderConfigModeMeta() {
+            return null;
+        }
+    });
+    let claudeSpeedTestCalls = 0;
+    const context = {
+        ...methods,
+        providersList: ['alpha'],
+        speedResults: {},
+        speedLoading: {},
+        healthCheckLoading: false,
+        healthCheckResult: { ok: true },
+        configMode: 'claude',
+        claudeConfigs: {
+            primary: {
+                baseUrl: 'https://example.com',
+                apiKey: 'secret'
+            }
+        },
+        shownMessages: [],
+        showMessage(message, type) {
+            this.shownMessages.push({ message, type });
+        },
+        async runSpeedTest() {
+            throw new Error('speed tests should be skipped when health check already failed');
+        },
+        async runClaudeSpeedTest() {
+            claudeSpeedTestCalls += 1;
+        }
+    };
+
+    await methods.runHealthCheck.call(context);
+
+    assert.strictEqual(context.healthCheckLoading, false);
+    assert.strictEqual(context.healthCheckResult, null);
+    assert.strictEqual(claudeSpeedTestCalls, 0);
+    assert.deepStrictEqual(context.shownMessages, [{
+        message: 'health failed',
+        type: 'error'
+    }]);
+});
+
+test('applyCodexConfigDirect keeps the successful apply result when only the refresh fails', async () => {
+    const apiCalls = [];
+    const methods = createCodexConfigMethods({
+        api: async (action) => {
+            apiCalls.push(action);
+            if (action === 'get-config-template') {
+                return { template: 'template-body' };
+            }
+            if (action === 'apply-config-template') {
+                return { success: true };
+            }
+            throw new Error(`Unexpected action: ${action}`);
+        },
+        getProviderConfigModeMeta() {
+            return null;
+        }
+    });
+    const context = {
+        ...methods,
+        codexApplying: false,
+        _pendingCodexApplyOptions: null,
+        currentProvider: 'alpha',
+        currentModel: 'alpha-model',
+        serviceTier: 'fast',
+        modelReasoningEffort: 'high',
+        modelContextWindowInput: '190000',
+        modelAutoCompactTokenLimitInput: '185000',
+        shownMessages: [],
+        normalizePositiveIntegerInput(value, label, fallback = '') {
+            const raw = value === undefined || value === null || value === ''
+                ? String(fallback || '')
+                : String(value);
+            const numeric = Number.parseInt(String(raw).trim(), 10);
+            if (!Number.isFinite(numeric) || numeric <= 0) {
+                return { ok: false, error: `${label} invalid` };
+            }
+            return { ok: true, value: numeric, text: String(numeric) };
+        },
+        showMessage(message, type) {
+            this.shownMessages.push({ message, type });
+        },
+        async loadAll() {
+            throw new Error('refresh failed');
+        }
+    };
+
+    await methods.applyCodexConfigDirect.call(context);
+
+    assert.strictEqual(context.codexApplying, false);
+    assert.deepStrictEqual(apiCalls, ['get-config-template', 'apply-config-template']);
+    assert.deepStrictEqual(context.shownMessages, [{
+        message: '配置已应用',
+        type: 'success'
+    }, {
+        message: '配置已应用，但界面刷新失败，请手动刷新',
+        type: 'error'
+    }]);
+});
+
 test('handleBeforeUnload keeps the agents unsaved-change guard active while saving', () => {
     const methods = createAgentsMethods();
     const context = {
@@ -176,6 +349,49 @@ test('latest agents editor request keeps loading state until the newest response
     assert.strictEqual(context.agentsPath, '/tmp/openclaw/AGENTS.md');
     assert.strictEqual(context.agentsLineEnding, '\r\n');
     assert.strictEqual(context.resetCalls, 1);
+    assert.deepStrictEqual(context.shownMessages, []);
+});
+
+test('closeAgentsModal invalidates pending open requests so late responses cannot reopen the modal', async () => {
+    let resolveApi;
+    const methods = createAgentsMethods({
+        api: async () => await new Promise((resolve) => {
+            resolveApi = resolve;
+        })
+    });
+    const context = {
+        ...methods,
+        showAgentsModal: false,
+        agentsContent: '',
+        agentsOriginalContent: '',
+        agentsPath: '',
+        agentsExists: false,
+        agentsLineEnding: '\n',
+        shownMessages: [],
+        showMessage(message, type) {
+            this.shownMessages.push({ message, type });
+        }
+    };
+
+    const pendingOpen = methods.openAgentsEditor.call(context);
+    assert.strictEqual(context.agentsLoading, true);
+
+    await methods.closeAgentsModal.call(context, { force: true });
+    assert.strictEqual(context.agentsLoading, false);
+    assert.strictEqual(context.showAgentsModal, false);
+
+    resolveApi({
+        content: 'late-agents',
+        path: '/tmp/AGENTS.md',
+        exists: true,
+        lineEnding: '\n'
+    });
+    await pendingOpen;
+
+    assert.strictEqual(context.agentsLoading, false);
+    assert.strictEqual(context.showAgentsModal, false);
+    assert.strictEqual(context.agentsContent, '');
+    assert.strictEqual(context.agentsPath, '');
     assert.deepStrictEqual(context.shownMessages, []);
 });
 

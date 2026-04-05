@@ -137,6 +137,9 @@ export function createStartupClaudeMethods(options = {}) {
                 this.modelsSource = res.source || 'remote';
                 this.modelsHasCurrent = !!this.currentModel && list.includes(this.currentModel);
             } catch (_) {
+                if (!isLatestRequest()) {
+                    return;
+                }
                 if (!silentError) {
                     this.showMessage('获取模型列表失败', 'error');
                 }
@@ -316,6 +319,7 @@ export function createStartupClaudeMethods(options = {}) {
                 this.claudeModels = [];
                 this.claudeModelsSource = 'unlimited';
                 this.claudeModelsHasCurrent = true;
+                this.claudeModelsLoading = false;
                 return;
             }
 
@@ -361,6 +365,9 @@ export function createStartupClaudeMethods(options = {}) {
                 this.claudeModelsSource = res.source || 'remote';
                 this.updateClaudeModelsCurrent();
             } catch (_) {
+                if (!isLatestRequest()) {
+                    return;
+                }
                 if (!silentError) {
                     this.showMessage('获取模型列表失败', 'error');
                 }

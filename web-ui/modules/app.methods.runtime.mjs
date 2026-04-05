@@ -228,10 +228,14 @@ export function createRuntimeMethods(options = {}) {
                 }
                 const backupTip = res && res.backupPath ? `，原配置已备份到临时文件：${res.backupPath}` : '';
                 this.showMessage(`导入成功${backupTip}`, 'success');
-                if (type === 'claude') {
-                    await this.refreshClaudeSelectionFromSettings({ silent: true });
-                } else {
-                    await this.loadAll();
+                try {
+                    if (type === 'claude') {
+                        await this.refreshClaudeSelectionFromSettings({ silent: true });
+                    } else {
+                        await this.loadAll();
+                    }
+                } catch (_) {
+                    this.showMessage('导入已完成，但界面刷新失败，请手动刷新', 'error');
                 }
             } catch (e) {
                 this.showMessage('导入失败：' + (e && e.message ? e.message : '未知错误'), 'error');

@@ -721,8 +721,8 @@ test('loadAll can refresh in background without flipping the global loading stat
             loadingState = value;
         },
         initError: 'stale',
-        currentProvider: 'alpha',
-        currentModel: 'alpha-model',
+        currentProvider: 'stale-provider',
+        currentModel: 'stale-model',
         serviceTier: 'fast',
         modelReasoningEffort: 'high',
         modelContextWindowInput: '190000',

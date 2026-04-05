@@ -414,6 +414,8 @@ export function createAgentsMethods(options = {}) {
                     return;
                 }
             }
+            issueLatestRequestToken(this, '_agentsOpenRequestToken');
+            this.agentsLoading = false;
             this.showAgentsModal = false;
             this.agentsContent = '';
             this.agentsOriginalContent = '';
