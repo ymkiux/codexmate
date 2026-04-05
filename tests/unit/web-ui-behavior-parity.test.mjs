@@ -320,19 +320,15 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     const extraCurrentKeys = currentDataKeys.filter((key) => !headDataKeys.includes(key)).sort();
     const missingCurrentKeys = headDataKeys.filter((key) => !currentDataKeys.includes(key)).sort();
     const allowedExtraCurrentKeys = [
-        'claudeModelsRequestSeq',
-        'codexModelsRequestSeq',
         'healthCheckDialogLastResult',
         'healthCheckDialogLockedProvider',
         'healthCheckDialogMessages',
         'healthCheckDialogPrompt',
         'healthCheckDialogSelectedProvider',
         'healthCheckDialogSending',
-        'providerSwitchDisplayTarget',
-        'sessionPathRequestSeqMap',
         'showHealthCheckDialog'
     ];
-    const allowedMissingCurrentKeys = ['sessionPathRequestSeq'];
+    const allowedMissingCurrentKeys = [];
     if (parityAgainstHead) {
         const allowedExtraKeySet = new Set(allowedExtraCurrentKeys);
         const allowedMissingKeySet = new Set(allowedMissingCurrentKeys);
@@ -353,11 +349,9 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     const missingCurrentMethodKeys = headMethodKeys.filter((key) => !currentMethodKeys.includes(key)).sort();
     const allowedExtraCurrentMethodKeys = [
         'buildDefaultHealthCheckPrompt',
-        'cancelTouchNavIntentReset',
         'closeHealthCheckDialog',
         'openHealthCheckDialog',
-        'sendHealthCheckDialogMessage',
-        'scheduleTouchNavIntentReset'
+        'sendHealthCheckDialogMessage'
     ];
     if (parityAgainstHead) {
         const allowedExtraMethodKeySet = new Set(allowedExtraCurrentMethodKeys);
