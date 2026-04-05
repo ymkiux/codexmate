@@ -152,10 +152,10 @@ export function createAgentsMethods(options = {}) {
             this.closeAgentsModal();
         },
         hasPendingAgentsDraft() {
-            if (!this.showAgentsModal || this.agentsLoading || this.agentsSaving) {
+            if (!this.showAgentsModal || this.agentsLoading) {
                 return false;
             }
-            return this.hasAgentsContentChanged() || this.agentsDiffVisible;
+            return !!this.agentsSaving || this.hasAgentsContentChanged() || this.agentsDiffVisible;
         },
         handleBeforeUnload(event) {
             if (!this.hasPendingAgentsDraft()) {

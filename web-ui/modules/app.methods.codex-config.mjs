@@ -441,12 +441,19 @@ export function createCodexConfigMethods(options = {}) {
             }
         },
 
-        closeConfigTemplateModal() {
+        closeConfigTemplateModal(options = {}) {
+            const force = !!options.force;
+            if (!force && this.configTemplateApplying) {
+                return;
+            }
             this.showConfigTemplateModal = false;
             this.configTemplateContent = '';
         },
 
         async applyConfigTemplate() {
+            if (this.configTemplateApplying) {
+                return;
+            }
             if (!this.configTemplateContent || !this.configTemplateContent.trim()) {
                 this.showMessage('模板不能为空', 'error');
                 return;
@@ -462,7 +469,7 @@ export function createCodexConfigMethods(options = {}) {
                     return;
                 }
                 this.showMessage('模板已应用', 'success');
-                this.closeConfigTemplateModal();
+                this.closeConfigTemplateModal({ force: true });
                 await this.loadAll();
             } catch (e) {
                 this.showMessage('应用模板失败', 'error');

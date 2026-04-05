@@ -23,6 +23,7 @@ await import(pathToFileURL(path.join(__dirname, 'startup-claude-star-prompt.test
 await import(pathToFileURL(path.join(__dirname, 'install-methods.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'openclaw-core.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'openclaw-persist-regression.test.mjs')));
+await import(pathToFileURL(path.join(__dirname, 'agents-modal-guards.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'session-browser-timeline-regression.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'agents-diff-ui.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'text-diff.test.mjs')));
