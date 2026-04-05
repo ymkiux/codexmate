@@ -9,6 +9,7 @@ import {
 test('config template keeps expected config tabs in top and side navigation', () => {
     const html = readBundledWebUiHtml();
     const modalsBasic = readProjectFile('web-ui/partials/index/modals-basic.html');
+    const healthCheckModal = readProjectFile('web-ui/partials/index/modal-health-check.html');
     const templateAgentModals = readProjectFile('web-ui/partials/index/modal-config-template-agents.html');
     const openclawModal = readProjectFile('web-ui/partials/index/modal-openclaw-config.html');
     const sessionsPanel = readProjectFile('web-ui/partials/index/panel-sessions.html');
@@ -31,7 +32,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /onConfigTabPointerDown\('codex', \$event\)/);
     assert.match(html, /onMainTabClick\('sessions', \$event\)/);
     assert.match(html, /onConfigTabClick\('codex', \$event\)/);
-    assert.match(html, /<span class="selector-title">上下文压缩阈值<\/span>/);
+    assert.match(html, /<span class="selector-title">压缩阈值<\/span>/);
     assert.match(html, /v-model="modelContextWindowInput"/);
     assert.match(html, /v-model="modelAutoCompactTokenLimitInput"/);
     assert.match(html, /@focus="editingCodexBudgetField = 'modelContextWindowInput'"/);
@@ -43,7 +44,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.doesNotMatch(html, /使用自定义数字输入框；失焦或回车后会按当前 Codex 配置规范写入模板。/);
     assert.match(
         html,
-        /<button[^>]*@click="resetCodexContextBudgetDefaults"[^>]*>[\s\S]*?重置默认值[\s\S]*?<\/button>/
+        /<button[^>]*@click="resetCodexContextBudgetDefaults"[^>]*>[\s\S]*?重置[\s\S]*?<\/button>/
     );
     assert.match(html, /class="codex-config-grid"/);
     assert.match(html, /onSettingsTabClick\('backup'\)/);
@@ -60,6 +61,8 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /:aria-selected="mainTab === 'market'"/);
     assert.match(html, /id="panel-market"/);
     assert.match(html, /v-show="mainTab === 'market'"/);
+    assert.doesNotMatch(html, /<span class="selector-title">Skills<\/span>/);
+    assert.doesNotMatch(html, /openSkillsManager\(\{ targetApp: 'codex' \}\)/);
     assert.match(html, /loadSkillsMarketOverview\(\{ forceRefresh: true, silent: false \}\)/);
     assert.match(html, /class="market-grid"/);
     assert.match(html, /class="market-action-grid"/);
@@ -171,10 +174,10 @@ test('config template keeps expected config tabs in top and side navigation', ()
     );
     assert(providerShareButton, 'provider share button should exist');
     assert.match(providerShareButton[0], /disabled/);
-    assert.match(providerShareButton[0], /title="分享导入命令（暂时禁用）"/);
+    assert.match(providerShareButton[0], /title="分享命令（暂不可用）"/);
     assert.match(html, /<button class="btn-icon" @click="showModelModal = true" aria-label="Add model" title="添加模型" v-if="modelsSource === 'legacy'">\+<\/button>/);
     assert.match(html, /<button class="btn-icon" @click="showModelListModal = true" aria-label="Manage models" title="管理模型" v-if="modelsSource === 'legacy'">≡<\/button>/);
-    assert.match(html, /<button class="card-action-btn"[^>]*@click="runSpeedTest\(provider\.name\)"[^>]*:aria-label="`Run speed test for \$\{provider\.name\}`"[^>]*title="Speed Test">/);
+    assert.match(html, /<button class="card-action-btn"[^>]*@click="openHealthCheckDialog\(\{ providerName: provider\.name, locked: true \}\)"[^>]*:aria-label="`Open health dialog for \$\{provider\.name\}`"[^>]*title="检测对话">/);
     assert.match(html, /<button[\s\S]*?@click="openEditModal\(provider\)"[\s\S]*?:aria-label="`Edit provider \$\{provider\.name\}`"[\s\S]*?:title="shouldShowProviderEdit\(provider\) \? '编辑' : '不可编辑'">/);
     assert.match(html, /<button[\s\S]*?@click="deleteProvider\(provider\.name\)"[\s\S]*?:aria-label="`Delete provider \$\{provider\.name\}`"[\s\S]*?:title="shouldShowProviderDelete\(provider\) \? '删除' : '不可删除'">/);
     assert.match(html, /<button class="card-action-btn"[^>]*@click="openEditConfigModal\(name\)"[^>]*:aria-label="`Edit Claude config \$\{name\}`"[^>]*title="编辑">/);
@@ -210,6 +213,10 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(templateAgentModals, /<div class="modal-title" id="agents-modal-title">{{ agentsModalTitle }}<\/div>/);
     assert.match(modalsBasic, /<button type="button" class="btn-remove-model" @click="removeModel\(model\)">删除<\/button>/);
     assert.doesNotMatch(modalsBasic, /<span class="btn-remove-model" @click="removeModel\(model\)">删除<\/span>/);
+    assert.match(healthCheckModal, /<div v-if="showHealthCheckDialog" class="modal-overlay" @click\.self="closeHealthCheckDialog\(\)">/);
+    assert.match(healthCheckModal, /<div class="modal modal-wide health-check-dialog" role="dialog" aria-modal="true" aria-labelledby="health-check-dialog-title">/);
+    assert.match(healthCheckModal, /v-model="healthCheckDialogSelectedProvider"/);
+    assert.match(healthCheckModal, /@click="sendHealthCheckDialogMessage"/);
     assert.match(openclawModal, /<div v-if="showOpenclawConfigModal" class="modal-overlay" @click\.self="!\(openclawSaving \|\| openclawApplying\) && closeOpenclawConfigModal\(\)">/);
     assert.match(openclawModal, /<div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="openclaw-config-modal-title">/);
     assert.match(openclawModal, /<div class="modal-title" id="openclaw-config-modal-title">{{ openclawEditorTitle }}<\/div>/);

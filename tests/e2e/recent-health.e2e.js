@@ -4,8 +4,11 @@ const os = require('os');
 const fs = require('fs');
 const { spawn } = require('child_process');
 
-const PORT = 3737;
-const API_URL = `http://localhost:${PORT}/api`;
+let g_port = 3737;
+
+function getApiUrl() {
+    return `http://localhost:${g_port}/api`;
+}
 
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -14,7 +17,7 @@ function delay(ms) {
 function request(action, params = {}) {
     const payload = JSON.stringify({ action, params });
     return new Promise((resolve, reject) => {
-        const req = http.request(API_URL, {
+    const req = http.request(getApiUrl(), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -74,12 +77,14 @@ function assert(condition, message) {
 }
 
 async function run() {
+    g_port = 18000 + Math.floor(Math.random() * 1000);
     const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'codexmate-e2e-'));
     const env = {
         ...process.env,
         USERPROFILE: tempHome,
         HOME: tempHome,
-        CODEXMATE_NO_BROWSER: '1'
+        CODEXMATE_NO_BROWSER: '1',
+        CODEXMATE_PORT: String(g_port)
     };
 
     const cliPath = path.join(__dirname, '..', '..', 'cli.js');
@@ -120,13 +125,19 @@ async function run() {
         assert(codes.has('model-unavailable'), 'health check should flag missing model');
 
         await request('apply-config-template', {
-            template: buildTemplate('local', 'm-local', `http://127.0.0.1:${PORT}`, 'sk-local')
+            template: buildTemplate('local', 'm-local', `http://127.0.0.1:${g_port}`, 'sk-local')
         });
         const remoteHealth = await request('config-health-check', { remote: true, timeoutMs: 2000 });
         assert(remoteHealth && Array.isArray(remoteHealth.issues), 'remote health issues should be array');
         assert(remoteHealth.ok === true, 'remote health should pass');
-        assert(remoteHealth.remote && remoteHealth.remote.type === 'speed-test', 'remote health should include speed-test info');
-        assert(typeof remoteHealth.remote.durationMs === 'number', 'remote health should include duration');
+        assert(remoteHealth.remote && remoteHealth.remote.type === 'remote-health-check', 'remote health should include remote-health-check info');
+        assert(remoteHealth.remote.statusCode === 200, 'remote health should expose statusCode');
+        assert(
+            remoteHealth.remote.checks &&
+            remoteHealth.remote.checks.modelProbe &&
+            typeof remoteHealth.remote.checks.modelProbe.durationMs === 'number',
+            'remote health should include model probe duration'
+        );
     } finally {
         if (child && !child.killed) {
             child.kill('SIGINT');
