@@ -1,6 +1,26 @@
 import { shouldForceCompactLayoutMode } from '../logic.mjs';
 
 export function createSessionTimelineMethods() {
+    const getSessionPreviewHeaderElement = (context, scrollEl = context.sessionPreviewScrollEl || context.$refs.sessionPreviewScroll) => {
+        const container = context.sessionPreviewContainerEl || context.$refs.sessionPreviewContainer;
+        return context.sessionPreviewHeaderEl
+            || (scrollEl && typeof scrollEl.querySelector === 'function'
+                ? scrollEl.querySelector('.session-preview-header')
+                : null)
+            || (container && typeof container.querySelector === 'function'
+                ? container.querySelector('.session-preview-header')
+                : null)
+            || null;
+    };
+
+    const getSessionPreviewHeaderOffset = (context, scrollEl = context.sessionPreviewScrollEl || context.$refs.sessionPreviewScroll) => {
+        const header = getSessionPreviewHeaderElement(context, scrollEl);
+        const headerHeight = header && typeof header.getBoundingClientRect === 'function'
+            ? Math.ceil(header.getBoundingClientRect().height)
+            : 0;
+        return headerHeight > 0 ? (headerHeight + 12) : 72;
+    };
+
     return {
         setSessionPreviewContainerRef(el) {
             this.sessionPreviewContainerEl = el || null;
@@ -171,11 +191,7 @@ export function createSessionTimelineMethods() {
         updateSessionTimelineOffset() {
             const container = this.sessionPreviewContainerEl || this.$refs.sessionPreviewContainer;
             if (!container || !container.style) return;
-            const header = this.sessionPreviewHeaderEl
-                || (this.sessionPreviewScrollEl ? this.sessionPreviewScrollEl.querySelector('.session-preview-header') : null)
-                || container.querySelector('.session-preview-header');
-            const headerHeight = header ? Math.ceil(header.getBoundingClientRect().height) : 0;
-            const offset = headerHeight > 0 ? (headerHeight + 12) : 72;
+            const offset = getSessionPreviewHeaderOffset(this);
             container.style.setProperty('--session-preview-header-offset', `${offset}px`);
         },
         bindSessionMessageRef(messageKey, el, ticket = this.sessionTabRenderTicket) {
@@ -346,8 +362,7 @@ export function createSessionTimelineMethods() {
                 }
                 return;
             }
-            const headerEl = scrollEl.querySelector('.session-preview-header');
-            const stickyOffset = headerEl ? (headerEl.offsetHeight + 8) : 8;
+            const stickyOffset = getSessionPreviewHeaderOffset(this, scrollEl);
             const rawAnchorY = Number(scrollEl.scrollTop || 0) + stickyOffset;
             const previousAnchorY = Number(this.sessionTimelineLastAnchorY || 0);
             let direction = rawAnchorY - previousAnchorY;
@@ -408,8 +423,7 @@ export function createSessionTimelineMethods() {
             if (!scrollEl) return;
             const messageEl = this.sessionMessageRefMap[messageKey];
             if (!messageEl) return;
-            const headerEl = scrollEl.querySelector('.session-preview-header');
-            const stickyOffset = headerEl ? (headerEl.offsetHeight + 8) : 8;
+            const stickyOffset = getSessionPreviewHeaderOffset(this, scrollEl);
             const scrollRect = scrollEl.getBoundingClientRect();
             const messageRect = messageEl.getBoundingClientRect();
             const targetScrollTop = scrollEl.scrollTop + (messageRect.top - scrollRect.top) - stickyOffset;

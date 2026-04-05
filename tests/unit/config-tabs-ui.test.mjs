@@ -9,7 +9,9 @@ import {
 test('config template keeps expected config tabs in top and side navigation', () => {
     const html = readBundledWebUiHtml();
     const modalsBasic = readProjectFile('web-ui/partials/index/modals-basic.html');
+    const openclawModal = readProjectFile('web-ui/partials/index/modal-openclaw-config.html');
     const sessionsPanel = readProjectFile('web-ui/partials/index/panel-sessions.html');
+    const baseTheme = readProjectFile('web-ui/styles/base-theme.css');
     const topTabModes = [...html.matchAll(/id="tab-config-([a-z]+)"/g)]
         .map((match) => match[1]);
     const sideTabModes = [...html.matchAll(/id="side-tab-config-([a-z]+)"/g)]
@@ -69,10 +71,13 @@ test('config template keeps expected config tabs in top and side navigation', ()
     for (const [buttonMarkup] of targetSwitchButtons) {
         assert.match(buttonMarkup, /:disabled="loading \|\| !!initError \|\| skillsMarketBusy"/);
     }
-    assert.match(html, /@click="loadSkillsMarketOverview\(\{ forceRefresh: true, silent: false \}\)" :disabled="loading \|\| !!initError \|\| skillsMarketBusy"/);
-    assert.match(html, /<button class="market-action-card" @click="openSkillsManager" :disabled="loading \|\| !!initError \|\| skillsMarketBusy">/);
-    assert.match(html, /<button class="market-action-card" @click="scanImportableSkills\(\{ silent: false \}\)" :disabled="loading \|\| !!initError \|\| skillsMarketBusy">/);
-    assert.match(html, /<button class="market-action-card" @click="triggerSkillsZipImport" :disabled="loading \|\| !!initError \|\| skillsMarketBusy">/);
+    assert.match(html, /<button type="button" class="btn-tool btn-tool-compact" @click="loadSkillsMarketOverview\(\{ forceRefresh: true, silent: false \}\)" :disabled="loading \|\| !!initError \|\| skillsMarketBusy"/);
+    assert.match(html, /<button type="button" class="btn-tool btn-tool-compact" @click="openSkillsManager" :disabled="loading \|\| !!initError \|\| skillsMarketBusy"/);
+    assert.match(html, /<button type="button" class="btn-mini" @click="refreshSkillsList\(\{ silent: false \}\)" :disabled="loading \|\| !!initError \|\| skillsMarketBusy">/);
+    assert.match(html, /<button type="button" class="btn-mini" @click="scanImportableSkills\(\{ silent: false \}\)" :disabled="loading \|\| !!initError \|\| skillsMarketBusy">/);
+    assert.match(html, /<button type="button" class="market-action-card" @click="openSkillsManager" :disabled="loading \|\| !!initError \|\| skillsMarketBusy">/);
+    assert.match(html, /<button type="button" class="market-action-card" @click="scanImportableSkills\(\{ silent: false \}\)" :disabled="loading \|\| !!initError \|\| skillsMarketBusy">/);
+    assert.match(html, /<button type="button" class="market-action-card" @click="triggerSkillsZipImport" :disabled="loading \|\| !!initError \|\| skillsMarketBusy">/);
     assert.match(html, /class="market-target-switch" role="group" aria-label="选择 Skills 安装目标"/);
     assert.match(html, /class="market-target-switch market-target-switch-compact" role="group" aria-label="选择 Skills 管理目标"/);
     assert.doesNotMatch(html, /class="market-target-switch" role="tablist" aria-label="选择 Skills 安装目标"/);
@@ -163,6 +168,10 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.strictEqual([...modalsBasic.matchAll(/type="password"/g)].length, 2);
     assert.match(modalsBasic, /<button type="button" class="btn-remove-model" @click="removeModel\(model\)">删除<\/button>/);
     assert.doesNotMatch(modalsBasic, /<span class="btn-remove-model" @click="removeModel\(model\)">删除<\/span>/);
+    assert.match(openclawModal, /<div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="openclaw-config-modal-title">/);
+    assert.match(openclawModal, /<div class="modal-title" id="openclaw-config-modal-title">{{ openclawEditorTitle }}<\/div>/);
+    assert.match(openclawModal, /:readonly="openclawSaving \|\| openclawApplying"/);
+    assert.doesNotMatch(baseTheme, /fonts\.googleapis\.com/);
 });
 
 test('web ui script defines provider mode metadata for codex only', () => {

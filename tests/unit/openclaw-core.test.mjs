@@ -1,0 +1,17 @@
+import assert from 'assert';
+import path from 'path';
+import { fileURLToPath, pathToFileURL } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const { createOpenclawCoreMethods } = await import(
+    pathToFileURL(path.join(__dirname, '..', '..', 'web-ui', 'modules', 'app.methods.openclaw-core.mjs'))
+);
+
+const methods = createOpenclawCoreMethods();
+
+test('parseOptionalNumber preserves numeric zero values', () => {
+    assert.deepStrictEqual(methods.parseOptionalNumber(0, 'Timeout'), { ok: true, value: 0 });
+    assert.deepStrictEqual(methods.parseOptionalNumber('0', 'Timeout'), { ok: true, value: 0 });
+});
