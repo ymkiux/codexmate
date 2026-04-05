@@ -1,4 +1,4 @@
-        <div v-if="showOpenclawConfigModal" class="modal-overlay" @click.self="closeOpenclawConfigModal">
+        <div v-if="showOpenclawConfigModal" class="modal-overlay" @click.self="!(openclawSaving || openclawApplying) && closeOpenclawConfigModal()">
             <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="openclaw-config-modal-title">
                 <div class="modal-title" id="openclaw-config-modal-title">{{ openclawEditorTitle }}</div>
 
@@ -263,7 +263,7 @@
                 </div>
 
                 <div class="btn-group">
-                    <button class="btn btn-cancel" @click="closeOpenclawConfigModal">取消</button>
+                    <button class="btn btn-cancel" @click="closeOpenclawConfigModal" :disabled="openclawSaving || openclawApplying">取消</button>
                     <button class="btn btn-confirm" @click="saveOpenclawConfig" :disabled="openclawSaving">
                         {{ openclawSaving ? '保存中...' : '保存' }}
                     </button>
