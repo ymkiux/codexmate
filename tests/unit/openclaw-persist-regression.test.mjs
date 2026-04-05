@@ -229,6 +229,29 @@ test('saveOpenclawConfig closes modal after a successful save while save state i
     }]);
 });
 
+test('saveOpenclawConfig ignores save requests while apply is already busy', async () => {
+    const methods = createOpenclawPersistMethods();
+    const context = createContext(methods, {
+        openclawApplying: true,
+        showOpenclawConfigModal: true,
+        openclawEditing: {
+            name: 'draft',
+            content: 'draft-content',
+            lockName: false
+        },
+        saveOpenclawConfigs() {
+            throw new Error('save should not run while apply is busy');
+        }
+    });
+
+    await methods.saveOpenclawConfig.call(context);
+
+    assert.strictEqual(context.openclawApplying, true);
+    assert.strictEqual(context.openclawSaving, false);
+    assert.strictEqual(context.showOpenclawConfigModal, true);
+    assert.deepStrictEqual(context.shownMessages, []);
+});
+
 test('saveAndApplyOpenclawConfig does not call apply api when local persistence fails', async () => {
     let applyCalls = 0;
     const methods = createOpenclawPersistMethods({
@@ -314,6 +337,33 @@ test('saveAndApplyOpenclawConfig closes modal after a successful apply while app
         message: '已保存并应用 OpenClaw 配置（/tmp/openclaw.json）',
         type: 'success'
     }]);
+});
+
+test('saveAndApplyOpenclawConfig ignores apply requests while save is already busy', async () => {
+    const methods = createOpenclawPersistMethods({
+        api: async () => {
+            throw new Error('apply api should not run while save is busy');
+        }
+    });
+    const context = createContext(methods, {
+        openclawSaving: true,
+        showOpenclawConfigModal: true,
+        openclawEditing: {
+            name: 'draft',
+            content: 'draft-content',
+            lockName: false
+        },
+        saveOpenclawConfigs() {
+            throw new Error('persist should not run while save is busy');
+        }
+    });
+
+    await methods.saveAndApplyOpenclawConfig.call(context);
+
+    assert.strictEqual(context.openclawSaving, true);
+    assert.strictEqual(context.openclawApplying, false);
+    assert.strictEqual(context.showOpenclawConfigModal, true);
+    assert.deepStrictEqual(context.shownMessages, []);
 });
 
 test('persistOpenclawConfig restores the previous config content when saving an existing item fails', () => {
