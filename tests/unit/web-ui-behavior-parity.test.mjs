@@ -339,12 +339,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     const headMethodKeys = Object.keys(headMethods).sort();
     const extraCurrentMethodKeys = currentMethodKeys.filter((key) => !headMethodKeys.includes(key)).sort();
     const missingCurrentMethodKeys = headMethodKeys.filter((key) => !currentMethodKeys.includes(key)).sort();
-    const allowedExtraCurrentMethodKeys = [
-        'buildDefaultHealthCheckPrompt',
-        'closeHealthCheckDialog',
-        'openHealthCheckDialog',
-        'sendHealthCheckDialogMessage'
-    ];
+    const allowedExtraCurrentMethodKeys = [];
     if (parityAgainstHead) {
         const allowedExtraMethodKeySet = new Set(allowedExtraCurrentMethodKeys);
         const unexpectedExtraCurrentMethodKeys = extraCurrentMethodKeys.filter((key) => !allowedExtraMethodKeySet.has(key));
