@@ -56,6 +56,7 @@ jobs:
             const body = [
               "@coderabbitai re-review",
               "Stop making breaking changes, do a proper review!",
+              "If I merge this directly, will it introduce any regressions? Please list only the impacted issues. Do not include style suggestions, speculative concerns, or already-resolved items.",
               `<!-- codexmate-coderabbit-review-commit-count: ${pr.commits} -->`,
             ].join("\n");
 

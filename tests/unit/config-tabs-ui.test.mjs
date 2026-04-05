@@ -1,18 +1,20 @@
 ﻿import assert from 'assert';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, '..', '..');
-
-function readProjectFile(relativePath) {
-    return fs.readFileSync(path.join(projectRoot, relativePath), 'utf8');
-}
+import {
+    readBundledWebUiCss,
+    readBundledWebUiHtml,
+    readBundledWebUiScript,
+    readProjectFile
+} from './helpers/web-ui-source.mjs';
 
 test('config template keeps expected config tabs in top and side navigation', () => {
-    const html = readProjectFile('web-ui/index.html');
+    const html = readBundledWebUiHtml();
+    const modalsBasic = readProjectFile('web-ui/partials/index/modals-basic.html');
+    const templateAgentModals = readProjectFile('web-ui/partials/index/modal-config-template-agents.html');
+    const openclawModal = readProjectFile('web-ui/partials/index/modal-openclaw-config.html');
+    const sessionsPanel = readProjectFile('web-ui/partials/index/panel-sessions.html');
+    const baseTheme = readProjectFile('web-ui/styles/base-theme.css');
+    const controlsForms = readProjectFile('web-ui/styles/controls-forms.css');
+    const sideRail = html.match(/<aside class="side-rail"[\s\S]*?<\/aside>/)?.[0] || '';
     const topTabModes = [...html.matchAll(/id="tab-config-([a-z]+)"/g)]
         .map((match) => match[1]);
     const sideTabModes = [...html.matchAll(/id="side-tab-config-([a-z]+)"/g)]
@@ -72,14 +74,25 @@ test('config template keeps expected config tabs in top and side navigation', ()
     for (const [buttonMarkup] of targetSwitchButtons) {
         assert.match(buttonMarkup, /:disabled="loading \|\| !!initError \|\| skillsMarketBusy"/);
     }
-    assert.match(html, /@click="loadSkillsMarketOverview\(\{ forceRefresh: true, silent: false \}\)" :disabled="loading \|\| !!initError \|\| skillsMarketBusy"/);
-    assert.match(html, /<button class="market-action-card" @click="openSkillsManager" :disabled="loading \|\| !!initError \|\| skillsMarketBusy">/);
-    assert.match(html, /<button class="market-action-card" @click="scanImportableSkills\(\{ silent: false \}\)" :disabled="loading \|\| !!initError \|\| skillsMarketBusy">/);
-    assert.match(html, /<button class="market-action-card" @click="triggerSkillsZipImport" :disabled="loading \|\| !!initError \|\| skillsMarketBusy">/);
+    assert.match(html, /<button type="button" class="btn-tool btn-tool-compact" @click="loadSkillsMarketOverview\(\{ forceRefresh: true, silent: false \}\)" :disabled="loading \|\| !!initError \|\| skillsMarketBusy"/);
+    assert.match(html, /<button type="button" class="btn-tool btn-tool-compact" @click="openSkillsManager" :disabled="loading \|\| !!initError \|\| skillsMarketBusy"/);
+    assert.match(html, /<button type="button" class="btn-mini" @click="refreshSkillsList\(\{ silent: false \}\)" :disabled="loading \|\| !!initError \|\| skillsMarketBusy">/);
+    assert.match(html, /<button type="button" class="btn-mini" @click="scanImportableSkills\(\{ silent: false \}\)" :disabled="loading \|\| !!initError \|\| skillsMarketBusy">/);
+    assert.match(html, /<button type="button" class="market-action-card" @click="openSkillsManager" :disabled="loading \|\| !!initError \|\| skillsMarketBusy">/);
+    assert.match(html, /<button type="button" class="market-action-card" @click="scanImportableSkills\(\{ silent: false \}\)" :disabled="loading \|\| !!initError \|\| skillsMarketBusy">/);
+    assert.match(html, /<button type="button" class="market-action-card" @click="triggerSkillsZipImport" :disabled="loading \|\| !!initError \|\| skillsMarketBusy">/);
     assert.match(html, /class="market-target-switch" role="group" aria-label="选择 Skills 安装目标"/);
     assert.match(html, /class="market-target-switch market-target-switch-compact" role="group" aria-label="选择 Skills 管理目标"/);
     assert.doesNotMatch(html, /class="market-target-switch" role="tablist" aria-label="选择 Skills 安装目标"/);
     assert.doesNotMatch(html, /class="market-target-switch market-target-switch-compact" role="tablist" aria-label="选择 Skills 管理目标"/);
+    assert.match(html, /class="side-section" role="navigation" aria-label="配置管理"/);
+    assert.match(html, /class="side-section" role="navigation" aria-label="会话管理"/);
+    assert.match(html, /class="side-section" role="navigation" aria-label="技能市场"/);
+    assert.match(html, /class="side-section" role="navigation" aria-label="设置"/);
+    assert.doesNotMatch(sideRail, /role="tablist"/);
+    assert.doesNotMatch(sideRail, /role="tab"/);
+    assert.match(sideRail, /id="side-tab-config-codex"[\s\S]*:aria-current="mainTab === 'config' && configMode === 'codex' \? 'page' : null"/);
+    assert.match(sideRail, /id="side-tab-settings"[\s\S]*:aria-current="mainTab === 'settings' \? 'page' : null"/);
     assert.match(html, /skillsDefaultRootPath/);
     assert.match(html, /可直接导入/);
     assert.doesNotMatch(html, /在线生态目录/);
@@ -96,8 +109,8 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /aria-controls="settings-panel-trash"/);
     assert.match(html, /:aria-selected="settingsTab === 'backup'"/);
     assert.match(html, /:aria-selected="settingsTab === 'trash'"/);
-    assert.match(html, /id="settings-tab-backup"[\s\S]*tabindex="0"/);
-    assert.match(html, /id="settings-tab-trash"[\s\S]*tabindex="0"/);
+    assert.match(html, /id="settings-tab-backup"[\s\S]*:tabindex="settingsTab === 'backup' \? 0 : -1"/);
+    assert.match(html, /id="settings-tab-trash"[\s\S]*:tabindex="settingsTab === 'trash' \? 0 : -1"/);
     assert.match(html, /id="settings-panel-backup"/);
     assert.match(html, /id="settings-panel-trash"/);
     assert.match(html, /<div[\s\S]*v-show="settingsTab === 'backup'"[\s\S]*id="settings-panel-backup"[\s\S]*aria-labelledby="settings-tab-backup">/);
@@ -124,6 +137,28 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /isMainTabNavActive\('market'\)/);
     assert.match(html, /isConfigModeNavActive\('codex'\)/);
     assert.match(html, /:aria-pressed="isSessionPinned\(session\)"/);
+    assert.match(
+        sessionsPanel,
+        /:class="\[[\s\S]*'session-item'[\s\S]*@click="selectSession\(session\)"[\s\S]*@keydown\.enter\.self\.prevent="selectSession\(session\)"[\s\S]*@keydown\.space\.self\.prevent="selectSession\(session\)"[\s\S]*tabindex="0"[\s\S]*role="button"[\s\S]*:aria-current="activeSessionExportKey === getSessionExportKey\(session\) \? 'true' : null"/
+    );
+    assert.doesNotMatch(sessionsPanel, /!sessionStandalone/);
+    assert.doesNotMatch(sessionsPanel, /<span v-if="sessionStandaloneError">{{ sessionStandaloneError }}<\/span>/);
+    assert.match(
+        sessionsPanel,
+        /<div v-else class="session-preview-empty">[\s\S]*?<span>请先在左侧选择一个会话<\/span>[\s\S]*?<\/div>/
+    );
+    assert.match(
+        html,
+        /:class="\['card', \{ active: displayCurrentProvider === provider\.name \}\]"[\s\S]*@click="switchProvider\(provider\.name\)"[\s\S]*@keydown\.enter\.self\.prevent="switchProvider\(provider\.name\)"[\s\S]*@keydown\.space\.self\.prevent="switchProvider\(provider\.name\)"[\s\S]*tabindex="0"[\s\S]*role="button"[\s\S]*:aria-current="displayCurrentProvider === provider\.name \? 'true' : null"/
+    );
+    assert.match(
+        html,
+        /:class="\['card', \{ active: currentClaudeConfig === name \}\]"[\s\S]*@click="applyClaudeConfig\(name\)"[\s\S]*@keydown\.enter\.self\.prevent="applyClaudeConfig\(name\)"[\s\S]*@keydown\.space\.self\.prevent="applyClaudeConfig\(name\)"[\s\S]*tabindex="0"[\s\S]*role="button"[\s\S]*:aria-current="currentClaudeConfig === name \? 'true' : null"/
+    );
+    assert.match(
+        html,
+        /:class="\['card', \{ active: currentOpenclawConfig === name \}\]"[\s\S]*@click="applyOpenclawConfig\(name\)"[\s\S]*@keydown\.enter\.self\.prevent="applyOpenclawConfig\(name\)"[\s\S]*@keydown\.space\.self\.prevent="applyOpenclawConfig\(name\)"[\s\S]*tabindex="0"[\s\S]*role="button"[\s\S]*:aria-current="currentOpenclawConfig === name \? 'true' : null"/
+    );
     assert.match(html, /class="session-item-copy session-item-pin"/);
     assert.match(html, /class="pin-icon"/);
     assert.match(html, /:aria-selected="mainTab === 'sessions'"/);
@@ -137,11 +172,58 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert(providerShareButton, 'provider share button should exist');
     assert.match(providerShareButton[0], /disabled/);
     assert.match(providerShareButton[0], /title="分享导入命令（暂时禁用）"/);
+    assert.match(html, /<button class="btn-icon" @click="showModelModal = true" aria-label="Add model" title="添加模型" v-if="modelsSource === 'legacy'">\+<\/button>/);
+    assert.match(html, /<button class="btn-icon" @click="showModelListModal = true" aria-label="Manage models" title="管理模型" v-if="modelsSource === 'legacy'">≡<\/button>/);
+    assert.match(html, /<button class="card-action-btn"[^>]*@click="runSpeedTest\(provider\.name\)"[^>]*:aria-label="`Run speed test for \$\{provider\.name\}`"[^>]*title="Speed Test">/);
+    assert.match(html, /<button[\s\S]*?@click="openEditModal\(provider\)"[\s\S]*?:aria-label="`Edit provider \$\{provider\.name\}`"[\s\S]*?:title="shouldShowProviderEdit\(provider\) \? '编辑' : '不可编辑'">/);
+    assert.match(html, /<button[\s\S]*?@click="deleteProvider\(provider\.name\)"[\s\S]*?:aria-label="`Delete provider \$\{provider\.name\}`"[\s\S]*?:title="shouldShowProviderDelete\(provider\) \? '删除' : '不可删除'">/);
+    assert.match(html, /<button class="card-action-btn"[^>]*@click="openEditConfigModal\(name\)"[^>]*:aria-label="`Edit Claude config \$\{name\}`"[^>]*title="编辑">/);
+    assert.match(html, /<button class="card-action-btn delete"[^>]*@click="deleteClaudeConfig\(name\)"[^>]*:aria-label="`Delete Claude config \$\{name\}`"[^>]*title="删除">/);
     assert.match(html, /<button class="card-action-btn"[^>]*@click="copyClaudeShareCommand\(name\)"[^>]*disabled[^>]*>/);
+    assert.match(html, /<button class="card-action-btn"[^>]*@click="openOpenclawEditModal\(name\)"[^>]*:aria-label="`Edit OpenClaw config \$\{name\}`"[^>]*title="编辑">/);
+    assert.match(html, /<button class="card-action-btn delete"[^>]*@click="deleteOpenclawConfig\(name\)"[^>]*:aria-label="`Delete OpenClaw config \$\{name\}`"[^>]*title="删除">/);
+    assert.match(modalsBasic, /<div v-if="showAddModal" class="modal-overlay" @click\.self="closeAddModal">/);
+    assert.match(modalsBasic, /<div v-if="showModelModal" class="modal-overlay" @click\.self="closeModelModal">/);
+    assert.match(modalsBasic, /<div v-if="showClaudeConfigModal" class="modal-overlay" @click\.self="closeClaudeConfigModal">/);
+    for (const modalTitleId of [
+        'add-provider-modal-title',
+        'install-cli-modal-title',
+        'edit-provider-modal-title',
+        'add-model-modal-title',
+        'manage-models-modal-title',
+        'add-claude-config-modal-title',
+        'edit-claude-config-modal-title'
+    ]) {
+        assert.match(modalsBasic, new RegExp(`aria-labelledby="${modalTitleId}"`));
+        assert.match(modalsBasic, new RegExp(`id="${modalTitleId}"`));
+    }
+    assert.match(modalsBasic, /<input v-model="newProvider\.key" class="form-input" type="password" placeholder="sk-\.\.\.">/);
+    assert.match(modalsBasic, /<input v-model="editingProvider\.key" class="form-input" type="password" placeholder="留空则保持不变">/);
+    assert.match(modalsBasic, /<input v-model="newClaudeConfig\.apiKey" class="form-input" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-\.\.\.">/);
+    assert.match(modalsBasic, /<input v-model="editingConfig\.apiKey" class="form-input" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-\.\.\.">/);
+    assert.strictEqual([...modalsBasic.matchAll(/type="password"/g)].length, 4);
+    assert.match(templateAgentModals, /<div v-if="showConfigTemplateModal" class="modal-overlay" @click\.self="!configTemplateApplying && closeConfigTemplateModal\(\)">/);
+    assert.match(templateAgentModals, /<div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="config-template-modal-title">/);
+    assert.match(templateAgentModals, /<div class="modal-title" id="config-template-modal-title">Config 模板编辑器（手动确认应用）<\/div>/);
+    assert.match(templateAgentModals, /<div v-if="showAgentsModal" class="modal-overlay" @click\.self="closeAgentsModal">/);
+    assert.match(templateAgentModals, /<div class="modal modal-wide modal-editor" role="dialog" aria-modal="true" aria-labelledby="agents-modal-title">/);
+    assert.match(templateAgentModals, /<div class="modal-title" id="agents-modal-title">{{ agentsModalTitle }}<\/div>/);
+    assert.match(modalsBasic, /<button type="button" class="btn-remove-model" @click="removeModel\(model\)">删除<\/button>/);
+    assert.doesNotMatch(modalsBasic, /<span class="btn-remove-model" @click="removeModel\(model\)">删除<\/span>/);
+    assert.match(openclawModal, /<div v-if="showOpenclawConfigModal" class="modal-overlay" @click\.self="!\(openclawSaving \|\| openclawApplying\) && closeOpenclawConfigModal\(\)">/);
+    assert.match(openclawModal, /<div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="openclaw-config-modal-title">/);
+    assert.match(openclawModal, /<div class="modal-title" id="openclaw-config-modal-title">{{ openclawEditorTitle }}<\/div>/);
+    assert.match(openclawModal, /:readonly="openclawSaving \|\| openclawApplying"/);
+    assert.match(openclawModal, /<button class="btn btn-cancel" @click="closeOpenclawConfigModal" :disabled="openclawSaving \|\| openclawApplying">取消<\/button>/);
+    assert.match(openclawModal, /<button class="btn btn-confirm" @click="saveOpenclawConfig" :disabled="openclawSaving \|\| openclawApplying">/);
+    assert.match(openclawModal, /<button class="btn btn-confirm secondary" @click="saveAndApplyOpenclawConfig" :disabled="openclawSaving \|\| openclawApplying">/);
+    assert.doesNotMatch(baseTheme, /fonts\.googleapis\.com/);
+    assert.match(controlsForms, /\.btn-tool-compact:disabled:hover,\s*\.btn-tool-compact\[disabled\]:hover/);
 });
 
 test('web ui script defines provider mode metadata for codex only', () => {
-    const appScript = readProjectFile('web-ui/app.js');
+    const appScript = readBundledWebUiScript();
+    const constantsSource = readProjectFile('web-ui/modules/app.constants.mjs');
     const configModeComputed = readProjectFile('web-ui/modules/config-mode.computed.mjs');
 
     assert.match(appScript, /CONFIG_MODE_SET/);
@@ -203,8 +285,11 @@ test('web ui script defines provider mode metadata for codex only', () => {
     assert.match(appScript, /runLatestOnlyQueue\(/);
     assert.match(appScript, /providerSwitchInProgress:\s*false/);
     assert.match(appScript, /pendingProviderSwitch:\s*''/);
-    assert.match(appScript, /modelContextWindowInput:\s*'190000'/);
-    assert.match(appScript, /modelAutoCompactTokenLimitInput:\s*'185000'/);
+    assert.match(appScript, /providerSwitchDisplayTarget:\s*''/);
+    assert.match(appScript, /const switching = String\(this\.providerSwitchDisplayTarget \|\| ''\)\.trim\(\);/);
+    assert.match(appScript, /if \(switching\) return switching;/);
+    assert.match(appScript, /modelContextWindowInput:\s*String\(DEFAULT_MODEL_CONTEXT_WINDOW\)/);
+    assert.match(appScript, /modelAutoCompactTokenLimitInput:\s*String\(DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT\)/);
     assert.match(appScript, /editingCodexBudgetField:\s*''/);
     assert.match(appScript, /statusRes\.modelContextWindow/);
     assert.match(appScript, /statusRes\.modelAutoCompactTokenLimit/);
@@ -212,8 +297,8 @@ test('web ui script defines provider mode metadata for codex only', () => {
     assert.match(appScript, /onModelAutoCompactTokenLimitBlur\(\)/);
     assert.match(appScript, /resetCodexContextBudgetDefaults\(\)/);
     assert.match(appScript, /normalizePositiveIntegerInput\(/);
-    assert.match(appScript, /const SESSION_TRASH_LIST_LIMIT = 500;/);
-    assert.match(appScript, /const SESSION_TRASH_PAGE_SIZE = 200;/);
+    assert.match(constantsSource, /export const SESSION_TRASH_LIST_LIMIT = 500;/);
+    assert.match(constantsSource, /export const SESSION_TRASH_PAGE_SIZE = 200;/);
     assert.match(appScript, /settingsTab:\s*'backup'/);
     assert.match(appScript, /skillsTargetApp:\s*'codex'/);
     assert.match(appScript, /skillsMarketLoading:\s*false/);
@@ -281,7 +366,7 @@ test('session helper deferred claude refresh validates live tab and mode before 
 });
 
 test('trash item styles stay aligned with session card layout and keep mobile usability', () => {
-    const styles = readProjectFile('web-ui/styles.css');
+    const styles = readBundledWebUiCss();
     const mobile520Start = styles.indexOf('@media (max-width: 520px)');
     const mobile540Start = styles.indexOf('@media (max-width: 540px)');
 
@@ -292,11 +377,13 @@ test('trash item styles stay aligned with session card layout and keep mobile us
 
     assert.match(styles, /\.session-source\s*\{/);
     assert.match(styles, /\.trash-item\.session-item\s*\{[\s\S]*height:\s*auto;/);
+    assert.match(styles, /\.session-item:focus-visible\s*\{[\s\S]*outline:\s*3px solid rgba\(201,\s*94,\s*75,\s*0\.25\);[\s\S]*outline-offset:\s*2px;/);
     assert.match(styles, /\.trash-item-title\s*\{[\s\S]*-webkit-line-clamp:\s*2;/);
     assert.match(styles, /\.trash-item-side\s*\{[\s\S]*min-width:\s*132px;/);
     assert.match(styles, /\.trash-item-actions\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(108px,\s*108px\)\);/);
     assert.match(styles, /\.trash-item-actions \.btn-mini\s*\{[\s\S]*min-height:\s*36px;/);
     assert.match(styles, /\.trash-item-path\s*\{[\s\S]*grid-template-columns:\s*48px\s+minmax\(0,\s*1fr\);/);
+    assert.match(styles, /\.session-toolbar-grow\s*\{[\s\S]*grid-column:\s*1\s*\/\s*-1;/);
     assert.match(mobile520Block, /\.trash-item-header\s*\{[\s\S]*flex-direction:\s*column;/);
     assert.match(mobile520Block, /\.trash-item-actions\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
     assert.match(mobile520Block, /\.trash-item-actions \.btn-mini\s*\{[\s\S]*min-height:\s*40px;/);
@@ -319,6 +406,7 @@ test('trash item styles stay aligned with session card layout and keep mobile us
         styles,
         /@media \(max-width: 540px\)\s*\{[\s\S]*\.session-item-copy\.session-item-pin svg,\s*[\s\S]*width:\s*16px;/
     );
+    assert.match(styles, /@media \(max-width: 540px\)\s*\{[\s\S]*\.session-item-copy\s*\{[\s\S]*width:\s*44px;[\s\S]*height:\s*44px;[\s\S]*min-width:\s*44px;[\s\S]*min-height:\s*44px;/);
     assert.match(styles, /\.codex-config-grid\s*\{/);
     assert.match(styles, /\.codex-config-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(240px,\s*100%\),\s*1fr\)\);/);
     assert.match(styles, /\.codex-config-field\s*\{/);
@@ -326,7 +414,7 @@ test('trash item styles stay aligned with session card layout and keep mobile us
 });
 
 test('settings tab header actions keep compact tool buttons inline on wider screens', () => {
-    const styles = readProjectFile('web-ui/styles.css');
+    const styles = readBundledWebUiCss();
 
     assert.match(styles, /\.settings-tab-header\s*\{[\s\S]*justify-content:\s*flex-end;/);
     assert.match(styles, /\.settings-tab-header\s*\{[\s\S]*align-items:\s*center;/);
@@ -354,12 +442,18 @@ test('settings tab header actions keep compact tool buttons inline on wider scre
     assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact\s*\{[\s\S]*top:\s*0;/);
     assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact\s*\{[\s\S]*white-space:\s*nowrap;/);
     assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool \+ \.btn-tool\s*\{[\s\S]*margin-top:\s*0;/);
-    assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool:hover,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact:hover\s*\{[\s\S]*transform:\s*none;/);
+    assert.match(styles, /\.selector-header \.trash-header-actions > \.btn-tool:not\(:disabled\):hover,\s*\.selector-header \.trash-header-actions > \.btn-tool-compact:not\(:disabled\):hover\s*\{[\s\S]*transform:\s*none;/);
+    assert.match(styles, /\.btn-tool:disabled,\s*\.btn-tool\[disabled\]\s*\{[\s\S]*cursor:\s*not-allowed;/);
+    assert.match(styles, /\.btn-tool:disabled:hover,\s*\.btn-tool\[disabled\]:hover,\s*\.btn-tool:disabled:active,\s*\.btn-tool\[disabled\]:active,\s*\.btn-tool-compact:disabled:hover,\s*\.btn-tool-compact\[disabled\]:hover,\s*\.btn-tool-compact:disabled:active,\s*\.btn-tool-compact\[disabled\]:active\s*\{[\s\S]*transform:\s*none;/);
     assert.match(styles, /\.market-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
     assert.match(styles, /\.market-action-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/);
     assert.match(styles, /\.market-target-switch\s*\{/);
     assert.match(styles, /\.market-target-chip\.active\s*\{/);
     assert.match(styles, /\.market-target-chip:disabled,\s*\.market-target-chip\[disabled\]\s*\{/);
+    assert.match(styles, /@keyframes modalFadeIn/);
+    assert.match(styles, /@keyframes modalSlideUp/);
+    assert.match(styles, /\.modal-overlay\s*\{[\s\S]*animation:\s*modalFadeIn/);
+    assert.match(styles, /\.modal\s*\{[\s\S]*animation:\s*modalSlideUp/);
     assert.match(styles, /\.market-panel-wide\s*\{/);
     assert.match(styles, /--radius-md:\s*[0-9.]+(?:px|rem);/);
     assert.match(styles, /--font-weight-primary:\s*[0-9]+;/);

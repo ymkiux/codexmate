@@ -41,6 +41,31 @@ test('normalizeClaudeConfig trims all fields', () => {
     assert.deepStrictEqual(cfg, { apiKey: 'key', baseUrl: 'url', model: 'model', authToken: 'token', useKey: 'yes', externalCredentialType: 'auth-token' });
 });
 
+test('normalizeClaudeConfig infers external credential type from authToken and useKey', () => {
+    assert.deepStrictEqual(
+        normalizeClaudeConfig({ apiKey: '', authToken: ' token ', useKey: '' }),
+        {
+            apiKey: '',
+            baseUrl: '',
+            model: '',
+            authToken: 'token',
+            useKey: '',
+            externalCredentialType: 'auth-token'
+        }
+    );
+    assert.deepStrictEqual(
+        normalizeClaudeConfig({ apiKey: '', authToken: '', useKey: ' 1 ' }),
+        {
+            apiKey: '',
+            baseUrl: '',
+            model: '',
+            authToken: '',
+            useKey: '1',
+            externalCredentialType: 'claude-code-use-key'
+        }
+    );
+});
+
 test('normalizeClaudeSettingsEnv trims settings env', () => {
     const env = {
         ANTHROPIC_API_KEY: ' key ',
@@ -68,6 +93,25 @@ test('normalizeClaudeSettingsEnv fills missing fields with empty strings', () =>
         authToken: '',
         useKey: '',
         externalCredentialType: ''
+    });
+});
+
+test('buildSessionListParams normalizes source and path filter before building request', () => {
+    assert.deepStrictEqual(buildSessionListParams({
+        source: ' CLAUDE ',
+        pathFilter: ' /tmp/demo ',
+        query: 'needle'
+    }), {
+        source: 'claude',
+        pathFilter: '/tmp/demo',
+        query: 'needle',
+        queryMode: 'and',
+        queryScope: 'content',
+        contentScanLimit: 50,
+        roleFilter: 'all',
+        timeRangePreset: 'all',
+        limit: 200,
+        forceRefresh: true
     });
 });
 
@@ -209,6 +253,17 @@ test('buildAgentsDiffPreview ignores a leading BOM to match shared diff normaliz
     assert.strictEqual(diff.stats.removed, 0);
 });
 
+test('buildAgentsDiffPreview preserves newline-only diffs at file end', () => {
+    const diff = buildAgentsDiffPreview({
+        baseContent: 'alpha',
+        content: 'alpha\n'
+    });
+
+    assert.strictEqual(diff.hasChanges, true);
+    assert.strictEqual(diff.stats.added, 1);
+    assert.strictEqual(diff.stats.removed, 0);
+});
+
 test('buildAgentsDiffPreview still exposes diff points for large block insertions', () => {
     const beforeLines = Array.from({ length: 3200 }, (_, index) => `section-${index}`);
     const afterLines = beforeLines.slice();
@@ -273,6 +328,8 @@ test('formatLatency formats success and errors', () => {
     assert.strictEqual(formatLatency(null), '');
     assert.strictEqual(formatLatency({ ok: true, durationMs: undefined }), '0ms');
     assert.strictEqual(formatLatency({ ok: true, durationMs: '12' }), '0ms');
+    assert.strictEqual(formatLatency({ ok: true, durationMs: Number.NaN }), '0ms');
+    assert.strictEqual(formatLatency({ ok: true, durationMs: Number.POSITIVE_INFINITY }), '0ms');
 });
 
 test('buildSpeedTestIssue maps errors and status codes', () => {
@@ -310,6 +367,7 @@ test('buildSpeedTestIssue maps errors and status codes', () => {
     const http400 = buildSpeedTestIssue('p1', { ok: false, status: 400 });
     assert.strictEqual(http400.code, 'remote-speedtest-http-error');
 });
+
 
 test('runLatestOnlyQueue drains pending targets in order', async () => {
     let pending = '';
@@ -524,15 +582,15 @@ test('buildSessionListParams keeps query for enabled sources', () => {
     assert.strictEqual(paramsAll.limit, 200);
 });
 
-test('buildSessionListParams clears query for unsupported sources', () => {
+test('buildSessionListParams normalizes unsupported sources to all and preserves query behavior', () => {
     const params = buildSessionListParams({
         source: 'openai',
         query: 'hello',
         pathFilter: '/tmp',
         roleFilter: 'assistant'
     });
-    assert.strictEqual(params.query, '');
-    assert.strictEqual(params.source, 'openai');
+    assert.strictEqual(params.query, 'hello');
+    assert.strictEqual(params.source, 'all');
     assert.strictEqual(params.pathFilter, '/tmp');
     assert.strictEqual(params.roleFilter, 'assistant');
     assert.strictEqual(params.limit, 200);

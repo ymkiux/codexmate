@@ -1,0 +1,243 @@
+.session-toolbar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--spacing-xs);
+    margin-bottom: var(--spacing-sm);
+    align-items: end;
+}
+
+.session-toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.session-toolbar-grow {
+    grid-column: 1 / -1;
+}
+
+.session-toolbar-actions {
+    justify-content: flex-end;
+}
+
+.session-toolbar-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--spacing-xs);
+    margin-top: -2px;
+    padding-top: 6px;
+    margin-bottom: 12px;
+    border-top: 1px dashed var(--color-border-soft);
+}
+
+.session-toolbar-footer .quick-option {
+    margin: 0;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border-soft);
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.8) 100%);
+    box-shadow: inset 0 1px 2px rgba(31, 26, 23, 0.04);
+    transition: all var(--transition-fast) var(--ease-spring);
+    line-height: 1.2;
+}
+
+.session-toolbar-footer .quick-option:hover {
+    border-color: var(--color-border-strong);
+}
+
+.session-source-select,
+.session-path-select,
+.session-query-input,
+.session-role-select,
+.session-time-select {
+    flex: 1;
+    min-width: 160px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border-soft);
+    background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.92) 100%);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-body);
+    font-family: var(--font-family);
+    outline: none;
+    transition: all var(--transition-fast) var(--ease-spring);
+    box-shadow: inset 0 1px 2px rgba(31, 26, 23, 0.04);
+}
+
+.session-query-input {
+    flex: 2;
+    min-width: 220px;
+}
+
+.session-source-select:hover,
+.session-path-select:hover,
+.session-query-input:hover,
+.session-role-select:hover,
+.session-time-select:hover {
+    border-color: var(--color-border-strong);
+}
+
+.session-source-select:focus,
+.session-path-select:focus,
+.session-query-input:focus,
+.session-role-select:focus,
+.session-time-select:focus {
+    border-color: var(--color-brand);
+    box-shadow: var(--shadow-input-focus);
+}
+
+.session-hint {
+    font-size: var(--font-size-secondary);
+    color: var(--color-text-tertiary);
+    margin-bottom: 12px;
+    line-height: 1.45;
+}
+
+.session-card {
+    align-items: flex-start;
+    cursor: default;
+}
+
+.session-card:hover {
+    transform: none;
+    box-shadow: var(--shadow-card);
+}
+
+.session-card .card-leading {
+    align-items: flex-start;
+}
+
+.session-meta {
+    margin-top: 6px;
+    font-size: var(--font-size-caption);
+    color: var(--color-text-tertiary);
+    line-height: 1.4;
+    word-break: break-all;
+}
+
+.session-actions {
+    display: flex;
+    gap: var(--spacing-xs);
+    align-items: center;
+    margin-left: var(--spacing-sm);
+    flex-shrink: 0;
+}
+
+.session-source {
+    font-size: var(--font-size-caption);
+    color: var(--color-text-tertiary);
+    border: 1px solid var(--color-border-soft);
+    border-radius: 999px;
+    padding: 2px 8px;
+    background: var(--color-surface-alt);
+    white-space: nowrap;
+}
+
+.session-count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 7px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--color-brand) 0%, var(--color-brand-dark) 100%);
+    color: #fff;
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-secondary);
+    line-height: 1;
+    box-shadow: 0 4px 10px rgba(208, 88, 58, 0.16);
+    flex-shrink: 0;
+}
+
+.trash-list-footer {
+    display: flex;
+    justify-content: center;
+    margin-top: var(--spacing-sm);
+}
+
+.btn-session-export,
+.btn-session-open,
+.btn-session-clone,
+.btn-session-refresh {
+    border: 1px solid var(--color-border-soft);
+    border-radius: var(--radius-sm);
+    background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.9) 100%);
+    color: var(--color-text-secondary);
+    padding: 8px 12px;
+    font-size: var(--font-size-secondary);
+    font-weight: var(--font-weight-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast) var(--ease-spring);
+    white-space: nowrap;
+    box-shadow: var(--shadow-subtle);
+    letter-spacing: -0.01em;
+}
+
+.btn-session-delete {
+    border: 1px solid rgba(189, 70, 68, 0.45);
+    border-radius: var(--radius-sm);
+    background: linear-gradient(to bottom, rgba(255, 245, 245, 0.95) 0%, rgba(255, 255, 255, 0.9) 100%);
+    color: #b74545;
+    padding: 8px 12px;
+    font-size: var(--font-size-secondary);
+    font-weight: var(--font-weight-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast) var(--ease-spring);
+    white-space: nowrap;
+    box-shadow: var(--shadow-subtle);
+    letter-spacing: -0.01em;
+}
+
+.btn-session-refresh:hover {
+    border-color: var(--color-brand);
+    color: var(--color-brand);
+    transform: translateY(-1px);
+}
+
+.btn-session-refresh:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-session-export:hover,
+.btn-session-open:hover {
+    border-color: var(--color-brand);
+    color: var(--color-brand);
+    transform: translateY(-1px);
+}
+
+.btn-session-export:disabled,
+.btn-session-open:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-session-clone:hover {
+    border-color: var(--color-brand);
+    color: var(--color-brand);
+    transform: translateY(-1px);
+}
+
+.btn-session-clone:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-session-delete:hover {
+    border-color: rgba(189, 70, 68, 0.8);
+    color: #9f3b3b;
+    transform: translateY(-1px);
+}
+
+.btn-session-delete:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}

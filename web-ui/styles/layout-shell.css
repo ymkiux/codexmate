@@ -1,0 +1,330 @@
+/* ============================================
+   容器
+   ============================================ */
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0));
+    opacity: 0.16;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* 背景网格 */
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image:
+        linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+    background-size: 180px 180px;
+    opacity: 0.08;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* ============================================
+   容器
+   ============================================ */
+.container {
+    width: 100%;
+    max-width: 2200px;
+    margin: 0 auto;
+    padding: 16px 12px 28px;
+    position: relative;
+    z-index: 1;
+}
+
+/* ============================================
+   布局：三栏（侧栏 + 主区 + 状态检查器）
+   ============================================ */
+.app-shell {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr) 340px;
+    gap: 16px;
+    align-items: flex-start;
+}
+
+.app-shell.standalone {
+    grid-template-columns: 1fr;
+}
+
+.side-rail {
+    position: sticky;
+    top: var(--spacing-md);
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md) var(--spacing-sm);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 250, 245, 0.9) 100%);
+    border: 1px solid rgba(216, 201, 184, 0.65);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-card);
+    min-height: 420px;
+}
+
+.side-rail .brand-title {
+    font-size: 24px;
+    margin-bottom: 2px;
+}
+
+.side-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.side-section-title {
+    font-size: var(--font-size-secondary);
+    font-weight: var(--font-weight-secondary);
+    color: var(--color-text-tertiary);
+    letter-spacing: 0.01em;
+    padding: 0 var(--spacing-xs);
+}
+
+.side-item {
+    width: 100%;
+    text-align: left;
+    padding: 12px var(--spacing-sm);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border-soft);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 247, 240, 0.95) 100%);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    box-shadow: var(--shadow-subtle);
+}
+
+.side-item:hover {
+    border-color: var(--color-brand);
+    color: var(--color-text-primary);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-card-hover);
+}
+
+.side-item.active {
+    border-color: var(--color-brand);
+    background: linear-gradient(135deg, rgba(201, 94, 75, 0.14), rgba(255, 255, 255, 0.96));
+    color: var(--color-text-primary);
+    box-shadow: var(--shadow-float);
+}
+
+.side-item.nav-intent-active {
+    border-color: var(--color-brand);
+    background: linear-gradient(135deg, rgba(201, 94, 75, 0.14), rgba(255, 255, 255, 0.96));
+    color: var(--color-text-primary);
+    box-shadow: var(--shadow-float);
+}
+
+.side-item.nav-intent-inactive,
+.side-item.active.nav-intent-inactive {
+    border-color: var(--color-border-soft);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 247, 240, 0.95) 100%);
+    color: var(--color-text-secondary);
+    box-shadow: var(--shadow-subtle);
+}
+
+.side-item-title {
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-secondary);
+    letter-spacing: -0.01em;
+}
+
+.side-item-meta {
+    font-size: var(--font-size-caption);
+    color: var(--color-text-tertiary);
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.side-item-meta > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+@media (min-width: 961px) {
+    body:not(.force-compact) #app > .top-tabs {
+        display: none;
+    }
+}
+
+.brand-block {
+    display: grid;
+    grid-template-columns: 48px 1fr;
+    grid-template-rows: auto auto;
+    column-gap: var(--spacing-sm);
+    row-gap: 2px;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.brand-logo-wrap {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: rgba(208, 88, 58, 0.08);
+    border: 1px solid var(--color-border-soft);
+    display: grid;
+    place-items: center;
+    box-shadow: var(--shadow-subtle);
+    flex-shrink: 0;
+    grid-row: 1 / span 2;
+}
+
+.brand-logo {
+    width: 34px;
+    height: 34px;
+    object-fit: contain;
+    display: block;
+}
+
+.brand-title {
+    font-size: 30px;
+    line-height: 1.05;
+    font-family: var(--font-family-display);
+    color: var(--color-text-primary);
+    letter-spacing: -0.02em;
+}
+
+.brand-title .accent {
+    color: var(--color-brand);
+}
+
+.brand-subtitle {
+    margin-top: 8px;
+    font-size: var(--font-size-secondary);
+    color: var(--color-text-tertiary);
+    line-height: 1.45;
+}
+
+.github-badge {
+    grid-column: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--color-border-soft);
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0.72) 100%);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-caption);
+    text-decoration: none;
+    box-shadow: var(--shadow-subtle);
+    transition: all var(--transition-fast) var(--ease-spring);
+    min-width: 0;
+}
+
+.github-badge-rail {
+    width: 100%;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(216, 201, 184, 0.5);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.github-badge:hover {
+    border-color: rgba(201, 94, 75, 0.5);
+    color: var(--color-text-primary);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 12px rgba(27, 23, 20, 0.08);
+}
+
+.github-badge-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+.github-badge-left {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.github-badge-label {
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-secondary);
+    color: var(--color-text-secondary);
+}
+
+.github-badge-text {
+    min-width: 0;
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-caption);
+    color: var(--color-text-tertiary);
+    line-height: 1.3;
+    display: inline-block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.github-badge-text > span {
+    white-space: nowrap;
+}
+
+.github-owner {
+    font-weight: 600;
+    color: var(--color-text-secondary);
+}
+
+.github-sep {
+    margin: 0 2px;
+    color: var(--color-text-tertiary);
+}
+
+.github-repo {
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.github-badge-rail .github-badge-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    color: var(--color-text-secondary);
+}
+
+.github-badge-rail .github-sep {
+    display: none;
+}
+
+.github-badge-rail .github-owner,
+.github-badge-rail .github-repo {
+    font-weight: 600;
+}
+
+.github-badge-rail .github-badge-left {
+    padding: 4px;
+    border-radius: 999px;
+    background: rgba(201, 94, 75, 0.12);
+}
+
+.github-badge-rail .github-badge-label {
+    display: none;
+}
+
+.github-badge-rail:hover {
+    transform: translateY(-1px);
+    border-color: rgba(201, 94, 75, 0.5);
+}

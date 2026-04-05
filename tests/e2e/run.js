@@ -23,6 +23,7 @@ const testMessages = require('./test-messages');
 const testMcp = require('./test-mcp');
 const testWorkflow = require('./test-workflow');
 const testInvalidConfig = require('./test-invalid-config');
+const testWebUiAssets = require('./test-web-ui-assets');
 
 async function main() {
     const realHome = os.homedir();
@@ -118,6 +119,7 @@ async function main() {
         await testMessages(ctx);
         await testMcp(ctx);
         await testWorkflow(ctx);
+        await testWebUiAssets(ctx);
 
     } finally {
         const waitForExit = new Promise((resolve) => {

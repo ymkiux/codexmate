@@ -1,13 +1,7 @@
 ﻿import assert from 'assert';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { readBundledWebUiScript } from './helpers/web-ui-source.mjs';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const appPath = path.join(__dirname, '..', '..', 'web-ui', 'app.js');
-const appSource = fs.readFileSync(appPath, 'utf-8');
+const appSource = readBundledWebUiScript();
 
 function escapeRegExp(value) {
     return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -391,6 +385,98 @@ test('applyClaudeConfig reports informative message for external credential only
     assert.deepStrictEqual(result, messages[0]);
 });
 
+test('onClaudeModelChange applies external credential config without api key', () => {
+    const source = extractMethodAsFunction(appSource, 'onClaudeModelChange');
+    const onClaudeModelChange = instantiateFunction(source, 'onClaudeModelChange');
+
+    let saveCount = 0;
+    let updateCount = 0;
+    const applyCalls = [];
+    const messages = [];
+    const context = {
+        currentClaudeConfig: 'imported',
+        currentClaudeModel: ' claude-opus-4-6 ',
+        claudeConfigs: {
+            imported: {
+                apiKey: '',
+                baseUrl: 'https://api.anthropic.com',
+                model: 'claude-3-7-sonnet',
+                externalCredentialType: 'auth-token'
+            }
+        },
+        mergeClaudeConfig(existing, updates) {
+            return { ...existing, ...updates };
+        },
+        saveClaudeConfigs() {
+            saveCount += 1;
+        },
+        updateClaudeModelsCurrent() {
+            updateCount += 1;
+        },
+        applyClaudeConfig(name) {
+            applyCalls.push(name);
+        },
+        showMessage(msg, type) {
+            messages.push({ msg, type });
+        }
+    };
+
+    onClaudeModelChange.call(context);
+
+    assert.strictEqual(saveCount, 1);
+    assert.strictEqual(updateCount, 1);
+    assert.deepStrictEqual(applyCalls, ['imported']);
+    assert.deepStrictEqual(messages, []);
+    assert.strictEqual(context.currentClaudeModel, 'claude-opus-4-6');
+    assert.strictEqual(context.claudeConfigs.imported.model, 'claude-opus-4-6');
+});
+
+test('onClaudeModelChange still requires api key when no external credential is present', () => {
+    const source = extractMethodAsFunction(appSource, 'onClaudeModelChange');
+    const onClaudeModelChange = instantiateFunction(source, 'onClaudeModelChange');
+
+    let saveCount = 0;
+    let updateCount = 0;
+    const applyCalls = [];
+    const messages = [];
+    const context = {
+        currentClaudeConfig: 'local',
+        currentClaudeModel: ' claude-opus-4-6 ',
+        claudeConfigs: {
+            local: {
+                apiKey: '',
+                baseUrl: 'https://api.anthropic.com',
+                model: 'claude-3-7-sonnet',
+                externalCredentialType: ''
+            }
+        },
+        mergeClaudeConfig(existing, updates) {
+            return { ...existing, ...updates };
+        },
+        saveClaudeConfigs() {
+            saveCount += 1;
+        },
+        updateClaudeModelsCurrent() {
+            updateCount += 1;
+        },
+        applyClaudeConfig(name) {
+            applyCalls.push(name);
+        },
+        showMessage(msg, type) {
+            messages.push({ msg, type });
+        }
+    };
+
+    onClaudeModelChange.call(context);
+
+    assert.strictEqual(saveCount, 1);
+    assert.strictEqual(updateCount, 1);
+    assert.deepStrictEqual(applyCalls, []);
+    assert.deepStrictEqual(messages, [{ msg: '请先配置 API Key', type: 'error' }]);
+    assert.strictEqual(context.currentClaudeModel, 'claude-opus-4-6');
+    assert.strictEqual(context.claudeConfigs.local.model, 'claude-opus-4-6');
+});
+
 test('mergeClaudeConfig preserves externalCredentialType across edits without api key', () => {
     const source = extractMethodAsFunction(appSource, 'mergeClaudeConfig');
     const mergeClaudeConfig = instantiateFunction(source, 'mergeClaudeConfig');
@@ -484,6 +570,72 @@ test('loadModelsForProvider keeps error state but suppresses toast in silent mod
     assert.deepStrictEqual(messages, []);
 });
 
+test('loadModelsForProvider ignores stale responses after provider selection changes', async () => {
+    let resolveApi = null;
+    const source = extractMethodAsFunction(appSource, 'loadModelsForProvider');
+    const loadModelsForProvider = instantiateFunction(source, 'loadModelsForProvider', {
+        api: async () => await new Promise((resolve) => {
+            resolveApi = resolve;
+        })
+    });
+
+    const context = {
+        currentProvider: 'alpha',
+        codexModelsRequestSeq: 0,
+        codexModelsLoading: false,
+        models: ['old-model'],
+        modelsSource: 'remote',
+        modelsHasCurrent: true,
+        currentModel: 'old-model',
+        showMessage() {
+            throw new Error('stale response should not emit toast');
+        }
+    };
+
+    const pending = loadModelsForProvider.call(context, 'alpha');
+    context.currentProvider = 'beta';
+    resolveApi({ models: ['alpha-model'], source: 'remote' });
+    await pending;
+
+    assert.strictEqual(context.codexModelsLoading, false);
+    assert.deepStrictEqual(context.models, ['old-model']);
+    assert.strictEqual(context.modelsSource, 'remote');
+    assert.strictEqual(context.modelsHasCurrent, true);
+});
+
+test('loadModelsForProvider ignores stale failures after provider selection changes', async () => {
+    let rejectApi = null;
+    const source = extractMethodAsFunction(appSource, 'loadModelsForProvider');
+    const loadModelsForProvider = instantiateFunction(source, 'loadModelsForProvider', {
+        api: async () => await new Promise((_, reject) => {
+            rejectApi = reject;
+        })
+    });
+
+    const context = {
+        currentProvider: 'alpha',
+        codexModelsRequestSeq: 0,
+        codexModelsLoading: false,
+        models: ['old-model'],
+        modelsSource: 'remote',
+        modelsHasCurrent: true,
+        currentModel: 'old-model',
+        showMessage() {
+            throw new Error('stale failure should not emit toast');
+        }
+    };
+
+    const pending = loadModelsForProvider.call(context, 'alpha');
+    context.currentProvider = 'beta';
+    rejectApi(new Error('network failed'));
+    await pending;
+
+    assert.strictEqual(context.codexModelsLoading, false);
+    assert.deepStrictEqual(context.models, ['old-model']);
+    assert.strictEqual(context.modelsSource, 'remote');
+    assert.strictEqual(context.modelsHasCurrent, true);
+});
+
 test('loadClaudeModels keeps error state but suppresses toast in silent mode', async () => {
     const source = extractMethodAsFunction(appSource, 'loadClaudeModels');
     const loadClaudeModels = instantiateFunction(source, 'loadClaudeModels', {
@@ -518,6 +670,112 @@ test('loadClaudeModels keeps error state but suppresses toast in silent mode', a
     assert.deepStrictEqual(messages, []);
 });
 
+test('loadClaudeModels ignores stale responses after Claude config selection changes', async () => {
+    let resolveApi = null;
+    const source = extractMethodAsFunction(appSource, 'loadClaudeModels');
+    const loadClaudeModels = instantiateFunction(source, 'loadClaudeModels', {
+        api: async () => await new Promise((resolve) => {
+            resolveApi = resolve;
+        })
+    });
+
+    const configs = {
+        alpha: {
+            baseUrl: 'https://alpha.example.com',
+            apiKey: 'alpha-key',
+            model: 'alpha-model'
+        },
+        beta: {
+            baseUrl: 'https://beta.example.com',
+            apiKey: 'beta-key',
+            model: 'beta-model'
+        }
+    };
+    const context = {
+        currentClaudeConfig: 'alpha',
+        claudeModelsRequestSeq: 0,
+        claudeModelsLoading: false,
+        claudeModels: ['old-model'],
+        claudeModelsSource: 'remote',
+        claudeModelsHasCurrent: true,
+        getCurrentClaudeConfig() {
+            return configs[this.currentClaudeConfig] || null;
+        },
+        resetClaudeModelsState() {
+            throw new Error('config exists during stale response test');
+        },
+        updateClaudeModelsCurrent() {
+            throw new Error('stale response should not update current state');
+        },
+        showMessage() {
+            throw new Error('stale response should not emit toast');
+        }
+    };
+
+    const pending = loadClaudeModels.call(context);
+    context.currentClaudeConfig = 'beta';
+    resolveApi({ models: ['alpha-remote'], source: 'remote' });
+    await pending;
+
+    assert.strictEqual(context.claudeModelsLoading, false);
+    assert.deepStrictEqual(context.claudeModels, ['old-model']);
+    assert.strictEqual(context.claudeModelsSource, 'remote');
+    assert.strictEqual(context.claudeModelsHasCurrent, true);
+});
+
+test('loadClaudeModels ignores stale failures after Claude config selection changes', async () => {
+    let rejectApi = null;
+    const source = extractMethodAsFunction(appSource, 'loadClaudeModels');
+    const loadClaudeModels = instantiateFunction(source, 'loadClaudeModels', {
+        api: async () => await new Promise((_, reject) => {
+            rejectApi = reject;
+        })
+    });
+
+    const configs = {
+        alpha: {
+            baseUrl: 'https://alpha.example.com',
+            apiKey: 'alpha-key',
+            model: 'alpha-model'
+        },
+        beta: {
+            baseUrl: 'https://beta.example.com',
+            apiKey: 'beta-key',
+            model: 'beta-model'
+        }
+    };
+    const context = {
+        currentClaudeConfig: 'alpha',
+        claudeModelsRequestSeq: 0,
+        claudeModelsLoading: false,
+        claudeModels: ['old-model'],
+        claudeModelsSource: 'remote',
+        claudeModelsHasCurrent: true,
+        getCurrentClaudeConfig() {
+            return configs[this.currentClaudeConfig] || null;
+        },
+        resetClaudeModelsState() {
+            throw new Error('config exists during stale failure test');
+        },
+        updateClaudeModelsCurrent() {
+            throw new Error('stale failure should not update current state');
+        },
+        showMessage() {
+            throw new Error('stale failure should not emit toast');
+        }
+    };
+
+    const pending = loadClaudeModels.call(context);
+    context.currentClaudeConfig = 'beta';
+    rejectApi(new Error('network failed'));
+    await pending;
+
+    assert.strictEqual(context.claudeModelsLoading, false);
+    assert.deepStrictEqual(context.claudeModels, ['old-model']);
+    assert.strictEqual(context.claudeModelsSource, 'remote');
+    assert.strictEqual(context.claudeModelsHasCurrent, true);
+});
+
 test('loadClaudeModels skips remote fetch for external-credential config without api key', async () => {
     const source = extractMethodAsFunction(appSource, 'loadClaudeModels');
     const loadClaudeModels = instantiateFunction(source, 'loadClaudeModels', {
@@ -528,7 +786,7 @@ test('loadClaudeModels skips remote fetch for external-credential config without
 
     const messages = [];
     const context = {
-        claudeModelsLoading: false,
+        claudeModelsLoading: true,
         claudeModels: ['old-model'],
         claudeModelsSource: 'remote',
         claudeModelsHasCurrent: false,
