@@ -162,6 +162,9 @@ export function createOpenclawPersistMethods(options = {}) {
         },
 
         async saveOpenclawConfig() {
+            if (this.openclawSaving || this.openclawApplying) {
+                return;
+            }
             this.openclawSaving = true;
             try {
                 const name = this.persistOpenclawConfig();
@@ -173,6 +176,9 @@ export function createOpenclawPersistMethods(options = {}) {
         },
 
         async saveAndApplyOpenclawConfig() {
+            if (this.openclawSaving || this.openclawApplying) {
+                return;
+            }
             this.openclawApplying = true;
             try {
                 const name = this.persistOpenclawConfig({ closeModal: false });

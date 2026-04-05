@@ -173,6 +173,8 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(openclawModal, /<div class="modal-title" id="openclaw-config-modal-title">{{ openclawEditorTitle }}<\/div>/);
     assert.match(openclawModal, /:readonly="openclawSaving \|\| openclawApplying"/);
     assert.match(openclawModal, /<button class="btn btn-cancel" @click="closeOpenclawConfigModal" :disabled="openclawSaving \|\| openclawApplying">取消<\/button>/);
+    assert.match(openclawModal, /<button class="btn btn-confirm" @click="saveOpenclawConfig" :disabled="openclawSaving \|\| openclawApplying">/);
+    assert.match(openclawModal, /<button class="btn btn-confirm secondary" @click="saveAndApplyOpenclawConfig" :disabled="openclawSaving \|\| openclawApplying">/);
     assert.doesNotMatch(baseTheme, /fonts\.googleapis\.com/);
 });
 
