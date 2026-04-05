@@ -1,4 +1,4 @@
-        <div v-if="showConfigTemplateModal" class="modal-overlay" @click.self="closeConfigTemplateModal">
+        <div v-if="showConfigTemplateModal" class="modal-overlay" @click.self="!configTemplateApplying && closeConfigTemplateModal()">
             <div class="modal modal-wide">
                 <div class="modal-title">Config 模板编辑器（手动确认应用）</div>
 
@@ -8,6 +8,7 @@
                         v-model="configTemplateContent"
                         class="form-input template-editor"
                         spellcheck="false"
+                        :readonly="configTemplateApplying"
                         placeholder="在这里编辑 config.toml 模板内容"></textarea>
                     <div class="template-editor-warning">
                         工具不会自动改动 `config.toml`。只有点击“确认应用模板”后才写入。
@@ -15,7 +16,7 @@
                 </div>
 
                 <div class="btn-group">
-                    <button class="btn btn-cancel" @click="closeConfigTemplateModal">取消</button>
+                    <button class="btn btn-cancel" @click="closeConfigTemplateModal" :disabled="configTemplateApplying">取消</button>
                     <button class="btn btn-confirm" @click="applyConfigTemplate" :disabled="configTemplateApplying">
                         {{ configTemplateApplying ? '应用中...' : '确认应用模板' }}
                     </button>
@@ -90,7 +91,7 @@
                             v-model="agentsContent"
                             class="form-input template-editor"
                             spellcheck="false"
-                            :readonly="agentsLoading"
+                            :readonly="agentsLoading || agentsSaving"
                             @input="onAgentsContentInput"
                             placeholder="在这里编辑 AGENTS.md 内容"></textarea>
                         <div class="template-editor-warning">
@@ -122,4 +123,3 @@
                 </div>
             </div>
         </div>
-
