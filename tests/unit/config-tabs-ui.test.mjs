@@ -177,6 +177,13 @@ test('config template keeps expected config tabs in top and side navigation', ()
         /:class="\['card', \{ active: currentOpenclawConfig === name \}\]"[\s\S]*@click="applyOpenclawConfig\(name\)"[\s\S]*@keydown\.enter\.self\.prevent="applyOpenclawConfig\(name\)"[\s\S]*@keydown\.space\.self\.prevent="applyOpenclawConfig\(name\)"[\s\S]*tabindex="0"[\s\S]*role="button"[\s\S]*:aria-current="currentOpenclawConfig === name \? 'true' : null"/
     );
     assert.match(html, /class="session-item-copy session-item-pin"/);
+    assert.match(sessionsPanel, /class="sessions-subtabs" role="tablist" aria-label="会话视图切换"/);
+    assert.match(sessionsPanel, /sessionsViewMode === 'browser'/);
+    assert.match(sessionsPanel, /sessionsViewMode === 'usage'/);
+    assert.match(sessionsPanel, /sessionsUsageTimeRange === '7d'/);
+    assert.match(sessionsPanel, /sessionsUsageTimeRange === '30d'/);
+    assert.match(sessionsPanel, /sessionUsageSummaryCards/);
+    assert.match(sessionsPanel, /sessionUsageCharts\.buckets/);
     assert.match(html, /class="pin-icon"/);
     assert.match(html, /:aria-selected="mainTab === 'sessions'"/);
     assert.match(html, /:aria-selected="mainTab === 'config' && configMode === 'codex'"/);

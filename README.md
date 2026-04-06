@@ -24,7 +24,7 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 - Claude Code 配置方案（写入 `~/.claude/settings.json`）
 - OpenClaw JSON5 配置与 Workspace `AGENTS.md`
 - Codex / Claude Code Skills 市场（安装目标切换、本地 skills 管理、跨应用导入、ZIP 分发）
-- Codex / Claude 本地会话浏览、筛选、导出、删除
+- Codex / Claude 本地会话浏览、筛选、导出、删除与 Usage 统计概览
 
 项目不依赖云端托管，配置写入你的本地文件，便于审计和回滚。Skills 市场同样坚持本地优先，只操作本地目录，不依赖远程在线市场。
 
@@ -34,8 +34,9 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 | --- | --- | --- |
 | 多工具管理 | Codex + Claude Code + OpenClaw 统一入口 | 多文件、多目录分散修改 |
 | 使用方式 | CLI + 本地 Web UI | 纯手改 TOML / JSON / JSON5 |
-| 会话处理 | 支持浏览、导出、批量清理 | 需要手动定位和处理文件 |
+| 会话处理 | 支持浏览、筛选、Usage 统计、导出、批量清理 | 需要手动定位和处理文件 |
 | Skills 复用 | 本地 Skills 市场 + 跨应用导入 + ZIP 分发 | 目录手动复制，容易遗漏 |
+| 使用可见性 | 统一查看配置、会话与 Usage 概览 | 依赖手工翻文件和零散命令 |
 | 可回滚性 | 首次接管前自动备份 | 易误覆盖、回滚成本高 |
 | 自动化接入 | 提供 MCP stdio（默认只读） | 需自行封装脚本 |
 
@@ -51,6 +52,7 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 - 同页查看 Codex 与 Claude 会话
 - 支持本地会话置顶，置顶状态持久化保存并优先排序显示
 - 关键词搜索、来源筛选、cwd 路径筛选
+- Usage 子页：近 7 天 / 近 30 天会话趋势、消息趋势、来源占比、高频路径
 - 会话导出 Markdown
 - 会话与消息级删除（支持批量）
 
@@ -78,7 +80,7 @@ flowchart TB
       ENTRY["cli.js Entry"]
       API["Local HTTP API"]
       MCPS["MCP stdio Server"]
-      SERVICES["Config / Sessions / Skills Market / Workflow"]
+      SERVICES["Config / Sessions & Usage / Skills Market / Workflow"]
       CORE["File IO / Network / Diff / Session Utils"]
     end
 
@@ -87,7 +89,7 @@ flowchart TB
       CLAUDE["~/.claude/settings.json"]
       OPENCLAW["~/.openclaw/*.json5 + ~/.openclaw/openclaw.json + workspace/AGENTS.md"]
       SKILLS["~/.codex/skills / ~/.claude/skills / ~/.agents/skills"]
-      STATE["sessions / trash / workflow runs / skill exports"]
+      STATE["sessions / usage aggregates / trash / workflow runs / skill exports"]
     end
 
     CLI --> ENTRY
@@ -187,8 +189,10 @@ codexmate codex --model gpt-5.3-codex --follow-up "步骤1" --follow-up "步骤2
 
 ### 会话模式
 - Codex + Claude 会话统一列表
+- Browser / Usage 双子视图切换
 - 支持本地会话置顶、持久化保存与置顶优先排序
 - 搜索、筛选、导出、删除、批量清理
+- Usage 视图提供近 7 天 / 近 30 天会话趋势、消息趋势、来源占比与高频路径统计
 
 ### Skills 市场标签页
 - 在 `Codex` 与 `Claude Code` 之间切换 skills 安装目标

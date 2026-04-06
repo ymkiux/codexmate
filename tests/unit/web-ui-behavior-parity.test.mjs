@@ -319,7 +319,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     const headDataKeys = Object.keys(headAppOptions.data()).sort();
     const extraCurrentKeys = currentDataKeys.filter((key) => !headDataKeys.includes(key)).sort();
     const missingCurrentKeys = headDataKeys.filter((key) => !currentDataKeys.includes(key)).sort();
-    const allowedExtraCurrentKeys = [];
+    const allowedExtraCurrentKeys = ['sessionsUsageTimeRange', 'sessionsViewMode'];
     const allowedMissingCurrentKeys = [];
     if (parityAgainstHead) {
         const allowedExtraKeySet = new Set(allowedExtraCurrentKeys);
@@ -353,9 +353,23 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         currentMethodKeys.filter((key) => !extraCurrentMethodKeys.includes(key)).sort(),
         headMethodKeys
     );
+    const currentComputedKeys = Object.keys(currentComputed).sort();
+    const headComputedKeys = Object.keys(headComputed).sort();
+    const extraCurrentComputedKeys = currentComputedKeys.filter((key) => !headComputedKeys.includes(key)).sort();
+    const missingCurrentComputedKeys = headComputedKeys.filter((key) => !currentComputedKeys.includes(key)).sort();
+    const allowedExtraCurrentComputedKeys = ['sessionUsageCharts', 'sessionUsageSummaryCards'];
+    if (parityAgainstHead) {
+        const allowedExtraComputedKeySet = new Set(allowedExtraCurrentComputedKeys);
+        const unexpectedExtraCurrentComputedKeys = extraCurrentComputedKeys.filter((key) => !allowedExtraComputedKeySet.has(key));
+        assert.deepStrictEqual(unexpectedExtraCurrentComputedKeys, [], `unexpected extra computed keys against ${parityBaseline.ref}`);
+        assert.deepStrictEqual(missingCurrentComputedKeys, [], `unexpected missing computed keys against ${parityBaseline.ref}`);
+    } else {
+        assert.deepStrictEqual(extraCurrentComputedKeys, allowedExtraCurrentComputedKeys);
+        assert.deepStrictEqual(missingCurrentComputedKeys, []);
+    }
     assert.deepStrictEqual(
-        Object.keys(currentComputed).sort(),
-        Object.keys(headComputed).sort()
+        currentComputedKeys.filter((key) => !extraCurrentComputedKeys.includes(key)).sort(),
+        headComputedKeys
     );
     assert.strictEqual(typeof currentAppOptions.mounted, typeof headAppOptions.mounted);
     assert.strictEqual(typeof currentAppOptions.beforeUnmount, typeof headAppOptions.beforeUnmount);
