@@ -37,6 +37,8 @@ await import(pathToFileURL(path.join(__dirname, 'provider-share-command.test.mjs
 await import(pathToFileURL(path.join(__dirname, 'provider-switch-regression.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'codex-proxy-options.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'coderabbit-workflows.test.mjs')));
+await import(pathToFileURL(path.join(__dirname, 'ci-workflow-contract.test.mjs')));
+await import(pathToFileURL(path.join(__dirname, 'lint-contract.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'session-tab-switch-performance.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'session-trash-state.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'web-ui-restart.test.mjs')));

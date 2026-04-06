@@ -31,7 +31,12 @@
     "docs:dev": "node ./node_modules/vitepress/dist/node/cli.js dev site",
     "docs:build": "node ./node_modules/vitepress/dist/node/cli.js build site",
     "docs:preview": "node ./node_modules/vitepress/dist/node/cli.js preview site",
+    "ci:install": "node scripts/run-ci-check.js install",
+    "ci:lint": "node scripts/run-ci-check.js lint",
+    "ci:test": "node scripts/run-ci-check.js test",
+    "lint": "node scripts/lint.js",
     "test": "npm run test:unit && npm run test:e2e",
+    "test:ci": "node scripts/run-ci-check.js all",
     "test:unit": "node tests/unit/run.mjs",
     "test:e2e": "node tests/e2e/run.js",
     "pretest": "node scripts/ensure-test-deps.js"
