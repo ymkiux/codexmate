@@ -118,6 +118,16 @@ const resolveWebHostSource = extractFunctionBySignature(
     'function resolveWebHost(options = {}) {',
     'resolveWebHost'
 );
+const cmdStartSource = extractFunctionBySignature(
+    cliContent,
+    'function cmdStart(options = {}) {',
+    'cmdStart'
+);
+const releaseRunPortIfNeededSource = extractFunctionBySignature(
+    cliContent,
+    'function releaseRunPortIfNeeded(port, host, deps = {}) {',
+    'releaseRunPortIfNeeded'
+);
 const resolveWebHost = instantiateFunction(resolveWebHostSource, 'resolveWebHost', {
     DEFAULT_WEB_HOST: defaultHostMatch[1],
     process: { env: {} }
@@ -151,6 +161,277 @@ test('web auto-open uses IPv6 loopback when binding to IPv6 any address', () => 
         cliContent,
         /const openHost = host === '::'\s*\?\s*'::1'\s*:\s*\(host === '0\.0\.0\.0' \? DEFAULT_WEB_OPEN_HOST : host\);/
     );
+});
+
+test('releaseRunPortIfNeeded skips non-default ports', () => {
+    const calls = [];
+    const releaseRunPortIfNeeded = instantiateFunction(releaseRunPortIfNeededSource, 'releaseRunPortIfNeeded', {
+        DEFAULT_WEB_PORT: 3737,
+        spawnSync(command, args) {
+            calls.push([command, args]);
+            return { status: 0, stdout: '', stderr: '' };
+        },
+        process: { platform: 'linux' },
+        console: { log() {} }
+    });
+
+    const result = releaseRunPortIfNeeded(3999, '0.0.0.0');
+    assert.deepStrictEqual(result, {
+        attempted: false,
+        released: false,
+        pids: [],
+        reason: 'non-default-port'
+    });
+    assert.deepStrictEqual(calls, []);
+});
+
+test('releaseRunPortIfNeeded clears default port only after lsof pids map to managed run processes', () => {
+    const calls = [];
+    const killed = [];
+    const logs = [];
+    const releaseRunPortIfNeeded = instantiateFunction(releaseRunPortIfNeededSource, 'releaseRunPortIfNeeded', {
+        DEFAULT_WEB_PORT: 3737,
+        spawnSync(command, args) {
+            calls.push([command, args]);
+            if (command === 'lsof') {
+                return { status: 0, stdout: '1234\n8888\n', stderr: '' };
+            }
+            if (command === 'ps') {
+                return {
+                    status: 0,
+                    stdout: [
+                        'UID        PID  PPID  C STIME TTY          TIME CMD',
+                        'u0_a876   1234  1000  0  1970 ?        00:00:00 node /repo/cli.js run --no-browser',
+                        'u0_a876   8888  1000  0  1970 ?        00:00:00 node /repo/other-server.js'
+                    ].join('\n'),
+                    stderr: ''
+                };
+            }
+            throw new Error(`unexpected command: ${command}`);
+        },
+        process: {
+            platform: 'linux',
+            kill(pid, signal) {
+                killed.push([pid, signal]);
+            }
+        },
+        console: { log(message) { logs.push(message); } }
+    });
+
+    const result = releaseRunPortIfNeeded(3737, '0.0.0.0');
+    assert.deepStrictEqual(calls, [
+        ['lsof', ['-ti', 'tcp:3737']],
+        ['ps', ['-ef']]
+    ]);
+    assert.deepStrictEqual(killed, [[1234, 'SIGKILL']]);
+    assert.deepStrictEqual(result, {
+        attempted: true,
+        released: true,
+        pids: [1234]
+    });
+    assert.deepStrictEqual(logs, ['~ 已释放端口 3737 占用']);
+});
+
+test('releaseRunPortIfNeeded falls back to non-destructive fuser pids when lsof is unavailable', () => {
+    const calls = [];
+    const killed = [];
+    const releaseRunPortIfNeeded = instantiateFunction(releaseRunPortIfNeededSource, 'releaseRunPortIfNeeded', {
+        DEFAULT_WEB_PORT: 3737,
+        spawnSync(command, args) {
+            calls.push([command, args]);
+            if (command === 'lsof') {
+                return { error: { code: 'ENOENT' }, status: null, stdout: '', stderr: '' };
+            }
+            if (command === 'fuser') {
+                return { status: 0, stdout: '', stderr: '2222 3333' };
+            }
+            if (command === 'ps') {
+                return {
+                    status: 0,
+                    stdout: [
+                        'UID        PID  PPID  C STIME TTY          TIME CMD',
+                        'u0_a876   2222  1000  0  1970 ?        00:00:00 node /repo/cli.js run --no-browser',
+                        'u0_a876   3333  1000  0  1970 ?        00:00:00 /usr/bin/codexmate run'
+                    ].join('\n'),
+                    stderr: ''
+                };
+            }
+            throw new Error(`unexpected command: ${command}`);
+        },
+        process: {
+            platform: 'linux',
+            kill(pid, signal) {
+                killed.push([pid, signal]);
+            }
+        },
+        console: { log() {} }
+    });
+
+    const result = releaseRunPortIfNeeded(3737, '0.0.0.0');
+    assert.deepStrictEqual(calls, [
+        ['lsof', ['-ti', 'tcp:3737']],
+        ['fuser', ['3737/tcp']],
+        ['ps', ['-ef']]
+    ]);
+    assert.deepStrictEqual(killed, [
+        [2222, 'SIGKILL'],
+        [3333, 'SIGKILL']
+    ]);
+    assert.deepStrictEqual(result, {
+        attempted: true,
+        released: true,
+        pids: [2222, 3333]
+    });
+});
+
+test('releaseRunPortIfNeeded falls back to ps scan for managed run processes', () => {
+    const calls = [];
+    const killed = [];
+    const releaseRunPortIfNeeded = instantiateFunction(releaseRunPortIfNeededSource, 'releaseRunPortIfNeeded', {
+        DEFAULT_WEB_PORT: 3737,
+        spawnSync(command, args) {
+            calls.push([command, args]);
+            if (command === 'lsof') {
+                return { status: 0, stdout: '9001\n9002\n', stderr: '' };
+            }
+            if (command === 'ps') {
+                return {
+                    status: 0,
+                    stdout: [
+                        'UID        PID  PPID  C STIME TTY          TIME CMD',
+                        'u0_a876   9001  1000  0  1970 ?        00:00:00 node /repo/cli.js run --no-browser',
+                        'u0_a876   9002  1000  0  1970 ?        00:00:00 /usr/bin/codexmate run',
+                        'u0_a876   9100  1000  0  1970 ?        00:00:00 node /repo/cli.js config'
+                    ].join('\n'),
+                    stderr: ''
+                };
+            }
+            throw new Error(`unexpected command: ${command}`);
+        },
+        process: {
+            platform: 'linux',
+            pid: 9002,
+            kill(pid, signal) {
+                killed.push([pid, signal]);
+            }
+        },
+        console: { log() {} }
+    });
+
+    const result = releaseRunPortIfNeeded(3737, '0.0.0.0');
+    assert.deepStrictEqual(calls, [
+        ['lsof', ['-ti', 'tcp:3737']],
+        ['ps', ['-ef']]
+    ]);
+    assert.deepStrictEqual(killed, [[9001, 'SIGKILL']]);
+    assert.deepStrictEqual(result, {
+        attempted: true,
+        released: true,
+        pids: [9001]
+    });
+});
+
+test('releaseRunPortIfNeeded skips ps-based kill when no port-scoped owner pids can be identified', () => {
+    const calls = [];
+    const killed = [];
+    const releaseRunPortIfNeeded = instantiateFunction(releaseRunPortIfNeededSource, 'releaseRunPortIfNeeded', {
+        DEFAULT_WEB_PORT: 3737,
+        spawnSync(command, args) {
+            calls.push([command, args]);
+            if (command === 'lsof') {
+                return { error: { code: 'ENOENT' }, status: null, stdout: '', stderr: '' };
+            }
+            if (command === 'fuser') {
+                return { error: { code: 'ENOENT' }, status: null, stdout: '', stderr: '' };
+            }
+            if (command === 'ps') {
+                throw new Error('ps should not run without port-scoped pid candidates');
+            }
+            throw new Error(`unexpected command: ${command}`);
+        },
+        process: {
+            platform: 'linux',
+            kill(pid, signal) {
+                killed.push([pid, signal]);
+            }
+        },
+        console: { log() {} }
+    });
+
+    const result = releaseRunPortIfNeeded(3737, '0.0.0.0');
+    assert.deepStrictEqual(calls, [
+        ['lsof', ['-ti', 'tcp:3737']],
+        ['fuser', ['3737/tcp']]
+    ]);
+    assert.deepStrictEqual(killed, []);
+    assert.deepStrictEqual(result, {
+        attempted: true,
+        released: false,
+        pids: []
+    });
+});
+
+test('releaseRunPortIfNeeded only taskkills Windows listeners that match host and managed command line', () => {
+    const calls = [];
+    const logs = [];
+    const releaseRunPortIfNeeded = instantiateFunction(releaseRunPortIfNeededSource, 'releaseRunPortIfNeeded', {
+        DEFAULT_WEB_PORT: 3737,
+        spawnSync(command, args) {
+            calls.push([command, args]);
+            if (command === 'netstat') {
+                return {
+                    status: 0,
+                    stdout: [
+                        '  TCP    0.0.0.0:3737       0.0.0.0:0      LISTENING       1111',
+                        '  TCP    127.0.0.1:3737     0.0.0.0:0      LISTENING       2222',
+                        '  TCP    0.0.0.0:3737       0.0.0.0:0      LISTENING       3333'
+                    ].join('\r\n'),
+                    stderr: ''
+                };
+            }
+            if (command === 'powershell') {
+                if (String(args[2]).includes('1111')) {
+                    return { status: 0, stdout: 'node C:\\repo\\cli.js run --no-browser\r\n', stderr: '' };
+                }
+                if (String(args[2]).includes('3333')) {
+                    return { status: 0, stdout: 'node C:\\repo\\other-server.js\r\n', stderr: '' };
+                }
+                throw new Error(`unexpected powershell args: ${args.join(' ')}`);
+            }
+            if (command === 'taskkill') {
+                return { status: 0, stdout: '', stderr: '' };
+            }
+            throw new Error(`unexpected command: ${command}`);
+        },
+        process: { platform: 'win32', pid: 9999 },
+        console: { log(message) { logs.push(message); } }
+    });
+
+    const result = releaseRunPortIfNeeded(3737, '0.0.0.0');
+    assert.deepStrictEqual(calls, [
+        ['netstat', ['-ano', '-p', 'tcp']],
+        ['powershell', ['-NoProfile', '-Command', '$p = Get-CimInstance Win32_Process -Filter "ProcessId = 1111"; if ($p) { $p.CommandLine }']],
+        ['taskkill', ['/PID', '1111', '/F']],
+        ['powershell', ['-NoProfile', '-Command', '$p = Get-CimInstance Win32_Process -Filter "ProcessId = 3333"; if ($p) { $p.CommandLine }']]
+    ]);
+    assert.deepStrictEqual(result, {
+        attempted: true,
+        released: true,
+        pids: [1111]
+    });
+    assert.deepStrictEqual(logs, ['~ 已释放端口 3737 占用']);
+});
+
+test('cmdStart releases the resolved port before creating the web server', () => {
+    const resolveIndex = cmdStartSource.indexOf('resolveWebPort(');
+    const releaseIndex = cmdStartSource.indexOf('releaseRunPortIfNeeded(port, host)');
+    const createIndex = cmdStartSource.indexOf('createWebServer(');
+
+    assert(resolveIndex >= 0, 'cmdStart should resolve the web port');
+    assert(releaseIndex >= 0, 'cmdStart should release the run port with host before startup');
+    assert(createIndex >= 0, 'cmdStart should create the web server');
+    assert(resolveIndex < releaseIndex, 'cmdStart should resolve the port before releasing it');
+    assert(releaseIndex < createIndex, 'cmdStart should release the port before creating the web server');
 });
 
 const getCodexSkillsDirSource = extractFunctionBySignature(

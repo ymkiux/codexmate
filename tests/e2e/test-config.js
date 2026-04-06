@@ -408,6 +408,10 @@ preferred_auth_method = "shadow-key"
             /^\s*model_auto_compact_token_limit\s*=\s*185000\s*$/m.test(legacyTemplateDefaults.template),
             'legacy get-config-template should restore default model_auto_compact_token_limit'
         );
+        assert(
+            !/^\s*model_reasoning_effort\s*=.+$/m.test(legacyTemplateDefaults.template),
+            'legacy get-config-template should keep default medium reasoning without model_reasoning_effort'
+        );
         const legacyAddDup = await legacyApi('add-provider', {
             name: 'foo.bar',
             url: 'https://dup.example.com/v1',
