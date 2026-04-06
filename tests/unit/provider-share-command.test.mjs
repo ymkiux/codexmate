@@ -757,6 +757,87 @@ test('loadAll can refresh in background without flipping the global loading stat
     assert.strictEqual(context.initError, '');
 });
 
+test('loadAll falls back to medium for unsupported reasoning effort values while preserving xhigh', async () => {
+    const loadAllSource = extractBlockBySignature(
+        appSource,
+        'async loadAll(options = {}) {'
+    ).replace(/^async loadAll/, 'async function loadAll');
+    const responses = [
+        {
+            provider: 'alpha',
+            model: 'alpha-model',
+            serviceTier: 'fast',
+            modelReasoningEffort: 'bogus',
+            modelContextWindow: 200000,
+            modelAutoCompactTokenLimit: 180000,
+            configReady: true,
+            initNotice: ''
+        },
+        {
+            provider: 'alpha',
+            model: 'alpha-model',
+            serviceTier: 'fast',
+            modelReasoningEffort: 'xhigh',
+            modelContextWindow: 200000,
+            modelAutoCompactTokenLimit: 180000,
+            configReady: true,
+            initNotice: ''
+        }
+    ];
+    let statusIndex = 0;
+    const loadAll = instantiateFunction(loadAllSource, 'loadAll', {
+        defaultModelContextWindow: 190000,
+        defaultModelAutoCompactTokenLimit: 185000,
+        api: async (action) => {
+            if (action === 'status') {
+                return responses[statusIndex++] || responses[responses.length - 1];
+            }
+            if (action === 'list') {
+                return {
+                    providers: [{ name: 'alpha', url: 'https://api.example.com/v1', hasKey: true }]
+                };
+            }
+            throw new Error(`Unexpected api action: ${action}`);
+        }
+    });
+
+    const createContext = () => ({
+        loading: false,
+        initError: '',
+        currentProvider: 'stale-provider',
+        currentModel: 'stale-model',
+        serviceTier: 'fast',
+        modelReasoningEffort: 'high',
+        modelContextWindowInput: '190000',
+        modelAutoCompactTokenLimitInput: '185000',
+        editingCodexBudgetField: '',
+        providersList: [],
+        normalizePositiveIntegerInput(value, label, fallback = '') {
+            const raw = value === undefined || value === null || value === ''
+                ? String(fallback || '')
+                : String(value);
+            const text = raw.trim();
+            const numeric = Number.parseInt(text, 10);
+            if (!Number.isFinite(numeric) || numeric <= 0) {
+                return { ok: false, error: `${label} invalid` };
+            }
+            return { ok: true, value: numeric, text: String(numeric) };
+        },
+        showMessage() {},
+        maybeShowStarPrompt() {},
+        async loadModelsForProvider() {},
+        async loadCodexAuthProfiles() {}
+    });
+
+    const invalidContext = createContext();
+    await loadAll.call(invalidContext);
+    assert.strictEqual(invalidContext.modelReasoningEffort, 'medium');
+
+    const xhighContext = createContext();
+    await loadAll.call(xhighContext);
+    assert.strictEqual(xhighContext.modelReasoningEffort, 'xhigh');
+});
+
 test('loadAll treats provider list fetch failures as startup errors and skips model refresh', async () => {
     const loadAllSource = extractBlockBySignature(
         appSource,

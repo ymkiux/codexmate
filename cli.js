@@ -237,28 +237,36 @@ function releaseRunPortIfNeeded(port, deps = {}) {
         ? deps.kill
         : (typeof processRef.kill === 'function' ? processRef.kill.bind(processRef) : null);
     const seenPids = new Set();
+    const candidatePids = new Set();
     const currentPid = Number(processRef.pid);
     let released = false;
 
-    const addPidsFromText = (text) => {
+    const addPidsFromText = (text, targetSet = seenPids) => {
+        if (!targetSet) {
+            return;
+        }
         const lines = String(text || '').split(/\r?\n/);
         for (const line of lines) {
             const trimmed = line.trim();
             if (!/^\d+$/.test(trimmed)) {
                 continue;
             }
-            seenPids.add(Number(trimmed));
+            targetSet.add(Number(trimmed));
         }
     };
 
-    const runCommand = (command, args) => {
+    const runCommand = (command, args, options = {}) => {
+        const {
+            stdoutPidSet = seenPids,
+            stderrPidSet = seenPids
+        } = options;
         const result = runSpawnSync(command, args, { encoding: 'utf8' });
-        if (result && result.stdout) addPidsFromText(result.stdout);
-        if (result && result.stderr) addPidsFromText(result.stderr);
+        if (result && result.stdout) addPidsFromText(result.stdout, stdoutPidSet);
+        if (result && result.stderr) addPidsFromText(result.stderr, stderrPidSet);
         return result || {};
     };
 
-    const addManagedRunPidsFromPs = (text) => {
+    const addManagedRunPidsFromPs = (text, allowedPids = null) => {
         const lines = String(text || '').split(/\r?\n/);
         for (const line of lines) {
             const normalizedLine = ` ${line.replace(/\s+/g, ' ').trim()} `;
@@ -271,6 +279,9 @@ function releaseRunPortIfNeeded(port, deps = {}) {
             }
             const pid = Number(pidMatch[1]);
             if (!Number.isFinite(pid) || pid <= 0 || pid === currentPid) {
+                continue;
+            }
+            if (allowedPids && !allowedPids.has(pid)) {
                 continue;
             }
             seenPids.add(pid);
@@ -302,23 +313,31 @@ function releaseRunPortIfNeeded(port, deps = {}) {
             }
         }
     } else {
-        const fuserResult = runCommand('fuser', ['-k', `${numericPort}/tcp`]);
-        if (!fuserResult.error && fuserResult.status === 0) {
-            released = true;
-        }
-        const fuserMissing = !!(fuserResult && fuserResult.error && fuserResult.error.code === 'ENOENT');
-        if ((fuserMissing || !released || seenPids.size === 0) && killProcess) {
-            const lsofResult = runCommand('lsof', ['-ti', `tcp:${numericPort}`]);
-            if (!(lsofResult && lsofResult.error)) {
-                // noop: lsof pid collection is handled through stdout parsing above.
+        let psResult = null;
+        const readPsResult = () => {
+            if (psResult) {
+                return psResult;
+            }
+            psResult = runCommand('ps', ['-ef'], { stdoutPidSet: null, stderrPidSet: null });
+            return psResult;
+        };
+
+        const lsofResult = runCommand(
+            'lsof',
+            ['-ti', `tcp:${numericPort}`],
+            { stdoutPidSet: candidatePids, stderrPidSet: null }
+        );
+        if (!(lsofResult && lsofResult.error) && candidatePids.size > 0) {
+            const managedPsResult = readPsResult();
+            if (!(managedPsResult && managedPsResult.error)) {
+                addManagedRunPidsFromPs(managedPsResult.stdout, candidatePids);
             }
         }
-    }
-
-    if (processRef.platform !== 'win32' && killProcess && !released && seenPids.size === 0) {
-        const psResult = runCommand('ps', ['-ef']);
-        if (!(psResult && psResult.error)) {
-            addManagedRunPidsFromPs(psResult.stdout);
+        if (killProcess && seenPids.size === 0) {
+            const managedPsResult = readPsResult();
+            if (!(managedPsResult && managedPsResult.error)) {
+                addManagedRunPidsFromPs(managedPsResult.stdout);
+            }
         }
     }
 
