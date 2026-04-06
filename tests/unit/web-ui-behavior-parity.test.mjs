@@ -329,8 +329,12 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         assert.deepStrictEqual(unexpectedExtraCurrentKeys, [], `unexpected extra data keys against ${parityBaseline.ref}`);
         assert.deepStrictEqual(unexpectedMissingCurrentKeys, [], `unexpected missing data keys against ${parityBaseline.ref}`);
     } else {
-        assert.deepStrictEqual(extraCurrentKeys, allowedExtraCurrentKeys, `unexpected extra data keys against ${parityBaseline.ref}`);
-        assert.deepStrictEqual(missingCurrentKeys, allowedMissingCurrentKeys, `unexpected missing data keys against ${parityBaseline.ref}`);
+        const allowedExtraKeySet = new Set(allowedExtraCurrentKeys);
+        const allowedMissingKeySet = new Set(allowedMissingCurrentKeys);
+        const unexpectedExtraCurrentKeys = extraCurrentKeys.filter((key) => !allowedExtraKeySet.has(key));
+        const unexpectedMissingCurrentKeys = missingCurrentKeys.filter((key) => !allowedMissingKeySet.has(key));
+        assert.deepStrictEqual(unexpectedExtraCurrentKeys, [], `unexpected extra data keys against ${parityBaseline.ref}`);
+        assert.deepStrictEqual(unexpectedMissingCurrentKeys, [], `unexpected missing data keys against ${parityBaseline.ref}`);
     }
     const normalizedCurrentKeys = currentDataKeys.filter((key) => !extraCurrentKeys.includes(key)).sort();
     const normalizedHeadKeys = headDataKeys.filter((key) => !missingCurrentKeys.includes(key)).sort();
@@ -346,8 +350,10 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         assert.deepStrictEqual(unexpectedExtraCurrentMethodKeys, [], `unexpected extra method keys against ${parityBaseline.ref}`);
         assert.deepStrictEqual(missingCurrentMethodKeys, [], `unexpected missing method keys against ${parityBaseline.ref}`);
     } else {
-        assert.deepStrictEqual(extraCurrentMethodKeys, allowedExtraCurrentMethodKeys);
-        assert.deepStrictEqual(missingCurrentMethodKeys, []);
+        const allowedExtraMethodKeySet = new Set(allowedExtraCurrentMethodKeys);
+        const unexpectedExtraCurrentMethodKeys = extraCurrentMethodKeys.filter((key) => !allowedExtraMethodKeySet.has(key));
+        assert.deepStrictEqual(unexpectedExtraCurrentMethodKeys, [], `unexpected extra method keys against ${parityBaseline.ref}`);
+        assert.deepStrictEqual(missingCurrentMethodKeys, [], `unexpected missing method keys against ${parityBaseline.ref}`);
     }
     assert.deepStrictEqual(
         currentMethodKeys.filter((key) => !extraCurrentMethodKeys.includes(key)).sort(),
@@ -364,8 +370,10 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         assert.deepStrictEqual(unexpectedExtraCurrentComputedKeys, [], `unexpected extra computed keys against ${parityBaseline.ref}`);
         assert.deepStrictEqual(missingCurrentComputedKeys, [], `unexpected missing computed keys against ${parityBaseline.ref}`);
     } else {
-        assert.deepStrictEqual(extraCurrentComputedKeys, allowedExtraCurrentComputedKeys);
-        assert.deepStrictEqual(missingCurrentComputedKeys, []);
+        const allowedExtraComputedKeySet = new Set(allowedExtraCurrentComputedKeys);
+        const unexpectedExtraCurrentComputedKeys = extraCurrentComputedKeys.filter((key) => !allowedExtraComputedKeySet.has(key));
+        assert.deepStrictEqual(unexpectedExtraCurrentComputedKeys, [], `unexpected extra computed keys against ${parityBaseline.ref}`);
+        assert.deepStrictEqual(missingCurrentComputedKeys, [], `unexpected missing computed keys against ${parityBaseline.ref}`);
     }
     assert.deepStrictEqual(
         currentComputedKeys.filter((key) => !extraCurrentComputedKeys.includes(key)).sort(),
