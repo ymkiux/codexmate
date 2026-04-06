@@ -223,6 +223,239 @@ function resolveWebPort() {
     return parsed;
 }
 
+// #region releaseRunPortIfNeeded
+function releaseRunPortIfNeeded(port, host, deps = {}) {
+    const numericPort = parseInt(String(port), 10);
+    if (numericPort !== DEFAULT_WEB_PORT) {
+        return { attempted: false, released: false, pids: [], reason: 'non-default-port' };
+    }
+
+    const processRef = deps.process || process;
+    const runSpawnSync = deps.spawnSync || spawnSync;
+    const logger = deps.logger || console;
+    const killProcess = typeof deps.kill === 'function'
+        ? deps.kill
+        : (typeof processRef.kill === 'function' ? processRef.kill.bind(processRef) : null);
+    const seenPids = new Set();
+    const candidatePids = new Set();
+    const currentPid = Number(processRef.pid);
+    const normalizedHost = typeof host === 'string' ? host.trim().toLowerCase() : '';
+    let released = false;
+    const windowsCommandLineCache = new Map();
+
+    const isManagedRunCommand = (commandLine) => {
+        const normalizedLine = ` ${String(commandLine || '').replace(/\s+/g, ' ').trim()} `;
+        return /(^|[\/\\\s])codexmate(?:\.cmd|\.exe)? run(\s|$)/i.test(normalizedLine)
+            || /(^|[\/\\\s])cli\.js run(\s|$)/i.test(normalizedLine);
+    };
+
+    const normalizeListenerHost = (value) => {
+        const trimmed = String(value || '').trim().toLowerCase();
+        if (!trimmed) {
+            return '';
+        }
+        if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+            return trimmed.slice(1, -1);
+        }
+        return trimmed.startsWith('::ffff:') ? trimmed.slice('::ffff:'.length) : trimmed;
+    };
+
+    const extractListenerHost = (localAddress) => {
+        const trimmed = String(localAddress || '').trim();
+        if (!trimmed) {
+            return '';
+        }
+        if (trimmed.startsWith('[')) {
+            const closingBracket = trimmed.indexOf(']');
+            if (closingBracket > 0) {
+                return normalizeListenerHost(trimmed.slice(1, closingBracket));
+            }
+        }
+        const lastColon = trimmed.lastIndexOf(':');
+        if (lastColon <= 0) {
+            return normalizeListenerHost(trimmed);
+        }
+        return normalizeListenerHost(trimmed.slice(0, lastColon));
+    };
+
+    const isMatchingWindowsListenerAddress = (localAddress) => {
+        const listenerHost = extractListenerHost(localAddress);
+        if (!listenerHost || !normalizedHost) {
+            return false;
+        }
+        if (normalizedHost === 'localhost') {
+            return listenerHost === '127.0.0.1' || listenerHost === '::1';
+        }
+        if (normalizedHost === '0.0.0.0' || normalizedHost === '::') {
+            return listenerHost === normalizedHost;
+        }
+        return listenerHost === normalizeListenerHost(normalizedHost);
+    };
+
+    const addPidsFromText = (text, targetSet = seenPids) => {
+        if (!targetSet) {
+            return;
+        }
+        const lines = String(text || '').split(/\r?\n/);
+        for (const line of lines) {
+            const tokens = line.trim().split(/\s+/).filter(Boolean);
+            for (const token of tokens) {
+                if (!/^\d+$/.test(token)) {
+                    continue;
+                }
+                targetSet.add(Number(token));
+            }
+        }
+    };
+
+    const runCommand = (command, args, options = {}) => {
+        const {
+            stdoutPidSet = seenPids,
+            stderrPidSet = seenPids
+        } = options;
+        const result = runSpawnSync(command, args, { encoding: 'utf8' });
+        if (result && result.stdout) addPidsFromText(result.stdout, stdoutPidSet);
+        if (result && result.stderr) addPidsFromText(result.stderr, stderrPidSet);
+        return result || {};
+    };
+
+    const addManagedRunPidsFromPs = (text, allowedPids = null) => {
+        const lines = String(text || '').split(/\r?\n/);
+        for (const line of lines) {
+            const normalizedLine = ` ${line.replace(/\s+/g, ' ').trim()} `;
+            if (!/(^|[\/\s])codexmate run(\s|$)/.test(normalizedLine) && !/(^|[\/\s])cli\.js run(\s|$)/.test(normalizedLine)) {
+                continue;
+            }
+            const pidMatch = line.match(/^\S+\s+(\d+)\s+/);
+            if (!pidMatch) {
+                continue;
+            }
+            const pid = Number(pidMatch[1]);
+            if (!Number.isFinite(pid) || pid <= 0 || pid === currentPid) {
+                continue;
+            }
+            if (allowedPids && !allowedPids.has(pid)) {
+                continue;
+            }
+            seenPids.add(pid);
+        }
+    };
+
+    const getWindowsProcessCommandLine = (pid) => {
+        if (windowsCommandLineCache.has(pid)) {
+            return windowsCommandLineCache.get(pid);
+        }
+        const result = runCommand(
+            'powershell',
+            [
+                '-NoProfile',
+                '-Command',
+                `$p = Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}"; if ($p) { $p.CommandLine }`
+            ],
+            { stdoutPidSet: null, stderrPidSet: null }
+        );
+        const commandLine = !result.error && result.status === 0
+            ? String(result.stdout || '').trim()
+            : '';
+        windowsCommandLineCache.set(pid, commandLine);
+        return commandLine;
+    };
+
+    if (processRef.platform === 'win32') {
+        const netstatResult = runCommand('netstat', ['-ano', '-p', 'tcp'], { stdoutPidSet: null, stderrPidSet: null });
+        if (!(netstatResult && netstatResult.error)) {
+            const lines = String(netstatResult.stdout || '').split(/\r?\n/);
+            for (const line of lines) {
+                const parts = line.trim().split(/\s+/);
+                if (parts.length < 5) {
+                    continue;
+                }
+                const localAddress = parts[1];
+                const state = parts[3];
+                const pidText = parts[4];
+                if (state !== 'LISTENING' || !localAddress.endsWith(`:${numericPort}`) || !/^\d+$/.test(pidText)) {
+                    continue;
+                }
+                if (!isMatchingWindowsListenerAddress(localAddress)) {
+                    continue;
+                }
+                candidatePids.add(Number(pidText));
+            }
+            for (const pid of candidatePids) {
+                if (pid === currentPid) {
+                    continue;
+                }
+                if (!isManagedRunCommand(getWindowsProcessCommandLine(pid))) {
+                    continue;
+                }
+                seenPids.add(pid);
+                const taskkillResult = runCommand(
+                    'taskkill',
+                    ['/PID', String(pid), '/F'],
+                    { stdoutPidSet: null, stderrPidSet: null }
+                );
+                if (!taskkillResult.error && taskkillResult.status === 0) {
+                    released = true;
+                }
+            }
+        }
+    } else {
+        let psResult = null;
+        const readPsResult = () => {
+            if (psResult) {
+                return psResult;
+            }
+            psResult = runCommand('ps', ['-ef'], { stdoutPidSet: null, stderrPidSet: null });
+            return psResult;
+        };
+
+        const lsofResult = runCommand(
+            'lsof',
+            ['-ti', `tcp:${numericPort}`],
+            { stdoutPidSet: candidatePids, stderrPidSet: null }
+        );
+        const shouldTryFuser = !!(lsofResult && lsofResult.error && lsofResult.error.code === 'ENOENT');
+        if (shouldTryFuser && candidatePids.size === 0) {
+            runCommand(
+                'fuser',
+                [`${numericPort}/tcp`],
+                { stdoutPidSet: candidatePids, stderrPidSet: candidatePids }
+            );
+        }
+        if (candidatePids.size > 0) {
+            const managedPsResult = readPsResult();
+            if (!(managedPsResult && managedPsResult.error)) {
+                addManagedRunPidsFromPs(managedPsResult.stdout, candidatePids);
+            }
+        }
+    }
+
+    if (processRef.platform !== 'win32' && killProcess && !released && seenPids.size > 0) {
+        for (const pid of seenPids) {
+            if (pid === currentPid) {
+                continue;
+            }
+            try {
+                killProcess(pid, 'SIGKILL');
+                released = true;
+            } catch (_) {}
+        }
+    }
+
+    if (released) {
+        logger.log(`~ 已释放端口 ${numericPort} 占用`);
+    }
+
+    return {
+        attempted: true,
+        released,
+        pids: Array.from(seenPids)
+            .filter((pid) => pid !== currentPid)
+            .sort((a, b) => a - b)
+    };
+}
+// #endregion releaseRunPortIfNeeded
+
 function resolveWebHost(options = {}) {
     const optionHost = typeof options.host === 'string' ? options.host.trim() : '';
     if (optionHost) {
@@ -236,7 +469,6 @@ function resolveWebHost(options = {}) {
 }
 
 const EMPTY_CONFIG_FALLBACK_TEMPLATE = `model = "gpt-5.3-codex"
-model_reasoning_effort = "high"
 model_context_window = ${DEFAULT_MODEL_CONTEXT_WINDOW}
 model_auto_compact_token_limit = ${DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT}
 disable_response_storage = true
@@ -10845,6 +11077,7 @@ function cmdStart(options = {}) {
 
     const port = resolveWebPort();
     const host = resolveWebHost(options);
+    releaseRunPortIfNeeded(port, host);
 
     let serverHandle = createWebServer({
         htmlPath,

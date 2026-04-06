@@ -105,7 +105,7 @@ function createLoadAllContext() {
         currentProvider: 'existing-provider',
         currentModel: 'existing-model',
         serviceTier: 'fast',
-        modelReasoningEffort: 'high',
+        modelReasoningEffort: 'medium',
         modelContextWindowInput: 'dirty-context',
         modelAutoCompactTokenLimitInput: 'dirty-limit',
         editingCodexBudgetField: 'modelContextWindowInput',
