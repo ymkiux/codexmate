@@ -24,7 +24,7 @@ Codex Mate is a local-first CLI + Web UI for unified management of:
 - Claude Code profiles (writes to `~/.claude/settings.json`)
 - OpenClaw JSON5 profiles and workspace `AGENTS.md`
 - Local skills market for Codex / Claude Code (target switching, local skills management, cross-app import, ZIP distribution)
-- Local Codex/Claude sessions (list/filter/export/delete)
+- Local Codex/Claude sessions (list/filter/export/delete) with Usage analytics overview
 
 It works on local files directly and does not require cloud hosting. The skills market is also local-first: it operates on local directories and does not depend on a remote marketplace.
 
@@ -34,8 +34,9 @@ It works on local files directly and does not require cloud hosting. The skills 
 | --- | --- | --- |
 | Multi-tool management | Codex + Claude Code + OpenClaw in one entry | Different files and folders per tool |
 | Operation mode | CLI + local Web UI | Manual TOML/JSON/JSON5 edits |
-| Session handling | Browse/export/batch cleanup | Manual file location and processing |
+| Session handling | Browse/filter/Usage analytics/export/batch cleanup | Manual file location and processing |
 | Skills reuse | Local skills market + cross-app import + ZIP distribution | Manual folder copy and reconciliation |
+| Operational visibility | Unified view of config, sessions, and Usage summaries | Depends on manual file inspection and scattered commands |
 | Rollback readiness | Backup before first takeover | Easy to overwrite by mistake |
 | Automation integration | MCP stdio (read-only by default) | Requires custom scripting |
 
@@ -51,6 +52,7 @@ It works on local files directly and does not require cloud hosting. The skills 
 - Unified Codex + Claude session list
 - Local session pinning with persistent pinned state and pinned-first ordering
 - Keyword/source/cwd filters
+- Usage subview with 7d / 30d session trends, message trends, source share, and top paths
 - Markdown export
 - Session-level and message-level delete (supports batch)
 
@@ -82,7 +84,7 @@ flowchart TB
       API["Local HTTP API"]
       MCPS["MCP stdio Server"]
       PROXY["Built-in Proxy"]
-      SERVICES["Config / Sessions / Skills Market / Workflow"]
+      SERVICES["Config / Sessions & Usage / Skills Market / Workflow"]
       CORE["File IO / Network / Diff / Session Utils"]
     end
 
@@ -91,7 +93,7 @@ flowchart TB
       CLAUDE["~/.claude/settings.json"]
       OPENCLAW["~/.openclaw/*.json5 + ~/.openclaw/openclaw.json + workspace/AGENTS.md"]
       SKILLS["~/.codex/skills / ~/.claude/skills / ~/.agents/skills"]
-      STATE["sessions / trash / workflow runs / skill exports"]
+      STATE["sessions / usage aggregates / trash / workflow runs / skill exports"]
     end
 
     CLI --> ENTRY
@@ -195,8 +197,10 @@ codexmate codex --model gpt-5.3-codex --follow-up "step1" --follow-up "step2"
 
 ### Sessions Mode
 - Unified Codex + Claude sessions
+- Browser / Usage subview switching
 - Local pin/unpin with persistent storage and pinned-first ordering
 - Search, filter, export, delete, batch cleanup
+- Usage view includes 7d / 30d session trends, message trends, source share, and top paths
 
 ### Skills Market Tab
 - Switch the skills install target between `Codex` and `Claude Code`

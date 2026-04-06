@@ -1,5 +1,6 @@
 import {
     buildSessionTimelineNodes,
+    buildUsageChartGroups,
     isSessionQueryEnabled
 } from '../logic.mjs';
 import { SESSION_TRASH_PAGE_SIZE } from './app.constants.mjs';
@@ -99,6 +100,21 @@ export function createSessionComputed() {
                 return '关键词检索（支持 Codex/Claude，例：claude code）';
             }
             return '当前来源暂不支持关键词检索';
+        },
+        sessionUsageCharts() {
+            return buildUsageChartGroups(this.sessionsList, {
+                range: this.sessionsUsageTimeRange
+            });
+        },
+        sessionUsageSummaryCards() {
+            const summary = this.sessionUsageCharts && this.sessionUsageCharts.summary
+                ? this.sessionUsageCharts.summary
+                : { totalSessions: 0, totalMessages: 0, activeDays: 0 };
+            return [
+                { key: 'sessions', label: '总会话数', value: summary.totalSessions || 0 },
+                { key: 'messages', label: '总消息数', value: summary.totalMessages || 0 },
+                { key: 'days', label: '活跃天数', value: summary.activeDays || 0 }
+            ];
         },
         visibleSessionTrashItems() {
             const items = Array.isArray(this.sessionTrashItems) ? this.sessionTrashItems : [];

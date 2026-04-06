@@ -88,6 +88,94 @@ export function formatSessionTimelineTimestamp(timestamp) {
     return value;
 }
 
+export function buildUsageChartGroups(sessions = [], options = {}) {
+    const list = Array.isArray(sessions) ? sessions : [];
+    const range = typeof options.range === 'string' ? options.range.trim().toLowerCase() : '7d';
+    const now = Number.isFinite(Number(options.now)) ? Number(options.now) : Date.now();
+    const dayMs = 24 * 60 * 60 * 1000;
+    const rangeDays = range === '30d' ? 30 : 7;
+    const buckets = [];
+    for (let i = rangeDays - 1; i >= 0; i -= 1) {
+        const stamp = new Date(now - (i * dayMs));
+        const key = `${stamp.getUTCFullYear()}-${String(stamp.getUTCMonth() + 1).padStart(2, '0')}-${String(stamp.getUTCDate()).padStart(2, '0')}`;
+        buckets.push({
+            key,
+            label: key.slice(5),
+            codex: 0,
+            claude: 0,
+            totalMessages: 0,
+            totalSessions: 0
+        });
+    }
+    const bucketMap = new Map(buckets.map((bucket) => [bucket.key, bucket]));
+    let codexTotal = 0;
+    let claudeTotal = 0;
+    let messageTotal = 0;
+    const pathMap = new Map();
+
+    for (const session of list) {
+        if (!session || typeof session !== 'object') continue;
+        const source = normalizeSessionSource(session.source, '');
+        if (source !== 'codex' && source !== 'claude') continue;
+        const updatedAtMs = Date.parse(session.updatedAt || '');
+        if (!Number.isFinite(updatedAtMs)) continue;
+        const stamp = new Date(updatedAtMs);
+        const key = `${stamp.getUTCFullYear()}-${String(stamp.getUTCMonth() + 1).padStart(2, '0')}-${String(stamp.getUTCDate()).padStart(2, '0')}`;
+        const bucket = bucketMap.get(key);
+        if (!bucket) continue;
+        const messageCount = Number.isFinite(Number(session.messageCount))
+            ? Math.max(0, Math.floor(Number(session.messageCount)))
+            : 0;
+        bucket.totalSessions += 1;
+        bucket.totalMessages += messageCount;
+        if (source === 'codex') {
+            bucket.codex += 1;
+            codexTotal += 1;
+        } else {
+            bucket.claude += 1;
+            claudeTotal += 1;
+        }
+        messageTotal += messageCount;
+        const cwd = normalizeSessionPathFilter(session.cwd);
+        if (cwd) {
+            pathMap.set(cwd, (Number(pathMap.get(cwd)) || 0) + 1);
+        }
+    }
+
+    const totalSessions = codexTotal + claudeTotal;
+    const sourceShare = [
+        { key: 'codex', label: 'Codex', value: codexTotal },
+        { key: 'claude', label: 'Claude', value: claudeTotal }
+    ].map((item) => ({
+        ...item,
+        percent: totalSessions > 0 ? Math.round((item.value / totalSessions) * 100) : 0
+    }));
+
+    const topPaths = [...pathMap.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh-Hans-CN'))
+        .slice(0, 5)
+        .map(([pathValue, count]) => ({ path: pathValue, count }));
+
+    const maxSessionBucket = buckets.reduce((max, item) => Math.max(max, item.totalSessions), 0);
+    const maxMessageBucket = buckets.reduce((max, item) => Math.max(max, item.totalMessages), 0);
+
+    return {
+        range,
+        buckets,
+        summary: {
+            totalSessions,
+            totalMessages: messageTotal,
+            codexTotal,
+            claudeTotal,
+            activeDays: buckets.filter((item) => item.totalSessions > 0).length
+        },
+        sourceShare,
+        topPaths,
+        maxSessionBucket,
+        maxMessageBucket
+    };
+}
+
 export function buildSessionTimelineNodes(messages = [], options = {}) {
     const list = Array.isArray(messages) ? messages : [];
     const getKey = typeof options.getKey === 'function'
