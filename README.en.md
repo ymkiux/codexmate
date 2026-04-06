@@ -24,7 +24,7 @@ Codex Mate is a local-first CLI + Web UI for unified management of:
 - Claude Code profiles (writes to `~/.claude/settings.json`)
 - OpenClaw JSON5 profiles and workspace `AGENTS.md`
 - Local skills market for Codex / Claude Code (target switching, local skills management, cross-app import, ZIP distribution)
-- Local Codex/Claude sessions (list/filter/export/delete)
+- Local Codex/Claude sessions (list/filter/export/delete) with Usage analytics overview
 
 It works on local files directly and does not require cloud hosting. The skills market is also local-first: it operates on local directories and does not depend on a remote marketplace.
 
@@ -51,6 +51,8 @@ It works on local files directly and does not require cloud hosting. The skills 
 - Unified Codex + Claude session list
 - Local session pinning with persistent pinned state and pinned-first ordering
 - Keyword/source/cwd filters
+- Usage subview with 7d / 30d session trends, message trends, source share, and top paths
+- Overflow-safe Usage layout for long paths and narrow containers
 - Markdown export
 - Session-level and message-level delete (supports batch)
 
@@ -195,8 +197,11 @@ codexmate codex --model gpt-5.3-codex --follow-up "step1" --follow-up "step2"
 
 ### Sessions Mode
 - Unified Codex + Claude sessions
+- Browser / Usage subview switching
 - Local pin/unpin with persistent storage and pinned-first ordering
 - Search, filter, export, delete, batch cleanup
+- Usage view includes 7d / 30d session trends, message trends, source share, and top paths
+- Usage charts and long-path rows are tuned to avoid overflow on narrow screens and small containers
 
 ### Skills Market Tab
 - Switch the skills install target between `Codex` and `Claude Code`

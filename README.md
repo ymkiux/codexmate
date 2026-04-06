@@ -24,7 +24,7 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 - Claude Code 配置方案（写入 `~/.claude/settings.json`）
 - OpenClaw JSON5 配置与 Workspace `AGENTS.md`
 - Codex / Claude Code Skills 市场（安装目标切换、本地 skills 管理、跨应用导入、ZIP 分发）
-- Codex / Claude 本地会话浏览、筛选、导出、删除
+- Codex / Claude 本地会话浏览、筛选、导出、删除与 Usage 统计概览
 
 项目不依赖云端托管，配置写入你的本地文件，便于审计和回滚。Skills 市场同样坚持本地优先，只操作本地目录，不依赖远程在线市场。
 
@@ -51,6 +51,8 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 - 同页查看 Codex 与 Claude 会话
 - 支持本地会话置顶，置顶状态持久化保存并优先排序显示
 - 关键词搜索、来源筛选、cwd 路径筛选
+- Usage 子页：近 7 天 / 近 30 天会话趋势、消息趋势、来源占比、高频路径
+- Usage 视图针对长路径与窄屏做了防溢出布局优化
 - 会话导出 Markdown
 - 会话与消息级删除（支持批量）
 
@@ -187,8 +189,11 @@ codexmate codex --model gpt-5.3-codex --follow-up "步骤1" --follow-up "步骤2
 
 ### 会话模式
 - Codex + Claude 会话统一列表
+- Browser / Usage 双子视图切换
 - 支持本地会话置顶、持久化保存与置顶优先排序
 - 搜索、筛选、导出、删除、批量清理
+- Usage 视图提供近 7 天 / 近 30 天会话趋势、消息趋势、来源占比与高频路径统计
+- Usage 图表与长路径列表已做窄屏与小容器防溢出优化
 
 ### Skills 市场标签页
 - 在 `Codex` 与 `Claude Code` 之间切换 skills 安装目标
