@@ -319,7 +319,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     const headDataKeys = Object.keys(headAppOptions.data()).sort();
     const extraCurrentKeys = currentDataKeys.filter((key) => !headDataKeys.includes(key)).sort();
     const missingCurrentKeys = headDataKeys.filter((key) => !currentDataKeys.includes(key)).sort();
-    const allowedExtraCurrentKeys = ['sessionsUsageTimeRange', 'sessionsViewMode'];
+    const allowedExtraCurrentKeys = [];
     const allowedMissingCurrentKeys = [];
     if (parityAgainstHead) {
         const allowedExtraKeySet = new Set(allowedExtraCurrentKeys);
@@ -357,7 +357,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     const headComputedKeys = Object.keys(headComputed).sort();
     const extraCurrentComputedKeys = currentComputedKeys.filter((key) => !headComputedKeys.includes(key)).sort();
     const missingCurrentComputedKeys = headComputedKeys.filter((key) => !currentComputedKeys.includes(key)).sort();
-    const allowedExtraCurrentComputedKeys = ['sessionUsageCharts', 'sessionUsageSummaryCards'];
+    const allowedExtraCurrentComputedKeys = [];
     if (parityAgainstHead) {
         const allowedExtraComputedKeySet = new Set(allowedExtraCurrentComputedKeys);
         const unexpectedExtraCurrentComputedKeys = extraCurrentComputedKeys.filter((key) => !allowedExtraComputedKeySet.has(key));
