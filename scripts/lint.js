@@ -38,8 +38,17 @@ function lintJson(filePath) {
 }
 
 function lintSource(filePath) {
-    const result = spawnSync(nodeCmd, ['--check', filePath], {
+    const ext = path.extname(filePath).toLowerCase();
+    const sourceText = fs.readFileSync(filePath, 'utf8');
+    const normalized = stripUtf8Bom(sourceText);
+    const treatsAsModule = ext === '.mjs'
+        || (ext === '.js' && /\b(?:import|export)\b|import\.meta/.test(normalized));
+    const args = treatsAsModule
+        ? ['--input-type=module', '--check']
+        : ['--check', filePath];
+    const result = spawnSync(nodeCmd, args, {
         cwd: root,
+        input: treatsAsModule ? normalized : undefined,
         encoding: 'utf8',
         env: process.env
     });
