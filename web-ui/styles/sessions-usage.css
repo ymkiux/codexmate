@@ -118,6 +118,8 @@
     background: var(--color-surface);
     border: 1px solid var(--color-border-soft);
     box-shadow: var(--shadow-subtle);
+    min-width: 0;
+    overflow: hidden;
 }
 
 .usage-card-title {
@@ -132,11 +134,16 @@
     align-items: flex-end;
     gap: 8px;
     min-height: 180px;
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 4px;
 }
 
 .usage-bar-group {
-    flex: 1;
-    min-width: 0;
+    flex: 1 0 44px;
+    min-width: 44px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -169,6 +176,11 @@
 .usage-bar-label {
     font-size: 11px;
     color: var(--color-text-secondary);
+    width: 100%;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .usage-legend {
@@ -192,19 +204,28 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+    min-width: 0;
 }
 
 .usage-list-row {
     display: grid;
-    grid-template-columns: 72px 1fr 48px;
+    grid-template-columns: minmax(56px, 72px) minmax(0, 1fr) minmax(48px, auto);
     gap: 10px;
     align-items: center;
+    min-width: 0;
 }
 
 .usage-list-label,
 .usage-list-value {
     font-size: 12px;
     color: var(--color-text-secondary);
+    min-width: 0;
+}
+
+.usage-list-value {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    text-align: right;
 }
 
 .usage-progress {
@@ -231,5 +252,25 @@
 @media (max-width: 960px) {
     .usage-chart-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .usage-list-row {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+
+    .usage-list-value {
+        text-align: left;
+    }
+
+    .usage-bar-group {
+        flex-basis: 36px;
+        min-width: 36px;
+    }
+
+    .usage-bar-stack {
+        max-width: 28px;
     }
 }
