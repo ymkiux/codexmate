@@ -40,7 +40,8 @@ export function createStartupClaudeMethods(options = {}) {
                         const effort = typeof statusRes.modelReasoningEffort === 'string'
                             ? statusRes.modelReasoningEffort.trim().toLowerCase()
                             : '';
-                        this.modelReasoningEffort = effort || 'medium';
+                        const allowedReasoningEfforts = new Set(['low', 'medium', 'high', 'xhigh']);
+                        this.modelReasoningEffort = allowedReasoningEfforts.has(effort) ? effort : 'medium';
                     }
                     {
                         const contextWindow = this.normalizePositiveIntegerInput(

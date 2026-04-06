@@ -118,6 +118,11 @@ const resolveWebHostSource = extractFunctionBySignature(
     'function resolveWebHost(options = {}) {',
     'resolveWebHost'
 );
+const cmdStartSource = extractFunctionBySignature(
+    cliContent,
+    'function cmdStart(options = {}) {',
+    'cmdStart'
+);
 const releaseRunPortIfNeededSource = extractFunctionBySignature(
     cliContent,
     'function releaseRunPortIfNeeded(port, deps = {}) {',
@@ -180,24 +185,45 @@ test('releaseRunPortIfNeeded skips non-default ports', () => {
     assert.deepStrictEqual(calls, []);
 });
 
-test('releaseRunPortIfNeeded clears default port via fuser on linux', () => {
+test('releaseRunPortIfNeeded clears default port only after lsof pids map to managed run processes', () => {
     const calls = [];
+    const killed = [];
     const logs = [];
     const releaseRunPortIfNeeded = instantiateFunction(releaseRunPortIfNeededSource, 'releaseRunPortIfNeeded', {
         DEFAULT_WEB_PORT: 3737,
         spawnSync(command, args) {
             calls.push([command, args]);
-            if (command === 'fuser') {
-                return { status: 0, stdout: '1234\n', stderr: '' };
+            if (command === 'lsof') {
+                return { status: 0, stdout: '1234\n8888\n', stderr: '' };
+            }
+            if (command === 'ps') {
+                return {
+                    status: 0,
+                    stdout: [
+                        'UID        PID  PPID  C STIME TTY          TIME CMD',
+                        'u0_a876   1234  1000  0  1970 ?        00:00:00 node /repo/cli.js run --no-browser',
+                        'u0_a876   8888  1000  0  1970 ?        00:00:00 node /repo/other-server.js'
+                    ].join('\n'),
+                    stderr: ''
+                };
             }
             throw new Error(`unexpected command: ${command}`);
         },
-        process: { platform: 'linux' },
+        process: {
+            platform: 'linux',
+            kill(pid, signal) {
+                killed.push([pid, signal]);
+            }
+        },
         console: { log(message) { logs.push(message); } }
     });
 
     const result = releaseRunPortIfNeeded(3737);
-    assert.deepStrictEqual(calls, [['fuser', ['-k', '3737/tcp']]]);
+    assert.deepStrictEqual(calls, [
+        ['lsof', ['-ti', 'tcp:3737']],
+        ['ps', ['-ef']]
+    ]);
+    assert.deepStrictEqual(killed, [[1234, 'SIGKILL']]);
     assert.deepStrictEqual(result, {
         attempted: true,
         released: true,
@@ -206,18 +232,26 @@ test('releaseRunPortIfNeeded clears default port via fuser on linux', () => {
     assert.deepStrictEqual(logs, ['~ 已释放端口 3737 占用']);
 });
 
-test('releaseRunPortIfNeeded falls back to lsof pids when fuser is unavailable', () => {
+test('releaseRunPortIfNeeded falls back to ps scan when lsof is unavailable', () => {
     const calls = [];
     const killed = [];
     const releaseRunPortIfNeeded = instantiateFunction(releaseRunPortIfNeededSource, 'releaseRunPortIfNeeded', {
         DEFAULT_WEB_PORT: 3737,
         spawnSync(command, args) {
             calls.push([command, args]);
-            if (command === 'fuser') {
+            if (command === 'lsof') {
                 return { error: { code: 'ENOENT' }, status: null, stdout: '', stderr: '' };
             }
-            if (command === 'lsof') {
-                return { status: 0, stdout: '2222\n3333\n', stderr: '' };
+            if (command === 'ps') {
+                return {
+                    status: 0,
+                    stdout: [
+                        'UID        PID  PPID  C STIME TTY          TIME CMD',
+                        'u0_a876   2222  1000  0  1970 ?        00:00:00 node /repo/cli.js run --no-browser',
+                        'u0_a876   3333  1000  0  1970 ?        00:00:00 /usr/bin/codexmate run'
+                    ].join('\n'),
+                    stderr: ''
+                };
             }
             throw new Error(`unexpected command: ${command}`);
         },
@@ -232,8 +266,8 @@ test('releaseRunPortIfNeeded falls back to lsof pids when fuser is unavailable',
 
     const result = releaseRunPortIfNeeded(3737);
     assert.deepStrictEqual(calls, [
-        ['fuser', ['-k', '3737/tcp']],
-        ['lsof', ['-ti', 'tcp:3737']]
+        ['lsof', ['-ti', 'tcp:3737']],
+        ['ps', ['-ef']]
     ]);
     assert.deepStrictEqual(killed, [
         [2222, 'SIGKILL'],
@@ -253,11 +287,8 @@ test('releaseRunPortIfNeeded falls back to ps scan for managed run processes', (
         DEFAULT_WEB_PORT: 3737,
         spawnSync(command, args) {
             calls.push([command, args]);
-            if (command === 'fuser') {
-                return { error: { code: 'EACCES' }, status: 1, stdout: '', stderr: 'Permission denied' };
-            }
             if (command === 'lsof') {
-                return { error: { code: 'ENOENT' }, status: null, stdout: '', stderr: '' };
+                return { status: 0, stdout: '9001\n9002\n', stderr: '' };
             }
             if (command === 'ps') {
                 return {
@@ -285,7 +316,6 @@ test('releaseRunPortIfNeeded falls back to ps scan for managed run processes', (
 
     const result = releaseRunPortIfNeeded(3737);
     assert.deepStrictEqual(calls, [
-        ['fuser', ['-k', '3737/tcp']],
         ['lsof', ['-ti', 'tcp:3737']],
         ['ps', ['-ef']]
     ]);
@@ -298,7 +328,15 @@ test('releaseRunPortIfNeeded falls back to ps scan for managed run processes', (
 });
 
 test('cmdStart releases the resolved port before creating the web server', () => {
-    assert.match(cliContent, /const port = resolveWebPort\(\);\s*const host = resolveWebHost\(options\);\s*releaseRunPortIfNeeded\(port\);\s*let serverHandle = createWebServer\(/s);
+    const resolveIndex = cmdStartSource.indexOf('resolveWebPort(');
+    const releaseIndex = cmdStartSource.indexOf('releaseRunPortIfNeeded(');
+    const createIndex = cmdStartSource.indexOf('createWebServer(');
+
+    assert(resolveIndex >= 0, 'cmdStart should resolve the web port');
+    assert(releaseIndex >= 0, 'cmdStart should release the run port before startup');
+    assert(createIndex >= 0, 'cmdStart should create the web server');
+    assert(resolveIndex < releaseIndex, 'cmdStart should resolve the port before releasing it');
+    assert(releaseIndex < createIndex, 'cmdStart should release the port before creating the web server');
 });
 
 const getCodexSkillsDirSource = extractFunctionBySignature(
