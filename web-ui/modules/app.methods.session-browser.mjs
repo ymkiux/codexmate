@@ -1,6 +1,8 @@
 import {
     buildSessionFilterCacheState,
+    findSessionMessageMatchKey,
     isSessionQueryEnabled,
+    normalizeSessionMatch,
     normalizeSessionMessageRole,
     normalizeSessionPathFilter
 } from '../logic.mjs';
@@ -323,11 +325,16 @@ export function createSessionBrowserMethods(options = {}) {
             const roleLabel = normalizedRole === 'user'
                 ? 'User'
                 : (normalizedRole === 'system' ? 'System' : 'Assistant');
+            const matchSnippet = typeof safeMessage.matchSnippet === 'string'
+                ? safeMessage.matchSnippet.trim()
+                : '';
             return {
                 ...safeMessage,
                 role: normalizedRole,
                 normalizedRole,
-                roleLabel
+                roleLabel,
+                matchSnippet,
+                isSearchMatch: !!matchSnippet
             };
         },
 
@@ -376,6 +383,7 @@ export function createSessionBrowserMethods(options = {}) {
             this.activeSessionDetailClipped = false;
             this.cancelSessionTimelineSync();
             this.sessionTimelineActiveKey = '';
+            this.pendingSessionMatchKey = '';
             this.clearSessionTimelineRefs();
             await this.loadActiveSessionDetail();
         },
@@ -429,7 +437,31 @@ export function createSessionBrowserMethods(options = {}) {
         },
 
         async loadActiveSessionDetail(options = {}) {
-            return loadActiveSessionDetailHelper.call(this, api, options);
+            const result = await loadActiveSessionDetailHelper.call(this, api, options);
+            const match = normalizeSessionMatch(this.activeSession);
+            const nextMatchKey = findSessionMessageMatchKey(this.activeSessionMessages, match.snippets);
+            this.pendingSessionMatchKey = nextMatchKey;
+            if (nextMatchKey) {
+                this.activeSessionMessages = Object.freeze(
+                    this.activeSessionMessages.map((message, index) => {
+                        const key = this.getRecordRenderKey(message, index);
+                        if (key !== nextMatchKey) {
+                            return message;
+                        }
+                        return Object.freeze({
+                            ...message,
+                            matchSnippet: match.primarySnippet
+                        });
+                    })
+                );
+                this.$nextTick(() => {
+                    if (this.pendingSessionMatchKey !== nextMatchKey) return;
+                    if (typeof this.jumpToSessionTimelineNode === 'function') {
+                        this.jumpToSessionTimelineNode(nextMatchKey);
+                    }
+                });
+            }
+            return result;
         }
     };
 }

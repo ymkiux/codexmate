@@ -378,6 +378,32 @@
     text-overflow: ellipsis;
 }
 
+.session-item-match {
+    margin-top: 6px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(208, 88, 58, 0.18);
+    background: rgba(210, 107, 90, 0.08);
+    color: var(--color-text-secondary);
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+}
+
+.session-match-count {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(210, 107, 90, 0.12);
+    color: var(--color-brand-dark);
+    font-size: 11px;
+    font-weight: 600;
+}
+
 .session-item-sub.session-item-wrap {
     white-space: normal;
 }

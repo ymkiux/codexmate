@@ -1,7 +1,8 @@
 import {
     buildSessionTimelineNodes,
     buildUsageChartGroups,
-    isSessionQueryEnabled
+    isSessionQueryEnabled,
+    normalizeSessionMatch
 } from '../logic.mjs';
 import { SESSION_TRASH_PAGE_SIZE } from './app.constants.mjs';
 
@@ -30,15 +31,27 @@ export function createSessionComputed() {
                 if (isPinned) {
                     hasPinned = true;
                 }
-                return { session, index, pinnedAt, isPinned };
+                return {
+                    session,
+                    index,
+                    pinnedAt,
+                    isPinned,
+                    match: normalizeSessionMatch(session)
+                };
             });
-            if (!hasPinned) return list;
+            if (!hasPinned) return decorated.map(item => ({
+                ...item.session,
+                match: item.match
+            }));
             decorated.sort((a, b) => {
                 if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
                 if (a.isPinned && a.pinnedAt !== b.pinnedAt) return b.pinnedAt - a.pinnedAt;
                 return a.index - b.index;
             });
-            return decorated.map(item => item.session);
+            return decorated.map(item => ({
+                ...item.session,
+                match: item.match
+            }));
         },
         activeSessionVisibleMessages() {
             if (this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {

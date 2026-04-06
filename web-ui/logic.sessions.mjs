@@ -58,6 +58,77 @@ export function normalizeSessionMessageRole(role) {
     return 'assistant';
 }
 
+export function normalizeSessionMatch(session) {
+    const raw = session && session.match && typeof session.match === 'object' ? session.match : null;
+    const hit = !!(raw && raw.hit);
+    const count = Number.isFinite(Number(raw && raw.count))
+        ? Math.max(0, Math.floor(Number(raw.count)))
+        : 0;
+    const snippets = Array.isArray(raw && raw.snippets)
+        ? raw.snippets
+            .filter((item) => typeof item === 'string')
+            .map((item) => item.trim())
+            .filter(Boolean)
+        : [];
+    return {
+        hit,
+        count,
+        snippets,
+        primarySnippet: snippets[0] || '',
+        hasSnippet: snippets.length > 0
+    };
+}
+
+export function buildSessionMessageSearchText(message) {
+    if (!message || typeof message !== 'object') {
+        return '';
+    }
+    const pieces = [];
+    if (typeof message.text === 'string' && message.text.trim()) {
+        pieces.push(message.text.trim());
+    }
+    if (typeof message.content === 'string' && message.content.trim()) {
+        pieces.push(message.content.trim());
+    }
+    if (Array.isArray(message.parts)) {
+        for (const part of message.parts) {
+            if (typeof part === 'string' && part.trim()) {
+                pieces.push(part.trim());
+                continue;
+            }
+            if (part && typeof part === 'object' && typeof part.text === 'string' && part.text.trim()) {
+                pieces.push(part.text.trim());
+            }
+        }
+    }
+    return pieces.join('\n').trim();
+}
+
+export function findSessionMessageMatchKey(messages = [], snippets = []) {
+    if (!Array.isArray(messages) || !messages.length || !Array.isArray(snippets) || !snippets.length) {
+        return '';
+    }
+    const normalizedSnippets = snippets
+        .filter((snippet) => typeof snippet === 'string')
+        .map((snippet) => snippet.trim().toLowerCase())
+        .filter(Boolean);
+    if (!normalizedSnippets.length) {
+        return '';
+    }
+    for (let index = 0; index < messages.length; index += 1) {
+        const message = messages[index];
+        const haystack = buildSessionMessageSearchText(message).toLowerCase();
+        if (!haystack) continue;
+        if (normalizedSnippets.some((snippet) => haystack.includes(snippet))) {
+            const recordKey = message && Number.isInteger(message.recordLineIndex) && message.recordLineIndex >= 0
+                ? `record-${message.recordLineIndex}`
+                : `record-fallback-${index}-${message && message.timestamp ? message.timestamp : ''}`;
+            return recordKey;
+        }
+    }
+    return '';
+}
+
 function toRoleMeta(role) {
     if (role === 'user') {
         return { role: 'user', roleLabel: 'User', roleShort: 'U' };

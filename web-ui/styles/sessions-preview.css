@@ -249,6 +249,24 @@
     word-break: break-word;
 }
 
+.session-msg-content-match {
+    background: linear-gradient(180deg, rgba(210, 107, 90, 0.10) 0%, rgba(210, 107, 90, 0.04) 100%);
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+
+.session-msg-match-chip {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 8px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: rgba(210, 107, 90, 0.14);
+    color: var(--color-brand-dark);
+    font-size: 11px;
+    font-weight: 600;
+}
+
 .session-preview-empty {
     flex: 1;
     display: flex;

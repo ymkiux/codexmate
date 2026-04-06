@@ -252,6 +252,10 @@
                             <div class="session-item-meta">
                                 <span class="session-source">{{ session.sourceLabel }}</span>
                                 <span class="session-item-time">{{ session.updatedAt || 'unknown time' }}</span>
+                                <span v-if="session.match && session.match.hit" class="session-match-count">命中 {{ session.match.count || 1 }}</span>
+                            </div>
+                            <div v-if="session.match && session.match.primarySnippet" class="session-item-sub session-item-match" :title="session.match.primarySnippet">
+                                {{ session.match.primarySnippet }}
                             </div>
                         </div>
                     </div>
@@ -352,7 +356,8 @@
                                                     <span class="session-msg-time">{{ msg.timestamp || '' }}</span>
                                                 </div>
                                             </div>
-                                            <div class="session-msg-content">{{ msg.text || '' }}</div>
+                                            <div class="session-msg-content" :class="{ 'session-msg-content-match': msg.isSearchMatch }">{{ msg.text || '' }}</div>
+                                            <div v-if="msg.matchSnippet" class="session-msg-match-chip">搜索命中</div>
                                         </div>
                                     </div>
                                 </div>
