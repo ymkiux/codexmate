@@ -34,8 +34,9 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 | --- | --- | --- |
 | 多工具管理 | Codex + Claude Code + OpenClaw 统一入口 | 多文件、多目录分散修改 |
 | 使用方式 | CLI + 本地 Web UI | 纯手改 TOML / JSON / JSON5 |
-| 会话处理 | 支持浏览、导出、批量清理 | 需要手动定位和处理文件 |
+| 会话处理 | 支持浏览、筛选、Usage 统计、导出、批量清理 | 需要手动定位和处理文件 |
 | Skills 复用 | 本地 Skills 市场 + 跨应用导入 + ZIP 分发 | 目录手动复制，容易遗漏 |
+| 使用可见性 | 统一查看配置、会话与 Usage 概览 | 依赖手工翻文件和零散命令 |
 | 可回滚性 | 首次接管前自动备份 | 易误覆盖、回滚成本高 |
 | 自动化接入 | 提供 MCP stdio（默认只读） | 需自行封装脚本 |
 
@@ -79,7 +80,7 @@ flowchart TB
       ENTRY["cli.js Entry"]
       API["Local HTTP API"]
       MCPS["MCP stdio Server"]
-      SERVICES["Config / Sessions / Skills Market / Workflow"]
+      SERVICES["Config / Sessions & Usage / Skills Market / Workflow"]
       CORE["File IO / Network / Diff / Session Utils"]
     end
 
@@ -88,7 +89,7 @@ flowchart TB
       CLAUDE["~/.claude/settings.json"]
       OPENCLAW["~/.openclaw/*.json5 + ~/.openclaw/openclaw.json + workspace/AGENTS.md"]
       SKILLS["~/.codex/skills / ~/.claude/skills / ~/.agents/skills"]
-      STATE["sessions / trash / workflow runs / skill exports"]
+      STATE["sessions / usage aggregates / trash / workflow runs / skill exports"]
     end
 
     CLI --> ENTRY
