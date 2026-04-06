@@ -223,6 +223,131 @@ function resolveWebPort() {
     return parsed;
 }
 
+// #region releaseRunPortIfNeeded
+function releaseRunPortIfNeeded(port, deps = {}) {
+    const numericPort = parseInt(String(port), 10);
+    if (numericPort !== DEFAULT_WEB_PORT) {
+        return { attempted: false, released: false, pids: [], reason: 'non-default-port' };
+    }
+
+    const processRef = deps.process || process;
+    const runSpawnSync = deps.spawnSync || spawnSync;
+    const logger = deps.logger || console;
+    const killProcess = typeof deps.kill === 'function'
+        ? deps.kill
+        : (typeof processRef.kill === 'function' ? processRef.kill.bind(processRef) : null);
+    const seenPids = new Set();
+    const currentPid = Number(processRef.pid);
+    let released = false;
+
+    const addPidsFromText = (text) => {
+        const lines = String(text || '').split(/\r?\n/);
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!/^\d+$/.test(trimmed)) {
+                continue;
+            }
+            seenPids.add(Number(trimmed));
+        }
+    };
+
+    const runCommand = (command, args) => {
+        const result = runSpawnSync(command, args, { encoding: 'utf8' });
+        if (result && result.stdout) addPidsFromText(result.stdout);
+        if (result && result.stderr) addPidsFromText(result.stderr);
+        return result || {};
+    };
+
+    const addManagedRunPidsFromPs = (text) => {
+        const lines = String(text || '').split(/\r?\n/);
+        for (const line of lines) {
+            const normalizedLine = ` ${line.replace(/\s+/g, ' ').trim()} `;
+            if (!/(^|[\/\s])codexmate run(\s|$)/.test(normalizedLine) && !/(^|[\/\s])cli\.js run(\s|$)/.test(normalizedLine)) {
+                continue;
+            }
+            const pidMatch = line.match(/^\S+\s+(\d+)\s+/);
+            if (!pidMatch) {
+                continue;
+            }
+            const pid = Number(pidMatch[1]);
+            if (!Number.isFinite(pid) || pid <= 0 || pid === currentPid) {
+                continue;
+            }
+            seenPids.add(pid);
+        }
+    };
+
+    if (processRef.platform === 'win32') {
+        const netstatResult = runCommand('netstat', ['-ano', '-p', 'tcp']);
+        if (!(netstatResult && netstatResult.error)) {
+            const lines = String(netstatResult.stdout || '').split(/\r?\n/);
+            for (const line of lines) {
+                const parts = line.trim().split(/\s+/);
+                if (parts.length < 5) {
+                    continue;
+                }
+                const localAddress = parts[1];
+                const state = parts[3];
+                const pidText = parts[4];
+                if (state !== 'LISTENING' || !localAddress.endsWith(`:${numericPort}`) || !/^\d+$/.test(pidText)) {
+                    continue;
+                }
+                seenPids.add(Number(pidText));
+            }
+            for (const pid of seenPids) {
+                const taskkillResult = runCommand('taskkill', ['/PID', String(pid), '/F']);
+                if (!taskkillResult.error && taskkillResult.status === 0) {
+                    released = true;
+                }
+            }
+        }
+    } else {
+        const fuserResult = runCommand('fuser', ['-k', `${numericPort}/tcp`]);
+        if (!fuserResult.error && fuserResult.status === 0) {
+            released = true;
+        }
+        const fuserMissing = !!(fuserResult && fuserResult.error && fuserResult.error.code === 'ENOENT');
+        if ((fuserMissing || !released || seenPids.size === 0) && killProcess) {
+            const lsofResult = runCommand('lsof', ['-ti', `tcp:${numericPort}`]);
+            if (!(lsofResult && lsofResult.error)) {
+                // noop: lsof pid collection is handled through stdout parsing above.
+            }
+        }
+    }
+
+    if (processRef.platform !== 'win32' && killProcess && !released && seenPids.size === 0) {
+        const psResult = runCommand('ps', ['-ef']);
+        if (!(psResult && psResult.error)) {
+            addManagedRunPidsFromPs(psResult.stdout);
+        }
+    }
+
+    if (processRef.platform !== 'win32' && killProcess && !released && seenPids.size > 0) {
+        for (const pid of seenPids) {
+            if (pid === currentPid) {
+                continue;
+            }
+            try {
+                killProcess(pid, 'SIGKILL');
+                released = true;
+            } catch (_) {}
+        }
+    }
+
+    if (released) {
+        logger.log(`~ 已释放端口 ${numericPort} 占用`);
+    }
+
+    return {
+        attempted: true,
+        released,
+        pids: Array.from(seenPids)
+            .filter((pid) => pid !== currentPid)
+            .sort((a, b) => a - b)
+    };
+}
+// #endregion releaseRunPortIfNeeded
+
 function resolveWebHost(options = {}) {
     const optionHost = typeof options.host === 'string' ? options.host.trim() : '';
     if (optionHost) {
@@ -236,7 +361,6 @@ function resolveWebHost(options = {}) {
 }
 
 const EMPTY_CONFIG_FALLBACK_TEMPLATE = `model = "gpt-5.3-codex"
-model_reasoning_effort = "high"
 model_context_window = ${DEFAULT_MODEL_CONTEXT_WINDOW}
 model_auto_compact_token_limit = ${DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT}
 disable_response_storage = true
@@ -10845,6 +10969,7 @@ function cmdStart(options = {}) {
 
     const port = resolveWebPort();
     const host = resolveWebHost(options);
+    releaseRunPortIfNeeded(port);
 
     let serverHandle = createWebServer({
         htmlPath,

@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentProvider: '',
                 currentModel: '',
                 serviceTier: 'fast',
-                modelReasoningEffort: 'high',
+                modelReasoningEffort: 'medium',
                 modelContextWindowInput: String(DEFAULT_MODEL_CONTEXT_WINDOW),
                 modelAutoCompactTokenLimitInput: String(DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT),
                 editingCodexBudgetField: '',
