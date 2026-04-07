@@ -221,8 +221,8 @@
     border: 1px solid rgba(216, 201, 184, 0.42);
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.94);
-    padding: 7px 10px;
-    font-size: 12px;
+    padding: 6px 9px;
+    font-size: 11px;
     color: var(--color-text-secondary);
     text-align: center;
     cursor: pointer;
