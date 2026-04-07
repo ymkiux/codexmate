@@ -117,7 +117,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 skillsMarketLocalLoadedOnce: false,
                 skillsMarketImportLoadedOnce: false,
                 sessionPinnedMap: {},
-                sessionsViewMode: 'browser',
                 sessionsUsageTimeRange: '7d',
                 sessionsList: [],
                 sessionsLoadedOnce: false,

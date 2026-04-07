@@ -15,6 +15,7 @@ export function switchMainTab(tab) {
     const nextTab = typeof tab === 'string' ? tab : '';
     const previousTab = this.mainTab;
     const leavingSessions = previousTab === 'sessions' && nextTab !== 'sessions';
+    const enteringSessionDataTab = nextTab === 'sessions' || nextTab === 'usage';
     this.mainTab = nextTab;
 
     if (leavingSessions) {
@@ -40,7 +41,7 @@ export function switchMainTab(tab) {
         }
     }
 
-    if (nextTab === 'sessions' && !this.sessionsLoadedOnce) {
+    if (enteringSessionDataTab && !this.sessionsLoadedOnce) {
         this.loadSessions();
     }
     if (nextTab === 'sessions') {
