@@ -61,10 +61,10 @@ body::after {
     flex-direction: column;
     gap: 14px;
     padding: 16px 12px 14px;
-    background: rgba(248, 244, 239, 0.82);
-    border: 1px solid rgba(216, 201, 184, 0.32);
+    background: rgba(246, 241, 235, 0.92);
+    border: 1px solid rgba(210, 193, 173, 0.42);
     border-radius: 20px;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78), 0 12px 24px rgba(31, 26, 23, 0.032);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 14px 28px rgba(31, 26, 23, 0.04);
     min-height: 420px;
     backdrop-filter: blur(10px);
 }
@@ -156,18 +156,18 @@ body::after {
 }
 
 .side-item-title {
-    font-size: var(--font-size-body);
-    font-weight: var(--font-weight-secondary);
+    font-size: 14px;
+    font-weight: 600;
     letter-spacing: -0.01em;
 }
 
 .side-item-meta {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--color-text-tertiary);
     display: flex;
-    gap: 6px;
+    gap: 5px;
     flex-wrap: wrap;
-    line-height: 1.4;
+    line-height: 1.35;
 }
 
 .side-item-meta > span {
@@ -190,8 +190,8 @@ body::after {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 8px;
-    margin-bottom: 4px;
+    gap: 4px;
+    margin-bottom: 6px;
     padding: 2px 4px 12px;
     border-bottom: 1px solid rgba(216, 201, 184, 0.22);
 }
@@ -203,6 +203,13 @@ body::after {
     text-transform: uppercase;
     color: var(--color-text-tertiary);
     font-weight: 700;
+}
+
+.brand-block::after {
+    content: "统一管理本地配置、会话与 Skills";
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--color-text-tertiary);
 }
 
 .brand-title {
