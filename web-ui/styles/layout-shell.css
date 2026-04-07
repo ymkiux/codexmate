@@ -44,8 +44,8 @@ body::after {
    ============================================ */
 .app-shell {
     display: grid;
-    grid-template-columns: minmax(208px, 264px) minmax(0, 1fr) minmax(216px, 272px);
-    gap: 20px;
+    grid-template-columns: minmax(236px, 272px) minmax(0, 1fr);
+    gap: 24px;
     align-items: flex-start;
 }
 
@@ -59,13 +59,13 @@ body::after {
     align-self: start;
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    padding: 16px 12px 14px;
-    background: rgba(246, 241, 235, 0.92);
-    border: 1px solid rgba(210, 193, 173, 0.42);
-    border-radius: 20px;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 14px 28px rgba(31, 26, 23, 0.04);
-    min-height: 420px;
+    gap: 18px;
+    padding: 18px 14px 16px;
+    background: rgba(243, 237, 230, 0.96);
+    border: 1px solid rgba(206, 188, 167, 0.5);
+    border-radius: 22px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84), 0 16px 34px rgba(31, 26, 23, 0.05);
+    min-height: calc(100vh - 32px);
     backdrop-filter: blur(10px);
 }
 
@@ -77,7 +77,14 @@ body::after {
 .side-section {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
+}
+
+.side-rail-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1 1 auto;
 }
 
 .side-section-title {
@@ -86,14 +93,14 @@ body::after {
     color: var(--color-text-tertiary);
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    padding: 0 8px 2px;
+    padding: 0 10px 0;
 }
 
 .side-item {
     width: 100%;
     text-align: left;
-    padding: 12px 12px 12px 14px;
-    border-radius: 14px;
+    padding: 13px 13px 13px 15px;
+    border-radius: 16px;
     border: 1px solid transparent;
     background: transparent;
     color: var(--color-text-secondary);
@@ -119,22 +126,22 @@ body::after {
 }
 
 .side-item:hover {
-    background: rgba(255, 255, 255, 0.56);
+    background: rgba(255, 255, 255, 0.7);
     color: var(--color-text-primary);
 }
 
 .side-item.active {
-    border-color: rgba(201, 94, 75, 0.3);
-    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(201, 94, 75, 0.36);
+    background: rgba(255, 255, 255, 0.98);
     color: var(--color-text-primary);
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.85);
+    box-shadow: 0 8px 18px rgba(31, 26, 23, 0.04);
 }
 
 .side-item.nav-intent-active {
-    border-color: rgba(201, 94, 75, 0.3);
-    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(201, 94, 75, 0.36);
+    background: rgba(255, 255, 255, 0.98);
     color: var(--color-text-primary);
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.85);
+    box-shadow: 0 8px 18px rgba(31, 26, 23, 0.04);
 }
 
 .side-item.nav-intent-inactive,
@@ -190,10 +197,10 @@ body::after {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 4px;
-    margin-bottom: 6px;
-    padding: 2px 4px 12px;
-    border-bottom: 1px solid rgba(216, 201, 184, 0.22);
+    gap: 6px;
+    margin-bottom: 0;
+    padding: 4px 6px 14px;
+    border-bottom: 1px solid rgba(216, 201, 184, 0.28);
 }
 
 .brand-kicker {
@@ -210,14 +217,53 @@ body::after {
     font-size: 12px;
     line-height: 1.45;
     color: var(--color-text-tertiary);
+    max-width: 20ch;
 }
 
 .brand-title {
-    font-size: 20px;
-    line-height: 1.15;
+    font-size: 24px;
+    line-height: 1.06;
     font-family: var(--font-family-display);
     color: var(--color-text-primary);
-    letter-spacing: -0.03em;
+    letter-spacing: -0.04em;
+}
+
+.side-rail-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 10px 2px;
+    border-top: 1px solid rgba(216, 201, 184, 0.28);
+}
+
+.side-rail-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    min-width: 0;
+    padding: 8px 10px;
+    border-radius: 12px;
+    border: 1px solid rgba(216, 201, 184, 0.34);
+    background: rgba(255, 255, 255, 0.72);
+    color: var(--color-text-primary);
+    text-decoration: none;
+    font-size: 12px;
+    font-family: var(--font-family-mono);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.side-rail-link:hover {
+    border-color: rgba(201, 94, 75, 0.42);
+    background: rgba(255, 255, 255, 0.96);
+}
+
+.side-rail-note {
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--color-text-tertiary);
+    padding: 0 2px;
 }
 
 .github-badge {
@@ -355,8 +401,8 @@ body::after {
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    margin-bottom: 10px;
-    padding: 10px 12px;
+    margin-bottom: 12px;
+    padding: 12px 14px;
     border-radius: 14px;
     border: 1px solid rgba(216, 201, 184, 0.32);
     background: rgba(255, 255, 255, 0.82);
@@ -377,7 +423,7 @@ body::after {
 
 .workbench-bar-title {
     margin-top: 2px;
-    font-size: 18px;
+    font-size: 17px;
     line-height: 1.15;
     letter-spacing: -0.03em;
     color: var(--color-text-primary);
@@ -389,7 +435,7 @@ body::after {
     align-items: center;
     justify-content: center;
     min-width: 0;
-    max-width: min(52vw, 320px);
+    max-width: min(34vw, 120px);
     padding: 8px 10px;
     border-radius: 10px;
     border: 1px solid rgba(216, 201, 184, 0.38);
@@ -398,7 +444,7 @@ body::after {
     color: var(--color-text-primary);
     text-decoration: none;
     font-size: 12px;
-    font-family: var(--font-family-mono);
+    font-family: var(--font-family-body);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

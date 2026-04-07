@@ -13,17 +13,12 @@ textarea:focus-visible {
 
 @media (max-width: 1280px) {
     .app-shell {
-        grid-template-columns: minmax(168px, 216px) minmax(0, 1fr) minmax(200px, 252px);
-        gap: 14px;
-    }
-
-    .status-inspector {
-        top: 16px;
-        height: calc(100vh - 32px);
+        grid-template-columns: minmax(214px, 240px) minmax(0, 1fr);
+        gap: 18px;
     }
 
     .main-panel {
-        padding: 20px 22px;
+        padding: 24px 24px 26px;
     }
 
 }
@@ -38,26 +33,24 @@ textarea:focus-visible {
     .side-rail {
         display: none;
     }
-    .status-inspector {
-        display: none;
-    }
     .workbench-bar {
         display: flex;
     }
     .main-panel {
         padding: 18px;
         border-radius: 20px;
+        min-height: 0;
     }
     .top-tabs {
         display: flex !important;
         flex-wrap: wrap;
     }
     .status-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: var(--spacing-sm);
         margin-top: 4px;
     }
     .status-chip {
-        flex: 1 1 calc(50% - var(--spacing-sm));
         min-width: 0;
     }
 
@@ -81,11 +74,11 @@ textarea:focus-visible {
 
 @media (max-width: 720px) {
     .main-title {
-        font-size: 34px;
+        font-size: 28px;
     }
 
     .subtitle {
-        font-size: var(--font-size-secondary);
+        font-size: 13px;
         margin-bottom: 0;
     }
 
@@ -107,9 +100,6 @@ textarea:focus-visible {
         grid-template-columns: 1fr;
     }
 
-    .status-chip {
-        flex: 1 1 100%;
-    }
 }
 
 @media (max-width: 540px) {
@@ -157,7 +147,6 @@ textarea:focus-visible {
     }
 
     .status-chip {
-        flex: 1 1 100%;
         min-width: 100%;
     }
 

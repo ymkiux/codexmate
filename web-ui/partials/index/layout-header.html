@@ -10,15 +10,15 @@
 
         <div v-if="!sessionStandalone" class="workbench-bar">
             <div class="workbench-bar-copy">
-                <div class="workbench-bar-kicker">Workspace</div>
-                <div class="workbench-bar-title">Codex Mate</div>
+                <div class="workbench-bar-kicker">Local workspace</div>
+                <div class="workbench-bar-title">Codex Mate 控制台</div>
             </div>
             <a
                 class="workbench-bar-repo"
                 href="https://github.com/SakuraByteCore/codexmate"
                 target="_blank"
                 rel="noopener noreferrer"
-                title="打开 GitHub 仓库">SakuraByteCore/codexmate</a>
+                title="打开 GitHub 仓库">仓库</a>
         </div>
 
         <div v-if="!sessionStandalone" class="top-tabs" role="tablist" aria-label="主导航">
@@ -32,7 +32,7 @@
                 aria-controls="panel-config-provider"
                 :class="{ active: isConfigModeNavActive('codex') }"
                 @pointerdown="onConfigTabPointerDown('codex', $event)"
-                @click="onConfigTabClick('codex', $event)">Codex 配置</button>
+                @click="onConfigTabClick('codex', $event)">Codex</button>
             <button class="top-tab"
                 id="tab-config-claude"
                 role="tab"
@@ -43,7 +43,7 @@
                 aria-controls="panel-config-claude"
                 :class="{ active: isConfigModeNavActive('claude') }"
                 @pointerdown="onConfigTabPointerDown('claude', $event)"
-                @click="onConfigTabClick('claude', $event)">Claude Code 配置</button>
+                @click="onConfigTabClick('claude', $event)">Claude</button>
             <button class="top-tab"
                 id="tab-config-openclaw"
                 role="tab"
@@ -54,7 +54,7 @@
                 aria-controls="panel-config-openclaw"
                 :class="{ active: isConfigModeNavActive('openclaw') }"
                 @pointerdown="onConfigTabPointerDown('openclaw', $event)"
-                @click="onConfigTabClick('openclaw', $event)">OpenClaw 配置</button>
+                @click="onConfigTabClick('openclaw', $event)">OpenClaw</button>
             <button class="top-tab"
                 id="tab-sessions"
                 role="tab"
@@ -64,7 +64,7 @@
                 aria-controls="panel-sessions"
                 :class="{ active: isMainTabNavActive('sessions') }"
                 @pointerdown="onMainTabPointerDown('sessions', $event)"
-                @click="onMainTabClick('sessions', $event)">会话浏览</button>
+                @click="onMainTabClick('sessions', $event)">会话</button>
             <button class="top-tab"
                 id="tab-usage"
                 role="tab"
@@ -84,7 +84,7 @@
                 aria-controls="panel-market"
                 :class="{ active: isMainTabNavActive('market') }"
                 @pointerdown="onMainTabPointerDown('market', $event)"
-                @click="onMainTabClick('market', $event)">技能市场</button>
+                @click="onMainTabClick('market', $event)">Skills</button>
             <button class="top-tab"
                 id="tab-settings"
                 role="tab"
@@ -100,12 +100,13 @@
         <div :class="['app-shell', { standalone: sessionStandalone }]">
             <aside class="side-rail" v-if="!sessionStandalone">
                 <div class="brand-block">
-                    <div class="brand-kicker">本地工作台</div>
+                    <div class="brand-kicker">Local control plane</div>
                     <div class="brand-title">Codex Mate</div>
                 </div>
 
+                <div class="side-rail-nav">
                 <div class="side-section" role="navigation" aria-label="配置管理">
-                    <div class="side-section-title">本地配置</div>
+                    <div class="side-section-title">配置</div>
                     <button
                         id="side-tab-config-codex"
                         data-main-tab="config"
@@ -114,7 +115,7 @@
                         :class="['side-item', { active: isConfigModeNavActive('codex') }]"
                         @pointerdown="onConfigTabPointerDown('codex', $event)"
                         @click="onConfigTabClick('codex', $event)">
-                        <div class="side-item-title">Codex 配置</div>
+                        <div class="side-item-title">Codex</div>
                         <div class="side-item-meta">
                             <span>Provider / Model</span>
                             <span v-if="currentProvider">当前 {{ currentProvider }}</span>
@@ -128,7 +129,7 @@
                         :class="['side-item', { active: isConfigModeNavActive('claude') }]"
                         @pointerdown="onConfigTabPointerDown('claude', $event)"
                         @click="onConfigTabClick('claude', $event)">
-                        <div class="side-item-title">Claude Code 配置</div>
+                        <div class="side-item-title">Claude Code</div>
                         <div class="side-item-meta">
                             <span>Claude Settings</span>
                             <span v-if="currentClaudeConfig">当前 {{ currentClaudeConfig }}</span>
@@ -142,7 +143,7 @@
                         :class="['side-item', { active: isConfigModeNavActive('openclaw') }]"
                         @pointerdown="onConfigTabPointerDown('openclaw', $event)"
                         @click="onConfigTabClick('openclaw', $event)">
-                        <div class="side-item-title">OpenClaw 配置</div>
+                        <div class="side-item-title">OpenClaw</div>
                         <div class="side-item-meta">
                             <span>JSON5 / AGENTS</span>
                             <span v-if="currentOpenclawConfig">当前 {{ currentOpenclawConfig }}</span>
@@ -151,7 +152,7 @@
                 </div>
 
                 <div class="side-section" role="navigation" aria-label="会话管理">
-                    <div class="side-section-title">本地会话</div>
+                    <div class="side-section-title">会话</div>
                     <button
                         id="side-tab-sessions"
                         data-main-tab="sessions"
@@ -161,7 +162,7 @@
                         @click="onMainTabClick('sessions', $event)">
                         <div class="side-item-title">会话浏览</div>
                         <div class="side-item-meta">
-                            <span>浏览 / 导出</span>
+                            <span>浏览 / 导出 / 清理</span>
                             <span>来源：{{ sessionFilterSource === 'all' ? '全部' : (sessionFilterSource === 'codex' ? 'Codex' : 'Claude') }}</span>
                         </div>
                     </button>
@@ -172,7 +173,7 @@
                         :class="['side-item', { active: isMainTabNavActive('usage') }]"
                         @pointerdown="onMainTabPointerDown('usage', $event)"
                         @click="onMainTabClick('usage', $event)">
-                        <div class="side-item-title">Usage</div>
+                        <div class="side-item-title">Usage 趋势</div>
                         <div class="side-item-meta">
                             <span>本地统计 / 趋势</span>
                             <span>范围：{{ sessionsUsageTimeRange === '30d' ? '近 30 天' : '近 7 天' }}</span>
@@ -181,7 +182,7 @@
                 </div>
 
                 <div class="side-section" role="navigation" aria-label="技能市场">
-                    <div class="side-section-title">本地 Skills</div>
+                    <div class="side-section-title">扩展</div>
                     <button
                         id="side-tab-market"
                         data-main-tab="market"
@@ -189,7 +190,7 @@
                         :class="['side-item', { active: isMainTabNavActive('market') }]"
                         @pointerdown="onMainTabPointerDown('market', $event)"
                         @click="onMainTabClick('market', $event)">
-                        <div class="side-item-title">Skills</div>
+                        <div class="side-item-title">Skills 市场</div>
                         <div class="side-item-meta">
                             <span>{{ skillsTargetLabel }} / 本地 Skills</span>
                             <span>已装 {{ skillsList.length }} · 可导入 {{ skillsImportList.length }}</span>
@@ -206,19 +207,30 @@
                         :class="['side-item', { active: isMainTabNavActive('settings') }]"
                         @pointerdown="onMainTabPointerDown('settings', $event)"
                         @click="onMainTabClick('settings', $event)">
-                        <div class="side-item-title">设置</div>
+                        <div class="side-item-title">运行设置</div>
                         <div class="side-item-meta">
                             <span>数据管理 / 下载</span>
                         </div>
                     </button>
                 </div>
+                </div>
+
+                <div class="side-rail-footer">
+                    <a
+                        class="side-rail-link"
+                        href="https://github.com/SakuraByteCore/codexmate"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="打开 GitHub 仓库">SakuraByteCore/codexmate</a>
+                    <div class="side-rail-note">本地优先的 Codex / Claude Code / OpenClaw 管理工作台</div>
+                </div>
             </aside>
             <main class="main-panel">
                 <div class="panel-header panel-header-refined" v-if="!sessionStandalone">
                     <div class="panel-header-copy">
-                        <div class="panel-kicker">{{ mainTab === 'config' ? '本地配置' : (mainTab === 'sessions' ? '本地会话' : (mainTab === 'usage' ? '本地用量' : (mainTab === 'market' ? '本地 Skills' : '系统设置'))) }}</div>
-                        <h1 class="main-title">{{ mainTab === 'config' ? 'Codex / Claude / OpenClaw 配置' : (mainTab === 'sessions' ? '本地会话浏览' : (mainTab === 'usage' ? '本地用量概览' : (mainTab === 'market' ? 'Skills 安装与导入' : '本地设置'))) }}</h1>
-                        <p class="subtitle">{{ mainTab === 'config' ? '统一管理本地配置文件、提供商、模型与运行参数。' : (mainTab === 'sessions' ? '浏览、筛选、导出 Codex 与 Claude 的本地会话记录。' : (mainTab === 'usage' ? '查看近 7 / 30 天会话、消息与来源趋势。' : (mainTab === 'market' ? '整理安装目标、导入来源与 ZIP 分发入口。' : '管理下载、数据目录与全局行为。'))) }}</p>
+                        <div class="panel-kicker">{{ mainTab === 'config' ? 'Configuration' : (mainTab === 'sessions' ? 'Sessions' : (mainTab === 'usage' ? 'Usage' : (mainTab === 'market' ? 'Skills' : 'Settings'))) }}</div>
+                        <h1 class="main-title">{{ mainTab === 'config' ? '本地配置控制台' : (mainTab === 'sessions' ? '会话与导出' : (mainTab === 'usage' ? '本地用量与趋势' : (mainTab === 'market' ? 'Skills 安装与同步' : '系统与数据设置'))) }}</h1>
+                        <p class="subtitle">{{ mainTab === 'config' ? '管理 Codex、Claude Code 与 OpenClaw 的本地配置、模型与运行参数。' : (mainTab === 'sessions' ? '浏览、筛选、导出与整理本地会话记录。' : (mainTab === 'usage' ? '查看近 7 / 30 天的会话、消息与来源趋势。' : (mainTab === 'market' ? '整理安装目标、导入来源与分发入口。' : '管理下载、数据目录、回收站与全局行为。'))) }}</p>
                     </div>
                 </div>
 
