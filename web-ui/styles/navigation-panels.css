@@ -209,6 +209,8 @@
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    scroll-snap-type: x proximity;
+    padding: 0 8px 2px 2px;
 }
 
 .top-tabs::-webkit-scrollbar {
@@ -227,6 +229,7 @@
     transition: border-color var(--transition-fast) var(--ease-smooth), background-color var(--transition-fast) var(--ease-smooth), color var(--transition-fast) var(--ease-smooth);
     box-shadow: none;
     flex: 0 0 auto;
+    scroll-snap-align: start;
 }
 
 .top-tab:hover {
