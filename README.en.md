@@ -147,6 +147,17 @@ npm start run --no-browser
 
 > Convention: automated tests validate service and API behavior only, without opening browser pages.
 
+### Developer helper scripts
+
+```bash
+npm run reset
+npm run reset -- 79
+```
+
+- `npm run reset`: prompt for a PR number; leave it blank to return to default `origin/main`
+- `npm run reset -- 79`: sync directly to the latest head snapshot of PR `#79`
+- The script also handles local branch switching, workspace cleanup, untracked file cleanup, and final state validation
+
 ## Command Reference
 
 | Command | Description |
