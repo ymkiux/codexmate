@@ -2,6 +2,7 @@
 /**
  * Reset working tree to origin/main:
  * - fetch origin/main
+ * - discard local changes
  * - checkout main
  * - hard reset to origin/main
  * - clean untracked files/dirs
@@ -37,6 +38,8 @@ function main() {
   console.log('[4/6] Reset local changes to origin/main');
   run('git reset --hard origin/main');
 
+  // Defensive extra clean: keep this pass in case future reset steps create
+  // untracked files before the final status check.
   console.log('[5/6] Remove untracked files');
   run('git clean -fd');
 

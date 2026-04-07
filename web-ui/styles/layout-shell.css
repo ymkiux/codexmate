@@ -45,8 +45,8 @@ body::after {
    ============================================ */
 .app-shell {
     display: grid;
-    grid-template-columns: 272px minmax(0, 1fr) 332px;
-    gap: 20px;
+    grid-template-columns: minmax(188px, 248px) minmax(0, 1fr) minmax(220px, 292px);
+    gap: 18px;
     align-items: flex-start;
 }
 
@@ -60,12 +60,12 @@ body::after {
     align-self: start;
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    padding: 16px 12px;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) 12px;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 251, 247, 0.9) 100%);
     border: 1px solid rgba(216, 201, 184, 0.44);
-    border-radius: 22px;
-    box-shadow: 0 14px 34px rgba(31, 26, 23, 0.06);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-card);
     min-height: 420px;
     backdrop-filter: blur(12px);
 }
@@ -408,6 +408,21 @@ body::after {
 .hero-link-pill {
     color: var(--color-text-primary);
     text-decoration: none;
+    transition: border-color var(--transition-fast) var(--ease-smooth), background-color var(--transition-fast) var(--ease-smooth), color var(--transition-fast) var(--ease-smooth), box-shadow var(--transition-fast) var(--ease-smooth);
+}
+
+.hero-link-pill:hover {
+    border-color: rgba(201, 94, 75, 0.46);
+    background: rgba(255, 252, 249, 0.98);
+    color: var(--color-text-primary);
+}
+
+.hero-link-pill:focus,
+.hero-link-pill:focus-visible {
+    outline: 3px solid rgba(201, 94, 75, 0.22);
+    outline-offset: 2px;
+    border-color: rgba(201, 94, 75, 0.54);
+    background: rgba(255, 252, 249, 0.98);
 }
 
 .hero-link-label,
