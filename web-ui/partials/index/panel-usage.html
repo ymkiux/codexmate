@@ -1,0 +1,81 @@
+                <!-- Usage 统计 -->
+                <div
+                    v-show="mainTab === 'usage'"
+                    class="mode-content"
+                    id="panel-usage"
+                    role="tabpanel"
+                    :aria-labelledby="'tab-usage'">
+                    <div class="usage-toolbar">
+                        <div class="selector-header" style="padding:0;border:0;background:none;">
+                            <span class="selector-title">本地使用概览</span>
+                        </div>
+                        <div class="usage-range-group" role="group" aria-label="Usage 时间范围">
+                            <button type="button" class="usage-range-btn" :class="{ active: sessionsUsageTimeRange === '7d' }" @click="sessionsUsageTimeRange = '7d'">近 7 天</button>
+                            <button type="button" class="usage-range-btn" :class="{ active: sessionsUsageTimeRange === '30d' }" @click="sessionsUsageTimeRange = '30d'">近 30 天</button>
+                        </div>
+                    </div>
+
+                    <div v-if="!sessionsList.length" class="usage-empty">暂无可用于统计的会话数据</div>
+                    <template v-else>
+                        <div class="usage-summary-grid">
+                            <div v-for="card in sessionUsageSummaryCards" :key="card.key" class="usage-summary-card">
+                                <div class="usage-summary-label">{{ card.label }}</div>
+                                <div class="usage-summary-value">{{ card.value }}</div>
+                            </div>
+                        </div>
+
+                        <div class="usage-chart-grid">
+                            <section class="usage-card">
+                                <div class="usage-card-title">会话趋势</div>
+                                <div class="usage-legend">
+                                    <span><span class="usage-legend-dot" style="background:#4f8cff"></span>Codex</span>
+                                    <span><span class="usage-legend-dot" style="background:#b277ff"></span>Claude</span>
+                                </div>
+                                <div class="usage-bars">
+                                    <div v-for="bucket in sessionUsageCharts.buckets" :key="bucket.key" class="usage-bar-group">
+                                        <div class="usage-bar-stack">
+                                            <div class="usage-bar codex" :style="{ height: ((bucket.codex / Math.max(sessionUsageCharts.maxSessionBucket, 1)) * 100) + '%' }" :title="`Codex ${bucket.codex}`"></div>
+                                            <div class="usage-bar claude" :style="{ height: ((bucket.claude / Math.max(sessionUsageCharts.maxSessionBucket, 1)) * 100) + '%' }" :title="`Claude ${bucket.claude}`"></div>
+                                        </div>
+                                        <div class="usage-bar-label">{{ bucket.label }}</div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="usage-card">
+                                <div class="usage-card-title">来源占比</div>
+                                <div class="usage-list">
+                                    <div v-for="item in sessionUsageCharts.sourceShare" :key="item.key" class="usage-list-row">
+                                        <div class="usage-list-label">{{ item.label }}</div>
+                                        <div class="usage-progress"><div class="usage-progress-fill" :style="{ width: item.percent + '%' }"></div></div>
+                                        <div class="usage-list-value">{{ item.percent }}%</div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="usage-card">
+                                <div class="usage-card-title">消息趋势</div>
+                                <div class="usage-bars">
+                                    <div v-for="bucket in sessionUsageCharts.buckets" :key="bucket.key + '-messages'" class="usage-bar-group">
+                                        <div class="usage-bar-stack">
+                                            <div class="usage-bar codex" style="width:100%" :style="{ height: ((bucket.totalMessages / Math.max(sessionUsageCharts.maxMessageBucket, 1)) * 100) + '%' }" :title="`${bucket.totalMessages} messages`"></div>
+                                        </div>
+                                        <div class="usage-bar-label">{{ bucket.label }}</div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="usage-card">
+                                <div class="usage-card-title">高频路径</div>
+                                <div v-if="!sessionUsageCharts.topPaths.length" class="usage-list-value">暂无路径数据</div>
+                                <div v-else class="usage-list">
+                                    <div v-for="item in sessionUsageCharts.topPaths" :key="item.path" class="usage-list-row">
+                                        <div class="usage-list-label">{{ item.count }} 次</div>
+                                        <div class="usage-progress"><div class="usage-progress-fill" :style="{ width: ((item.count / Math.max(sessionUsageCharts.topPaths[0]?.count || 1, 1)) * 100) + '%' }"></div></div>
+                                        <div class="usage-list-value" :title="item.path">{{ item.path }}</div>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+                    </template>
+                </div>

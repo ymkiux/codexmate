@@ -85,6 +85,39 @@ test('switchMainTab prepares session render and loads sessions only when not loa
     assert.strictEqual(calls.loadSessions, 1);
 });
 
+test('switchMainTab loads sessions for usage tab without preparing session render', () => {
+    const calls = {
+        teardown: 0,
+        prepare: 0,
+        loadSessions: 0
+    };
+    const vm = {
+        mainTab: 'config',
+        configMode: 'codex',
+        sessionsLoadedOnce: false,
+        teardownSessionTabRender() {
+            calls.teardown += 1;
+        },
+        prepareSessionTabRender() {
+            calls.prepare += 1;
+        },
+        loadSessions() {
+            calls.loadSessions += 1;
+            this.sessionsLoadedOnce = true;
+        },
+        refreshClaudeModelContext() {}
+    };
+
+    switchMainTab.call(vm, 'usage');
+    assert.strictEqual(vm.mainTab, 'usage');
+    assert.strictEqual(calls.prepare, 0);
+    assert.strictEqual(calls.loadSessions, 1);
+
+    switchMainTab.call(vm, 'usage');
+    assert.strictEqual(calls.prepare, 0);
+    assert.strictEqual(calls.loadSessions, 1);
+});
+
 test('switchMainTab keeps claude model context refresh behavior', () => {
     let refreshCount = 0;
     const vm = {
