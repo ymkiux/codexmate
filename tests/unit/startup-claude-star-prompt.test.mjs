@@ -56,7 +56,7 @@ test('maybeShowStarPrompt skips prompting when storage already contains the mark
     assert.strictEqual(setItemCalls, 0);
 });
 
-test('maybeShowStarPrompt prompts once and persists the marker on first success', () => {
+test('maybeShowStarPrompt silently persists the marker on first success', () => {
     const context = createContext();
     const writes = [];
 
@@ -71,11 +71,11 @@ test('maybeShowStarPrompt prompts once and persists the marker on first success'
         maybeShowStarPrompt.call(context);
     });
 
-    assert.deepStrictEqual(context.messages, [{ message: '欢迎到 GitHub 点 Star', level: 'info' }]);
+    assert.deepStrictEqual(context.messages, []);
     assert.deepStrictEqual(writes, [['codexmateStarPrompted', '1']]);
 });
 
-test('maybeShowStarPrompt only prompts once when persisting the marker fails', () => {
+test('maybeShowStarPrompt stays silent when persisting the marker fails', () => {
     const context = createContext();
 
     withLocalStorage({
@@ -89,10 +89,10 @@ test('maybeShowStarPrompt only prompts once when persisting the marker fails', (
         maybeShowStarPrompt.call(context);
     });
 
-    assert.deepStrictEqual(context.messages, [{ message: '欢迎到 GitHub 点 Star', level: 'info' }]);
+    assert.deepStrictEqual(context.messages, []);
 });
 
-test('maybeShowStarPrompt still prompts once when reading storage fails', () => {
+test('maybeShowStarPrompt stays silent when reading storage fails', () => {
     const context = createContext();
 
     withLocalStorage({
@@ -106,5 +106,5 @@ test('maybeShowStarPrompt still prompts once when reading storage fails', () => 
         maybeShowStarPrompt.call(context);
     });
 
-    assert.deepStrictEqual(context.messages, [{ message: '欢迎到 GitHub 点 Star', level: 'info' }]);
+    assert.deepStrictEqual(context.messages, []);
 });
