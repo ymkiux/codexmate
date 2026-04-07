@@ -13,6 +13,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     const templateAgentModals = readProjectFile('web-ui/partials/index/modal-config-template-agents.html');
     const openclawModal = readProjectFile('web-ui/partials/index/modal-openclaw-config.html');
     const sessionsPanel = readProjectFile('web-ui/partials/index/panel-sessions.html');
+    const usagePanel = readProjectFile('web-ui/partials/index/panel-usage.html');
     const baseTheme = readProjectFile('web-ui/styles/base-theme.css');
     const controlsForms = readProjectFile('web-ui/styles/controls-forms.css');
     const sideRail = html.match(/<aside class="side-rail"[\s\S]*?<\/aside>/)?.[0] || '';
@@ -56,6 +57,15 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /sessionTrashCount/);
     assert.match(html, /id="side-tab-market"/);
     assert.match(html, /id="tab-market"/);
+    assert.match(html, /id="side-tab-usage"/);
+    assert.match(html, /id="tab-usage"/);
+    assert.match(html, /data-main-tab="usage"/);
+    assert.match(html, /onMainTabPointerDown\('usage', \$event\)/);
+    assert.match(html, /onMainTabClick\('usage', \$event\)/);
+    assert.match(html, /aria-controls="panel-usage"/);
+    assert.match(html, /:aria-selected="mainTab === 'usage'"/);
+    assert.match(html, /id="panel-usage"/);
+    assert.match(html, /v-show="mainTab === 'usage'"/);
     assert.match(html, /data-main-tab="market"/);
     assert.match(html, /onMainTabPointerDown\('market', \$event\)/);
     assert.match(html, /onMainTabClick\('market', \$event\)/);
@@ -177,15 +187,15 @@ test('config template keeps expected config tabs in top and side navigation', ()
         /:class="\['card', \{ active: currentOpenclawConfig === name \}\]"[\s\S]*@click="applyOpenclawConfig\(name\)"[\s\S]*@keydown\.enter\.self\.prevent="applyOpenclawConfig\(name\)"[\s\S]*@keydown\.space\.self\.prevent="applyOpenclawConfig\(name\)"[\s\S]*tabindex="0"[\s\S]*role="button"[\s\S]*:aria-current="currentOpenclawConfig === name \? 'true' : null"/
     );
     assert.match(html, /class="session-item-copy session-item-pin"/);
-    assert.match(sessionsPanel, /class="sessions-subtabs" role="tablist" aria-label="会话视图切换"/);
-    assert.match(sessionsPanel, /sessionsViewMode === 'browser'/);
-    assert.match(sessionsPanel, /sessionsViewMode === 'usage'/);
-    assert.match(sessionsPanel, /sessionsUsageTimeRange === '7d'/);
-    assert.match(sessionsPanel, /sessionsUsageTimeRange === '30d'/);
-    assert.match(sessionsPanel, /sessionUsageSummaryCards/);
-    assert.match(sessionsPanel, /sessionUsageCharts\.buckets/);
+    assert.doesNotMatch(sessionsPanel, /sessionsViewMode/);
+    assert.doesNotMatch(sessionsPanel, /sessionUsageSummaryCards/);
+    assert.match(usagePanel, /sessionsUsageTimeRange === '7d'/);
+    assert.match(usagePanel, /sessionsUsageTimeRange === '30d'/);
+    assert.match(usagePanel, /sessionUsageSummaryCards/);
+    assert.match(usagePanel, /sessionUsageCharts\.buckets/);
     assert.match(html, /class="pin-icon"/);
     assert.match(html, /:aria-selected="mainTab === 'sessions'"/);
+    assert.match(html, /:aria-selected="mainTab === 'usage'"/);
     assert.match(html, /:aria-selected="mainTab === 'config' && configMode === 'codex'"/);
     assert.match(html, /v-memo="\[activeSessionExportKey === getSessionExportKey\(session\)/);
     assert.match(html, /v-memo="\[msg\.text,\s*msg\.timestamp,\s*msg\.roleLabel,\s*msg\.normalizedRole\]"/);
@@ -284,6 +294,7 @@ test('web ui script defines provider mode metadata for codex only', () => {
     assert.match(appScript, /isMainTabNavActive\(tab\)/);
     assert.match(appScript, /isConfigModeNavActive\(mode\)/);
     assert.match(appScript, /const isLeavingSessions = previousTab === 'sessions' && targetTab !== 'sessions';/);
+    assert.match(appScript, /const enteringSessionDataTab = nextTab === 'sessions' \|\| nextTab === 'usage';/);
     assert.match(appScript, /if \(targetTab === previousTab\) {/);
     assert.match(appScript, /const shouldDeferApply = isLeavingSessions;/);
     assert.match(appScript, /if \(isLeavingSessions && !this\.isSessionPanelFastHidden\(\)\) {/);

@@ -84,6 +84,16 @@
                 @pointerdown="onMainTabPointerDown('sessions', $event)"
                 @click="onMainTabClick('sessions', $event)">会话浏览</button>
             <button class="top-tab"
+                id="tab-usage"
+                role="tab"
+                data-main-tab="usage"
+                :tabindex="mainTab === 'usage' ? 0 : -1"
+                :aria-selected="mainTab === 'usage'"
+                aria-controls="panel-usage"
+                :class="{ active: isMainTabNavActive('usage') }"
+                @pointerdown="onMainTabPointerDown('usage', $event)"
+                @click="onMainTabClick('usage', $event)">Usage</button>
+            <button class="top-tab"
                 id="tab-market"
                 role="tab"
                 data-main-tab="market"
@@ -198,6 +208,19 @@
                             <span>来源：{{ sessionFilterSource === 'all' ? '全部' : (sessionFilterSource === 'codex' ? 'Codex' : 'Claude') }}</span>
                         </div>
                     </button>
+                    <button
+                        id="side-tab-usage"
+                        data-main-tab="usage"
+                        :aria-current="mainTab === 'usage' ? 'page' : null"
+                        :class="['side-item', { active: isMainTabNavActive('usage') }]"
+                        @pointerdown="onMainTabPointerDown('usage', $event)"
+                        @click="onMainTabClick('usage', $event)">
+                        <div class="side-item-title">Usage</div>
+                        <div class="side-item-meta">
+                            <span>本地统计 / 趋势</span>
+                            <span>范围：{{ sessionsUsageTimeRange === '30d' ? '近 30 天' : '近 7 天' }}</span>
+                        </div>
+                    </button>
                 </div>
 
                 <div class="side-section" role="navigation" aria-label="技能市场">
@@ -236,7 +259,7 @@
             <main class="main-panel">
                 <div class="panel-header" v-if="!sessionStandalone">
                     <h1 class="main-title">
-                        {{ mainTab === 'config' ? '配置中心' : (mainTab === 'sessions' ? '会话浏览' : (mainTab === 'market' ? '技能市场' : '设置')) }}
+                        {{ mainTab === 'config' ? '配置中心' : (mainTab === 'sessions' ? '会话浏览' : (mainTab === 'usage' ? 'Usage' : (mainTab === 'market' ? '技能市场' : '设置'))) }}
                     </h1>
                     <p class="subtitle" v-if="mainTab === 'config'">
                         配置中枢：管理 Codex / Claude / OpenClaw
@@ -244,6 +267,9 @@
                     </p>
                     <p class="subtitle" v-else-if="mainTab === 'sessions'">
                         统一查看与导出 Codex / Claude 会话。
+                    </p>
+                    <p class="subtitle" v-else-if="mainTab === 'usage'">
+                        单独查看本地会话用量、趋势与高频路径。
                     </p>
                     <p class="subtitle" v-else-if="mainTab === 'market'">
                         统一管理 Codex / Claude Skills，并聚焦本地导入与分发。
@@ -298,6 +324,20 @@
                     <div class="status-chip">
                         <span class="label">会话数</span>
                         <span class="value">{{ sessionsList.length }}</span>
+                    </div>
+                </div>
+                <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'usage'">
+                    <div class="status-chip">
+                        <span class="label">统计范围</span>
+                        <span class="value">{{ sessionsUsageTimeRange === '30d' ? '近 30 天' : '近 7 天' }}</span>
+                    </div>
+                    <div class="status-chip">
+                        <span class="label">总会话数</span>
+                        <span class="value">{{ sessionUsageSummaryCards[0]?.value ?? 0 }}</span>
+                    </div>
+                    <div class="status-chip">
+                        <span class="label">总消息数</span>
+                        <span class="value">{{ sessionUsageSummaryCards[1]?.value ?? 0 }}</span>
                     </div>
                 </div>
                 <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'market'">
