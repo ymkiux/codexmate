@@ -2,10 +2,10 @@
    主标题
    ============================================ */
 .main-title {
-    font-size: clamp(30px, 3.2vw, 42px);
+    font-size: clamp(32px, 3.6vw, 46px);
     font-weight: var(--font-weight-display);
-    line-height: 1.02;
-    letter-spacing: -0.04em;
+    line-height: 0.99;
+    letter-spacing: -0.045em;
     margin-bottom: 0;
     color: var(--color-text-primary);
     font-family: var(--font-family-display);
@@ -24,9 +24,9 @@
 .subtitle {
     font-size: 14px;
     color: var(--color-text-tertiary);
-    line-height: 1.6;
+    line-height: 1.55;
     margin-bottom: 0;
-    max-width: 56ch;
+    max-width: 48ch;
     letter-spacing: 0;
 }
 
