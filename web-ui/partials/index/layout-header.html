@@ -1,26 +1,4 @@
     <div id="app" class="container" v-cloak>
-        <button class="fab-install" @click="openInstallModal" aria-label="安装 CLI">
-            <span class="fab-install-icon" aria-hidden="true">
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
-                    <path d="M10 4v8M6.5 8.5 10 12l3.5-3.5" stroke-linecap="round" stroke-linejoin="round"/>
-                    <path d="M4 14.5h12" stroke-linecap="round"/>
-                </svg>
-            </span>
-        </button>
-
-        <div v-if="!sessionStandalone" class="workbench-bar">
-            <div class="workbench-bar-copy">
-                <div class="workbench-bar-kicker">Local workspace</div>
-                <div class="workbench-bar-title">Codex Mate 控制台</div>
-            </div>
-            <a
-                class="workbench-bar-repo"
-                href="https://github.com/SakuraByteCore/codexmate"
-                target="_blank"
-                rel="noopener noreferrer"
-                title="打开 GitHub 仓库">仓库</a>
-        </div>
-
         <div v-if="!sessionStandalone" class="top-tabs" role="tablist" aria-label="主导航">
             <button class="top-tab"
                 id="tab-config-codex"
@@ -100,7 +78,7 @@
         <div :class="['app-shell', { standalone: sessionStandalone }]">
             <aside class="side-rail" v-if="!sessionStandalone">
                 <div class="brand-block">
-                    <div class="brand-kicker">Local control plane</div>
+                    <div class="brand-kicker">Workspace</div>
                     <div class="brand-title">Codex Mate</div>
                 </div>
 
@@ -215,15 +193,6 @@
                 </div>
                 </div>
 
-                <div class="side-rail-footer">
-                    <a
-                        class="side-rail-link"
-                        href="https://github.com/SakuraByteCore/codexmate"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="打开 GitHub 仓库">SakuraByteCore/codexmate</a>
-                    <div class="side-rail-note">本地优先的 Codex / Claude Code / OpenClaw 管理工作台</div>
-                </div>
             </aside>
             <main class="main-panel">
                 <div class="panel-header panel-header-refined" v-if="!sessionStandalone">
