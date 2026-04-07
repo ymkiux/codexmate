@@ -2,10 +2,10 @@
    主标题
    ============================================ */
 .main-title {
-    font-size: clamp(24px, 2vw, 31px);
+    font-size: clamp(22px, 1.7vw, 28px);
     font-weight: var(--font-weight-display);
-    line-height: 1.06;
-    letter-spacing: -0.03em;
+    line-height: 1.04;
+    letter-spacing: -0.028em;
     margin-bottom: 0;
     color: var(--color-text-primary);
     font-family: var(--font-family-display);
@@ -22,9 +22,9 @@
 }
 
 .subtitle {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--color-text-tertiary);
-    line-height: 1.5;
+    line-height: 1.4;
     margin-bottom: 0;
     max-width: 62ch;
     letter-spacing: 0;
@@ -35,26 +35,26 @@
    ============================================ */
 .segmented-control {
     display: flex;
-    background: rgba(250, 248, 245, 0.92);
-    border-radius: 12px;
-    padding: 5px;
-    margin-bottom: 18px;
+    background: rgba(246, 241, 235, 0.78);
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 12px;
     position: relative;
     box-shadow: none;
-    border: 1px solid rgba(216, 201, 184, 0.32);
-    backdrop-filter: blur(4px);
+    border: 1px solid rgba(216, 201, 184, 0.26);
+    backdrop-filter: none;
 }
 
 .segment {
     flex: 1;
-    padding: 10px 14px;
+    padding: 8px 10px;
     border: none;
     background: transparent;
     font-size: var(--font-size-body);
     font-weight: var(--font-weight-secondary);
     color: var(--color-text-secondary);
     cursor: pointer;
-    border-radius: 9px;
+    border-radius: 8px;
     transition: color var(--transition-fast) var(--ease-smooth), background-color var(--transition-fast) var(--ease-smooth);
     position: relative;
     z-index: 2;
@@ -77,17 +77,17 @@
 .card-list {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    margin-bottom: 12px;
+    gap: 8px;
+    margin-bottom: 8px;
 }
 
 /* ============================================
    卡片
    ============================================ */
 .card {
-    background: rgba(255, 255, 255, 0.96);
-    border-radius: 14px;
-    padding: 13px;
+    background: rgba(255, 255, 255, 0.92);
+    border-radius: 12px;
+    padding: 10px 11px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -99,14 +99,14 @@
     box-shadow: none;
     user-select: none;
     will-change: auto;
-    border: 1px solid rgba(216, 201, 184, 0.38);
+    border: 1px solid rgba(216, 201, 184, 0.3);
     position: relative;
     overflow: hidden;
 }
 
 .card:hover {
     border-color: rgba(201, 94, 75, 0.38);
-    box-shadow: inset 0 0 0 1px rgba(201, 94, 75, 0.06);
+    box-shadow: inset 0 0 0 1px rgba(201, 94, 75, 0.04);
 }
 
 .card::before,
@@ -118,8 +118,8 @@
 
 .card::before {
     left: 0;
-    top: 10px;
-    bottom: 10px;
+    top: 8px;
+    bottom: 8px;
     width: 3px;
     border-radius: 999px;
     background: transparent;
@@ -129,7 +129,7 @@
 .card::after {
     inset: 0;
     border-radius: inherit;
-    background: linear-gradient(120deg, rgba(255, 255, 255, 0.35) 0%, transparent 55%);
+    background: linear-gradient(120deg, rgba(255, 255, 255, 0.18) 0%, transparent 55%);
     opacity: 0;
     transition: opacity var(--transition-fast) var(--ease-smooth);
 }
@@ -140,9 +140,9 @@
 }
 
 .card.active {
-    background: rgba(249, 244, 240, 0.98);
-    border-color: rgba(201, 94, 75, 0.52);
-    box-shadow: inset 0 0 0 1px rgba(201, 94, 75, 0.08);
+    background: rgba(248, 243, 237, 0.92);
+    border-color: rgba(201, 94, 75, 0.4);
+    box-shadow: inset 0 0 0 1px rgba(201, 94, 75, 0.05);
 }
 
 .card.active::before {
@@ -160,16 +160,16 @@
 .card-leading {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
+    gap: 10px;
     flex: 1;
     min-width: 0;
 }
 
 .card-icon {
-    width: 38px;
-    height: 38px;
-    border-radius: 10px;
-    background: rgba(247, 241, 232, 0.78);
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(244, 237, 228, 0.72);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -190,14 +190,14 @@
 .card-content {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 1px;
     min-width: 0;
 }
 
 .card-title {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     min-width: 0;
     font-size: var(--font-size-body);
     font-weight: var(--font-weight-secondary);
@@ -230,7 +230,7 @@
 }
 
 .card-subtitle {
-    font-size: var(--font-size-secondary);
+    font-size: 12px;
     color: var(--color-text-tertiary);
     white-space: nowrap;
     overflow: hidden;
