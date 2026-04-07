@@ -145,20 +145,12 @@ body.force-compact .top-tabs {
     }
 }
 
-body.force-compact .hero-logo {
-    display: block;
-}
-
-body.force-compact .hero-github {
+body.force-compact .workbench-bar {
     display: flex;
 }
 
 body.force-compact .main-panel {
     padding: 14px 12px;
-}
-
-body.force-compact .hero-title {
-    font-size: 34px;
 }
 
 body.force-compact .card {
