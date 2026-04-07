@@ -26,9 +26,6 @@ textarea:focus-visible {
         padding: 20px 22px;
     }
 
-    .hero-surface {
-        padding: 15px 18px;
-    }
 }
 
 @media (max-width: 960px) {
@@ -44,39 +41,16 @@ textarea:focus-visible {
     .status-inspector {
         display: none;
     }
-    .hero-logo {
-        display: block;
-        width: 60px;
-        height: 60px;
-    }
-    .hero-github {
+    .workbench-bar {
         display: flex;
-    }
-    .github-badge-mobile {
-        width: 100%;
-    }
-    .github-badge-mobile .github-badge-text,
-    .github-badge-mobile .github-badge-label {
-        font-size: var(--font-size-secondary);
     }
     .main-panel {
         padding: 18px;
         border-radius: 20px;
     }
-
-    .hero-surface {
-        padding: 16px;
-        border-radius: 16px;
-    }
-
-    .hero-meta-row,
-    .hero-title-row {
-        flex-direction: column;
-        align-items: flex-start;
-    }
     .top-tabs {
-        display: grid !important;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        display: flex !important;
+        flex-wrap: wrap;
     }
     .status-strip {
         gap: var(--spacing-sm);
@@ -108,10 +82,6 @@ textarea:focus-visible {
 @media (max-width: 720px) {
     .main-title {
         font-size: 34px;
-    }
-
-    .hero-title {
-        font-size: 30px;
     }
 
     .subtitle {
@@ -163,24 +133,12 @@ textarea:focus-visible {
     .container {
         padding: 0 var(--spacing-sm) var(--spacing-md);
     }
-    .hero-title {
-        font-size: 28px;
-    }
-    .hero-subtitle {
-        font-size: var(--font-size-secondary);
-    }
-
-    .hero-surface {
-        padding: 14px 12px;
-    }
-
-    .hero-link-pill,
-    .hero-summary-pill {
-        width: 100%;
-        justify-content: space-between;
+    .workbench-bar {
+        flex-direction: column;
+        align-items: stretch;
     }
     .top-tabs {
-        grid-template-columns: repeat(1, minmax(0, 1fr));
+        gap: 6px;
     }
     .main-panel {
         padding: var(--spacing-sm);
