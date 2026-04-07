@@ -5,9 +5,11 @@ body::before {
     content: "";
     position: fixed;
     inset: 0;
-    background-image:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0));
-    opacity: 0.16;
+    background:
+        radial-gradient(circle at top left, rgba(208, 88, 58, 0.1), transparent 34%),
+        radial-gradient(circle at top right, rgba(245, 201, 160, 0.24), transparent 28%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0));
+    opacity: 0.92;
     pointer-events: none;
     z-index: 0;
 }
@@ -18,10 +20,10 @@ body::after {
     position: fixed;
     inset: 0;
     background-image:
-        linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
-        linear-gradient(0deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
-    background-size: 180px 180px;
-    opacity: 0.08;
+        linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 160px 160px;
+    opacity: 0.06;
     pointer-events: none;
     z-index: 0;
 }
@@ -33,7 +35,7 @@ body::after {
     width: 100%;
     max-width: 2200px;
     margin: 0 auto;
-    padding: 16px 12px 28px;
+    padding: 24px 20px 36px;
     position: relative;
     z-index: 1;
 }
@@ -43,8 +45,8 @@ body::after {
    ============================================ */
 .app-shell {
     display: grid;
-    grid-template-columns: 260px minmax(0, 1fr) 340px;
-    gap: 16px;
+    grid-template-columns: 272px minmax(0, 1fr) 332px;
+    gap: 20px;
     align-items: flex-start;
 }
 
@@ -58,13 +60,14 @@ body::after {
     align-self: start;
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-md) var(--spacing-sm);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 250, 245, 0.9) 100%);
-    border: 1px solid rgba(216, 201, 184, 0.65);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-card);
+    gap: 18px;
+    padding: 18px 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 250, 245, 0.82) 100%);
+    border: 1px solid rgba(216, 201, 184, 0.5);
+    border-radius: 24px;
+    box-shadow: 0 18px 48px rgba(31, 26, 23, 0.08);
     min-height: 420px;
+    backdrop-filter: blur(18px);
 }
 
 .side-rail .brand-title {
@@ -162,9 +165,9 @@ body::after {
     grid-template-columns: 48px 1fr;
     grid-template-rows: auto auto;
     column-gap: var(--spacing-sm);
-    row-gap: 2px;
+    row-gap: 4px;
     align-items: center;
-    margin-bottom: var(--spacing-md);
+    margin-bottom: 8px;
 }
 
 .brand-logo-wrap {
@@ -200,10 +203,11 @@ body::after {
 }
 
 .brand-subtitle {
-    margin-top: 8px;
-    font-size: var(--font-size-secondary);
+    margin-top: 4px;
+    font-size: 12px;
     color: var(--color-text-tertiary);
-    line-height: 1.45;
+    line-height: 1.5;
+    max-width: 18ch;
 }
 
 .github-badge {
@@ -213,16 +217,17 @@ body::after {
     justify-content: space-between;
     gap: 10px;
     margin-top: 6px;
-    padding: 6px 10px;
+    padding: 7px 11px;
     border-radius: 999px;
-    border: 1px solid var(--color-border-soft);
-    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0.72) 100%);
+    border: 1px solid rgba(216, 201, 184, 0.5);
+    background: rgba(255, 255, 255, 0.78);
     color: var(--color-text-secondary);
     font-size: var(--font-size-caption);
     text-decoration: none;
     box-shadow: var(--shadow-subtle);
     transition: all var(--transition-fast) var(--ease-spring);
     min-width: 0;
+    backdrop-filter: blur(10px);
 }
 
 .github-badge-rail {
@@ -327,4 +332,95 @@ body::after {
 .github-badge-rail:hover {
     transform: translateY(-1px);
     border-color: rgba(201, 94, 75, 0.5);
+}
+
+.hero-surface {
+    margin-bottom: 20px;
+    padding: 24px 28px;
+    border-radius: 30px;
+    border: 1px solid rgba(216, 201, 184, 0.5);
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 247, 240, 0.88) 100%),
+        radial-gradient(circle at top right, rgba(208, 88, 58, 0.08), transparent 28%);
+    box-shadow: 0 24px 60px rgba(31, 26, 23, 0.08);
+    position: relative;
+    overflow: hidden;
+}
+
+.hero-surface::after {
+    content: "";
+    position: absolute;
+    inset: auto -40px -80px auto;
+    width: 240px;
+    height: 240px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(208, 88, 58, 0.08), transparent 68%);
+    pointer-events: none;
+}
+
+.hero-copy {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.hero-eyebrow {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: var(--color-text-tertiary);
+}
+
+.hero-title-row {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+.hero-title-block {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.hero-actions-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+}
+
+.hero-link-pill,
+.hero-summary-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(216, 201, 184, 0.56);
+    background: rgba(255, 255, 255, 0.78);
+    box-shadow: var(--shadow-subtle);
+}
+
+.hero-link-pill {
+    color: var(--color-text-primary);
+    text-decoration: none;
+}
+
+.hero-link-label,
+.hero-summary-label {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-tertiary);
+}
+
+.hero-link-value,
+.hero-summary-value {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-primary);
 }
