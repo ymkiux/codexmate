@@ -2,14 +2,14 @@
    主标题
    ============================================ */
 .main-title {
-    font-size: var(--font-size-display);
+    font-size: clamp(34px, 4.2vw, 56px);
     font-weight: var(--font-weight-display);
-    line-height: var(--line-height-tight);
-    letter-spacing: -0.03em;
-    margin-bottom: 10px;
+    line-height: 0.98;
+    letter-spacing: -0.05em;
+    margin-bottom: 0;
     color: var(--color-text-primary);
     font-family: var(--font-family-display);
-    background: linear-gradient(135deg, var(--color-text-primary) 0%, rgba(27, 23, 20, 0.78) 100%);
+    background: linear-gradient(135deg, var(--color-text-primary) 0%, rgba(27, 23, 20, 0.72) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -22,11 +22,11 @@
 }
 
 .subtitle {
-    font-size: var(--font-size-body);
+    font-size: 15px;
     color: var(--color-text-tertiary);
-    line-height: var(--line-height-normal);
-    margin-bottom: 20px;
-    max-width: 640px;
+    line-height: 1.75;
+    margin-bottom: 0;
+    max-width: 60ch;
     letter-spacing: 0.01em;
 }
 
@@ -85,9 +85,9 @@
    卡片
    ============================================ */
 .card {
-    background: linear-gradient(180deg, #fffdf9 0%, #fff8f2 100%);
-    border-radius: var(--radius-lg);
-    padding: 10px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 249, 243, 0.9) 100%);
+    border-radius: 20px;
+    padding: 14px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -96,10 +96,10 @@
         transform var(--transition-normal) var(--ease-spring),
         box-shadow var(--transition-normal) var(--ease-spring),
         background-color var(--transition-fast) var(--ease-smooth);
-    box-shadow: 0 10px 24px rgba(27, 23, 20, 0.08);
+    box-shadow: 0 18px 36px rgba(27, 23, 20, 0.06);
     user-select: none;
     will-change: transform;
-    border: 1px solid rgba(216, 201, 184, 0.55);
+    border: 1px solid rgba(216, 201, 184, 0.48);
     position: relative;
     overflow: hidden;
 }
@@ -235,7 +235,7 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    opacity: 0.8;
+    opacity: 0.9;
 }
 
 .card-trailing {

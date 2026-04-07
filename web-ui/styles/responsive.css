@@ -13,8 +13,8 @@ textarea:focus-visible {
 
 @media (max-width: 1280px) {
     .app-shell {
-        grid-template-columns: 240px minmax(0, 1fr) 300px;
-        gap: 14px;
+        grid-template-columns: 236px minmax(0, 1fr) 292px;
+        gap: 16px;
     }
 
     .status-inspector {
@@ -23,7 +23,11 @@ textarea:focus-visible {
     }
 
     .main-panel {
-        padding: var(--spacing-sm) var(--spacing-md);
+        padding: 22px 24px;
+    }
+
+    .hero-surface {
+        padding: 20px 22px;
     }
 }
 
@@ -42,6 +46,8 @@ textarea:focus-visible {
     }
     .hero-logo {
         display: block;
+        width: 60px;
+        height: 60px;
     }
     .hero-github {
         display: flex;
@@ -54,8 +60,22 @@ textarea:focus-visible {
         font-size: var(--font-size-secondary);
     }
     .main-panel {
-        padding: var(--spacing-sm) var(--spacing-sm);
-        border-radius: 14px;
+        padding: 18px;
+        border-radius: 20px;
+    }
+
+    .hero-surface {
+        padding: 18px;
+        border-radius: 22px;
+    }
+
+    .hero-title-row {
+        align-items: flex-start;
+    }
+
+    .hero-actions-row {
+        flex-direction: column;
+        align-items: stretch;
     }
     .top-tabs {
         display: grid !important;
@@ -90,11 +110,15 @@ textarea:focus-visible {
 
 @media (max-width: 720px) {
     .main-title {
-        font-size: 40px;
+        font-size: 36px;
     }
 
     .hero-title {
         font-size: 32px;
+    }
+
+    .hero-title-row {
+        flex-direction: column;
     }
 
     .subtitle {
@@ -147,10 +171,20 @@ textarea:focus-visible {
         padding: 0 var(--spacing-sm) var(--spacing-md);
     }
     .hero-title {
-        font-size: 32px;
+        font-size: 30px;
     }
     .hero-subtitle {
         font-size: var(--font-size-secondary);
+    }
+
+    .hero-surface {
+        padding: 16px 14px;
+    }
+
+    .hero-link-pill,
+    .hero-summary-pill {
+        width: 100%;
+        justify-content: space-between;
     }
     .top-tabs {
         grid-template-columns: repeat(1, minmax(0, 1fr));

@@ -8,16 +8,38 @@
             </span>
         </button>
 
-        <div class="hero" v-if="!sessionStandalone">
-            <img class="hero-logo" src="/res/logo.png" alt="Codex Mate logo">
-            <div class="hero-title">
-                Codex <span class="accent">Mate.</span>
+        <section class="hero-surface" v-if="!sessionStandalone">
+            <div class="hero-copy">
+                <div class="hero-eyebrow">LOCAL AI WORKSPACE</div>
+                <div class="hero-title-row">
+                    <img class="hero-logo" src="/res/logo.png" alt="Codex Mate logo">
+                    <div class="hero-title-block">
+                        <div class="hero-title">
+                            Codex <span class="accent">Mate.</span>
+                        </div>
+                        <div class="hero-subtitle">
+                            参考 Dory 的层级组织方式，但只保留 codexmate 真正需要的入口、状态和操作，不把界面硬凑成别人的样子。
+                            <span class="sr-only">本地配置中枢，统一管理 Codex / Claude Code / OpenClaw / 会话。</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="hero-actions-row">
+                    <a
+                        class="hero-link-pill"
+                        href="https://github.com/SakuraByteCore/codexmate"
+                        target="_blank"
+                        rel="noopener"
+                        title="打开 GitHub 仓库">
+                        <span class="hero-link-label">GitHub</span>
+                        <span class="hero-link-value">SakuraByteCore/codexmate</span>
+                    </a>
+                    <div class="hero-summary-pill">
+                        <span class="hero-summary-label">当前区域</span>
+                        <span class="hero-summary-value">{{ mainTab === 'config' ? '配置中心' : (mainTab === 'sessions' ? '会话浏览' : (mainTab === 'usage' ? 'Usage' : (mainTab === 'market' ? '技能市场' : '设置'))) }}</span>
+                    </div>
+                </div>
             </div>
-            <div class="hero-subtitle">
-                配置中枢：管理 Codex / Claude / OpenClaw / 会话
-                <span class="sr-only">本地配置中枢，统一管理 Codex / Claude Code / OpenClaw / 会话。</span>
-            </div>
-        </div>
+        </section>
         <div v-if="!sessionStandalone" class="hero-github">
             <a
                 class="github-badge github-badge-mobile"
@@ -257,23 +279,12 @@
                 </div>
             </aside>
             <main class="main-panel">
-                <div class="panel-header" v-if="!sessionStandalone">
-                    <h1 class="main-title">
-                        {{ mainTab === 'config' ? '配置中心' : (mainTab === 'sessions' ? '会话浏览' : (mainTab === 'usage' ? 'Usage' : (mainTab === 'market' ? '技能市场' : '设置'))) }}
-                    </h1>
-                    <p class="subtitle" v-if="mainTab === 'config'">
-                        配置中枢：管理 Codex / Claude / OpenClaw
-                        <span class="sr-only">本地配置中枢，统一管理 Codex / Claude Code / OpenClaw。</span>
-                    </p>
-                    <p class="subtitle" v-else-if="mainTab === 'sessions'">
-                        统一查看与导出 Codex / Claude 会话。
-                    </p>
-                    <p class="subtitle" v-else-if="mainTab === 'usage'">
-                        单独查看本地会话用量、趋势与高频路径。
-                    </p>
-                    <p class="subtitle" v-else-if="mainTab === 'market'">
-                        统一管理 Codex / Claude Skills，并聚焦本地导入与分发。
-                    </p>
+                <div class="panel-header panel-header-dory" v-if="!sessionStandalone">
+                    <div class="panel-header-copy">
+                        <div class="panel-kicker">{{ mainTab === 'config' ? '配置中心' : (mainTab === 'sessions' ? '会话浏览' : (mainTab === 'usage' ? 'Usage' : (mainTab === 'market' ? '技能市场' : '设置'))) }}</div>
+                        <h1 class="main-title">{{ mainTab === 'config' ? '本地 AI 工作台' : (mainTab === 'sessions' ? '会话与上下文' : (mainTab === 'usage' ? '本地用量与趋势' : (mainTab === 'market' ? '技能与分发' : '运行与数据设置'))) }}</h1>
+                        <p class="subtitle">{{ mainTab === 'config' ? '集中整理 Codex、Claude Code 与 OpenClaw 的关键配置，保持入口清爽、信息成组。' : (mainTab === 'sessions' ? '统一查看、检索和导出 Codex / Claude 会话，不把信息挤成一坨。' : (mainTab === 'usage' ? '把用量统计独立出来，避免会话浏览和趋势信息互相打架。' : (mainTab === 'market' ? '围绕本地 Skills 的安装、导入与同步建立清晰工作流。' : '处理下载、数据管理与全局行为，不往别的面板乱塞杂项。'))) }}</p>
+                    </div>
                 </div>
 
                 <div class="status-strip" v-if="!sessionStandalone && mainTab === 'config'">
