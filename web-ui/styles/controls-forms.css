@@ -2,22 +2,22 @@
    选择器 - 用于模型选择
    ============================================ */
 .selector-section {
-    background: linear-gradient(to bottom, var(--color-surface) 0%, rgba(255, 255, 255, 0.92) 100%);
-    border-radius: var(--radius-lg);
-    padding: calc(var(--spacing-sm) + 2px);
-    margin-bottom: 16px;
-    box-shadow: var(--shadow-card);
-    border: 1px solid var(--color-border-soft);
+    background: rgba(255, 255, 255, 0.82);
+    border-radius: 10px;
+    padding: 8px;
+    margin-bottom: 8px;
+    box-shadow: none;
+    border: 1px solid rgba(216, 201, 184, 0.22);
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-xs);
+    gap: 4px;
 }
 
 .selector-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: var(--spacing-xs);
+    margin-bottom: 4px;
 }
 
 .settings-tab-header {
@@ -74,11 +74,11 @@
 }
 
 .selector-title {
-    font-size: var(--font-size-caption);
+    font-size: 11px;
     font-weight: var(--font-weight-secondary);
     color: var(--color-text-muted);
     text-transform: none;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.03em;
     opacity: 0.85;
 }
 
@@ -88,9 +88,9 @@
 }
 
 .health-report {
-    margin-top: 10px;
-    padding: 10px 12px;
-    border-radius: var(--radius-md);
+    margin-top: 8px;
+    padding: 8px 10px;
+    border-radius: 10px;
     border: 1px solid var(--color-border-soft);
     background: var(--color-surface-alt);
     display: grid;
@@ -161,11 +161,12 @@
 
 .model-select {
     width: 100%;
-    padding: 12px var(--spacing-sm);
-    padding-right: 40px;
+    min-height: 36px;
+    padding: 8px 10px;
+    padding-right: 34px;
     border: 1px solid var(--color-border-soft);
-    border-radius: var(--radius-sm);
-    font-size: var(--font-size-body);
+    border-radius: 8px;
+    font-size: 13px;
     font-weight: var(--font-weight-body);
     background-color: var(--color-surface-alt);
     color: var(--color-text-primary);
@@ -177,7 +178,7 @@
     background-position: right 14px center;
     background-size: 12px;
     transition: all var(--transition-fast) var(--ease-smooth);
-    box-shadow: inset 0 1px 2px rgba(31, 26, 23, 0.04);
+    box-shadow: none;
 }
 
 .model-select:hover {
@@ -193,16 +194,17 @@
 
 .model-input {
     width: 100%;
-    padding: 12px var(--spacing-sm);
+    min-height: 36px;
+    padding: 8px 10px;
     border: 1px solid var(--color-border-soft);
-    border-radius: var(--radius-sm);
-    font-size: var(--font-size-body);
+    border-radius: 8px;
+    font-size: 13px;
     font-weight: var(--font-weight-body);
     background-color: var(--color-surface-alt);
     color: var(--color-text-primary);
     outline: none;
     transition: all var(--transition-fast) var(--ease-smooth);
-    box-shadow: inset 0 1px 2px rgba(31, 26, 23, 0.04);
+    box-shadow: none;
 }
 
 .model-input:hover {
@@ -217,16 +219,16 @@
 }
 
 .config-template-hint {
-    margin-top: 8px;
-    margin-bottom: 10px;
-    font-size: var(--font-size-caption);
+    margin-top: 6px;
+    margin-bottom: 6px;
+    font-size: 11px;
     color: var(--color-text-tertiary);
-    line-height: 1.4;
+    line-height: 1.35;
 }
 
 .codex-config-grid {
     display: grid;
-    gap: var(--spacing-sm);
+    gap: 10px;
     grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
     align-items: start;
 }
@@ -246,11 +248,12 @@
    ============================================ */
 .btn-add {
     width: 100%;
-    padding: 14px var(--spacing-sm);
-    border: 1.5px dashed rgba(208, 196, 182, 0.6);
-    border-radius: var(--radius-lg);
-    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.15) 100%);
-    font-size: var(--font-size-body);
+    min-height: 38px;
+    padding: 8px 10px;
+    border: 1px dashed rgba(208, 196, 182, 0.55);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.36);
+    font-size: 13px;
     font-weight: var(--font-weight-secondary);
     color: var(--color-text-tertiary);
     cursor: pointer;
@@ -265,7 +268,7 @@
 .selector-section + .btn-add,
 .btn-add + .card-list,
 .card-list + .btn-add {
-    margin-top: 12px;
+    margin-top: 8px;
 }
 
 .btn-add:hover {
@@ -290,11 +293,12 @@
 }
 
 .btn-tool {
-    padding: 12px var(--spacing-sm);
-    border-radius: var(--radius-sm);
+    min-height: 36px;
+    padding: 8px 10px;
+    border-radius: 8px;
     border: 1px solid var(--color-border-soft);
-    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%);
-    font-size: var(--font-size-body);
+    background: rgba(255, 255, 255, 0.86);
+    font-size: 13px;
     font-weight: var(--font-weight-secondary);
     color: var(--color-text-secondary);
     cursor: pointer;
@@ -342,13 +346,13 @@
 }
 
 .btn-tool-compact {
-    padding: 9px 12px;
-    font-size: var(--font-size-secondary);
+    padding: 7px 10px;
+    font-size: 12px;
 }
 
 .selector-header .btn-tool-compact {
-    padding: 6px 10px;
-    font-size: var(--font-size-caption);
+    padding: 5px 8px;
+    font-size: 11px;
     line-height: 1.1;
-    box-shadow: var(--shadow-subtle);
+    box-shadow: none;
 }
