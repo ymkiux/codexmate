@@ -178,34 +178,17 @@
     max-height: none;
     overflow-y: auto;
     overflow-x: hidden;
-    padding-right: 4px;
+    padding-right: 0;
     min-width: 0;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(166, 149, 130, 0.85) transparent;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
 
 .session-list::-webkit-scrollbar,
 .session-preview-scroll::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-}
-
-.session-list::-webkit-scrollbar-track,
-.session-preview-scroll::-webkit-scrollbar-track {
-    background: transparent;
-    border-radius: 999px;
-}
-
-.session-list::-webkit-scrollbar-thumb,
-.session-preview-scroll::-webkit-scrollbar-thumb {
-    background: linear-gradient(to bottom, rgba(191, 174, 154, 0.95) 0%, rgba(160, 141, 121, 0.95) 100%);
-    border-radius: 999px;
-    border: 2px solid rgba(255, 255, 255, 0.9);
-}
-
-.session-list::-webkit-scrollbar-thumb:hover,
-.session-preview-scroll::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(to bottom, rgba(175, 156, 136, 0.95) 0%, rgba(145, 126, 107, 0.95) 100%);
+    width: 0;
+    height: 0;
+    display: none;
 }
 
 .session-item {
