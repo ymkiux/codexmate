@@ -23,11 +23,11 @@ textarea:focus-visible {
     }
 
     .main-panel {
-        padding: 22px 24px;
+        padding: 20px 22px;
     }
 
     .hero-surface {
-        padding: 20px 22px;
+        padding: 15px 18px;
     }
 }
 
@@ -65,17 +65,14 @@ textarea:focus-visible {
     }
 
     .hero-surface {
-        padding: 18px;
-        border-radius: 22px;
+        padding: 16px;
+        border-radius: 16px;
     }
 
+    .hero-meta-row,
     .hero-title-row {
-        align-items: flex-start;
-    }
-
-    .hero-actions-row {
         flex-direction: column;
-        align-items: stretch;
+        align-items: flex-start;
     }
     .top-tabs {
         display: grid !important;
@@ -110,15 +107,11 @@ textarea:focus-visible {
 
 @media (max-width: 720px) {
     .main-title {
-        font-size: 36px;
+        font-size: 34px;
     }
 
     .hero-title {
-        font-size: 32px;
-    }
-
-    .hero-title-row {
-        flex-direction: column;
+        font-size: 30px;
     }
 
     .subtitle {
@@ -171,14 +164,14 @@ textarea:focus-visible {
         padding: 0 var(--spacing-sm) var(--spacing-md);
     }
     .hero-title {
-        font-size: 30px;
+        font-size: 28px;
     }
     .hero-subtitle {
         font-size: var(--font-size-secondary);
     }
 
     .hero-surface {
-        padding: 16px 14px;
+        padding: 14px 12px;
     }
 
     .hero-link-pill,

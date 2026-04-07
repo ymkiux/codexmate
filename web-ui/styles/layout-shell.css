@@ -6,10 +6,9 @@ body::before {
     position: fixed;
     inset: 0;
     background:
-        radial-gradient(circle at top left, rgba(208, 88, 58, 0.04), transparent 28%),
-        radial-gradient(circle at top right, rgba(245, 201, 160, 0.1), transparent 24%),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0));
-    opacity: 0.84;
+        radial-gradient(circle at top left, rgba(208, 88, 58, 0.025), transparent 24%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0));
+    opacity: 0.58;
     pointer-events: none;
     z-index: 0;
 }
@@ -20,10 +19,10 @@ body::after {
     position: fixed;
     inset: 0;
     background-image:
-        linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
-        linear-gradient(0deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-    background-size: 180px 180px;
-    opacity: 0.04;
+        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 220px 220px;
+    opacity: 0.018;
     pointer-events: none;
     z-index: 0;
 }
@@ -60,14 +59,14 @@ body::after {
     align-self: start;
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-sm) 12px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 251, 247, 0.9) 100%);
-    border: 1px solid rgba(216, 201, 184, 0.44);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-card);
+    gap: 10px;
+    padding: 12px 10px;
+    background: rgba(255, 255, 255, 0.88);
+    border: 1px solid rgba(216, 201, 184, 0.34);
+    border-radius: 18px;
+    box-shadow: 0 8px 18px rgba(31, 26, 23, 0.035);
     min-height: 420px;
-    backdrop-filter: blur(12px);
+    backdrop-filter: blur(8px);
 }
 
 .side-rail .brand-title {
@@ -92,46 +91,44 @@ body::after {
 .side-item {
     width: 100%;
     text-align: left;
-    padding: 12px var(--spacing-sm);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--color-border-soft);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 247, 240, 0.95) 100%);
+    padding: 11px var(--spacing-sm);
+    border-radius: 12px;
+    border: 1px solid rgba(216, 201, 184, 0.34);
+    background: rgba(255, 255, 255, 0.92);
     color: var(--color-text-secondary);
     cursor: pointer;
-    transition: none;
+    transition: border-color var(--transition-fast) var(--ease-smooth), background-color var(--transition-fast) var(--ease-smooth), color var(--transition-fast) var(--ease-smooth);
     display: flex;
     flex-direction: column;
     gap: 6px;
-    box-shadow: var(--shadow-subtle);
+    box-shadow: none;
 }
 
 .side-item:hover {
-    border-color: var(--color-brand);
+    border-color: rgba(201, 94, 75, 0.38);
     color: var(--color-text-primary);
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-card-hover);
 }
 
 .side-item.active {
-    border-color: var(--color-brand);
-    background: linear-gradient(135deg, rgba(201, 94, 75, 0.14), rgba(255, 255, 255, 0.96));
+    border-color: rgba(201, 94, 75, 0.48);
+    background: rgba(249, 244, 240, 0.98);
     color: var(--color-text-primary);
-    box-shadow: var(--shadow-float);
+    box-shadow: inset 0 0 0 1px rgba(201, 94, 75, 0.06);
 }
 
 .side-item.nav-intent-active {
-    border-color: var(--color-brand);
-    background: linear-gradient(135deg, rgba(201, 94, 75, 0.14), rgba(255, 255, 255, 0.96));
+    border-color: rgba(201, 94, 75, 0.48);
+    background: rgba(249, 244, 240, 0.98);
     color: var(--color-text-primary);
-    box-shadow: var(--shadow-float);
+    box-shadow: inset 0 0 0 1px rgba(201, 94, 75, 0.06);
 }
 
 .side-item.nav-intent-inactive,
 .side-item.active.nav-intent-inactive {
-    border-color: var(--color-border-soft);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 247, 240, 0.95) 100%);
+    border-color: rgba(216, 201, 184, 0.34);
+    background: rgba(255, 255, 255, 0.92);
     color: var(--color-text-secondary);
-    box-shadow: var(--shadow-subtle);
+    box-shadow: none;
 }
 
 .side-item-title {
@@ -203,10 +200,10 @@ body::after {
 }
 
 .brand-subtitle {
-    margin-top: 4px;
-    font-size: 12px;
+    margin-top: 2px;
+    font-size: 11px;
     color: var(--color-text-tertiary);
-    line-height: 1.5;
+    line-height: 1.45;
     max-width: 18ch;
 }
 
@@ -216,18 +213,18 @@ body::after {
     align-items: center;
     justify-content: space-between;
     gap: 10px;
-    margin-top: 6px;
-    padding: 7px 11px;
-    border-radius: 999px;
-    border: 1px solid rgba(216, 201, 184, 0.42);
-    background: rgba(255, 255, 255, 0.9);
+    margin-top: 4px;
+    padding: 8px 10px;
+    border-radius: 12px;
+    border: 1px solid rgba(216, 201, 184, 0.4);
+    background: rgba(255, 255, 255, 0.82);
     color: var(--color-text-secondary);
     font-size: var(--font-size-caption);
     text-decoration: none;
-    box-shadow: var(--shadow-subtle);
-    transition: all var(--transition-fast) var(--ease-spring);
+    box-shadow: none;
+    transition: border-color var(--transition-fast) var(--ease-smooth), background-color var(--transition-fast) var(--ease-smooth), color var(--transition-fast) var(--ease-smooth), box-shadow var(--transition-fast) var(--ease-smooth);
     min-width: 0;
-    backdrop-filter: blur(6px);
+    backdrop-filter: blur(4px);
 }
 
 .github-badge-rail {
@@ -235,18 +232,26 @@ body::after {
     align-items: center;
     justify-content: flex-start;
     gap: 8px;
-    padding: 6px 8px;
+    padding: 8px 9px;
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.8);
-    border: 1px solid rgba(216, 201, 184, 0.5);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(216, 201, 184, 0.38);
+    box-shadow: none;
 }
 
 .github-badge:hover {
-    border-color: rgba(201, 94, 75, 0.5);
+    border-color: rgba(201, 94, 75, 0.46);
+    background: rgba(255, 255, 255, 0.92);
     color: var(--color-text-primary);
-    transform: translateY(-1px);
-    box-shadow: 0 6px 12px rgba(27, 23, 20, 0.08);
+    box-shadow: 0 0 0 1px rgba(201, 94, 75, 0.08);
+}
+
+.github-badge:focus-visible {
+    outline: 3px solid rgba(201, 94, 75, 0.22);
+    outline-offset: 2px;
+    border-color: rgba(201, 94, 75, 0.52);
+    color: var(--color-text-primary);
+    background: rgba(255, 255, 255, 0.94);
 }
 
 .github-badge-icon {
@@ -330,32 +335,22 @@ body::after {
 }
 
 .github-badge-rail:hover {
-    transform: translateY(-1px);
     border-color: rgba(201, 94, 75, 0.5);
 }
 
 .hero-surface {
     margin-bottom: 18px;
-    padding: 22px 24px;
-    border-radius: 26px;
-    border: 1px solid rgba(216, 201, 184, 0.44);
-    background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 251, 247, 0.93) 100%),
-        radial-gradient(circle at top right, rgba(208, 88, 58, 0.04), transparent 24%);
-    box-shadow: 0 18px 42px rgba(31, 26, 23, 0.06);
+    padding: 16px 20px;
+    border-radius: 18px;
+    border: 1px solid rgba(216, 201, 184, 0.36);
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 10px 22px rgba(31, 26, 23, 0.035);
     position: relative;
     overflow: hidden;
 }
 
 .hero-surface::after {
-    content: "";
-    position: absolute;
-    inset: auto -40px -80px auto;
-    width: 220px;
-    height: 220px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(208, 88, 58, 0.04), transparent 68%);
-    pointer-events: none;
+    display: none;
 }
 
 .hero-copy {
@@ -363,46 +358,51 @@ body::after {
     z-index: 1;
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 12px;
+}
+
+.hero-meta-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
 }
 
 .hero-eyebrow {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.08em;
     color: var(--color-text-tertiary);
+    text-transform: uppercase;
 }
 
 .hero-title-row {
     display: flex;
-    align-items: center;
-    gap: 18px;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
 }
 
 .hero-title-block {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-}
-
-.hero-actions-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    align-items: center;
+    gap: 4px;
+    min-width: 0;
 }
 
 .hero-link-pill,
 .hero-summary-pill {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
-    min-height: 38px;
-    padding: 0 13px;
-    border-radius: 999px;
-    border: 1px solid rgba(216, 201, 184, 0.48);
-    background: rgba(255, 255, 255, 0.92);
-    box-shadow: var(--shadow-subtle);
+    gap: 8px;
+    min-height: 34px;
+    min-width: 0;
+    max-width: 100%;
+    padding: 0 11px;
+    border-radius: 10px;
+    border: 1px solid rgba(216, 201, 184, 0.38);
+    background: rgba(251, 249, 246, 0.92);
+    box-shadow: none;
 }
 
 .hero-link-pill {
@@ -413,7 +413,7 @@ body::after {
 
 .hero-link-pill:hover {
     border-color: rgba(201, 94, 75, 0.46);
-    background: rgba(255, 252, 249, 0.98);
+    background: rgba(255, 255, 255, 0.98);
     color: var(--color-text-primary);
 }
 
@@ -422,15 +422,16 @@ body::after {
     outline: 3px solid rgba(201, 94, 75, 0.22);
     outline-offset: 2px;
     border-color: rgba(201, 94, 75, 0.54);
-    background: rgba(255, 252, 249, 0.98);
+    background: rgba(255, 255, 255, 0.98);
 }
 
 .hero-link-label,
 .hero-summary-label {
     font-size: 11px;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--color-text-tertiary);
+    flex-shrink: 0;
 }
 
 .hero-link-value,
@@ -438,4 +439,8 @@ body::after {
     font-size: 13px;
     font-weight: 600;
     color: var(--color-text-primary);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
