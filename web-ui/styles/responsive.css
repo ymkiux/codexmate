@@ -35,6 +35,11 @@ textarea:focus-visible {
     }
     .workbench-bar {
         display: flex;
+        justify-content: flex-start;
+    }
+
+    .workbench-bar-repo {
+        display: none;
     }
     .main-panel {
         padding: 14px;
@@ -47,6 +52,8 @@ textarea:focus-visible {
         overflow-x: auto;
         overflow-y: hidden;
         padding-bottom: 2px;
+        margin-left: -2px;
+        margin-right: -2px;
     }
     .status-strip {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -143,7 +150,7 @@ textarea:focus-visible {
     .workbench-bar {
         flex-direction: row;
         align-items: center;
-        justify-content: space-between;
+        justify-content: flex-start;
     }
 
     .workbench-bar-kicker {
@@ -153,10 +160,6 @@ textarea:focus-visible {
     .workbench-bar-title {
         font-size: 15px;
         margin-top: 1px;
-    }
-
-    .workbench-bar-repo {
-        display: none;
     }
 
     .top-tabs {
