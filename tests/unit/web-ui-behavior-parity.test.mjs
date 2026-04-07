@@ -322,9 +322,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     const allowedExtraCurrentKeys = parityAgainstHead ? [] : [
         'sessionsViewMode'
     ];
-    const allowedMissingCurrentKeys = parityAgainstHead ? [
-        'sessionsViewMode'
-    ] : [];
+    const allowedMissingCurrentKeys = parityAgainstHead ? [] : [];
     if (parityAgainstHead) {
         const allowedExtraKeySet = new Set(allowedExtraCurrentKeys);
         const allowedMissingKeySet = new Set(allowedMissingCurrentKeys);

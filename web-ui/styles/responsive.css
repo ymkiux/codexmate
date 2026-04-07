@@ -13,8 +13,8 @@ textarea:focus-visible {
 
 @media (max-width: 1280px) {
     .app-shell {
-        grid-template-columns: 236px minmax(0, 1fr) 292px;
-        gap: 16px;
+        grid-template-columns: minmax(168px, 216px) minmax(0, 1fr) minmax(200px, 252px);
+        gap: 14px;
     }
 
     .status-inspector {
@@ -123,7 +123,7 @@ textarea:focus-visible {
 
     .subtitle {
         font-size: var(--font-size-secondary);
-        margin-bottom: 16px;
+        margin-bottom: 0;
     }
 
     .segmented-control {
@@ -132,8 +132,8 @@ textarea:focus-visible {
     }
 
     .status-strip {
-        flex-direction: row;
-        flex-wrap: wrap;
+        grid-template-columns: 1fr;
+        gap: 12px;
     }
 
     .market-grid {

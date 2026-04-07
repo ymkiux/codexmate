@@ -28,7 +28,7 @@
                         class="hero-link-pill"
                         href="https://github.com/SakuraByteCore/codexmate"
                         target="_blank"
-                        rel="noopener"
+                        rel="noopener noreferrer"
                         title="打开 GitHub 仓库">
                         <span class="hero-link-label">GitHub</span>
                         <span class="hero-link-value">SakuraByteCore/codexmate</span>
@@ -45,7 +45,7 @@
                 class="github-badge github-badge-mobile"
                 href="https://github.com/SakuraByteCore/codexmate"
                 target="_blank"
-                rel="noopener"
+                rel="noopener noreferrer"
                 title="打开 GitHub 仓库">
                 <span class="github-badge-left">
                     <svg class="github-badge-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -153,7 +153,7 @@
                         class="github-badge github-badge-rail"
                         href="https://github.com/SakuraByteCore/codexmate"
                         target="_blank"
-                        rel="noopener"
+                        rel="noopener noreferrer"
                         title="打开 GitHub 仓库">
                         <span class="github-badge-left">
                             <svg class="github-badge-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -282,8 +282,8 @@
                 <div class="panel-header panel-header-refined" v-if="!sessionStandalone">
                     <div class="panel-header-copy">
                         <div class="panel-kicker">{{ mainTab === 'config' ? '配置中心' : (mainTab === 'sessions' ? '会话浏览' : (mainTab === 'usage' ? 'Usage' : (mainTab === 'market' ? '技能市场' : '设置'))) }}</div>
-                        <h1 class="main-title">{{ mainTab === 'config' ? '本地 AI 工作台' : (mainTab === 'sessions' ? '会话与上下文' : (mainTab === 'usage' ? '本地用量与趋势' : (mainTab === 'market' ? '技能与分发' : '运行与数据设置'))) }}</h1>
-                        <p class="subtitle">{{ mainTab === 'config' ? '集中整理 Codex、Claude Code 与 OpenClaw 的关键配置，保持入口清爽、信息成组。' : (mainTab === 'sessions' ? '统一查看、检索和导出 Codex / Claude 会话，不把信息挤成一坨。' : (mainTab === 'usage' ? '把用量统计独立出来，避免会话浏览和趋势信息互相打架。' : (mainTab === 'market' ? '围绕本地 Skills 的安装、导入与同步建立清晰工作流。' : '处理下载、数据管理与全局行为，不往别的面板乱塞杂项。'))) }}</p>
+                        <h1 class="main-title">{{ mainTab === 'config' ? '配置与运行' : (mainTab === 'sessions' ? '会话与上下文' : (mainTab === 'usage' ? '本地用量与趋势' : (mainTab === 'market' ? '技能与分发' : '运行与数据设置'))) }}</h1>
+                        <p class="subtitle">{{ mainTab === 'config' ? '统一处理 Provider、Claude Code 与 OpenClaw 配置。' : (mainTab === 'sessions' ? '查看、检索、导出并继续处理本地会话记录。' : (mainTab === 'usage' ? '单独查看本地使用趋势与活跃来源。' : (mainTab === 'market' ? '围绕本地 Skills 的安装、导入与同步整理入口。' : '管理下载、数据目录与全局行为。'))) }}</p>
                     </div>
                 </div>
 
