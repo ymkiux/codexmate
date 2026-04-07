@@ -28,8 +28,8 @@ test('styles include force-compact fallback rules for readability on touch devic
     assert.match(styles, /body\.force-compact\s*\{/);
     assert.match(styles, /body\.force-compact\s+\.app-shell\s*\{/);
     assert.match(styles, /body\.force-compact\s+\.status-inspector\s*\{[\s\S]*display:\s*none;/);
-    assert.match(styles, /body\.force-compact\s+\.top-tabs\s*\{[\s\S]*display:\s*grid\s*!important;[\s\S]*grid-template-columns:\s*repeat\(1,\s*minmax\(0,\s*1fr\)\);/);
-    assert.match(styles, /@media\s*\(min-width:\s*541px\)\s*\{[\s\S]*body\.force-compact\s+\.top-tabs\s*\{[\s\S]*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
+    assert.match(styles, /body\.force-compact\s+\.top-tabs\s*\{[\s\S]*display:\s*flex\s*!important;[\s\S]*flex-wrap:\s*nowrap;[\s\S]*overflow-x:\s*auto;/);
+    assert.match(styles, /body\.force-compact\s+\.top-tabs::-webkit-scrollbar\s*\{[\s\S]*display:\s*none;/);
     assert.match(layoutShell, /@media\s*\(min-width:\s*961px\)\s*\{[\s\S]*body:not\(.force-compact\)\s+#app\s*>\s*\.top-tabs\s*\{[\s\S]*display:\s*none;/);
     assert.doesNotMatch(layoutShell, /^\s*\.top-tabs\s*\{[\s\S]*display:\s*none\s*!important;/m);
     assert.match(styles, /body\.force-compact\s+\.card-subtitle/);
