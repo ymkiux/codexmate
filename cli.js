@@ -184,34 +184,44 @@ const HTTP_KEEP_ALIVE_AGENT = new http.Agent({ keepAlive: true });
 const HTTPS_KEEP_ALIVE_AGENT = new https.Agent({ keepAlive: true });
 
 function getCodexSkillsDir() {
+    const joinPath = (basePath, ...segments) => {
+        const base = typeof basePath === 'string' ? basePath.trim() : '';
+        const pathApi = base.includes('/') && !base.includes('\\') && path.posix ? path.posix : path;
+        return pathApi.join(base, ...segments);
+    };
     const envCodexHome = typeof process.env.CODEX_HOME === 'string' ? process.env.CODEX_HOME.trim() : '';
     if (envCodexHome) {
-        const target = path.join(envCodexHome, 'skills');
+        const target = joinPath(envCodexHome, 'skills');
         return resolveExistingDir([target], target);
     }
     const xdgConfig = typeof process.env.XDG_CONFIG_HOME === 'string' ? process.env.XDG_CONFIG_HOME.trim() : '';
     if (xdgConfig) {
-        const target = path.join(xdgConfig, 'codex', 'skills');
+        const target = joinPath(xdgConfig, 'codex', 'skills');
         return resolveExistingDir([target], target);
     }
-    const homeConfigDir = path.join(os.homedir(), '.config', 'codex', 'skills');
+    const homeConfigDir = joinPath(os.homedir(), '.config', 'codex', 'skills');
     return resolveExistingDir([homeConfigDir], CODEX_SKILLS_DIR);
 }
 
 function getClaudeSkillsDir() {
+    const joinPath = (basePath, ...segments) => {
+        const base = typeof basePath === 'string' ? basePath.trim() : '';
+        const pathApi = base.includes('/') && !base.includes('\\') && path.posix ? path.posix : path;
+        return pathApi.join(base, ...segments);
+    };
     const envClaudeHome = typeof process.env.CLAUDE_HOME === 'string' && process.env.CLAUDE_HOME.trim()
         ? process.env.CLAUDE_HOME.trim()
         : (typeof process.env.CLAUDE_CONFIG_DIR === 'string' ? process.env.CLAUDE_CONFIG_DIR.trim() : '');
     if (envClaudeHome) {
-        const target = path.join(envClaudeHome, 'skills');
+        const target = joinPath(envClaudeHome, 'skills');
         return resolveExistingDir([target], target);
     }
     const xdgConfig = typeof process.env.XDG_CONFIG_HOME === 'string' ? process.env.XDG_CONFIG_HOME.trim() : '';
     if (xdgConfig) {
-        const target = path.join(xdgConfig, 'claude', 'skills');
+        const target = joinPath(xdgConfig, 'claude', 'skills');
         return resolveExistingDir([target], target);
     }
-    const homeConfigDir = path.join(os.homedir(), '.config', 'claude', 'skills');
+    const homeConfigDir = joinPath(os.homedir(), '.config', 'claude', 'skills');
     return resolveExistingDir([homeConfigDir], CLAUDE_SKILLS_DIR);
 }
 
@@ -2005,11 +2015,16 @@ function listSkillEntriesByRoot(rootDir) {
 }
 
 function scanUnmanagedSkills(params = {}) {
+    const getPathApi = (basePath) => {
+        const base = typeof basePath === 'string' ? basePath.trim() : '';
+        return base.includes('/') && !base.includes('\\') && path.posix ? path.posix : path;
+    };
     const target = resolveSkillTarget(params);
     if (!target) {
         return { error: '目标宿主不支持' };
     }
     const targetRoot = resolveCopyTargetRoot(target.dir);
+    const targetPathApi = getPathApi(targetRoot);
     const existing = listSkills({ targetApp: target.app });
     if (existing.error) {
         return { error: existing.error };
@@ -2023,7 +2038,7 @@ function scanUnmanagedSkills(params = {}) {
     for (const source of sources) {
         const sourceEntries = listSkillEntriesByRoot(source.dir);
         for (const entry of sourceEntries) {
-            const targetCandidate = path.join(targetRoot, entry.name);
+            const targetCandidate = targetPathApi.join(targetRoot, entry.name);
             if (fs.existsSync(targetCandidate)) {
                 continue;
             }
@@ -2070,11 +2085,16 @@ function scanUnmanagedCodexSkills() {
 }
 
 function importSkills(params = {}) {
+    const getPathApi = (basePath) => {
+        const base = typeof basePath === 'string' ? basePath.trim() : '';
+        return base.includes('/') && !base.includes('\\') && path.posix ? path.posix : path;
+    };
     const target = resolveSkillTarget(params);
     if (!target) {
         return { error: '目标宿主不支持' };
     }
     const targetRoot = resolveCopyTargetRoot(target.dir);
+    const targetPathApi = getPathApi(targetRoot);
     const rawItems = Array.isArray(params.items) ? params.items : [];
     if (!rawItems.length) {
         return { error: '请先选择要导入的 skill' };
@@ -2118,9 +2138,10 @@ function importSkills(params = {}) {
         }
         dedup.add(dedupKey);
 
-        const sourcePath = path.join(source.dir, normalizedName.name);
-        const sourceRelative = path.relative(source.dir, sourcePath);
-        if (sourceRelative.startsWith('..') || path.isAbsolute(sourceRelative)) {
+        const sourcePathApi = getPathApi(source.dir);
+        const sourcePath = sourcePathApi.join(source.dir, normalizedName.name);
+        const sourceRelative = sourcePathApi.relative(source.dir, sourcePath);
+        if (sourceRelative.startsWith('..') || sourcePathApi.isAbsolute(sourceRelative)) {
             failed.push({
                 name: normalizedName.name,
                 sourceApp: source.app,
@@ -2137,9 +2158,9 @@ function importSkills(params = {}) {
             continue;
         }
 
-        const targetPath = path.join(targetRoot, normalizedName.name);
-        const targetRelative = path.relative(targetRoot, targetPath);
-        if (targetRelative.startsWith('..') || path.isAbsolute(targetRelative)) {
+        const targetPath = targetPathApi.join(targetRoot, normalizedName.name);
+        const targetRelative = targetPathApi.relative(targetRoot, targetPath);
+        if (targetRelative.startsWith('..') || targetPathApi.isAbsolute(targetRelative)) {
             failed.push({
                 name: normalizedName.name,
                 sourceApp: source.app,
@@ -2283,12 +2304,18 @@ function resolveSkillNameFromImportedDirectory(skillDir, extractionRoot, fallbac
 }
 
 async function importSkillsFromZipFile(zipPath, options = {}) {
+    const getPathApi = (basePath) => {
+        const base = typeof basePath === 'string' ? basePath.trim() : '';
+        return base.includes('/') && !base.includes('\\') && path.posix ? path.posix : path;
+    };
     const fallbackName = typeof options.fallbackName === 'string' ? options.fallbackName : '';
     const tempDir = typeof options.tempDir === 'string' ? options.tempDir : '';
     const imported = [];
     const failed = [];
     const dedupNames = new Set();
-    const extractionRoot = path.join(tempDir || path.dirname(zipPath), 'extract');
+    const extractionPathApi = getPathApi(tempDir || zipPath);
+    const extractionBaseDir = tempDir || extractionPathApi.dirname(zipPath);
+    const extractionRoot = extractionPathApi.join(extractionBaseDir, 'extract');
     let target = null;
     let targetRoot = '';
 
@@ -2298,6 +2325,7 @@ async function importSkillsFromZipFile(zipPath, options = {}) {
             return { error: '目标宿主不支持' };
         }
         targetRoot = resolveCopyTargetRoot(target.dir);
+        const targetPathApi = getPathApi(targetRoot);
         await inspectZipArchiveLimits(zipPath, {
             maxEntryCount: MAX_SKILLS_ZIP_ENTRY_COUNT,
             maxUncompressedBytes: MAX_SKILLS_ZIP_UNCOMPRESSED_BYTES
@@ -2328,9 +2356,9 @@ async function importSkillsFromZipFile(zipPath, options = {}) {
             }
             dedupNames.add(dedupKey);
 
-            const targetPath = path.join(targetRoot, normalizedName.name);
-            const targetRelative = path.relative(targetRoot, targetPath);
-            if (targetRelative.startsWith('..') || path.isAbsolute(targetRelative)) {
+            const targetPath = targetPathApi.join(targetRoot, normalizedName.name);
+            const targetRelative = targetPathApi.relative(targetRoot, targetPath);
+            if (targetRelative.startsWith('..') || targetPathApi.isAbsolute(targetRelative)) {
                 failed.push({
                     name: normalizedName.name,
                     error: '目标路径非法'
@@ -3856,27 +3884,30 @@ function isPathInside(targetPath, rootPath) {
     if (resolvedTarget === resolvedRoot) {
         return true;
     }
-    const rootWithSlash = resolvedRoot.endsWith(path.sep) ? resolvedRoot : resolvedRoot + path.sep;
+    const separator = resolvedRoot.includes('/') && !resolvedRoot.includes('\\') ? '/' : path.sep;
+    const rootWithSlash = resolvedRoot.endsWith(separator) ? resolvedRoot : resolvedRoot + separator;
     return resolvedTarget.startsWith(rootWithSlash);
 }
 
 function resolveCopyTargetRoot(targetDir) {
+    const base = typeof targetDir === 'string' ? targetDir.trim() : '';
+    const pathApi = base.includes('/') && !base.includes('\\') && path.posix ? path.posix : path;
     const suffixSegments = [];
-    let current = path.resolve(targetDir || '');
+    let current = pathApi.resolve(base || '');
     while (current && !fs.existsSync(current)) {
-        const parent = path.dirname(current);
+        const parent = pathApi.dirname(current);
         if (!parent || parent === current) {
             break;
         }
-        suffixSegments.unshift(path.basename(current));
+        suffixSegments.unshift(pathApi.basename(current));
         current = parent;
     }
-    let resolvedRoot = normalizePathForCompare(current || targetDir);
+    let resolvedRoot = normalizePathForCompare(current || base);
     if (!resolvedRoot) {
-        resolvedRoot = path.resolve(targetDir || '');
+        resolvedRoot = pathApi.resolve(base || '');
     }
     for (const segment of suffixSegments) {
-        resolvedRoot = path.join(resolvedRoot, segment);
+        resolvedRoot = pathApi.join(resolvedRoot, segment);
     }
     return resolvedRoot;
 }
@@ -9991,6 +10022,14 @@ function watchPathsForRestart(targets, onChange) {
     const debounceMs = 300;
     let timer = null;
     const watcherEntries = new Map();
+    const getPathApi = (targetPath) => {
+        const value = typeof targetPath === 'string' ? targetPath.trim() : '';
+        return value.includes('/') && !value.includes('\\') && path.posix ? path.posix : path;
+    };
+    const getPathSeparator = (targetPath) => {
+        const pathApi = getPathApi(targetPath);
+        return pathApi.sep || (pathApi === path.posix ? '/' : path.sep);
+    };
 
     const trigger = (info) => {
         if (timer) clearTimeout(timer);
@@ -10013,6 +10052,7 @@ function watchPathsForRestart(targets, onChange) {
         const queue = [rootDir];
         const directories = [];
         const seen = new Set();
+        const pathApi = getPathApi(rootDir);
         while (queue.length) {
             const current = queue.shift();
             if (!current || seen.has(current) || !fs.existsSync(current)) {
@@ -10037,7 +10077,7 @@ function watchPathsForRestart(targets, onChange) {
             }
             for (const entry of entries) {
                 if (entry && typeof entry.isDirectory === 'function' && entry.isDirectory()) {
-                    queue.push(path.join(current, entry.name));
+                    queue.push(pathApi.join(current, entry.name));
                 }
             }
         }
@@ -10045,7 +10085,8 @@ function watchPathsForRestart(targets, onChange) {
     };
 
     const isSameOrNestedPath = (candidate, rootDir) => {
-        return candidate === rootDir || candidate.startsWith(`${rootDir}${path.sep}`);
+        const separator = getPathSeparator(rootDir);
+        return candidate === rootDir || candidate.startsWith(`${rootDir}${separator}`);
     };
 
     const addWatcher = (target, recursive, isDirectory = false) => {
@@ -10055,8 +10096,9 @@ function watchPathsForRestart(targets, onChange) {
             return true;
         }
         try {
-            const basename = isDirectory ? '' : path.basename(target);
-            const watchTarget = isDirectory ? target : path.dirname(target);
+            const pathApi = getPathApi(target);
+            const basename = isDirectory ? '' : pathApi.basename(target);
+            const watchTarget = isDirectory ? target : pathApi.dirname(target);
             const watcher = fs.watch(watchTarget, { recursive }, (eventType, filename) => {
                 if (isDirectory && !recursive && eventType === 'rename') {
                     syncDirectoryTree(target);
@@ -10100,7 +10142,8 @@ function watchPathsForRestart(targets, onChange) {
     };
 
     const addMissingDirectoryWatcher = (target) => {
-        const parentDir = path.dirname(target);
+        const pathApi = getPathApi(target);
+        const parentDir = pathApi.dirname(target);
         if (!parentDir || parentDir === target || !fs.existsSync(parentDir)) {
             return false;
         }
