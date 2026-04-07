@@ -9,10 +9,10 @@
                     <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M10 4v12M4 10h12"/>
                     </svg>
-                    添加 OpenClaw 配置
+                    新增 OpenClaw 配置
                 </button>
                 <div class="config-template-hint">
-                    默认应用到 <code>~/.openclaw/openclaw.json</code>。支持 JSON5（注释/尾逗号）。
+                    写入 <code>~/.openclaw/openclaw.json</code>，支持 JSON5。
                 </div>
 
                 <div class="selector-section">
@@ -20,10 +20,10 @@
                         <span class="selector-title">AGENTS.md</span>
                     </div>
                     <div class="config-template-hint">
-                        管理 OpenClaw Workspace 指令文件，默认读写 <code>~/.openclaw/workspace/AGENTS.md</code>。
+                        读写 Workspace 的 <code>AGENTS.md</code>，默认路径 <code>~/.openclaw/workspace/AGENTS.md</code>。
                     </div>
                     <button class="btn-tool" @click="openOpenclawAgentsEditor" :disabled="loading || !!initError || agentsLoading">
-                        {{ agentsLoading ? '加载中...' : '打开 AGENTS.md 编辑器' }}
+                        {{ agentsLoading ? '加载中...' : '打开 AGENTS.md' }}
                     </button>
                 </div>
 
@@ -37,7 +37,7 @@
                         v-model="openclawWorkspaceFileName"
                         placeholder="例如: SOUL.md">
                     <div class="config-template-hint">
-                        仅支持 OpenClaw Workspace 内的 <code>.md</code> 文件。
+                        仅限 Workspace 内的 <code>.md</code> 文件。
                     </div>
                     <button class="btn-tool" @click="openOpenclawWorkspaceEditor" :disabled="loading || !!initError || agentsLoading">
                         {{ agentsLoading ? '加载中...' : '打开工作区文件' }}

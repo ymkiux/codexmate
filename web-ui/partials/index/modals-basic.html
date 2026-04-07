@@ -26,7 +26,7 @@
         <div v-if="showInstallModal" class="modal-overlay" @click.self="closeInstallModal">
             <div class="modal" role="dialog" aria-modal="true" aria-labelledby="install-cli-modal-title">
                 <div class="modal-header">
-                    <div class="modal-title" id="install-cli-modal-title">安装 CLI</div>
+                    <div class="modal-title" id="install-cli-modal-title">CLI 安装</div>
                 </div>
 
                 <div class="list-row">
@@ -49,10 +49,10 @@
                         class="form-input install-registry-input"
                         placeholder="https://registry.example.com">
                     <div class="form-hint install-registry-hint" v-if="installRegistryPreview">
-                        当前命令会附加：--registry={{ installRegistryPreview }}
+                        命令将附加：--registry={{ installRegistryPreview }}
                     </div>
                     <div class="form-hint install-registry-hint" v-else-if="installRegistryPreset === 'custom'">
-                        请输入完整 URL（含 http/https）后将自动附加到安装/升级命令。
+                        请输入完整 URL（含 http/https），将自动附加到命令。
                     </div>
                     <label class="form-label">操作</label>
                     <div class="install-action-tabs">
@@ -76,7 +76,7 @@
                 </div>
 
                 <div class="install-help">
-                    <div class="form-label">常见失败自救</div>
+                    <div class="form-label">常见问题</div>
                     <ul class="install-help-list">
                         <li v-for="tip in installTroubleshootingTips" :key="tip">{{ tip }}</li>
                     </ul>
