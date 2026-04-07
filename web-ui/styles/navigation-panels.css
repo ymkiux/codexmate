@@ -32,9 +32,9 @@
 }
 
 .status-strip {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
-    gap: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 8px;
     margin-bottom: 10px;
     margin-top: 0;
 }
@@ -42,23 +42,22 @@
 .status-chip {
     min-width: 0;
     max-width: 100%;
-    padding: 7px 8px;
-    border-radius: 10px;
-    border: 1px solid rgba(216, 201, 184, 0.26);
-    background: rgba(248, 244, 239, 0.82);
+    padding: 0;
+    border: none;
+    background: transparent;
     box-shadow: none;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
+    display: inline-flex;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 6px;
 }
 
 .status-chip .label {
-    display: block;
+    display: inline;
     font-size: 10px;
-    color: var(--color-text-tertiary);
+    color: var(--color-text-muted);
     margin-bottom: 0;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     flex-shrink: 0;
 }
@@ -68,9 +67,9 @@
     font-weight: 600;
     color: var(--color-text-primary);
     letter-spacing: -0.01em;
-    white-space: normal;
-    overflow-wrap: anywhere;
-    word-break: break-word;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
 }
 
 .provider-fast-switch {
@@ -116,12 +115,12 @@
 
 .main-panel {
     min-width: 0;
-    background: rgba(255, 255, 255, 0.97);
-    border: 1px solid rgba(208, 192, 173, 0.38);
-    border-radius: 18px;
-    box-shadow: 0 10px 24px rgba(31, 26, 23, 0.03);
-    padding: 16px 18px;
-    backdrop-filter: blur(6px);
+    background: rgba(255, 255, 255, 0.98);
+    border: 1px solid rgba(214, 201, 186, 0.34);
+    border-radius: 14px;
+    box-shadow: 0 4px 14px rgba(31, 26, 23, 0.02);
+    padding: 14px 16px 18px;
+    backdrop-filter: none;
     position: relative;
     overflow-x: hidden;
     overflow-y: visible;
@@ -138,9 +137,9 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
-    margin-bottom: 10px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid rgba(216, 201, 184, 0.22);
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(216, 201, 184, 0.18);
 }
 
 .panel-header-copy {
@@ -324,6 +323,7 @@
     border-radius: 0;
     box-shadow: none;
     padding: 0;
+    max-width: 980px;
 }
 
 .mode-content {

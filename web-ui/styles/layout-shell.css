@@ -131,17 +131,17 @@ body::after {
 }
 
 .side-item.active {
-    border-color: rgba(201, 94, 75, 0.28);
-    background: rgba(255, 255, 255, 0.92);
+    border-color: rgba(201, 94, 75, 0.18);
+    background: rgba(255, 255, 255, 0.82);
     color: var(--color-text-primary);
-    box-shadow: 0 2px 8px rgba(31, 26, 23, 0.03);
+    box-shadow: none;
 }
 
 .side-item.nav-intent-active {
-    border-color: rgba(201, 94, 75, 0.28);
-    background: rgba(255, 255, 255, 0.92);
+    border-color: rgba(201, 94, 75, 0.18);
+    background: rgba(255, 255, 255, 0.82);
     color: var(--color-text-primary);
-    box-shadow: 0 2px 8px rgba(31, 26, 23, 0.03);
+    box-shadow: none;
 }
 
 .side-item.nav-intent-inactive,

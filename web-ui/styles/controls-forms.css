@@ -2,12 +2,13 @@
    选择器 - 用于模型选择
    ============================================ */
 .selector-section {
-    background: rgba(255, 255, 255, 0.82);
-    border-radius: 10px;
-    padding: 8px;
-    margin-bottom: 8px;
+    background: transparent;
+    border-radius: 0;
+    padding: 10px 0 0;
+    margin-bottom: 10px;
     box-shadow: none;
-    border: 1px solid rgba(216, 201, 184, 0.22);
+    border: none;
+    border-top: 1px solid rgba(224, 214, 202, 0.72);
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -17,7 +18,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
 }
 
 .settings-tab-header {
@@ -89,10 +90,11 @@
 
 .health-report {
     margin-top: 8px;
-    padding: 8px 10px;
-    border-radius: 10px;
+    padding: 8px 0 0;
+    border-radius: 0;
     border: 1px solid var(--color-border-soft);
-    background: var(--color-surface-alt);
+    border-width: 1px 0 0;
+    background: transparent;
     display: grid;
     gap: 8px;
 }
@@ -220,7 +222,7 @@
 
 .config-template-hint {
     margin-top: 6px;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
     font-size: 11px;
     color: var(--color-text-tertiary);
     line-height: 1.35;
@@ -251,8 +253,8 @@
     min-height: 38px;
     padding: 8px 10px;
     border: 1px dashed rgba(208, 196, 182, 0.55);
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.36);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.22);
     font-size: 13px;
     font-weight: var(--font-weight-secondary);
     color: var(--color-text-tertiary);
@@ -297,13 +299,13 @@
     padding: 8px 10px;
     border-radius: 8px;
     border: 1px solid var(--color-border-soft);
-    background: rgba(255, 255, 255, 0.86);
+    background: rgba(255, 255, 255, 0.72);
     font-size: 13px;
     font-weight: var(--font-weight-secondary);
     color: var(--color-text-secondary);
     cursor: pointer;
     transition: all var(--transition-fast) var(--ease-spring);
-    box-shadow: var(--shadow-subtle);
+    box-shadow: none;
     letter-spacing: -0.01em;
     width: 100%;
     text-align: center;
