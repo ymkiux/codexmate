@@ -84,12 +84,13 @@ textarea:focus-visible {
 
 @media (max-width: 720px) {
     .main-title {
-        font-size: 24px;
+        font-size: 22px;
     }
 
     .subtitle {
-        font-size: 12px;
+        font-size: 11px;
         margin-bottom: 0;
+        line-height: 1.35;
     }
 
     .panel-kicker {
@@ -103,7 +104,8 @@ textarea:focus-visible {
     }
 
     .top-tabs {
-        margin: 4px 0 8px;
+        margin: 3px 0 8px;
+        gap: 5px;
     }
 
     .segmented-control {
@@ -163,11 +165,12 @@ textarea:focus-visible {
     }
 
     .top-tabs {
-        gap: 6px;
+        gap: 5px;
         margin: 2px 0 8px;
+        padding-right: 14px;
     }
     .main-panel {
-        padding: 12px;
+        padding: 10px;
     }
     .card {
         padding: 12px;

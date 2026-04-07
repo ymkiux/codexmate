@@ -263,7 +263,8 @@ body {
 
 .fab-install {
     position: fixed;
-    left: 14px;
+    left: auto;
+    right: 14px;
     bottom: calc(14px + env(safe-area-inset-bottom, 0px));
     z-index: 90;
     display: inline-grid;
@@ -328,37 +329,9 @@ body {
     filter: saturate(0.98);
 }
 
-@media (max-width: 640px) {
-    .fab-install {
-        left: auto;
-        right: 10px;
-        bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-        width: 38px;
-        height: 38px;
-        min-width: 38px;
-        min-height: 38px;
-        padding: 0;
-        font-size: 12px;
-        opacity: 0.66;
-        box-shadow: 0 6px 14px rgba(31, 26, 23, 0.08);
-    }
-
-    .fab-install-icon {
-        width: 14px;
-        height: 14px;
-    }
-
-    .fab-install-icon svg {
-        width: 12px;
-        height: 12px;
-    }
-}
-
 @media (max-width: 960px) {
     .fab-install {
-        left: auto;
-        right: 12px;
-        bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+        display: none;
     }
 }
 
