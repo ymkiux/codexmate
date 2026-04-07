@@ -24,19 +24,23 @@ function main() {
     process.exit(1);
   }
 
-  console.log('[1/5] Fetch origin/main');
+  console.log('[1/6] Fetch origin/main');
   run('git fetch origin main --prune');
 
-  console.log('[2/5] Checkout main');
-  run('git checkout main');
-
-  console.log('[3/5] Reset local changes to origin/main');
-  run('git reset --hard origin/main');
-
-  console.log('[4/5] Remove untracked files');
+  console.log('[2/6] Discard local changes');
+  run('git reset --hard');
   run('git clean -fd');
 
-  console.log('[5/5] Final status');
+  console.log('[3/6] Checkout main');
+  run('git checkout main');
+
+  console.log('[4/6] Reset local changes to origin/main');
+  run('git reset --hard origin/main');
+
+  console.log('[5/6] Remove untracked files');
+  run('git clean -fd');
+
+  console.log('[6/6] Final status');
   run('git status --short --branch');
 
   console.log('Done. Working tree synced to origin/main.');
