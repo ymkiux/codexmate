@@ -10,32 +10,27 @@
 
         <section class="hero-surface" v-if="!sessionStandalone">
             <div class="hero-copy">
-                <div class="hero-eyebrow">LOCAL AI WORKSPACE</div>
-                <div class="hero-title-row">
-                    <img class="hero-logo" src="/res/logo.png" alt="Codex Mate logo">
-                    <div class="hero-title-block">
-                        <div class="hero-title">
-                            Codex <span class="accent">Mate.</span>
-                        </div>
-                        <div class="hero-subtitle">
-                            统一管理 Codex、Claude Code、OpenClaw 与本地会话。
-                            <span class="sr-only">本地配置中枢，统一管理 Codex / Claude Code / OpenClaw / 会话。</span>
-                        </div>
+                <div class="hero-meta-row">
+                    <div class="hero-eyebrow">Codex Mate 工作台</div>
+                    <div class="hero-summary-pill">
+                        <span class="hero-summary-label">当前区域</span>
+                        <span class="hero-summary-value">{{ mainTab === 'config' ? '配置中心' : (mainTab === 'sessions' ? '会话浏览' : (mainTab === 'usage' ? 'Usage' : (mainTab === 'market' ? '技能市场' : '设置'))) }}</span>
                     </div>
-                </div>
-                <div class="hero-actions-row">
                     <a
                         class="hero-link-pill"
                         href="https://github.com/SakuraByteCore/codexmate"
                         target="_blank"
                         rel="noopener noreferrer"
                         title="打开 GitHub 仓库">
-                        <span class="hero-link-label">GitHub</span>
+                        <span class="hero-link-label">仓库</span>
                         <span class="hero-link-value">SakuraByteCore/codexmate</span>
                     </a>
-                    <div class="hero-summary-pill">
-                        <span class="hero-summary-label">当前区域</span>
-                        <span class="hero-summary-value">{{ mainTab === 'config' ? '配置中心' : (mainTab === 'sessions' ? '会话浏览' : (mainTab === 'usage' ? 'Usage' : (mainTab === 'market' ? '技能市场' : '设置'))) }}</span>
+                </div>
+                <div class="hero-title-block">
+                    <div class="hero-title">本地配置、会话与技能入口</div>
+                    <div class="hero-subtitle">
+                        统一处理 Codex、Claude Code、OpenClaw 与本地会话。
+                        <span class="sr-only">本地配置中枢，统一管理 Codex / Claude Code / OpenClaw / 会话。</span>
                     </div>
                 </div>
             </div>
