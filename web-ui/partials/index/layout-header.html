@@ -18,7 +18,7 @@
                             Codex <span class="accent">Mate.</span>
                         </div>
                         <div class="hero-subtitle">
-                            参考 Dory 的层级组织方式，但只保留 codexmate 真正需要的入口、状态和操作，不把界面硬凑成别人的样子。
+                            把层级、留白和信息编排重新整理清楚，只保留 codexmate 真正需要的入口、状态和操作，不把界面硬凑成花架子。
                             <span class="sr-only">本地配置中枢，统一管理 Codex / Claude Code / OpenClaw / 会话。</span>
                         </div>
                     </div>
@@ -279,7 +279,7 @@
                 </div>
             </aside>
             <main class="main-panel">
-                <div class="panel-header panel-header-dory" v-if="!sessionStandalone">
+                <div class="panel-header panel-header-refined" v-if="!sessionStandalone">
                     <div class="panel-header-copy">
                         <div class="panel-kicker">{{ mainTab === 'config' ? '配置中心' : (mainTab === 'sessions' ? '会话浏览' : (mainTab === 'usage' ? 'Usage' : (mainTab === 'market' ? '技能市场' : '设置'))) }}</div>
                         <h1 class="main-title">{{ mainTab === 'config' ? '本地 AI 工作台' : (mainTab === 'sessions' ? '会话与上下文' : (mainTab === 'usage' ? '本地用量与趋势' : (mainTab === 'market' ? '技能与分发' : '运行与数据设置'))) }}</h1>
