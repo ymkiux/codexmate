@@ -135,15 +135,8 @@
         <div :class="['app-shell', { standalone: sessionStandalone }]">
             <aside class="side-rail" v-if="!sessionStandalone">
                 <div class="brand-block">
-                    <div class="brand-logo-wrap">
-                        <img class="brand-logo" src="/res/logo.png" alt="Codex Mate logo">
-                    </div>
-                    <div class="brand-title">
-                        Codex <span class="accent">Mate</span>
-                    </div>
-                    <div class="brand-subtitle">
-                        配置 / 会话切换器
-                    </div>
+                    <div class="brand-kicker">Workspace</div>
+                    <div class="brand-title">Codex Mate</div>
                     <a
                         class="github-badge github-badge-rail"
                         href="https://github.com/SakuraByteCore/codexmate"
@@ -276,9 +269,9 @@
             <main class="main-panel">
                 <div class="panel-header panel-header-refined" v-if="!sessionStandalone">
                     <div class="panel-header-copy">
-                        <div class="panel-kicker">{{ mainTab === 'config' ? '配置中心' : (mainTab === 'sessions' ? '会话浏览' : (mainTab === 'usage' ? 'Usage' : (mainTab === 'market' ? '技能市场' : '设置'))) }}</div>
-                        <h1 class="main-title">{{ mainTab === 'config' ? '配置与运行' : (mainTab === 'sessions' ? '会话与上下文' : (mainTab === 'usage' ? '本地用量与趋势' : (mainTab === 'market' ? '技能与分发' : '运行与数据设置'))) }}</h1>
-                        <p class="subtitle">{{ mainTab === 'config' ? '统一处理 Provider、Claude Code 与 OpenClaw 配置。' : (mainTab === 'sessions' ? '查看、检索、导出并继续处理本地会话记录。' : (mainTab === 'usage' ? '单独查看本地使用趋势与活跃来源。' : (mainTab === 'market' ? '围绕本地 Skills 的安装、导入与同步整理入口。' : '管理下载、数据目录与全局行为。'))) }}</p>
+                        <div class="panel-kicker">{{ mainTab === 'config' ? '配置' : (mainTab === 'sessions' ? '会话' : (mainTab === 'usage' ? 'Usage' : (mainTab === 'market' ? '技能市场' : '设置'))) }}</div>
+                        <h1 class="main-title">{{ mainTab === 'config' ? '当前配置' : (mainTab === 'sessions' ? '会话浏览' : (mainTab === 'usage' ? '本地用量' : (mainTab === 'market' ? '技能管理' : '运行设置'))) }}</h1>
+                        <p class="subtitle">{{ mainTab === 'config' ? '管理提供商、模型与运行参数。' : (mainTab === 'sessions' ? '筛选、预览、导出本地会话。' : (mainTab === 'usage' ? '查看本地使用趋势与来源分布。' : (mainTab === 'market' ? '整理安装、导入与同步入口。' : '管理下载、数据目录与全局行为。'))) }}</p>
                     </div>
                 </div>
 
