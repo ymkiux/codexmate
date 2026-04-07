@@ -202,9 +202,17 @@
     padding: 0;
     box-shadow: none;
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 6px;
     backdrop-filter: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.top-tabs::-webkit-scrollbar {
+    display: none;
 }
 
 .top-tab {

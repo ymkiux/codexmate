@@ -43,7 +43,10 @@ textarea:focus-visible {
     }
     .top-tabs {
         display: flex !important;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 2px;
     }
     .status-strip {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -89,6 +92,7 @@ textarea:focus-visible {
     .workbench-bar {
         margin-bottom: 8px;
         padding: 8px 10px;
+        border-radius: 12px;
     }
 
     .top-tabs {
@@ -137,11 +141,27 @@ textarea:focus-visible {
         padding: 0 var(--spacing-sm) var(--spacing-md);
     }
     .workbench-bar {
-        flex-direction: column;
-        align-items: stretch;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
     }
+
+    .workbench-bar-kicker {
+        font-size: 9px;
+    }
+
+    .workbench-bar-title {
+        font-size: 15px;
+        margin-top: 1px;
+    }
+
+    .workbench-bar-repo {
+        display: none;
+    }
+
     .top-tabs {
         gap: 6px;
+        margin: 2px 0 8px;
     }
     .main-panel {
         padding: 12px;

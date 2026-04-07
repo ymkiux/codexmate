@@ -135,14 +135,16 @@ body.force-compact .status-inspector {
 }
 
 body.force-compact .top-tabs {
-    display: grid !important;
-    grid-template-columns: repeat(1, minmax(0, 1fr));
+    display: flex !important;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
 }
 
-@media (min-width: 541px) {
-    body.force-compact .top-tabs {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
+body.force-compact .top-tabs::-webkit-scrollbar {
+    display: none;
 }
 
 body.force-compact .workbench-bar {
