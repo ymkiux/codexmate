@@ -33,24 +33,24 @@
 
 .status-strip {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
-    gap: 8px;
-    margin-bottom: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+    gap: 6px;
+    margin-bottom: 10px;
     margin-top: 0;
 }
 
 .status-chip {
     min-width: 0;
     max-width: 100%;
-    padding: 9px 10px;
-    border-radius: 12px;
+    padding: 7px 8px;
+    border-radius: 10px;
     border: 1px solid rgba(216, 201, 184, 0.26);
     background: rgba(248, 244, 239, 0.82);
     box-shadow: none;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 3px;
+    gap: 2px;
 }
 
 .status-chip .label {
@@ -64,7 +64,7 @@
 }
 
 .status-chip .value {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--color-text-primary);
     letter-spacing: -0.01em;
@@ -120,12 +120,12 @@
     border: 1px solid rgba(208, 192, 173, 0.38);
     border-radius: 18px;
     box-shadow: 0 10px 24px rgba(31, 26, 23, 0.03);
-    padding: 20px 22px;
+    padding: 16px 18px;
     backdrop-filter: blur(6px);
     position: relative;
     overflow-x: hidden;
     overflow-y: visible;
-    min-height: calc(100vh - 32px);
+    min-height: 0;
 }
 
 .panel-header {
@@ -138,8 +138,8 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
-    margin-bottom: 12px;
-    padding-bottom: 12px;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
     border-bottom: 1px solid rgba(216, 201, 184, 0.22);
 }
 

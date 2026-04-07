@@ -147,10 +147,6 @@ body.force-compact .top-tabs::-webkit-scrollbar {
     display: none;
 }
 
-body.force-compact .workbench-bar {
-    display: flex;
-}
-
 body.force-compact .main-panel {
     padding: 14px 12px;
 }
@@ -261,83 +257,3 @@ body {
     overflow-x: hidden;
 }
 
-.fab-install {
-    position: fixed;
-    left: auto;
-    right: 14px;
-    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
-    z-index: 90;
-    display: inline-grid;
-    place-items: center;
-    width: 42px;
-    height: 42px;
-    min-width: 40px;
-    min-height: 40px;
-    padding: 0;
-    border-radius: var(--radius-full);
-    border: 1px solid rgba(201, 94, 75, 0.2);
-    background: rgba(201, 94, 75, 0.9);
-    color: #fff;
-    font-size: 12px;
-    font-weight: var(--font-weight-secondary);
-    letter-spacing: 0.015em;
-    box-shadow: 0 8px 18px rgba(31, 26, 23, 0.1);
-    cursor: pointer;
-    overflow: hidden;
-    transition:
-        transform var(--transition-fast) var(--ease-spring),
-        box-shadow var(--transition-fast) var(--ease-spring),
-        filter var(--transition-fast) var(--ease-smooth);
-    animation: none;
-    opacity: 0.82;
-}
-
-.fab-install::after {
-    content: "";
-    position: absolute;
-    inset: 1px;
-    border-radius: inherit;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    pointer-events: none;
-}
-
-.fab-install-icon {
-    width: 16px;
-    height: 16px;
-    display: inline-grid;
-    place-items: center;
-    color: #fff;
-    background: transparent;
-    box-shadow: none;
-    flex-shrink: 0;
-}
-
-.fab-install-icon svg {
-    width: 14px;
-    height: 14px;
-}
-
-.fab-install:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 10px 20px rgba(31, 26, 23, 0.12);
-    filter: saturate(1.02);
-    opacity: 0.96;
-}
-
-.fab-install:active {
-    transform: translateY(0);
-    filter: saturate(0.98);
-}
-
-@media (max-width: 960px) {
-    .fab-install {
-        display: none;
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .fab-install {
-        animation: none;
-        transition: none;
-    }
-}
