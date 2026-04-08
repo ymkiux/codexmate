@@ -73,7 +73,9 @@ test('fillOpenclawQuickFromConfig reads provider base url and key from root prov
         ...methods.getOpenclawQuickDefaults(),
         providerName: 'maxx',
         baseUrl: 'https://provider.example.com/v1',
+        baseUrlDisplayKind: 'string',
         apiKey: 'sk-live',
+        apiKeyDisplayKind: 'string',
         apiType: 'openai-chat',
         modelId: 'gpt-4.1',
         modelName: 'GPT 4.1',
@@ -207,6 +209,83 @@ test('fillOpenclawQuickFromConfig treats alias-split provider maps as one config
     assert.strictEqual(context.openclawQuick.apiKey, 'zai-key');
     assert.strictEqual(context.openclawQuick.modelId, 'glm-4.5');
     assert.strictEqual(context.openclawQuick.modelName, 'GLM 4.5');
+});
+
+test('fillOpenclawQuickFromConfig falls back to auth profile summary when provider config has no direct key', () => {
+    const context = {
+        ...methods,
+        openclawQuick: methods.getOpenclawQuickDefaults(),
+        openclawAuthProfilesByProvider: {
+            'openai-codex': {
+                provider: 'openai-codex',
+                profileId: 'openai-codex:default',
+                type: 'oauth',
+                display: 'AuthProfile(oauth:openai-codex:default) · work@example.com'
+            }
+        }
+    };
+
+    methods.fillOpenclawQuickFromConfig.call(context, {
+        agents: {
+            defaults: {
+                model: {
+                    primary: 'openai-codex/gpt-5.4'
+                }
+            }
+        },
+        models: {
+            providers: {
+                'openai-codex': {
+                    baseUrl: 'https://api.openai.com/v1',
+                    api: 'openai-responses'
+                }
+            }
+        }
+    });
+
+    assert.strictEqual(context.openclawQuick.providerName, 'openai-codex');
+    assert.strictEqual(context.openclawQuick.baseUrl, 'https://api.openai.com/v1');
+    assert.strictEqual(context.openclawQuick.apiKey, 'AuthProfile(oauth:openai-codex:default) · work@example.com');
+    assert.strictEqual(context.openclawQuick.apiKeyReadOnly, true);
+    assert.strictEqual(context.openclawQuick.apiKeyDisplayKind, 'auth-profile');
+});
+
+test('fillOpenclawQuickFromConfig resolves auth profile summaries through normalized provider aliases', () => {
+    const context = {
+        ...methods,
+        openclawQuick: methods.getOpenclawQuickDefaults(),
+        openclawAuthProfilesByProvider: {
+            zai: {
+                provider: 'zai',
+                profileId: 'zai:default',
+                type: 'api_key',
+                display: 'AuthProfile(api_key:zai:default)'
+            }
+        }
+    };
+
+    methods.fillOpenclawQuickFromConfig.call(context, {
+        agents: {
+            defaults: {
+                model: {
+                    primary: 'z.ai/glm-4.5'
+                }
+            }
+        },
+        models: {
+            providers: {
+                zai: {
+                    baseUrl: 'https://zai.example.com/v1',
+                    api: 'openai-responses'
+                }
+            }
+        }
+    });
+
+    assert.strictEqual(context.openclawQuick.providerName, 'zai');
+    assert.strictEqual(context.openclawQuick.apiKey, 'AuthProfile(api_key:zai:default)');
+    assert.strictEqual(context.openclawQuick.apiKeyReadOnly, true);
+    assert.strictEqual(context.openclawQuick.apiKeyDisplayKind, 'auth-profile');
 });
 
 test('fillOpenclawQuickFromConfig renders structured SecretRef values as read-only labels', () => {

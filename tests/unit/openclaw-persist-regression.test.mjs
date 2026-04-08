@@ -36,6 +36,7 @@ function createContext(methods, overrides = {}) {
         openclawConfigPath: '',
         openclawConfigExists: false,
         openclawLineEnding: '\n',
+        openclawAuthProfilesByProvider: {},
         openclawSaving: false,
         openclawApplying: false,
         openclawFileLoading: false,
@@ -153,6 +154,43 @@ test('default openclaw config edit always refreshes from the real config file', 
     assert.strictEqual(context.openclawConfigExists, true);
     assert.strictEqual(context.openclawConfigs['默认配置'].content, 'real-default-content');
     assert.strictEqual(context.currentOpenclawConfig, 'saved');
+});
+
+test('loadOpenclawConfigFromFile keeps auth profile summaries alongside config content', async () => {
+    const methods = createOpenclawPersistMethods({
+        api: async () => ({
+            error: '',
+            exists: true,
+            path: '/tmp/openclaw.json',
+            lineEnding: '\n',
+            content: 'real-default-content',
+            authProfilesByProvider: {
+                'openai-codex': {
+                    provider: 'openai-codex',
+                    profileId: 'openai-codex:default',
+                    type: 'oauth',
+                    display: 'AuthProfile(oauth:openai-codex:default)'
+                }
+            }
+        })
+    });
+    const context = createContext(methods);
+
+    await methods.loadOpenclawConfigFromFile.call(context, {
+        silent: true,
+        force: true,
+        fallbackToTemplate: true
+    });
+
+    assert.deepStrictEqual(context.openclawAuthProfilesByProvider, {
+        'openai-codex': {
+            provider: 'openai-codex',
+            profileId: 'openai-codex:default',
+            type: 'oauth',
+            display: 'AuthProfile(oauth:openai-codex:default)'
+        }
+    });
+    assert.strictEqual(context.openclawEditing.content, 'real-default-content');
 });
 
 test('stale openclaw loads from an earlier modal session are ignored after reopening', async () => {
