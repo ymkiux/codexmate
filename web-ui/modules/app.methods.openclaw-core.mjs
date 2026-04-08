@@ -159,22 +159,26 @@ export function createOpenclawCoreMethods() {
             const rootProviders = isPlainRecord(config.providers)
                 ? config.providers
                 : null;
-            if (!providerName) {
-                const providerKeys = Array.from(new Set([
-                    ...Object.keys(modelProviders || {}),
-                    ...Object.keys(rootProviders || {})
-                ]));
-                if (providerKeys.length === 1) {
-                    providerName = providerKeys[0];
-                }
+            const providerKeys = Array.from(new Set([
+                ...Object.keys(modelProviders || {}),
+                ...Object.keys(rootProviders || {})
+            ]));
+            if (!providerName && providerKeys.length === 1) {
+                providerName = providerKeys[0];
             }
 
-            const providerRecords = providerName
+            const buildProviderRecords = (name) => name
                 ? [
-                    modelProviders && modelProviders[providerName],
-                    rootProviders && rootProviders[providerName]
+                    modelProviders && modelProviders[name],
+                    rootProviders && rootProviders[name]
                 ]
                 : [];
+            let providerRecords = buildProviderRecords(providerName);
+            const hasProviderConfig = providerRecords.some((item) => isPlainRecord(item));
+            if (!hasProviderConfig && providerKeys.length === 1) {
+                providerName = providerKeys[0];
+                providerRecords = buildProviderRecords(providerName);
+            }
             const providerConfig = providerRecords.find((item) => isPlainRecord(item)) || null;
             const providerModels = readPreferredProviderModels(providerRecords);
 
