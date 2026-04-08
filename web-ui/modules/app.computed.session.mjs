@@ -40,6 +40,28 @@ export function createSessionComputed() {
             });
             return decorated.map(item => item.session);
         },
+        visibleSessionsList() {
+            if (this.mainTab !== 'sessions' || !this.sessionListRenderEnabled) {
+                return [];
+            }
+            const list = Array.isArray(this.sortedSessionsList) ? this.sortedSessionsList : [];
+            const rawCount = Number(this.sessionListVisibleCount);
+            const visibleCount = Number.isFinite(rawCount)
+                ? Math.max(0, Math.floor(rawCount))
+                : 0;
+            if (visibleCount <= 0) {
+                return list.slice(0, Math.min(24, list.length));
+            }
+            if (visibleCount >= list.length) {
+                return list;
+            }
+            return list.slice(0, visibleCount);
+        },
+        sessionListRemainingCount() {
+            const total = Array.isArray(this.sortedSessionsList) ? this.sortedSessionsList.length : 0;
+            const visible = Array.isArray(this.visibleSessionsList) ? this.visibleSessionsList.length : 0;
+            return Math.max(0, total - visible);
+        },
         activeSessionVisibleMessages() {
             if (this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {
                 return [];

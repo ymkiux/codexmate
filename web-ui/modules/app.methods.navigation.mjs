@@ -386,6 +386,118 @@ export function createNavigationMethods(options = {}) {
             this.__sessionTabDeferredTeardownHandle = null;
         },
 
+        getSessionListRenderSource() {
+            if (Array.isArray(this.sortedSessionsList)) {
+                return this.sortedSessionsList;
+            }
+            return Array.isArray(this.sessionsList) ? this.sessionsList : [];
+        },
+        setSessionListRef(el) {
+            this.sessionListEl = el || null;
+            if (this.sessionListEl && this.mainTab === 'sessions' && this.sessionListRenderEnabled) {
+                this.scheduleSessionListViewportFill();
+            }
+        },
+        cancelScheduledSessionListViewportFill() {
+            if (this.__sessionListViewportFillRafId) {
+                const rafId = this.__sessionListViewportFillRafId;
+                this.__sessionListViewportFillRafId = 0;
+                if (typeof cancelAnimationFrame === 'function') {
+                    cancelAnimationFrame(rafId);
+                } else {
+                    clearTimeout(rafId);
+                }
+            }
+        },
+        resetSessionListRender() {
+            this.cancelScheduledSessionListViewportFill();
+            this.sessionListVisibleCount = 0;
+        },
+        expandVisibleSessionList(stepSize) {
+            const source = this.getSessionListRenderSource();
+            const total = source.length;
+            if (total <= 0) {
+                this.sessionListVisibleCount = 0;
+                return 0;
+            }
+            const current = Number.isFinite(this.sessionListVisibleCount)
+                ? Math.max(0, Math.floor(this.sessionListVisibleCount))
+                : 0;
+            const fallbackStep = Number.isFinite(this.sessionListLoadStep)
+                ? Math.max(1, Math.floor(this.sessionListLoadStep))
+                : 160;
+            const amount = Number.isFinite(stepSize)
+                ? Math.max(1, Math.floor(stepSize))
+                : fallbackStep;
+            const nextCount = Math.min(total, Math.max(current, 0) + amount);
+            this.sessionListVisibleCount = nextCount;
+            return nextCount;
+        },
+        scheduleSessionListViewportFill() {
+            this.cancelScheduledSessionListViewportFill();
+            if (this.mainTab !== 'sessions' || !this.sessionListRenderEnabled) {
+                return;
+            }
+            const source = this.getSessionListRenderSource();
+            if (!source.length || this.sessionListVisibleCount >= source.length) {
+                return;
+            }
+            const schedule = typeof requestAnimationFrame === 'function'
+                ? requestAnimationFrame
+                : (callback) => setTimeout(callback, 16);
+            this.__sessionListViewportFillRafId = schedule(() => {
+                this.__sessionListViewportFillRafId = 0;
+                if (this.mainTab !== 'sessions' || !this.sessionListRenderEnabled) {
+                    return;
+                }
+                const listEl = this.sessionListEl || (this.$refs && this.$refs.sessionList) || null;
+                if (!listEl) {
+                    return;
+                }
+                const needsMore = listEl.scrollHeight <= (listEl.clientHeight + 24);
+                if (!needsMore) {
+                    return;
+                }
+                const previousCount = this.sessionListVisibleCount;
+                this.expandVisibleSessionList();
+                if (this.sessionListVisibleCount > previousCount) {
+                    this.scheduleSessionListViewportFill();
+                }
+            });
+        },
+        primeSessionListRender() {
+            this.resetSessionListRender();
+            if (this.mainTab !== 'sessions' || !this.sessionListRenderEnabled) {
+                return;
+            }
+            const source = this.getSessionListRenderSource();
+            const total = source.length;
+            if (total <= 0) return;
+            const baseSize = Number.isFinite(this.sessionListInitialBatchSize)
+                ? Math.max(1, Math.floor(this.sessionListInitialBatchSize))
+                : 120;
+            this.sessionListVisibleCount = Math.min(baseSize, total);
+            this.$nextTick(() => {
+                if (this.mainTab !== 'sessions' || !this.sessionListRenderEnabled) {
+                    return;
+                }
+                this.scheduleSessionListViewportFill();
+            });
+        },
+        onSessionListScroll() {
+            if (this.mainTab !== 'sessions' || !this.sessionListRenderEnabled) {
+                return;
+            }
+            const listEl = this.sessionListEl || (this.$refs && this.$refs.sessionList) || null;
+            if (!listEl) return;
+            const remaining = Number(this.sessionListRemainingCount || 0);
+            if (remaining <= 0) return;
+            const distanceToBottom = listEl.scrollHeight - (listEl.scrollTop + listEl.clientHeight);
+            if (distanceToBottom > 240) return;
+            this.expandVisibleSessionList();
+            this.scheduleSessionListViewportFill();
+        },
+
         resetSessionPreviewMessageRender() {
             this.sessionPreviewVisibleCount = 0;
             this.invalidateSessionTimelineMeasurementCache();
@@ -424,12 +536,14 @@ export function createNavigationMethods(options = {}) {
             this.sessionTabRenderTicket += 1;
             this.sessionListRenderEnabled = false;
             this.sessionPreviewRenderEnabled = false;
+            this.resetSessionListRender();
             this.cancelSessionTimelineSync();
             this.sessionTimelineActiveKey = '';
             this.sessionTimelineLastSyncAt = 0;
             this.sessionTimelineLastScrollTop = 0;
             this.sessionTimelineLastAnchorY = 0;
             this.sessionTimelineLastDirection = 0;
+            this.sessionListEl = null;
             this.sessionPreviewScrollEl = null;
             this.sessionPreviewContainerEl = null;
             this.sessionPreviewHeaderEl = null;
@@ -450,6 +564,7 @@ export function createNavigationMethods(options = {}) {
             const ticket = ++this.sessionTabRenderTicket;
             this.sessionListRenderEnabled = false;
             this.sessionPreviewRenderEnabled = false;
+            this.resetSessionListRender();
             this.resetSessionPreviewMessageRender();
 
             this.scheduleAfterFrame(() => {
@@ -457,6 +572,7 @@ export function createNavigationMethods(options = {}) {
                     return;
                 }
                 this.sessionListRenderEnabled = true;
+                this.primeSessionListRender();
 
                 this.scheduleAfterFrame(() => {
                     if (ticket !== this.sessionTabRenderTicket || this.mainTab !== 'sessions') {

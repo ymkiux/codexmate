@@ -98,9 +98,9 @@
                 </div>
 
                 <div v-else class="session-layout">
-                    <div v-if="sessionListRenderEnabled" class="session-list">
+                    <div v-if="sessionListRenderEnabled" class="session-list" :ref="setSessionListRef" @scroll="onSessionListScroll">
                         <div
-                            v-for="session in sortedSessionsList"
+                            v-for="session in visibleSessionsList"
                             :key="session.source + '-' + session.sessionId + '-' + session.filePath"
                             v-memo="[activeSessionExportKey === getSessionExportKey(session), session.messageCount, session.updatedAt, session.title, session.sourceLabel, isSessionPinned(session), sessionsLoading]"
                             :class="[
@@ -154,6 +154,9 @@
                                 <span class="session-source">{{ session.sourceLabel }}</span>
                                 <span class="session-item-time">{{ session.updatedAt || 'unknown time' }}</span>
                             </div>
+                        </div>
+                        <div v-if="sessionListRemainingCount > 0" class="session-item-sub session-item-wrap">
+                            继续滚动可加载更多会话（剩余 {{ sessionListRemainingCount }}）
                         </div>
                     </div>
                     <div v-else class="session-list session-list-placeholder"></div>

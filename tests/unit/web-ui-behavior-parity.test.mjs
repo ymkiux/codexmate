@@ -321,11 +321,17 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     const missingCurrentKeys = headDataKeys.filter((key) => !currentDataKeys.includes(key)).sort();
     const allowedExtraCurrentKeys = parityAgainstHead ? [
         'openclawAuthProfilesByProvider',
-        'openclawPendingAuthProfileUpdates'
+        'openclawPendingAuthProfileUpdates',
+        'sessionListVisibleCount',
+        'sessionListInitialBatchSize',
+        'sessionListLoadStep'
     ] : [
         '__mainTabSwitchState',
         'openclawAuthProfilesByProvider',
         'openclawPendingAuthProfileUpdates',
+        'sessionListVisibleCount',
+        'sessionListInitialBatchSize',
+        'sessionListLoadStep',
         'sessionsUsageError',
         'sessionsUsageList',
         'sessionsUsageLoadedOnce',
@@ -358,7 +364,10 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     const extraCurrentMethodKeys = currentMethodKeys.filter((key) => !headMethodKeys.includes(key)).sort();
     const missingCurrentMethodKeys = headMethodKeys.filter((key) => !currentMethodKeys.includes(key)).sort();
     const allowedExtraCurrentMethodKeys = [
+        'cancelScheduledSessionListViewportFill',
         'canSubmitProvider',
+        'expandVisibleSessionList',
+        'getSessionListRenderSource',
         'findProviderByName',
         'getProviderValidation',
         'invalidateSessionsUsageData',
@@ -366,8 +375,13 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'isValidProviderNameInput',
         'isValidProviderUrlInput',
         'loadSessionsUsage',
+        'onSessionListScroll',
         'normalizeProviderDraft',
+        'primeSessionListRender',
         'providerFieldError',
+        'resetSessionListRender',
+        'scheduleSessionListViewportFill',
+        'setSessionListRef',
         'syncDefaultOpenclawConfigEntry'
     ];
     const allowedMissingCurrentMethodKeys = [
@@ -397,7 +411,10 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     const headComputedKeys = Object.keys(headComputed).sort();
     const extraCurrentComputedKeys = currentComputedKeys.filter((key) => !headComputedKeys.includes(key)).sort();
     const missingCurrentComputedKeys = headComputedKeys.filter((key) => !currentComputedKeys.includes(key)).sort();
-    const allowedExtraCurrentComputedKeys = [];
+    const allowedExtraCurrentComputedKeys = [
+        'sessionListRemainingCount',
+        'visibleSessionsList'
+    ];
     if (parityAgainstHead) {
         const allowedExtraComputedKeySet = new Set(allowedExtraCurrentComputedKeys);
         const unexpectedExtraCurrentComputedKeys = extraCurrentComputedKeys.filter((key) => !allowedExtraComputedKeySet.has(key));
