@@ -5,12 +5,6 @@
                     id="panel-config-openclaw"
                     role="tabpanel"
                     :aria-labelledby="'tab-config-openclaw'">
-                <button class="btn-add" @click="openOpenclawAddModal" v-if="!loading && !initError">
-                    <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M10 4v12M4 10h12"/>
-                    </svg>
-                    新增 OpenClaw 配置
-                </button>
                 <div class="config-template-hint">
                     写入 <code>~/.openclaw/openclaw.json</code>，支持 JSON5。
                 </div>
