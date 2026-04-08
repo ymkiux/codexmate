@@ -345,8 +345,8 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     const missingCurrentMethodKeys = headMethodKeys.filter((key) => !currentMethodKeys.includes(key)).sort();
     const allowedExtraCurrentMethodKeys = [];
     const allowedMissingCurrentMethodKeys = [
-        'openInstallModal',
-        'closeInstallModal'
+        'closeInstallModal',
+        'openInstallModal'
     ];
     if (parityAgainstHead) {
         const allowedExtraMethodKeySet = new Set(allowedExtraCurrentMethodKeys);
