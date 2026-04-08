@@ -40,6 +40,8 @@ function createContext(overrides = {}) {
         openclawAgentsList: [],
         openclawProviders: [],
         openclawMissingProviders: [],
+        openclawAuthProfilesByProvider: {},
+        openclawPendingAuthProfileUpdates: {},
         messages: [],
         showMessage(message, type) {
             this.messages.push({ message, type });
@@ -152,4 +154,60 @@ test('applyOpenclawQuickToText preserves keyRef-backed provider auth without rew
     });
     assert.strictEqual(parsed.data.models.providers.openai.apiKey, undefined);
     assert.strictEqual(parsed.data.models.providers.openai.models[0].name, 'GPT-5 Stable');
+});
+
+test('applyOpenclawQuickToText queues auth profile updates instead of inlining edited auth profile tokens', () => {
+    const context = createContext({
+        openclawAuthProfilesByProvider: {
+            'openai-codex': {
+                provider: 'openai-codex',
+                profileId: 'openai-codex:default',
+                type: 'oauth',
+                display: 'AuthProfile(oauth:openai-codex:default)',
+                resolvedValue: 'old-access-token',
+                resolvedField: 'access',
+                editable: true,
+                valueKind: 'oauth-access'
+            }
+        }
+    });
+    const config = {
+        agents: {
+            defaults: {
+                model: {
+                    primary: 'openai-codex/gpt-5.4'
+                }
+            }
+        },
+        auth: {
+            profiles: {
+                'openai-codex:default': {
+                    provider: 'openai-codex',
+                    mode: 'oauth'
+                }
+            }
+        }
+    };
+
+    context.openclawEditing.content = context.stringifyOpenclawConfig(config);
+    context.fillOpenclawQuickFromConfig(config, {
+        authProfilesByProvider: context.openclawAuthProfilesByProvider
+    });
+    context.openclawQuick.apiKey = 'new-access-token';
+    context.openclawQuick.overrideProvider = true;
+
+    editingMethods.applyOpenclawQuickToText.call(context);
+
+    const parsed = context.parseOpenclawContent(context.openclawEditing.content, { allowEmpty: true });
+    assert.strictEqual(parsed.ok, true);
+    assert.strictEqual(parsed.data.models.providers['openai-codex'].apiKey, undefined);
+    assert.strictEqual(parsed.data.models.providers['openai-codex'].baseUrl, 'https://chatgpt.com/backend-api');
+    assert.deepStrictEqual(context.openclawPendingAuthProfileUpdates, {
+        'openai-codex:default': {
+            profileId: 'openai-codex:default',
+            provider: 'openai-codex',
+            field: 'access',
+            value: 'new-access-token'
+        }
+    });
 });

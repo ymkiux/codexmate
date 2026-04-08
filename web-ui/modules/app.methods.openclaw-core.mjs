@@ -89,6 +89,17 @@ function coerceSecretRefRecord(value) {
     return null;
 }
 
+const BUILTIN_PROVIDER_DEFAULTS = {
+    openai: {
+        baseUrl: 'https://api.openai.com/v1',
+        apiType: 'openai-responses'
+    },
+    'openai-codex': {
+        baseUrl: 'https://chatgpt.com/backend-api',
+        apiType: 'openai-codex-responses'
+    }
+};
+
 function formatSecretRefLabel(ref) {
     const normalized = coerceSecretRefRecord(ref);
     if (!normalized) return '';
@@ -125,17 +136,69 @@ function readFirstProviderDisplayValue(records, keys) {
 function readOpenclawAuthProfileDisplayValue(authProfilesByProvider, providerName) {
     const matchedKey = findNormalizedProviderKey(authProfilesByProvider, providerName) || providerName;
     const summary = isPlainRecord(authProfilesByProvider) ? authProfilesByProvider[matchedKey] : null;
-    if (!isPlainRecord(summary) || typeof summary.display !== 'string' || !summary.display.trim()) {
+    if (!isPlainRecord(summary)) {
+        return {
+            value: '',
+            readOnly: false,
+            kind: 'missing',
+            sourceKind: '',
+            sourceProfileId: '',
+            sourceWriteField: '',
+            sourceOriginalValue: '',
+            sourceCredentialType: ''
+        };
+    }
+    if (typeof summary.resolvedValue === 'string' && summary.resolvedValue.trim()) {
+        return {
+            value: summary.resolvedValue.trim(),
+            readOnly: false,
+            kind: 'auth-profile-value',
+            sourceKind: 'auth-profile',
+            sourceProfileId: typeof summary.profileId === 'string' ? summary.profileId.trim() : '',
+            sourceWriteField: typeof summary.resolvedField === 'string' ? summary.resolvedField.trim() : '',
+            sourceOriginalValue: summary.resolvedValue.trim(),
+            sourceCredentialType: typeof summary.type === 'string' ? summary.type.trim() : ''
+        };
+    }
+    if (typeof summary.display !== 'string' || !summary.display.trim()) {
+        return {
+            value: '',
+            readOnly: false,
+            kind: 'missing',
+            sourceKind: '',
+            sourceProfileId: '',
+            sourceWriteField: '',
+            sourceOriginalValue: '',
+            sourceCredentialType: ''
+        };
+    }
+    return {
+        value: summary.display.trim(),
+        readOnly: true,
+        kind: 'auth-profile',
+        sourceKind: '',
+        sourceProfileId: typeof summary.profileId === 'string' ? summary.profileId.trim() : '',
+        sourceWriteField: '',
+        sourceOriginalValue: '',
+        sourceCredentialType: typeof summary.type === 'string' ? summary.type.trim() : ''
+    };
+}
+
+function readBuiltinProviderDisplayValue(providerName, field) {
+    const defaults = BUILTIN_PROVIDER_DEFAULTS[normalizeProviderId(providerName)];
+    if (!defaults) {
         return {
             value: '',
             readOnly: false,
             kind: 'missing'
         };
     }
+    const key = field === 'apiType' ? 'apiType' : 'baseUrl';
+    const value = typeof defaults[key] === 'string' ? defaults[key].trim() : '';
     return {
-        value: summary.display.trim(),
-        readOnly: true,
-        kind: 'auth-profile'
+        value,
+        readOnly: false,
+        kind: value ? 'builtin-default' : 'missing'
     };
 }
 
@@ -223,6 +286,11 @@ export function createOpenclawCoreMethods() {
                 apiKey: '',
                 apiKeyReadOnly: false,
                 apiKeyDisplayKind: 'missing',
+                apiKeySourceKind: '',
+                apiKeySourceProfileId: '',
+                apiKeySourceWriteField: '',
+                apiKeySourceOriginalValue: '',
+                apiKeySourceCredentialType: '',
                 apiType: 'openai-responses',
                 modelId: '',
                 modelName: '',
@@ -340,13 +408,28 @@ export function createOpenclawCoreMethods() {
                 }
             }
 
-            const baseUrlField = readFirstProviderDisplayValue(providerRecords, ['baseUrl', 'base_url', 'url']);
+            const configuredBaseUrlField = readFirstProviderDisplayValue(providerRecords, ['baseUrl', 'base_url', 'url']);
+            const baseUrlField = configuredBaseUrlField.value
+                ? configuredBaseUrlField
+                : readBuiltinProviderDisplayValue(providerName, 'baseUrl');
             const providerApiKeyField = readFirstProviderDisplayValue(providerRecords, ['apiKey', 'api_key', 'keyRef', 'key', 'authToken', 'auth_token', 'tokenRef', 'token']);
             const authProfileField = providerName
                 ? readOpenclawAuthProfileDisplayValue(authProfilesByProvider, providerName)
-                : { value: '', readOnly: false, kind: 'missing' };
+                : {
+                    value: '',
+                    readOnly: false,
+                    kind: 'missing',
+                    sourceKind: '',
+                    sourceProfileId: '',
+                    sourceWriteField: '',
+                    sourceOriginalValue: '',
+                    sourceCredentialType: ''
+                };
             const apiKeyField = providerApiKeyField.value ? providerApiKeyField : authProfileField;
-            const apiTypeField = readFirstProviderDisplayValue(providerRecords, ['api', 'apiType', 'api_type']);
+            const configuredApiTypeField = readFirstProviderDisplayValue(providerRecords, ['api', 'apiType', 'api_type']);
+            const apiTypeField = configuredApiTypeField.value
+                ? configuredApiTypeField
+                : readBuiltinProviderDisplayValue(providerName, 'apiType');
 
             this.openclawQuick = {
                 ...defaults,
@@ -357,6 +440,11 @@ export function createOpenclawCoreMethods() {
                 apiKey: apiKeyField.value,
                 apiKeyReadOnly: apiKeyField.readOnly,
                 apiKeyDisplayKind: apiKeyField.kind,
+                apiKeySourceKind: apiKeyField.sourceKind || '',
+                apiKeySourceProfileId: apiKeyField.sourceProfileId || '',
+                apiKeySourceWriteField: apiKeyField.sourceWriteField || '',
+                apiKeySourceOriginalValue: apiKeyField.sourceOriginalValue || '',
+                apiKeySourceCredentialType: apiKeyField.sourceCredentialType || '',
                 apiType: apiTypeField.value || defaults.apiType,
                 modelId: modelId || '',
                 modelName: modelEntry && typeof modelEntry.name === 'string'

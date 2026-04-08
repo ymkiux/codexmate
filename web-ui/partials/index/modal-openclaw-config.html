@@ -49,7 +49,8 @@
                             <div class="form-group">
                                 <label class="form-label">Base URL</label>
                                 <input v-model="openclawQuick.baseUrl" class="form-input" placeholder="https://api.example.com/v1" :readonly="openclawQuick.baseUrlReadOnly">
-                                <div v-if="openclawQuick.baseUrlReadOnly" class="form-hint">检测到外部引用，快速表单中只读显示；如需修改请使用原文编辑。</div>
+                                <div v-if="openclawQuick.baseUrlDisplayKind === 'builtin-default'" class="form-hint">已按 OpenClaw 内建 provider 默认值回填，可直接修改。</div>
+                                <div v-else-if="openclawQuick.baseUrlReadOnly" class="form-hint">检测到外部引用，快速表单中只读显示；如需修改请使用原文编辑。</div>
                             </div>
                             <div class="form-group">
                                 <label class="form-label">API Key</label>
@@ -59,7 +60,8 @@
                                         {{ openclawQuick.showKey ? '隐藏' : '显示' }}
                                     </button>
                                 </div>
-                                <div v-if="openclawQuick.apiKeyReadOnly" class="form-hint">检测到外部认证或引用，快速表单中只读显示；如需修改请使用原文编辑或对应认证配置。</div>
+                                <div v-if="openclawQuick.apiKeyDisplayKind === 'auth-profile-value'" class="form-hint">当前值来自 OpenClaw 外部认证配置；修改后在“保存并应用”时会回写对应 auth profile。</div>
+                                <div v-else-if="openclawQuick.apiKeyReadOnly" class="form-hint">检测到外部认证或引用，快速表单中只读显示；如需修改请使用原文编辑或对应认证配置。</div>
                                 <div v-else class="form-hint">留空表示不覆盖现有 key。</div>
                             </div>
                             <div class="form-group">

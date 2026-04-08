@@ -288,6 +288,56 @@ test('fillOpenclawQuickFromConfig resolves auth profile summaries through normal
     assert.strictEqual(context.openclawQuick.apiKeyDisplayKind, 'auth-profile');
 });
 
+test('fillOpenclawQuickFromConfig uses builtin openai-codex defaults and editable auth profile values', () => {
+    const context = {
+        ...methods,
+        openclawQuick: methods.getOpenclawQuickDefaults(),
+        openclawAuthProfilesByProvider: {
+            'openai-codex': {
+                provider: 'openai-codex',
+                profileId: 'openai-codex:default',
+                type: 'oauth',
+                display: 'AuthProfile(oauth:openai-codex:default)',
+                resolvedValue: 'access-token-value',
+                resolvedField: 'access',
+                editable: true,
+                valueKind: 'oauth-access'
+            }
+        }
+    };
+
+    methods.fillOpenclawQuickFromConfig.call(context, {
+        agents: {
+            defaults: {
+                model: {
+                    primary: 'openai-codex/gpt-5.4'
+                }
+            }
+        },
+        auth: {
+            profiles: {
+                'openai-codex:default': {
+                    provider: 'openai-codex',
+                    mode: 'oauth'
+                }
+            }
+        }
+    });
+
+    assert.strictEqual(context.openclawQuick.providerName, 'openai-codex');
+    assert.strictEqual(context.openclawQuick.baseUrl, 'https://chatgpt.com/backend-api');
+    assert.strictEqual(context.openclawQuick.baseUrlDisplayKind, 'builtin-default');
+    assert.strictEqual(context.openclawQuick.apiType, 'openai-codex-responses');
+    assert.strictEqual(context.openclawQuick.apiKey, 'access-token-value');
+    assert.strictEqual(context.openclawQuick.apiKeyReadOnly, false);
+    assert.strictEqual(context.openclawQuick.apiKeyDisplayKind, 'auth-profile-value');
+    assert.strictEqual(context.openclawQuick.apiKeySourceKind, 'auth-profile');
+    assert.strictEqual(context.openclawQuick.apiKeySourceProfileId, 'openai-codex:default');
+    assert.strictEqual(context.openclawQuick.apiKeySourceWriteField, 'access');
+    assert.strictEqual(context.openclawQuick.apiKeySourceOriginalValue, 'access-token-value');
+    assert.strictEqual(context.openclawQuick.apiKeySourceCredentialType, 'oauth');
+});
+
 test('fillOpenclawQuickFromConfig renders structured SecretRef values as read-only labels', () => {
     const context = {
         ...methods,
