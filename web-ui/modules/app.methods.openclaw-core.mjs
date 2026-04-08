@@ -13,9 +13,35 @@ function isSecretRefRecord(value) {
         && typeof value.id === 'string';
 }
 
+function isLegacySecretRefRecord(value) {
+    return isPlainRecord(value)
+        && typeof value.source === 'string'
+        && typeof value.id === 'string'
+        && (value.provider === undefined || value.provider === null || value.provider === '');
+}
+
+function coerceSecretRefRecord(value) {
+    if (isSecretRefRecord(value)) {
+        return {
+            source: value.source.trim(),
+            provider: value.provider.trim(),
+            id: value.id.trim()
+        };
+    }
+    if (isLegacySecretRefRecord(value)) {
+        return {
+            source: value.source.trim(),
+            provider: 'default',
+            id: value.id.trim()
+        };
+    }
+    return null;
+}
+
 function formatSecretRefLabel(ref) {
-    if (!isSecretRefRecord(ref)) return '';
-    return `SecretRef(${ref.source}:${ref.provider}:${ref.id})`;
+    const normalized = coerceSecretRefRecord(ref);
+    if (!normalized) return '';
+    return `SecretRef(${normalized.source}:${normalized.provider}:${normalized.id})`;
 }
 
 function readFirstProviderDisplayValue(records, keys) {
@@ -29,7 +55,7 @@ function readFirstProviderDisplayValue(records, keys) {
                     kind: isEnvTemplateString(record[key]) ? 'env-template' : 'string'
                 };
             }
-            if (isSecretRefRecord(record[key])) {
+            if (coerceSecretRefRecord(record[key])) {
                 return {
                     value: formatSecretRefLabel(record[key]),
                     readOnly: true,
@@ -233,7 +259,7 @@ export function createOpenclawCoreMethods() {
             }
 
             const baseUrlField = readFirstProviderDisplayValue(providerRecords, ['baseUrl', 'base_url', 'url']);
-            const apiKeyField = readFirstProviderDisplayValue(providerRecords, ['apiKey', 'api_key', 'preferred_auth_method', 'key', 'authToken', 'auth_token', 'token']);
+            const apiKeyField = readFirstProviderDisplayValue(providerRecords, ['apiKey', 'api_key', 'keyRef', 'key', 'authToken', 'auth_token', 'tokenRef', 'token']);
             const apiTypeField = readFirstProviderDisplayValue(providerRecords, ['api', 'apiType', 'api_type']);
 
             this.openclawQuick = {
@@ -436,7 +462,7 @@ export function createOpenclawCoreMethods() {
             if (typeof value === 'undefined' || value === null) {
                 return '';
             }
-            if (isSecretRefRecord(value)) {
+            if (coerceSecretRefRecord(value)) {
                 return formatSecretRefLabel(value);
             }
             let text = '';

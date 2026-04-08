@@ -63,7 +63,7 @@ test('fillOpenclawQuickFromConfig reads provider base url and key from root prov
         providers: {
             maxx: {
                 base_url: 'https://provider.example.com/v1',
-                preferred_auth_method: 'sk-live',
+                api_key: 'sk-live',
                 api_type: 'openai-chat'
             }
         }
@@ -122,7 +122,7 @@ test('fillOpenclawQuickFromConfig falls back to the sole configured provider whe
             providers: {
                 maxx: {
                     base_url: 'https://maxx.example.com/v1',
-                    preferred_auth_method: 'maxx-key',
+                    api_key: 'maxx-key',
                     api_type: 'openai-responses'
                 }
             }
@@ -175,6 +175,64 @@ test('fillOpenclawQuickFromConfig renders structured SecretRef values as read-on
     assert.strictEqual(context.openclawQuick.apiKeyReadOnly, true);
 });
 
+test('fillOpenclawQuickFromConfig supports legacy SecretRef objects without provider and explicit keyRef fields', () => {
+    const context = {
+        ...methods,
+        openclawQuick: methods.getOpenclawQuickDefaults()
+    };
+
+    methods.fillOpenclawQuickFromConfig.call(context, {
+        agents: {
+            defaults: {
+                model: {
+                    primary: 'openai/gpt-5'
+                }
+            }
+        },
+        models: {
+            providers: {
+                openai: {
+                    baseUrl: 'https://api.openai.com/v1',
+                    keyRef: {
+                        source: 'env',
+                        id: 'OPENAI_API_KEY'
+                    },
+                    api: 'openai-responses'
+                }
+            }
+        }
+    });
+
+    assert.strictEqual(context.openclawQuick.baseUrl, 'https://api.openai.com/v1');
+    assert.strictEqual(context.openclawQuick.apiKey, 'SecretRef(env:default:OPENAI_API_KEY)');
+    assert.strictEqual(context.openclawQuick.apiKeyReadOnly, true);
+});
+
+test('fillOpenclawQuickFromConfig does not mistake auth mode fields for api keys', () => {
+    const context = {
+        ...methods,
+        openclawQuick: methods.getOpenclawQuickDefaults()
+    };
+
+    methods.fillOpenclawQuickFromConfig.call(context, {
+        models: {
+            providers: {
+                openai: {
+                    baseUrl: 'https://api.openai.com/v1',
+                    auth: 'oauth',
+                    preferred_auth_method: 'oauth',
+                    api: 'openai-responses'
+                }
+            }
+        }
+    });
+
+    assert.strictEqual(context.openclawQuick.providerName, 'openai');
+    assert.strictEqual(context.openclawQuick.baseUrl, 'https://api.openai.com/v1');
+    assert.strictEqual(context.openclawQuick.apiKey, '');
+    assert.strictEqual(context.openclawQuick.apiKeyReadOnly, false);
+});
+
 test('formatProviderValue shows readable labels for env template and SecretRef inputs', () => {
     const context = { ...methods };
 
@@ -185,5 +243,9 @@ test('formatProviderValue shows readable labels for env template and SecretRef i
     assert.strictEqual(
         methods.formatProviderValue.call(context, 'apiKey', '${OPENAI_API_KEY}'),
         'EnvRef(OPENAI_API_KEY)'
+    );
+    assert.strictEqual(
+        methods.formatProviderValue.call(context, 'keyRef', { source: 'env', id: 'OPENAI_API_KEY' }),
+        'SecretRef(env:default:OPENAI_API_KEY)'
     );
 });
