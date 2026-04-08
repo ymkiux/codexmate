@@ -321,6 +321,10 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     const missingCurrentKeys = headDataKeys.filter((key) => !currentDataKeys.includes(key)).sort();
     const allowedExtraCurrentKeys = parityAgainstHead ? [] : [
         '__mainTabSwitchState',
+        'sessionsUsageError',
+        'sessionsUsageList',
+        'sessionsUsageLoadedOnce',
+        'sessionsUsageLoading',
         'sessionsViewMode'
     ];
     const allowedMissingCurrentKeys = [
@@ -352,9 +356,11 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'canSubmitProvider',
         'findProviderByName',
         'getProviderValidation',
+        'invalidateSessionsUsageData',
         'isReservedProviderCreationName',
         'isValidProviderNameInput',
         'isValidProviderUrlInput',
+        'loadSessionsUsage',
         'normalizeProviderDraft',
         'providerFieldError'
     ];

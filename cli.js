@@ -5443,6 +5443,29 @@ async function listAllSessionsData(params = {}) {
     return result;
 }
 
+async function listSessionUsage(params = {}) {
+    const source = params.source === 'codex' || params.source === 'claude'
+        ? params.source
+        : 'all';
+    const rawLimit = Number(params.limit);
+    const limit = Number.isFinite(rawLimit)
+        ? Math.max(1, Math.min(rawLimit, MAX_SESSION_LIST_SIZE))
+        : 200;
+    const sessions = await listAllSessions({
+        source,
+        limit,
+        forceRefresh: !!params.forceRefresh
+    });
+    return sessions.map((item) => {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) {
+            return item;
+        }
+        const normalized = { ...item };
+        delete normalized.__messageCountExact;
+        return normalized;
+    });
+}
+
 function listSessionPaths(params = {}) {
     const source = typeof params.source === 'string' ? params.source.trim().toLowerCase() : '';
     if (source && source !== 'codex' && source !== 'claude' && source !== 'all') {
@@ -10701,6 +10724,19 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                                 } else {
                                     result = {
                                         sessions: await listAllSessionsData(params),
+                                        source: source || 'all'
+                                    };
+                                }
+                            }
+                            break;
+                        case 'list-sessions-usage':
+                            {
+                                const source = typeof params.source === 'string' ? params.source.trim().toLowerCase() : '';
+                                if (source && source !== 'codex' && source !== 'claude' && source !== 'all') {
+                                    result = { error: 'Invalid source. Must be codex, claude, or all' };
+                                } else {
+                                    result = {
+                                        sessions: await listSessionUsage(params || {}),
                                         source: source || 'all'
                                     };
                                 }

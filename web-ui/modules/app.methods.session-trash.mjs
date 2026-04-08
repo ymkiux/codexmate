@@ -340,6 +340,9 @@ export function createSessionTrashMethods(options = {}) {
                     return;
                 }
                 this.showMessage('会话已恢复', 'success');
+                if (typeof this.invalidateSessionsUsageData === 'function') {
+                    this.invalidateSessionsUsageData({ preserveList: true });
+                }
                 this.invalidateSessionTrashRequests();
                 await this.loadSessionTrash({ forceRefresh: true });
                 if (this.sessionsLoadedOnce) {

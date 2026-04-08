@@ -85,25 +85,31 @@ test('switchMainTab prepares session render and loads sessions only when not loa
     assert.strictEqual(calls.loadSessions, 1);
 });
 
-test('switchMainTab loads sessions for usage tab without preparing session render', () => {
+test('switchMainTab loads lightweight usage data without preparing session render', () => {
     const calls = {
         teardown: 0,
         prepare: 0,
-        loadSessions: []
+        loadSessions: 0,
+        loadSessionsUsage: 0
     };
     const vm = {
         mainTab: 'config',
         configMode: 'codex',
         sessionsLoadedOnce: false,
+        sessionsUsageLoadedOnce: false,
         teardownSessionTabRender() {
             calls.teardown += 1;
         },
         prepareSessionTabRender() {
             calls.prepare += 1;
         },
-        loadSessions(options) {
-            calls.loadSessions.push(options || {});
+        loadSessions() {
+            calls.loadSessions += 1;
             this.sessionsLoadedOnce = true;
+        },
+        loadSessionsUsage() {
+            calls.loadSessionsUsage += 1;
+            this.sessionsUsageLoadedOnce = true;
         },
         refreshClaudeModelContext() {}
     };
@@ -111,11 +117,13 @@ test('switchMainTab loads sessions for usage tab without preparing session rende
     switchMainTab.call(vm, 'usage');
     assert.strictEqual(vm.mainTab, 'usage');
     assert.strictEqual(calls.prepare, 0);
-    assert.deepStrictEqual(calls.loadSessions, [{ includeActiveDetail: false }]);
+    assert.strictEqual(calls.loadSessions, 0);
+    assert.strictEqual(calls.loadSessionsUsage, 1);
 
     switchMainTab.call(vm, 'usage');
     assert.strictEqual(calls.prepare, 0);
-    assert.deepStrictEqual(calls.loadSessions, [{ includeActiveDetail: false }]);
+    assert.strictEqual(calls.loadSessions, 0);
+    assert.strictEqual(calls.loadSessionsUsage, 1);
 });
 
 test('switchMainTab keeps claude model context refresh behavior', () => {
