@@ -103,3 +103,35 @@ test('fillOpenclawQuickFromConfig falls back to the sole provider across provide
     assert.strictEqual(context.openclawQuick.apiKey, 'alpha-key');
     assert.strictEqual(context.openclawQuick.apiType, 'openai-responses');
 });
+
+test('fillOpenclawQuickFromConfig falls back to the sole configured provider when primary provider is missing', () => {
+    const context = {
+        ...methods,
+        openclawQuick: methods.getOpenclawQuickDefaults()
+    };
+
+    methods.fillOpenclawQuickFromConfig.call(context, {
+        agents: {
+            defaults: {
+                model: {
+                    primary: 'openai-codex/gpt-5.4'
+                }
+            }
+        },
+        models: {
+            providers: {
+                maxx: {
+                    base_url: 'https://maxx.example.com/v1',
+                    preferred_auth_method: 'maxx-key',
+                    api_type: 'openai-responses'
+                }
+            }
+        }
+    });
+
+    assert.strictEqual(context.openclawQuick.providerName, 'maxx');
+    assert.strictEqual(context.openclawQuick.baseUrl, 'https://maxx.example.com/v1');
+    assert.strictEqual(context.openclawQuick.apiKey, 'maxx-key');
+    assert.strictEqual(context.openclawQuick.apiType, 'openai-responses');
+    assert.strictEqual(context.openclawQuick.modelId, 'gpt-5.4');
+});
