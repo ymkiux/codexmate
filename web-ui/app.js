@@ -116,6 +116,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 skillsMarketLocalLoadedOnce: false,
                 skillsMarketImportLoadedOnce: false,
                 sessionPinnedMap: {},
+                __mainTabSwitchState: {
+                    intent: '',
+                    pendingTarget: '',
+                    pendingConfigMode: '',
+                    ticket: 0
+                },
                 sessionsViewMode: 'browser',
                 sessionsUsageTimeRange: '7d',
                 sessionsList: [],
