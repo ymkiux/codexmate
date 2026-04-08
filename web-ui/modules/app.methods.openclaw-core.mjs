@@ -2,6 +2,57 @@ function isPlainRecord(value) {
     return !!(value && typeof value === 'object' && !Array.isArray(value));
 }
 
+function normalizeProviderId(provider) {
+    const normalized = typeof provider === 'string' ? provider.trim().toLowerCase() : '';
+    if (!normalized) return '';
+    if (normalized === 'modelstudio' || normalized === 'qwencloud') {
+        return 'qwen';
+    }
+    if (normalized === 'z.ai' || normalized === 'z-ai') {
+        return 'zai';
+    }
+    if (normalized === 'opencode-zen') {
+        return 'opencode';
+    }
+    if (normalized === 'opencode-go-auth') {
+        return 'opencode-go';
+    }
+    if (normalized === 'kimi' || normalized === 'kimi-code' || normalized === 'kimi-coding') {
+        return 'kimi';
+    }
+    if (normalized === 'bedrock' || normalized === 'aws-bedrock') {
+        return 'amazon-bedrock';
+    }
+    if (normalized === 'bytedance' || normalized === 'doubao') {
+        return 'volcengine';
+    }
+    return normalized;
+}
+
+function findNormalizedProviderKey(entries, provider) {
+    if (!isPlainRecord(entries)) {
+        return '';
+    }
+    const providerKey = normalizeProviderId(provider);
+    if (!providerKey) {
+        return '';
+    }
+    return Object.keys(entries).find((key) => normalizeProviderId(key) === providerKey) || '';
+}
+
+function collectDistinctProviderKeys(...providerMaps) {
+    const byNormalizedKey = new Map();
+    for (const providerMap of providerMaps) {
+        if (!isPlainRecord(providerMap)) continue;
+        for (const key of Object.keys(providerMap)) {
+            const normalizedKey = normalizeProviderId(key);
+            if (!normalizedKey || byNormalizedKey.has(normalizedKey)) continue;
+            byNormalizedKey.set(normalizedKey, key);
+        }
+    }
+    return Array.from(byNormalizedKey.values());
+}
+
 function isEnvTemplateString(value) {
     return typeof value === 'string' && /^\$\{[A-Z][A-Z0-9_]{0,127}\}$/.test(value.trim());
 }
@@ -218,20 +269,29 @@ export function createOpenclawCoreMethods() {
             const rootProviders = isPlainRecord(config.providers)
                 ? config.providers
                 : null;
-            const providerKeys = Array.from(new Set([
-                ...Object.keys(modelProviders || {}),
-                ...Object.keys(rootProviders || {})
-            ]));
+            const providerKeys = collectDistinctProviderKeys(modelProviders, rootProviders);
             if (!providerName && providerKeys.length === 1) {
                 providerName = providerKeys[0];
             }
 
-            const buildProviderRecords = (name) => name
-                ? [
-                    modelProviders && modelProviders[name],
-                    rootProviders && rootProviders[name]
-                ]
-                : [];
+            const normalizedConfiguredProviderName = providerName
+                ? (findNormalizedProviderKey(modelProviders, providerName)
+                    || findNormalizedProviderKey(rootProviders, providerName)
+                    || providerName)
+                : '';
+            if (normalizedConfiguredProviderName) {
+                providerName = normalizedConfiguredProviderName;
+            }
+
+            const buildProviderRecords = (name) => {
+                if (!name) return [];
+                const modelProviderKey = findNormalizedProviderKey(modelProviders, name) || name;
+                const rootProviderKey = findNormalizedProviderKey(rootProviders, name) || name;
+                return [
+                    modelProviders && modelProviders[modelProviderKey],
+                    rootProviders && rootProviders[rootProviderKey]
+                ];
+            };
             let providerRecords = buildProviderRecords(providerName);
             const hasProviderConfig = providerRecords.some((item) => isPlainRecord(item));
             if (!hasProviderConfig && providerKeys.length === 1) {
