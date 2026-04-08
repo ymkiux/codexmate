@@ -1,30 +1,9 @@
 /* ============================================
    容器
    ============================================ */
-body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    background:
-        radial-gradient(circle at top left, rgba(208, 88, 58, 0.025), transparent 24%),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0));
-    opacity: 0.34;
-    pointer-events: none;
-    z-index: 0;
-}
-
-/* 背景网格 */
+body::before,
 body::after {
-    content: "";
-    position: fixed;
-    inset: 0;
-    background-image:
-        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-        linear-gradient(0deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-    background-size: 220px 220px;
-    opacity: 0.01;
-    pointer-events: none;
-    z-index: 0;
+    content: none;
 }
 
 /* ============================================
@@ -32,11 +11,12 @@ body::after {
    ============================================ */
 .container {
     width: 100%;
-    max-width: 2200px;
-    margin: 0 auto;
-    padding: 12px 14px 18px;
+    max-width: none;
+    margin: 0;
+    padding: 0;
     position: relative;
     z-index: 1;
+    min-height: 100vh;
 }
 
 /* ============================================
@@ -44,9 +24,11 @@ body::after {
    ============================================ */
 .app-shell {
     display: grid;
-    grid-template-columns: minmax(196px, 216px) minmax(0, 1fr);
-    gap: 16px;
-    align-items: flex-start;
+    grid-template-columns: 248px minmax(0, 1fr);
+    gap: 0;
+    align-items: stretch;
+    min-height: 100vh;
+    background: var(--color-bg);
 }
 
 .app-shell.standalone {
@@ -55,18 +37,18 @@ body::after {
 
 .side-rail {
     position: sticky;
-    top: var(--spacing-md);
-    align-self: start;
+    top: 0;
+    align-self: stretch;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 12px 8px 10px;
-    background: rgba(242, 237, 231, 0.92);
-    border: 1px solid rgba(201, 184, 165, 0.42);
-    border-radius: 16px;
+    gap: 0;
+    padding: 0;
+    background: var(--color-surface);
+    border-right: 1px solid var(--color-border);
+    border-radius: 0;
     box-shadow: none;
-    min-height: 0;
-    backdrop-filter: blur(10px);
+    min-height: 100vh;
+    backdrop-filter: none;
 }
 
 .side-rail .brand-title {
@@ -78,29 +60,35 @@ body::after {
     display: flex;
     flex-direction: column;
     gap: 4px;
+    padding: 16px 12px;
+}
+
+.side-section + .side-section {
+    border-top: 1px solid var(--color-border);
 }
 
 .side-rail-nav {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 0;
     flex: 1 1 auto;
 }
 
 .side-section-title {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
-    color: var(--color-text-tertiary);
-    letter-spacing: 0.08em;
+    color: var(--color-text-muted);
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    padding: 0 8px 0;
+    padding: 0 8px;
+    margin-bottom: 8px;
 }
 
 .side-item {
     width: 100%;
     text-align: left;
-    padding: 9px 9px 9px 12px;
-    border-radius: 12px;
+    padding: 8px 12px;
+    border-radius: 8px;
     border: 1px solid transparent;
     background: transparent;
     color: var(--color-text-secondary);
@@ -108,7 +96,7 @@ body::after {
     transition: border-color var(--transition-fast) var(--ease-smooth), background-color var(--transition-fast) var(--ease-smooth), color var(--transition-fast) var(--ease-smooth);
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 2px;
     box-shadow: none;
     position: relative;
 }
@@ -117,24 +105,25 @@ body::after {
     content: "";
     position: absolute;
     left: 0;
-    top: 8px;
-    bottom: 8px;
+    top: 50%;
+    transform: translateY(-50%);
     width: 3px;
-    border-radius: 999px;
+    height: 16px;
+    border-radius: 0 2px 2px 0;
     background: transparent;
     transition: background-color var(--transition-fast) var(--ease-smooth);
 }
 
 .side-item:hover {
-    background: rgba(255, 255, 255, 0.58);
+    background: var(--color-surface-alt);
     color: var(--color-text-primary);
 }
 
 .side-item.active,
 .side-item.nav-intent-active {
-    border-color: rgba(201, 94, 75, 0.18);
-    background: rgba(255, 255, 255, 0.82);
-    color: var(--color-text-primary);
+    border-color: transparent;
+    background: rgba(59, 130, 246, 0.08);
+    color: var(--color-brand-dark);
     box-shadow: none;
 }
 
@@ -148,7 +137,7 @@ body::after {
 
 .side-item.active::before,
 .side-item.nav-intent-active::before {
-    background: rgba(201, 94, 75, 0.9);
+    background: var(--color-brand);
 }
 
 .side-item.nav-intent-inactive::before,
@@ -157,14 +146,14 @@ body::after {
 }
 
 .side-item-title {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
     letter-spacing: -0.01em;
 }
 
 .side-item-meta {
-    font-size: 10px;
-    color: var(--color-text-tertiary);
+    font-size: 11px;
+    color: var(--color-text-muted);
     display: flex;
     visibility: hidden;
     opacity: 0;
@@ -197,34 +186,34 @@ body::after {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 3px;
+    gap: 6px;
     margin-bottom: 0;
-    padding: 2px 4px 8px;
-    border-bottom: 1px solid rgba(216, 201, 184, 0.22);
+    padding: 20px;
+    border-bottom: 1px solid var(--color-border);
 }
 
 .brand-kicker {
-    font-size: 10px;
+    font-size: 11px;
     line-height: 1;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--color-text-tertiary);
+    color: var(--color-text-muted);
     font-weight: 700;
 }
 
 .brand-subtitle {
-    font-size: 10px;
-    line-height: 1.3;
-    color: var(--color-text-muted);
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--color-text-secondary);
     max-width: 18ch;
 }
 
 .brand-title {
-    font-size: 20px;
-    line-height: 1.02;
+    font-size: 18px;
+    line-height: 1.1;
     font-family: var(--font-family-display);
     color: var(--color-text-primary);
-    letter-spacing: -0.04em;
+    letter-spacing: -0.02em;
 }
 
 .github-badge {
@@ -234,43 +223,44 @@ body::after {
     gap: 10px;
     margin-top: 0;
     padding: 8px 10px;
-    border-radius: 10px;
-    border: 1px solid rgba(216, 201, 184, 0.36);
-    background: rgba(255, 255, 255, 0.8);
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
     color: var(--color-text-secondary);
     font-size: var(--font-size-caption);
     text-decoration: none;
     box-shadow: none;
     transition: border-color var(--transition-fast) var(--ease-smooth), background-color var(--transition-fast) var(--ease-smooth), color var(--transition-fast) var(--ease-smooth), box-shadow var(--transition-fast) var(--ease-smooth);
     min-width: 0;
-    backdrop-filter: blur(4px);
+    backdrop-filter: none;
 }
 
 .github-badge-rail {
-    width: 100%;
+    width: calc(100% - 24px);
+    margin: 0 12px 12px;
     align-items: center;
     justify-content: flex-start;
     gap: 8px;
-    padding: 8px 9px;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.62);
-    border: 1px solid rgba(216, 201, 184, 0.32);
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
     box-shadow: none;
 }
 
 .github-badge:hover {
-    border-color: rgba(201, 94, 75, 0.46);
-    background: rgba(255, 255, 255, 0.92);
+    border-color: var(--color-border-strong);
+    background: var(--color-surface-alt);
     color: var(--color-text-primary);
-    box-shadow: 0 0 0 1px rgba(201, 94, 75, 0.08);
+    box-shadow: none;
 }
 
 .github-badge:focus-visible {
-    outline: 3px solid rgba(201, 94, 75, 0.22);
+    outline: 3px solid rgba(59, 130, 246, 0.18);
     outline-offset: 2px;
-    border-color: rgba(201, 94, 75, 0.52);
+    border-color: var(--color-brand);
     color: var(--color-text-primary);
-    background: rgba(255, 255, 255, 0.94);
+    background: var(--color-surface);
 }
 
 .github-badge-icon {
@@ -346,7 +336,7 @@ body::after {
 .github-badge-rail .github-badge-left {
     padding: 4px;
     border-radius: 999px;
-    background: rgba(201, 94, 75, 0.12);
+    background: rgba(59, 130, 246, 0.12);
 }
 
 .github-badge-rail .github-badge-label {
@@ -354,5 +344,5 @@ body::after {
 }
 
 .github-badge-rail:hover {
-    border-color: rgba(201, 94, 75, 0.5);
+    border-color: var(--color-border-strong);
 }

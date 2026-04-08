@@ -34,22 +34,22 @@
 .status-strip {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px 8px;
-    margin-bottom: 10px;
-    margin-top: 0;
+    gap: 8px;
+    margin: 0 0 14px;
 }
 
 .status-chip {
     min-width: 0;
     max-width: 100%;
-    padding: 0;
-    border: none;
-    background: transparent;
+    padding: 6px 10px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
     box-shadow: none;
     display: inline-flex;
     flex-direction: row;
-    align-items: baseline;
-    gap: 6px;
+    align-items: center;
+    gap: 8px;
+    border-radius: 999px;
 }
 
 .status-chip .label {
@@ -73,11 +73,11 @@
 }
 
 .provider-fast-switch {
-    margin: 0 0 10px;
-    padding: 8px 10px;
+    margin: 0 0 14px;
+    padding: 10px 12px;
     border-radius: 10px;
-    border: 1px solid rgba(216, 201, 184, 0.42);
-    background: rgba(252, 250, 247, 0.96);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
     box-shadow: none;
     display: grid;
     gap: 6px;
@@ -87,6 +87,7 @@
     font-size: 11px;
     color: var(--color-text-tertiary);
     letter-spacing: 0.02em;
+    font-weight: 600;
 }
 
 .provider-fast-switch-select {
@@ -115,11 +116,11 @@
 
 .main-panel {
     min-width: 0;
-    background: rgba(255, 255, 255, 0.98);
-    border: 1px solid rgba(214, 201, 186, 0.34);
-    border-radius: 14px;
-    box-shadow: 0 4px 14px rgba(31, 26, 23, 0.02);
-    padding: 14px 16px 18px;
+    background: var(--color-bg);
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0 24px 24px;
     backdrop-filter: none;
     position: relative;
     overflow-x: hidden;
@@ -128,32 +129,33 @@
 }
 
 .panel-header {
-    margin-bottom: 8px;
+    margin-bottom: 14px;
     text-align: left;
 }
 
 .panel-header-refined {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 8px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid rgba(216, 201, 184, 0.18);
+    gap: 14px;
+    margin: 0 -24px 14px;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-surface);
 }
 
 .panel-header-copy {
     display: flex;
     flex-direction: column;
-    gap: 3px;
-    max-width: 760px;
+    gap: 4px;
+    max-width: none;
 }
 
 .panel-kicker {
-    font-size: 9px;
+    font-size: 10px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--color-text-tertiary);
+    color: var(--color-brand);
     font-weight: 700;
 }
 
@@ -194,11 +196,11 @@
 }
 
 .top-tabs {
-    margin: 6px 0 10px;
+    margin: 10px 12px 12px;
     background: transparent;
     border: none;
     border-radius: 0;
-    padding: 0;
+    padding: 0 8px 2px 2px;
     box-shadow: none;
     display: flex;
     flex-wrap: nowrap;
@@ -209,7 +211,6 @@
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     scroll-snap-type: x proximity;
-    padding: 0 8px 2px 2px;
 }
 
 .top-tabs::-webkit-scrollbar {
@@ -217,10 +218,10 @@
 }
 
 .top-tab {
-    border: 1px solid rgba(216, 201, 184, 0.42);
+    border: 1px solid var(--color-border);
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.94);
-    padding: 6px 9px;
+    background: var(--color-surface);
+    padding: 6px 10px;
     font-size: 11px;
     color: var(--color-text-secondary);
     text-align: center;
@@ -232,29 +233,23 @@
 }
 
 .top-tab:hover {
-    border-color: var(--color-brand);
+    border-color: var(--color-border-strong);
     color: var(--color-text-primary);
 }
 
-.top-tab.active {
-    border-color: rgba(201, 94, 75, 0.46);
-    color: var(--color-text-primary);
-    background: rgba(249, 244, 240, 0.98);
-    box-shadow: inset 0 0 0 1px rgba(201, 94, 75, 0.08);
-}
-
+.top-tab.active,
 .top-tab.nav-intent-active {
-    border-color: rgba(201, 94, 75, 0.46);
-    color: var(--color-text-primary);
-    background: rgba(249, 244, 240, 0.98);
-    box-shadow: inset 0 0 0 1px rgba(201, 94, 75, 0.08);
+    border-color: rgba(59, 130, 246, 0.22);
+    color: var(--color-brand-dark);
+    background: rgba(59, 130, 246, 0.08);
+    box-shadow: none;
 }
 
 .top-tab.nav-intent-inactive,
 .top-tab.active.nav-intent-inactive {
-    border-color: rgba(216, 201, 184, 0.42);
+    border-color: var(--color-border);
     color: var(--color-text-secondary);
-    background: rgba(255, 255, 255, 0.94);
+    background: var(--color-surface);
     box-shadow: none;
 }
 
