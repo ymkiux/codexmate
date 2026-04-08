@@ -3455,6 +3455,9 @@ function addProviderToConfig(params = {}) {
     if (!isValidProviderName(name)) {
         return { error: '名称仅支持字母/数字/._-' };
     }
+    if (!isValidHttpUrl(normalizeBaseUrl(url))) {
+        return { error: 'URL 仅支持 http/https' };
+    }
     if (isReservedProviderNameForCreation(name)) {
         return { error: 'local provider 为系统保留名称，不可新增' };
     }
@@ -3532,6 +3535,9 @@ function updateProviderInConfig(params = {}) {
     if (!name) return { error: '名称不能为空' };
     if (!url && key === undefined) {
         return { error: 'URL 或密钥至少填写一项' };
+    }
+    if (url && !isValidHttpUrl(normalizeBaseUrl(url))) {
+        return { error: 'URL 仅支持 http/https' };
     }
     if (isNonEditableProvider(name) && !allowManaged) {
         if (isDefaultLocalProvider(name)) {
@@ -8228,7 +8234,7 @@ function cmdUseModel(modelName, silent = false) {
 // 添加提供商
 function cmdAdd(name, baseUrl, apiKey, silent = false) {
     const providerName = typeof name === 'string' ? name.trim() : '';
-    const providerBaseUrl = typeof baseUrl === 'string' ? baseUrl.trim() : '';
+    const providerBaseUrl = normalizeBaseUrl(baseUrl);
 
     if (!providerName || !providerBaseUrl) {
         if (!silent) {
@@ -8249,6 +8255,10 @@ function cmdAdd(name, baseUrl, apiKey, silent = false) {
     if (isBuiltinProxyProvider(providerName)) {
         if (!silent) console.error('错误: codexmate-proxy 为保留名称，不可手动添加');
         throw new Error('codexmate-proxy 为保留名称，不可手动添加');
+    }
+    if (!isValidHttpUrl(providerBaseUrl)) {
+        if (!silent) console.error('错误: URL 仅支持 http/https');
+        throw new Error('URL 仅支持 http/https');
     }
 
     const config = readConfig();
@@ -8307,6 +8317,7 @@ function cmdDelete(name, silent = false) {
 // 更新提供商
 function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
     const allowManaged = !!(options && options.allowManaged);
+    const normalizedBaseUrl = baseUrl === undefined ? undefined : normalizeBaseUrl(baseUrl);
     if (!name) {
         if (!silent) console.error('错误: 提供商名称必填');
         throw new Error('提供商名称必填');
@@ -8334,6 +8345,10 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
     if (ranges.length === 0) {
         if (!silent) console.error('错误: 无法找到提供商配置块');
         throw new Error('无法找到提供商配置块');
+    }
+    if (normalizedBaseUrl !== undefined && !isValidHttpUrl(normalizedBaseUrl)) {
+        if (!silent) console.error('错误: URL 仅支持 http/https');
+        throw new Error('URL 仅支持 http/https');
     }
 
     const replaceTomlStringField = (block, fieldName, rawValue) => {
@@ -8460,8 +8475,8 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
     for (const range of sorted) {
         const providerBlock = newContent.slice(range.start, range.end);
         let updatedBlock = providerBlock;
-        if (baseUrl) {
-            updatedBlock = replaceTomlStringField(updatedBlock, 'base_url', baseUrl);
+        if (normalizedBaseUrl) {
+            updatedBlock = replaceTomlStringField(updatedBlock, 'base_url', normalizedBaseUrl);
         }
         if (apiKey !== undefined) {
             updatedBlock = replaceTomlStringField(updatedBlock, 'preferred_auth_method', apiKey);

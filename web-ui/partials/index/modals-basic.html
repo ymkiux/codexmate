@@ -5,11 +5,25 @@
 
                 <div class="form-group">
                     <label class="form-label">名称</label>
-                    <input v-model="newProvider.name" class="form-input" placeholder="例如: myapi">
+                    <input
+                        v-model="newProvider.name"
+                        :class="['form-input', { invalid: !!providerFieldError('add', 'name') }]"
+                        placeholder="例如: myapi"
+                        autocomplete="off"
+                        spellcheck="false"
+                        @blur="normalizeProviderDraft('add')">
+                    <div v-if="providerFieldError('add', 'name')" class="form-hint form-error">{{ providerFieldError('add', 'name') }}</div>
                 </div>
                 <div class="form-group">
                     <label class="form-label">API 端点</label>
-                    <input v-model="newProvider.url" class="form-input" placeholder="https://api.example.com/v1">
+                    <input
+                        v-model="newProvider.url"
+                        :class="['form-input', { invalid: !!providerFieldError('add', 'url') }]"
+                        placeholder="https://api.example.com/v1"
+                        autocomplete="off"
+                        spellcheck="false"
+                        @blur="normalizeProviderDraft('add')">
+                    <div v-if="providerFieldError('add', 'url')" class="form-hint form-error">{{ providerFieldError('add', 'url') }}</div>
                 </div>
                 <div class="form-group">
                     <label class="form-label">认证密钥</label>
@@ -18,7 +32,7 @@
 
                 <div class="btn-group">
                     <button class="btn btn-cancel" @click="closeAddModal">取消</button>
-                    <button class="btn btn-confirm" @click="addProvider">添加</button>
+                    <button class="btn btn-confirm" @click="addProvider" :disabled="!canSubmitProvider('add')">添加</button>
                 </div>
             </div>
         </div>
@@ -34,7 +48,14 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">API 端点</label>
-                    <input v-model="editingProvider.url" class="form-input" placeholder="https://api.example.com/v1">
+                    <input
+                        v-model="editingProvider.url"
+                        :class="['form-input', { invalid: !!providerFieldError('edit', 'url') }]"
+                        placeholder="https://api.example.com/v1"
+                        autocomplete="off"
+                        spellcheck="false"
+                        @blur="normalizeProviderDraft('edit')">
+                    <div v-if="providerFieldError('edit', 'url')" class="form-hint form-error">{{ providerFieldError('edit', 'url') }}</div>
                 </div>
                 <div class="form-group">
                     <label class="form-label">认证密钥</label>
@@ -44,7 +65,7 @@
 
                 <div class="btn-group">
                     <button class="btn btn-cancel" @click="closeEditModal">取消</button>
-                    <button class="btn btn-confirm" @click="updateProvider">保存</button>
+                    <button class="btn btn-confirm" @click="updateProvider" :disabled="!canSubmitProvider('edit')">保存</button>
                 </div>
             </div>
         </div>
