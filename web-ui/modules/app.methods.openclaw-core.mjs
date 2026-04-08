@@ -2,16 +2,47 @@ function isPlainRecord(value) {
     return !!(value && typeof value === 'object' && !Array.isArray(value));
 }
 
-function readFirstProviderString(records, keys) {
+function isEnvTemplateString(value) {
+    return typeof value === 'string' && /^\$\{[A-Z][A-Z0-9_]{0,127}\}$/.test(value.trim());
+}
+
+function isSecretRefRecord(value) {
+    return isPlainRecord(value)
+        && typeof value.source === 'string'
+        && typeof value.provider === 'string'
+        && typeof value.id === 'string';
+}
+
+function formatSecretRefLabel(ref) {
+    if (!isSecretRefRecord(ref)) return '';
+    return `SecretRef(${ref.source}:${ref.provider}:${ref.id})`;
+}
+
+function readFirstProviderDisplayValue(records, keys) {
     for (const record of records) {
         if (!isPlainRecord(record)) continue;
         for (const key of keys) {
             if (typeof record[key] === 'string' && record[key].trim()) {
-                return record[key].trim();
+                return {
+                    value: record[key].trim(),
+                    readOnly: false,
+                    kind: isEnvTemplateString(record[key]) ? 'env-template' : 'string'
+                };
+            }
+            if (isSecretRefRecord(record[key])) {
+                return {
+                    value: formatSecretRefLabel(record[key]),
+                    readOnly: true,
+                    kind: 'secret-ref'
+                };
             }
         }
     }
-    return '';
+    return {
+        value: '',
+        readOnly: false,
+        kind: 'missing'
+    };
 }
 
 function readPreferredProviderModels(records) {
@@ -93,7 +124,9 @@ export function createOpenclawCoreMethods() {
             return {
                 providerName: '',
                 baseUrl: '',
+                baseUrlReadOnly: false,
                 apiKey: '',
+                apiKeyReadOnly: false,
                 apiType: 'openai-responses',
                 modelId: '',
                 modelName: '',
@@ -199,16 +232,18 @@ export function createOpenclawCoreMethods() {
                 }
             }
 
-            const baseUrl = readFirstProviderString(providerRecords, ['baseUrl', 'base_url', 'url']);
-            const apiKey = readFirstProviderString(providerRecords, ['apiKey', 'api_key', 'preferred_auth_method', 'key', 'authToken', 'auth_token', 'token']);
-            const apiType = readFirstProviderString(providerRecords, ['api', 'apiType', 'api_type']) || defaults.apiType;
+            const baseUrlField = readFirstProviderDisplayValue(providerRecords, ['baseUrl', 'base_url', 'url']);
+            const apiKeyField = readFirstProviderDisplayValue(providerRecords, ['apiKey', 'api_key', 'preferred_auth_method', 'key', 'authToken', 'auth_token', 'token']);
+            const apiTypeField = readFirstProviderDisplayValue(providerRecords, ['api', 'apiType', 'api_type']);
 
             this.openclawQuick = {
                 ...defaults,
                 providerName,
-                baseUrl,
-                apiKey,
-                apiType,
+                baseUrl: baseUrlField.value,
+                baseUrlReadOnly: baseUrlField.readOnly,
+                apiKey: apiKeyField.value,
+                apiKeyReadOnly: apiKeyField.readOnly,
+                apiType: apiTypeField.value || defaults.apiType,
                 modelId: modelId || '',
                 modelName: modelEntry && typeof modelEntry.name === 'string'
                     ? modelEntry.name
@@ -401,6 +436,9 @@ export function createOpenclawCoreMethods() {
             if (typeof value === 'undefined' || value === null) {
                 return '';
             }
+            if (isSecretRefRecord(value)) {
+                return formatSecretRefLabel(value);
+            }
             let text = '';
             if (typeof value === 'string') {
                 text = value;
@@ -414,6 +452,9 @@ export function createOpenclawCoreMethods() {
                 }
             }
             if (!text) return '';
+            if (isEnvTemplateString(text)) {
+                return `EnvRef(${text.trim().slice(2, -1)})`;
+            }
             if (/key|token|secret|password/i.test(key)) {
                 return this.maskProviderValue(text);
             }

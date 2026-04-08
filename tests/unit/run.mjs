@@ -25,6 +25,7 @@ await import(pathToFileURL(path.join(__dirname, 'install-methods.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'cli-network-utils.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'config-health-module.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'openclaw-core.test.mjs')));
+await import(pathToFileURL(path.join(__dirname, 'openclaw-editing.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'openclaw-persist-regression.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'agents-modal-guards.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'session-actions-standalone.test.mjs')));
