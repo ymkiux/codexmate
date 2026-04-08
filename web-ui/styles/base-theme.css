@@ -4,30 +4,30 @@
    设计系统 - Design Tokens
    ============================================ */
 :root {
-    /* 色彩系统：冷白控制台 / slate + blue */
-    --color-brand: #3B82F6;
-    --color-brand-dark: #2563EB;
-    --color-brand-light: rgba(59, 130, 246, 0.14);
-    --color-brand-subtle: rgba(59, 130, 246, 0.2);
+    /* 色彩系统：温和中性暖灰 + 柔粉强调 */
+    --color-brand: #C77462;
+    --color-brand-dark: #B45E4E;
+    --color-brand-light: rgba(199, 116, 98, 0.14);
+    --color-brand-subtle: rgba(199, 116, 98, 0.2);
 
-    --color-bg: #F8FAFC;
-    --color-surface: #FFFFFF;
-    --color-surface-alt: #F8FAFC;
+    --color-bg: #F7F3EF;
+    --color-surface: #FFFDFC;
+    --color-surface-alt: #F8F3EE;
     --color-surface-elevated: #FFFFFF;
-    --color-surface-tint: rgba(255, 255, 255, 0.88);
-    --color-text-primary: #0F172A;
-    --color-text-secondary: #475569;
-    --color-text-tertiary: #64748B;
-    --color-text-muted: #94A3B8;
-    --color-border: #E2E8F0;
-    --color-border-soft: rgba(148, 163, 184, 0.24);
-    --color-border-strong: rgba(148, 163, 184, 0.42);
+    --color-surface-tint: rgba(255, 253, 252, 0.9);
+    --color-text-primary: #241F1C;
+    --color-text-secondary: #5A514B;
+    --color-text-tertiary: #7A6E66;
+    --color-text-muted: #A39286;
+    --color-border: #E7DDD4;
+    --color-border-soft: rgba(163, 146, 134, 0.22);
+    --color-border-strong: rgba(163, 146, 134, 0.4);
 
-    --color-success: #10B981;
-    --color-error: #EF4444;
+    --color-success: #4B8B6A;
+    --color-error: #C44536;
 
     --bg-warm-gradient:
-        linear-gradient(180deg, #F8FAFC 0%, #F8FAFC 100%);
+        linear-gradient(180deg, #F7F3EF 0%, #F7F3EF 100%);
 
     /* 字体系统 */
     --font-family-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
@@ -66,15 +66,15 @@
     --radius-xl: 18px;
     --radius-full: 50px;
 
-    /* 阴影系统 - 冷静、克制 */
-    --shadow-subtle: 0 1px 2px rgba(15, 23, 42, 0.04);
-    --shadow-card: 0 4px 12px rgba(15, 23, 42, 0.05);
-    --shadow-card-hover: 0 8px 22px rgba(15, 23, 42, 0.08);
-    --shadow-float: 0 12px 28px rgba(15, 23, 42, 0.12);
-    --shadow-raised: 0 8px 18px rgba(15, 23, 42, 0.1);
+    /* 阴影系统 - 温和、轻量 */
+    --shadow-subtle: 0 1px 2px rgba(36, 31, 28, 0.03);
+    --shadow-card: 0 4px 12px rgba(36, 31, 28, 0.045);
+    --shadow-card-hover: 0 8px 22px rgba(36, 31, 28, 0.07);
+    --shadow-float: 0 12px 28px rgba(36, 31, 28, 0.1);
+    --shadow-raised: 0 8px 18px rgba(36, 31, 28, 0.08);
     --shadow-modal:
-        0 8px 24px rgba(15, 23, 42, 0.08),
-        0 24px 64px rgba(15, 23, 42, 0.06);
+        0 8px 24px rgba(36, 31, 28, 0.08),
+        0 24px 64px rgba(36, 31, 28, 0.05);
     --shadow-input-focus:
         0 0 0 3px var(--color-brand-light),
         0 1px 3px rgba(31, 26, 23, 0.04);

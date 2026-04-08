@@ -24,9 +24,9 @@
 .subtitle {
     font-size: 13px;
     color: var(--color-text-secondary);
-    line-height: 1.45;
+    line-height: 1.58;
     margin-bottom: 0;
-    max-width: 72ch;
+    max-width: 70ch;
     letter-spacing: 0;
 }
 
@@ -67,8 +67,8 @@
 
 .segment.active {
     color: var(--color-brand-dark);
-    background: rgba(59, 130, 246, 0.08);
-    box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.14);
+    background: var(--color-brand-light);
+    box-shadow: inset 0 0 0 1px rgba(199, 116, 98, 0.12);
 }
 
 /* ============================================
@@ -141,8 +141,8 @@
 }
 
 .card.active {
-    background: rgba(59, 130, 246, 0.08);
-    border-color: rgba(59, 130, 246, 0.2);
+    background: var(--color-brand-light);
+    border-color: rgba(199, 116, 98, 0.18);
     box-shadow: none;
 }
 
@@ -170,7 +170,7 @@
     width: 32px;
     height: 32px;
     border-radius: 8px;
-    background: rgba(59, 130, 246, 0.1);
+    background: rgba(199, 116, 98, 0.1);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -183,7 +183,7 @@
 }
 
 .card.active .card-icon {
-    background: rgba(59, 130, 246, 0.14);
+    background: rgba(199, 116, 98, 0.14);
     color: var(--color-brand-dark);
     box-shadow: none;
 }
