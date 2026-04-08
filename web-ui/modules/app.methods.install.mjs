@@ -144,14 +144,6 @@ export function createInstallMethods() {
 
         setInstallRegistryPreset(presetName) {
             this.installRegistryPreset = this.normalizeInstallRegistryPreset(presetName);
-        },
-
-        openInstallModal() {
-            this.showInstallModal = true;
-        },
-
-        closeInstallModal() {
-            this.showInstallModal = false;
         }
     };
 }

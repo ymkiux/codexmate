@@ -64,6 +64,16 @@
                 @pointerdown="onMainTabPointerDown('market', $event)"
                 @click="onMainTabClick('market', $event)">Skills</button>
             <button class="top-tab"
+                id="tab-docs"
+                role="tab"
+                data-main-tab="docs"
+                :tabindex="mainTab === 'docs' ? 0 : -1"
+                :aria-selected="mainTab === 'docs'"
+                aria-controls="panel-docs"
+                :class="{ active: isMainTabNavActive('docs') }"
+                @pointerdown="onMainTabPointerDown('docs', $event)"
+                @click="onMainTabClick('docs', $event)">文档</button>
+            <button class="top-tab"
                 id="tab-settings"
                 role="tab"
                 data-main-tab="settings"
@@ -182,6 +192,23 @@
                     </button>
                 </div>
 
+                <div class="side-section" role="navigation" aria-label="文档">
+                    <div class="side-section-title">文档</div>
+                    <button
+                        id="side-tab-docs"
+                        data-main-tab="docs"
+                        :aria-current="mainTab === 'docs' ? 'page' : null"
+                        :class="['side-item', { active: isMainTabNavActive('docs') }]"
+                        @pointerdown="onMainTabPointerDown('docs', $event)"
+                        @click="onMainTabClick('docs', $event)">
+                        <div class="side-item-title">CLI 安装</div>
+                        <div class="side-item-meta">
+                            <span>安装 / 升级 / 卸载</span>
+                            <span>{{ String(installPackageManager || 'npm').toUpperCase() }} · {{ installCommandAction === 'update' ? '升级' : (installCommandAction === 'uninstall' ? '卸载' : '安装') }}</span>
+                        </div>
+                    </button>
+                </div>
+
                 <div class="side-section" role="navigation" aria-label="设置">
                     <div class="side-section-title">系统</div>
                     <button
@@ -204,9 +231,9 @@
                 <div class="main-panel-topbar">
                     <div class="panel-header panel-header-refined" v-if="!sessionStandalone">
                         <div class="panel-header-copy">
-                            <div class="panel-kicker">{{ mainTab === 'config' ? 'Configuration' : (mainTab === 'sessions' ? 'Sessions' : (mainTab === 'usage' ? 'Usage' : (mainTab === 'market' ? 'Skills' : 'Settings'))) }}</div>
-                            <h1 class="main-title">{{ mainTab === 'config' ? '本地配置控制台' : (mainTab === 'sessions' ? '会话与导出' : (mainTab === 'usage' ? '本地用量与趋势' : (mainTab === 'market' ? 'Skills 安装与同步' : '系统与数据设置'))) }}</h1>
-                            <p class="subtitle">{{ mainTab === 'config' ? '管理 Codex、Claude Code 与 OpenClaw 的本地配置、模型与运行参数。' : (mainTab === 'sessions' ? '浏览、筛选、导出与整理本地会话记录。' : (mainTab === 'usage' ? '查看近 7 / 30 天的会话、消息与来源趋势。' : (mainTab === 'market' ? '整理安装目标、导入来源与分发入口。' : '管理下载、数据目录、回收站与全局行为。'))) }}</p>
+                            <div class="panel-kicker">{{ mainTab === 'config' ? 'Configuration' : (mainTab === 'sessions' ? 'Sessions' : (mainTab === 'usage' ? 'Usage' : (mainTab === 'market' ? 'Skills' : (mainTab === 'docs' ? 'Docs' : 'Settings')))) }}</div>
+                            <h1 class="main-title">{{ mainTab === 'config' ? '本地配置控制台' : (mainTab === 'sessions' ? '会话与导出' : (mainTab === 'usage' ? '本地用量与趋势' : (mainTab === 'market' ? 'Skills 安装与同步' : (mainTab === 'docs' ? 'CLI 安装与文档' : '系统与数据设置')))) }}</h1>
+                            <p class="subtitle">{{ mainTab === 'config' ? '管理 Codex、Claude Code 与 OpenClaw 的本地配置、模型与运行参数。' : (mainTab === 'sessions' ? '浏览、筛选、导出与整理本地会话记录。' : (mainTab === 'usage' ? '查看近 7 / 30 天的会话、消息与来源趋势。' : (mainTab === 'market' ? '整理安装目标、导入来源与分发入口。' : (mainTab === 'docs' ? '把 CLI 安装、升级、卸载命令与排障提示集中放进正文文档页，不再依赖悬浮入口或模态框。' : '管理下载、数据目录、回收站与全局行为。')))) }}</p>
                         </div>
                     </div>
 
@@ -290,6 +317,20 @@
                         <div class="status-chip">
                             <span class="label">可直接导入</span>
                             <span class="value">{{ skillsImportConfiguredCount }}</span>
+                        </div>
+                    </div>
+                    <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'docs'">
+                        <div class="status-chip">
+                            <span class="label">包管理器</span>
+                            <span class="value">{{ String(installPackageManager || 'npm').toUpperCase() }}</span>
+                        </div>
+                        <div class="status-chip">
+                            <span class="label">当前操作</span>
+                            <span class="value">{{ installCommandAction === 'update' ? '升级' : (installCommandAction === 'uninstall' ? '卸载' : '安装') }}</span>
+                        </div>
+                        <div class="status-chip">
+                            <span class="label">镜像</span>
+                            <span class="value">{{ installRegistryPreview || '官方默认' }}</span>
                         </div>
                     </div>
                     <div

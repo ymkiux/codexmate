@@ -23,67 +23,6 @@
             </div>
         </div>
 
-        <div v-if="showInstallModal" class="modal-overlay" @click.self="closeInstallModal">
-            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="install-cli-modal-title">
-                <div class="modal-header">
-                    <div class="modal-title" id="install-cli-modal-title">CLI 安装</div>
-                </div>
-
-                <div class="list-row">
-                    <label class="form-label">包管理器</label>
-                    <select class="form-input" v-model="installPackageManager">
-                        <option value="npm">npm</option>
-                        <option value="pnpm">pnpm</option>
-                        <option value="bun">bun</option>
-                    </select>
-                    <label class="form-label">镜像源</label>
-                    <div class="install-action-tabs">
-                        <button class="btn-mini" :class="{ active: installRegistryPreset === 'default' }" @click="setInstallRegistryPreset('default')">官方</button>
-                        <button class="btn-mini" :class="{ active: installRegistryPreset === 'npmmirror' }" @click="setInstallRegistryPreset('npmmirror')">npmmirror</button>
-                        <button class="btn-mini" :class="{ active: installRegistryPreset === 'tencent' }" @click="setInstallRegistryPreset('tencent')">腾讯云</button>
-                        <button class="btn-mini" :class="{ active: installRegistryPreset === 'custom' }" @click="setInstallRegistryPreset('custom')">自定义</button>
-                    </div>
-                    <input
-                        v-if="installRegistryPreset === 'custom'"
-                        v-model="installRegistryCustom"
-                        class="form-input install-registry-input"
-                        placeholder="https://registry.example.com">
-                    <div class="form-hint install-registry-hint" v-if="installRegistryPreview">
-                        命令将附加：--registry={{ installRegistryPreview }}
-                    </div>
-                    <div class="form-hint install-registry-hint" v-else-if="installRegistryPreset === 'custom'">
-                        请输入完整 URL（含 http/https），将自动附加到命令。
-                    </div>
-                    <label class="form-label">操作</label>
-                    <div class="install-action-tabs">
-                        <button class="btn-mini" :class="{ active: installCommandAction === 'install' }" @click="setInstallCommandAction('install')">安装</button>
-                        <button class="btn-mini" :class="{ active: installCommandAction === 'update' }" @click="setInstallCommandAction('update')">升级</button>
-                        <button class="btn-mini" :class="{ active: installCommandAction === 'uninstall' }" @click="setInstallCommandAction('uninstall')">卸载</button>
-                    </div>
-                </div>
-
-                <div class="install-list">
-                    <div
-                        class="install-row"
-                        v-for="target in installTargetCards"
-                        :key="'install-command-' + target.id + '-' + installCommandAction">
-                        <div class="install-row-main">
-                            <div class="install-row-title">{{ target.name }}</div>
-                            <code class="install-command">{{ target.command }}</code>
-                        </div>
-                        <button class="btn-mini" :disabled="!target.command" @click="copyInstallCommand(target.command)">复制</button>
-                    </div>
-                </div>
-
-                <div class="install-help">
-                    <div class="form-label">常见问题</div>
-                    <ul class="install-help-list">
-                        <li v-for="tip in installTroubleshootingTips" :key="tip">{{ tip }}</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-
         <!-- 编辑提供商模态框 -->
         <div v-if="showEditModal" class="modal-overlay" @click.self="closeEditModal">
             <div class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-provider-modal-title">

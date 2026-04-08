@@ -63,7 +63,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 showHealthCheckDialog: false,
                 showAgentsModal: false,
                 showSkillsModal: false,
-                showInstallModal: false,
                 showConfirmDialog: false,
                 confirmDialogTitle: '',
                 confirmDialogMessage: '',
