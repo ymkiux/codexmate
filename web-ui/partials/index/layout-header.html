@@ -1,44 +1,4 @@
     <div id="app" class="container" v-cloak>
-        <button class="fab-install" @click="openInstallModal" aria-label="安装 CLI">
-            <span class="fab-install-icon" aria-hidden="true">
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
-                    <path d="M10 4v8M6.5 8.5 10 12l3.5-3.5" stroke-linecap="round" stroke-linejoin="round"/>
-                    <path d="M4 14.5h12" stroke-linecap="round"/>
-                </svg>
-            </span>
-        </button>
-
-        <div class="hero" v-if="!sessionStandalone">
-            <img class="hero-logo" src="/res/logo.png" alt="Codex Mate logo">
-            <div class="hero-title">
-                Codex <span class="accent">Mate.</span>
-            </div>
-            <div class="hero-subtitle">
-                配置中枢：管理 Codex / Claude / OpenClaw / 会话
-                <span class="sr-only">本地配置中枢，统一管理 Codex / Claude Code / OpenClaw / 会话。</span>
-            </div>
-        </div>
-        <div v-if="!sessionStandalone" class="hero-github">
-            <a
-                class="github-badge github-badge-mobile"
-                href="https://github.com/SakuraByteCore/codexmate"
-                target="_blank"
-                rel="noopener"
-                title="打开 GitHub 仓库">
-                <span class="github-badge-left">
-                    <svg class="github-badge-icon" viewBox="0 0 24 24" aria-hidden="true">
-                        <path fill="currentColor" d="M12 2C6.48 2 2 6.58 2 12.26c0 4.5 2.87 8.32 6.84 9.67.5.1.68-.22.68-.49 0-.24-.01-.88-.01-1.73-2.78.62-3.37-1.38-3.37-1.38-.45-1.19-1.11-1.5-1.11-1.5-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.9 1.57 2.36 1.12 2.94.86.09-.66.35-1.12.63-1.38-2.22-.26-4.56-1.14-4.56-5.09 0-1.13.39-2.06 1.03-2.79-.1-.26-.45-1.31.1-2.73 0 0 .84-.28 2.75 1.06A9.36 9.36 0 0 1 12 6.8c.85 0 1.7.12 2.5.34 1.9-1.34 2.74-1.06 2.74-1.06.55 1.42.2 2.47.1 2.73.64.73 1.03 1.66 1.03 2.79 0 3.96-2.35 4.83-4.58 5.08.36.32.68.95.68 1.92 0 1.38-.01 2.5-.01 2.84 0 .27.18.59.69.49A10.04 10.04 0 0 0 22 12.26C22 6.58 17.52 2 12 2z"/>
-                    </svg>
-                    <span class="github-badge-label">GitHub</span>
-                </span>
-                <span class="github-badge-text" title="SakuraByteCore/codexmate">
-                    <span class="github-owner">SakuraByteCore</span>
-                    <span class="github-sep">/</span>
-                    <span class="github-repo">codexmate</span>
-                </span>
-            </a>
-        </div>
-
         <div v-if="!sessionStandalone" class="top-tabs" role="tablist" aria-label="主导航">
             <button class="top-tab"
                 id="tab-config-codex"
@@ -50,7 +10,7 @@
                 aria-controls="panel-config-provider"
                 :class="{ active: isConfigModeNavActive('codex') }"
                 @pointerdown="onConfigTabPointerDown('codex', $event)"
-                @click="onConfigTabClick('codex', $event)">Codex 配置</button>
+                @click="onConfigTabClick('codex', $event)">Codex</button>
             <button class="top-tab"
                 id="tab-config-claude"
                 role="tab"
@@ -61,7 +21,7 @@
                 aria-controls="panel-config-claude"
                 :class="{ active: isConfigModeNavActive('claude') }"
                 @pointerdown="onConfigTabPointerDown('claude', $event)"
-                @click="onConfigTabClick('claude', $event)">Claude Code 配置</button>
+                @click="onConfigTabClick('claude', $event)">Claude</button>
             <button class="top-tab"
                 id="tab-config-openclaw"
                 role="tab"
@@ -72,7 +32,7 @@
                 aria-controls="panel-config-openclaw"
                 :class="{ active: isConfigModeNavActive('openclaw') }"
                 @pointerdown="onConfigTabPointerDown('openclaw', $event)"
-                @click="onConfigTabClick('openclaw', $event)">OpenClaw 配置</button>
+                @click="onConfigTabClick('openclaw', $event)">OpenClaw</button>
             <button class="top-tab"
                 id="tab-sessions"
                 role="tab"
@@ -82,7 +42,7 @@
                 aria-controls="panel-sessions"
                 :class="{ active: isMainTabNavActive('sessions') }"
                 @pointerdown="onMainTabPointerDown('sessions', $event)"
-                @click="onMainTabClick('sessions', $event)">会话浏览</button>
+                @click="onMainTabClick('sessions', $event)">会话</button>
             <button class="top-tab"
                 id="tab-usage"
                 role="tab"
@@ -102,7 +62,17 @@
                 aria-controls="panel-market"
                 :class="{ active: isMainTabNavActive('market') }"
                 @pointerdown="onMainTabPointerDown('market', $event)"
-                @click="onMainTabClick('market', $event)">技能市场</button>
+                @click="onMainTabClick('market', $event)">Skills</button>
+            <button class="top-tab"
+                id="tab-docs"
+                role="tab"
+                data-main-tab="docs"
+                :tabindex="mainTab === 'docs' ? 0 : -1"
+                :aria-selected="mainTab === 'docs'"
+                aria-controls="panel-docs"
+                :class="{ active: isMainTabNavActive('docs') }"
+                @pointerdown="onMainTabPointerDown('docs', $event)"
+                @click="onMainTabClick('docs', $event)">文档</button>
             <button class="top-tab"
                 id="tab-settings"
                 role="tab"
@@ -118,37 +88,19 @@
         <div :class="['app-shell', { standalone: sessionStandalone }]">
             <aside class="side-rail" v-if="!sessionStandalone">
                 <div class="brand-block">
-                    <div class="brand-logo-wrap">
+                    <div class="brand-head">
                         <img class="brand-logo" src="/res/logo.png" alt="Codex Mate logo">
+                        <div class="brand-copy">
+                            <div class="brand-kicker">Workspace</div>
+                            <div class="brand-title">Codex Mate</div>
+                        </div>
                     </div>
-                    <div class="brand-title">
-                        Codex <span class="accent">Mate</span>
-                    </div>
-                    <div class="brand-subtitle">
-                        配置 / 会话切换器
-                    </div>
-                    <a
-                        class="github-badge github-badge-rail"
-                        href="https://github.com/SakuraByteCore/codexmate"
-                        target="_blank"
-                        rel="noopener"
-                        title="打开 GitHub 仓库">
-                        <span class="github-badge-left">
-                            <svg class="github-badge-icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <path fill="currentColor" d="M12 2C6.48 2 2 6.58 2 12.26c0 4.5 2.87 8.32 6.84 9.67.5.1.68-.22.68-.49 0-.24-.01-.88-.01-1.73-2.78.62-3.37-1.38-3.37-1.38-.45-1.19-1.11-1.5-1.11-1.5-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.9 1.57 2.36 1.12 2.94.86.09-.66.35-1.12.63-1.38-2.22-.26-4.56-1.14-4.56-5.09 0-1.13.39-2.06 1.03-2.79-.1-.26-.45-1.31.1-2.73 0 0 .84-.28 2.75 1.06A9.36 9.36 0 0 1 12 6.8c.85 0 1.7.12 2.5.34 1.9-1.34 2.74-1.06 2.74-1.06.55 1.42.2 2.47.1 2.73.64.73 1.03 1.66 1.03 2.79 0 3.96-2.35 4.83-4.58 5.08.36.32.68.95.68 1.92 0 1.38-.01 2.5-.01 2.84 0 .27.18.59.69.49A10.04 10.04 0 0 0 22 12.26C22 6.58 17.52 2 12 2z"/>
-                            </svg>
-                            <span class="github-badge-label">GitHub</span>
-                        </span>
-                        <span class="github-badge-text" title="SakuraByteCore/codexmate">
-                            <span class="github-owner">SakuraByteCore</span>
-                            <span class="github-sep">/</span>
-                            <span class="github-repo">codexmate</span>
-                        </span>
-                    </a>
+                    <div class="brand-subtitle">本地配置与会话工作台</div>
                 </div>
 
+                <div class="side-rail-nav">
                 <div class="side-section" role="navigation" aria-label="配置管理">
-                    <div class="side-section-title">配置管理</div>
+                    <div class="side-section-title">配置</div>
                     <button
                         id="side-tab-config-codex"
                         data-main-tab="config"
@@ -157,9 +109,9 @@
                         :class="['side-item', { active: isConfigModeNavActive('codex') }]"
                         @pointerdown="onConfigTabPointerDown('codex', $event)"
                         @click="onConfigTabClick('codex', $event)">
-                        <div class="side-item-title">Codex 配置</div>
+                        <div class="side-item-title">Codex</div>
                         <div class="side-item-meta">
-                            <span>提供商 / 模型</span>
+                            <span>Provider / Model</span>
                             <span v-if="currentProvider">当前 {{ currentProvider }}</span>
                         </div>
                     </button>
@@ -171,9 +123,9 @@
                         :class="['side-item', { active: isConfigModeNavActive('claude') }]"
                         @pointerdown="onConfigTabPointerDown('claude', $event)"
                         @click="onConfigTabClick('claude', $event)">
-                        <div class="side-item-title">Claude Code 配置</div>
+                        <div class="side-item-title">Claude Code</div>
                         <div class="side-item-meta">
-                            <span>Base URL / Key</span>
+                            <span>Claude Settings</span>
                             <span v-if="currentClaudeConfig">当前 {{ currentClaudeConfig }}</span>
                         </div>
                     </button>
@@ -185,16 +137,16 @@
                         :class="['side-item', { active: isConfigModeNavActive('openclaw') }]"
                         @pointerdown="onConfigTabPointerDown('openclaw', $event)"
                         @click="onConfigTabClick('openclaw', $event)">
-                        <div class="side-item-title">OpenClaw 配置</div>
+                        <div class="side-item-title">OpenClaw</div>
                         <div class="side-item-meta">
-                            <span>JSON5 / Workspace</span>
+                            <span>JSON5 / AGENTS</span>
                             <span v-if="currentOpenclawConfig">当前 {{ currentOpenclawConfig }}</span>
                         </div>
                     </button>
                 </div>
 
                 <div class="side-section" role="navigation" aria-label="会话管理">
-                    <div class="side-section-title">会话管理</div>
+                    <div class="side-section-title">会话</div>
                     <button
                         id="side-tab-sessions"
                         data-main-tab="sessions"
@@ -204,7 +156,7 @@
                         @click="onMainTabClick('sessions', $event)">
                         <div class="side-item-title">会话浏览</div>
                         <div class="side-item-meta">
-                            <span>快速预览 / 导出</span>
+                            <span>浏览 / 导出 / 清理</span>
                             <span>来源：{{ sessionFilterSource === 'all' ? '全部' : (sessionFilterSource === 'codex' ? 'Codex' : 'Claude') }}</span>
                         </div>
                     </button>
@@ -215,7 +167,7 @@
                         :class="['side-item', { active: isMainTabNavActive('usage') }]"
                         @pointerdown="onMainTabPointerDown('usage', $event)"
                         @click="onMainTabClick('usage', $event)">
-                        <div class="side-item-title">Usage</div>
+                        <div class="side-item-title">Usage 趋势</div>
                         <div class="side-item-meta">
                             <span>本地统计 / 趋势</span>
                             <span>范围：{{ sessionsUsageTimeRange === '30d' ? '近 30 天' : '近 7 天' }}</span>
@@ -224,7 +176,7 @@
                 </div>
 
                 <div class="side-section" role="navigation" aria-label="技能市场">
-                    <div class="side-section-title">技能市场</div>
+                    <div class="side-section-title">扩展</div>
                     <button
                         id="side-tab-market"
                         data-main-tab="market"
@@ -232,7 +184,7 @@
                         :class="['side-item', { active: isMainTabNavActive('market') }]"
                         @pointerdown="onMainTabPointerDown('market', $event)"
                         @click="onMainTabClick('market', $event)">
-                        <div class="side-item-title">市场</div>
+                        <div class="side-item-title">Skills 市场</div>
                         <div class="side-item-meta">
                             <span>{{ skillsTargetLabel }} / 本地 Skills</span>
                             <span>已装 {{ skillsList.length }} · 可导入 {{ skillsImportList.length }}</span>
@@ -240,8 +192,25 @@
                     </button>
                 </div>
 
+                <div class="side-section" role="navigation" aria-label="文档">
+                    <div class="side-section-title">文档</div>
+                    <button
+                        id="side-tab-docs"
+                        data-main-tab="docs"
+                        :aria-current="mainTab === 'docs' ? 'page' : null"
+                        :class="['side-item', { active: isMainTabNavActive('docs') }]"
+                        @pointerdown="onMainTabPointerDown('docs', $event)"
+                        @click="onMainTabClick('docs', $event)">
+                        <div class="side-item-title">CLI 安装</div>
+                        <div class="side-item-meta">
+                            <span>安装 / 升级 / 卸载</span>
+                            <span>{{ String(installPackageManager || 'npm').toUpperCase() }} · {{ installCommandAction === 'update' ? '升级' : (installCommandAction === 'uninstall' ? '卸载' : '安装') }}</span>
+                        </div>
+                    </button>
+                </div>
+
                 <div class="side-section" role="navigation" aria-label="设置">
-                    <div class="side-section-title">设置</div>
+                    <div class="side-section-title">系统</div>
                     <button
                         id="side-tab-settings"
                         data-main-tab="settings"
@@ -249,128 +218,135 @@
                         :class="['side-item', { active: isMainTabNavActive('settings') }]"
                         @pointerdown="onMainTabPointerDown('settings', $event)"
                         @click="onMainTabClick('settings', $event)">
-                        <div class="side-item-title">设置</div>
+                        <div class="side-item-title">运行设置</div>
                         <div class="side-item-meta">
                             <span>数据管理 / 下载</span>
                         </div>
                     </button>
                 </div>
-            </aside>
-            <main class="main-panel">
-                <div class="panel-header" v-if="!sessionStandalone">
-                    <h1 class="main-title">
-                        {{ mainTab === 'config' ? '配置中心' : (mainTab === 'sessions' ? '会话浏览' : (mainTab === 'usage' ? 'Usage' : (mainTab === 'market' ? '技能市场' : '设置'))) }}
-                    </h1>
-                    <p class="subtitle" v-if="mainTab === 'config'">
-                        配置中枢：管理 Codex / Claude / OpenClaw
-                        <span class="sr-only">本地配置中枢，统一管理 Codex / Claude Code / OpenClaw。</span>
-                    </p>
-                    <p class="subtitle" v-else-if="mainTab === 'sessions'">
-                        统一查看与导出 Codex / Claude 会话。
-                    </p>
-                    <p class="subtitle" v-else-if="mainTab === 'usage'">
-                        单独查看本地会话用量、趋势与高频路径。
-                    </p>
-                    <p class="subtitle" v-else-if="mainTab === 'market'">
-                        统一管理 Codex / Claude Skills，并聚焦本地导入与分发。
-                    </p>
                 </div>
 
-                <div class="status-strip" v-if="!sessionStandalone && mainTab === 'config'">
-                    <template v-if="isProviderConfigMode">
+            </aside>
+            <main class="main-panel">
+                <div class="main-panel-topbar">
+                    <div class="panel-header panel-header-refined" v-if="!sessionStandalone">
+                        <div class="panel-header-copy">
+                            <div class="panel-kicker">{{ mainTab === 'config' ? 'Configuration' : (mainTab === 'sessions' ? 'Sessions' : (mainTab === 'usage' ? 'Usage' : (mainTab === 'market' ? 'Skills' : (mainTab === 'docs' ? 'Docs' : 'Settings')))) }}</div>
+                            <h1 class="main-title">{{ mainTab === 'config' ? '本地配置控制台' : (mainTab === 'sessions' ? '会话与导出' : (mainTab === 'usage' ? '本地用量与趋势' : (mainTab === 'market' ? 'Skills 安装与同步' : (mainTab === 'docs' ? 'CLI 安装与文档' : '系统与数据设置')))) }}</h1>
+                            <p class="subtitle">{{ mainTab === 'config' ? '管理 Codex、Claude Code 与 OpenClaw 的本地配置、模型与运行参数。' : (mainTab === 'sessions' ? '浏览、筛选、导出与整理本地会话记录。' : (mainTab === 'usage' ? '查看近 7 / 30 天的会话、消息与来源趋势。' : (mainTab === 'market' ? '整理安装目标、导入来源与分发入口。' : (mainTab === 'docs' ? '把 CLI 安装、升级、卸载命令与排障提示集中放进正文文档页，不再依赖悬浮入口或模态框。' : '管理下载、数据目录、回收站与全局行为。')))) }}</p>
+                        </div>
+                    </div>
+
+                    <div class="status-strip" v-if="!sessionStandalone && mainTab === 'config'">
+                        <template v-if="isProviderConfigMode">
+                            <div class="status-chip">
+                                <span class="label">{{ activeProviderConfigChipLabel }}</span>
+                                <span class="value">{{ currentProvider || '未选择' }}</span>
+                            </div>
+                            <div class="status-chip">
+                                <span class="label">{{ activeProviderModelChipLabel }}</span>
+                                <span class="value">{{ currentModel || '未选择' }}</span>
+                            </div>
+                        </template>
+                        <template v-else-if="configMode === 'claude'">
+                            <div class="status-chip">
+                                <span class="label">Claude 配置</span>
+                                <span class="value">{{ currentClaudeConfig || '未选择' }}</span>
+                            </div>
+                            <div class="status-chip">
+                                <span class="label">Claude 模型</span>
+                                <span class="value">{{ currentClaudeModel || '未选择' }}</span>
+                            </div>
+                        </template>
+                        <template v-else-if="configMode === 'openclaw'">
+                            <div class="status-chip">
+                                <span class="label">OpenClaw 配置</span>
+                                <span class="value">{{ currentOpenclawConfig || '未选择' }}</span>
+                            </div>
+                            <div class="status-chip">
+                                <span class="label">工作区文件</span>
+                                <span class="value">{{ openclawWorkspaceFileName || '未选择' }}</span>
+                            </div>
+                        </template>
+                        <template v-else>
+                            <div class="status-chip">
+                                <span class="label">配置模式</span>
+                                <span class="value">未选择</span>
+                            </div>
+                        </template>
+                    </div>
+                    <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'sessions'">
                         <div class="status-chip">
-                            <span class="label">{{ activeProviderConfigChipLabel }}</span>
-                            <span class="value">{{ currentProvider || '未选择' }}</span>
+                            <span class="label">当前来源</span>
+                            <span class="value">
+                                {{ sessionFilterSource === 'all' ? '全部' : (sessionFilterSource === 'claude' ? 'Claude Code' : 'Codex') }}
+                            </span>
                         </div>
                         <div class="status-chip">
-                            <span class="label">{{ activeProviderModelChipLabel }}</span>
-                            <span class="value">{{ currentModel || '未选择' }}</span>
+                            <span class="label">会话数</span>
+                            <span class="value">{{ sessionsList.length }}</span>
                         </div>
-                    </template>
-                    <template v-else-if="configMode === 'claude'">
+                    </div>
+                    <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'usage'">
                         <div class="status-chip">
-                            <span class="label">Claude 配置</span>
-                            <span class="value">{{ currentClaudeConfig || '未选择' }}</span>
-                        </div>
-                        <div class="status-chip">
-                            <span class="label">Claude 模型</span>
-                            <span class="value">{{ currentClaudeModel || '未选择' }}</span>
-                        </div>
-                    </template>
-                    <template v-else-if="configMode === 'openclaw'">
-                        <div class="status-chip">
-                            <span class="label">OpenClaw 配置</span>
-                            <span class="value">{{ currentOpenclawConfig || '未选择' }}</span>
+                            <span class="label">统计范围</span>
+                            <span class="value">{{ sessionsUsageTimeRange === '30d' ? '近 30 天' : '近 7 天' }}</span>
                         </div>
                         <div class="status-chip">
-                            <span class="label">工作区文件</span>
-                            <span class="value">{{ openclawWorkspaceFileName || '未选择' }}</span>
+                            <span class="label">总会话数</span>
+                            <span class="value">{{ sessionUsageSummaryCards[0]?.value ?? 0 }}</span>
                         </div>
-                    </template>
-                    <template v-else>
                         <div class="status-chip">
-                            <span class="label">配置模式</span>
-                            <span class="value">未选择</span>
+                            <span class="label">总消息数</span>
+                            <span class="value">{{ sessionUsageSummaryCards[1]?.value ?? 0 }}</span>
                         </div>
-                    </template>
-                </div>
-                <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'sessions'">
-                    <div class="status-chip">
-                        <span class="label">当前来源</span>
-                        <span class="value">
-                            {{ sessionFilterSource === 'all' ? '全部' : (sessionFilterSource === 'claude' ? 'Claude Code' : 'Codex') }}
-                        </span>
                     </div>
-                    <div class="status-chip">
-                        <span class="label">会话数</span>
-                        <span class="value">{{ sessionsList.length }}</span>
+                    <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'market'">
+                        <div class="status-chip">
+                            <span class="label">当前目标</span>
+                            <span class="value">{{ skillsTargetLabel }}</span>
+                        </div>
+                        <div class="status-chip">
+                            <span class="label">本地 Skills</span>
+                            <span class="value">{{ skillsList.length }}</span>
+                        </div>
+                        <div class="status-chip">
+                            <span class="label">可导入</span>
+                            <span class="value">{{ skillsImportList.length }}</span>
+                        </div>
+                        <div class="status-chip">
+                            <span class="label">可直接导入</span>
+                            <span class="value">{{ skillsImportConfiguredCount }}</span>
+                        </div>
                     </div>
-                </div>
-                <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'usage'">
-                    <div class="status-chip">
-                        <span class="label">统计范围</span>
-                        <span class="value">{{ sessionsUsageTimeRange === '30d' ? '近 30 天' : '近 7 天' }}</span>
+                    <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'docs'">
+                        <div class="status-chip">
+                            <span class="label">包管理器</span>
+                            <span class="value">{{ String(installPackageManager || 'npm').toUpperCase() }}</span>
+                        </div>
+                        <div class="status-chip">
+                            <span class="label">当前操作</span>
+                            <span class="value">{{ installCommandAction === 'update' ? '升级' : (installCommandAction === 'uninstall' ? '卸载' : '安装') }}</span>
+                        </div>
+                        <div class="status-chip">
+                            <span class="label">镜像</span>
+                            <span class="value">{{ installRegistryPreview || '官方默认' }}</span>
+                        </div>
                     </div>
-                    <div class="status-chip">
-                        <span class="label">总会话数</span>
-                        <span class="value">{{ sessionUsageSummaryCards[0]?.value ?? 0 }}</span>
+                    <div
+                        v-if="!sessionStandalone && mainTab === 'config' && isProviderConfigMode && forceCompactLayout && !loading && !initError && displayProvidersList.length > 1"
+                        class="provider-fast-switch">
+                        <label class="provider-fast-switch-label" for="provider-fast-switch-select">快速切换提供商</label>
+                        <select
+                            id="provider-fast-switch-select"
+                            class="provider-fast-switch-select"
+                            :value="displayCurrentProvider"
+                            @change="quickSwitchProvider($event.target.value)">
+                            <option v-for="provider in displayProvidersList" :key="'quick-switch-' + provider.name" :value="provider.name">
+                                {{ provider.name }}
+                            </option>
+                        </select>
                     </div>
-                    <div class="status-chip">
-                        <span class="label">总消息数</span>
-                        <span class="value">{{ sessionUsageSummaryCards[1]?.value ?? 0 }}</span>
-                    </div>
-                </div>
-                <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'market'">
-                    <div class="status-chip">
-                        <span class="label">当前目标</span>
-                        <span class="value">{{ skillsTargetLabel }}</span>
-                    </div>
-                    <div class="status-chip">
-                        <span class="label">本地 Skills</span>
-                        <span class="value">{{ skillsList.length }}</span>
-                    </div>
-                    <div class="status-chip">
-                        <span class="label">可导入</span>
-                        <span class="value">{{ skillsImportList.length }}</span>
-                    </div>
-                    <div class="status-chip">
-                        <span class="label">可直接导入</span>
-                        <span class="value">{{ skillsImportConfiguredCount }}</span>
-                    </div>
-                </div>
-                <div
-                    v-if="!sessionStandalone && mainTab === 'config' && isProviderConfigMode && forceCompactLayout && !loading && !initError && displayProvidersList.length > 1"
-                    class="provider-fast-switch">
-                    <label class="provider-fast-switch-label" for="provider-fast-switch-select">快速切换提供商</label>
-                    <select
-                        id="provider-fast-switch-select"
-                        class="provider-fast-switch-select"
-                        :value="displayCurrentProvider"
-                        @change="quickSwitchProvider($event.target.value)">
-                        <option v-for="provider in displayProvidersList" :key="'quick-switch-' + provider.name" :value="provider.name">
-                            {{ provider.name }}
-                        </option>
-                    </select>
                 </div>
 
                 <!-- 内容包裹器 - 稳定布局 -->

@@ -4,35 +4,35 @@
    设计系统 - Design Tokens
    ============================================ */
 :root {
-    /* 色彩系统：去除杂纹，强调干净留白与温柔橙红 */
-    --color-brand: #D0583A;
-    --color-brand-dark: #B8442B;
-    --color-brand-light: rgba(208, 88, 58, 0.14);
-    --color-brand-subtle: rgba(201, 94, 75, 0.2);
+    /* 色彩系统：温和中性暖灰 + 柔粉强调 */
+    --color-brand: #C77462;
+    --color-brand-dark: #B45E4E;
+    --color-brand-light: rgba(199, 116, 98, 0.14);
+    --color-brand-subtle: rgba(199, 116, 98, 0.2);
 
-    --color-bg: #F8F2EA;
+    --color-bg: #F7F3EF;
     --color-surface: #FFFDFC;
-    --color-surface-alt: #FFF8F2;
+    --color-surface-alt: #F8F3EE;
     --color-surface-elevated: #FFFFFF;
-    --color-surface-tint: rgba(255, 255, 255, 0.84);
-    --color-text-primary: #1B1714;
-    --color-text-secondary: #473C34;
-    --color-text-tertiary: #6F6054;
-    --color-text-muted: #6C5B50;
-    --color-border: #D8C9B8;
-    --color-border-soft: rgba(216, 201, 184, 0.38);
-    --color-border-strong: rgba(216, 201, 184, 0.68);
+    --color-surface-tint: rgba(255, 253, 252, 0.9);
+    --color-text-primary: #241F1C;
+    --color-text-secondary: #5A514B;
+    --color-text-tertiary: #7A6E66;
+    --color-text-muted: #A39286;
+    --color-border: #E7DDD4;
+    --color-border-soft: rgba(163, 146, 134, 0.22);
+    --color-border-strong: rgba(163, 146, 134, 0.4);
 
     --color-success: #4B8B6A;
     --color-error: #C44536;
 
     --bg-warm-gradient:
-        linear-gradient(180deg, #F8F2EA 0%, #F8F2EA 100%);
+        linear-gradient(180deg, #F7F3EF 0%, #F7F3EF 100%);
 
     /* 字体系统 */
-    --font-family-body: 'JetBrainsMono Nerd Font Mono', 'OPPO Sans 4.0', 'Fira Mono', 'JetBrains Mono', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', monospace;
-    --font-family-display: 'JetBrainsMono Nerd Font Mono', 'OPPO Sans 4.0', 'Fira Mono', 'JetBrains Mono', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', monospace;
-    --font-family-mono: 'JetBrainsMono Nerd Font Mono', 'OPPO Sans 4.0', 'Fira Mono', 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+    --font-family-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    --font-family-display: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    --font-family-mono: 'JetBrainsMono Nerd Font Mono', 'JetBrains Mono', 'Fira Code', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
     --font-family: var(--font-family-body);
 
     --font-size-display: 52px;
@@ -66,15 +66,15 @@
     --radius-xl: 18px;
     --radius-full: 50px;
 
-    /* 阴影系统 - 多层叠加提升真实感 */
-    --shadow-subtle: 0 1px 2px rgba(31, 26, 23, 0.03);
-    --shadow-card: 0 6px 18px rgba(31, 26, 23, 0.06);
-    --shadow-card-hover: 0 10px 24px rgba(31, 26, 23, 0.08);
-    --shadow-float: 0 12px 26px rgba(31, 26, 23, 0.12);
-    --shadow-raised: 0 10px 20px rgba(31, 26, 23, 0.1);
+    /* 阴影系统 - 温和、轻量 */
+    --shadow-subtle: 0 1px 2px rgba(36, 31, 28, 0.03);
+    --shadow-card: 0 4px 12px rgba(36, 31, 28, 0.045);
+    --shadow-card-hover: 0 8px 22px rgba(36, 31, 28, 0.07);
+    --shadow-float: 0 12px 28px rgba(36, 31, 28, 0.1);
+    --shadow-raised: 0 8px 18px rgba(36, 31, 28, 0.08);
     --shadow-modal:
-        0 8px 24px rgba(31, 26, 23, 0.08),
-        0 24px 64px rgba(31, 26, 23, 0.06);
+        0 8px 24px rgba(36, 31, 28, 0.08),
+        0 24px 64px rgba(36, 31, 28, 0.05);
     --shadow-input-focus:
         0 0 0 3px var(--color-brand-light),
         0 1px 3px rgba(31, 26, 23, 0.04);
@@ -101,8 +101,8 @@ body.force-compact {
 }
 
 body.force-compact .container {
-    max-width: 760px;
-    padding: 10px 10px 16px;
+    max-width: none;
+    padding: 0;
 }
 
 body.force-compact .provider-fast-switch {
@@ -119,6 +119,9 @@ body.force-compact .provider-fast-switch-select {
 body.force-compact .app-shell {
     grid-template-columns: 1fr;
     gap: 12px;
+    height: auto;
+    min-height: auto;
+    overflow: visible;
 }
 
 body.force-compact .main-panel {
@@ -127,6 +130,7 @@ body.force-compact .main-panel {
     align-self: stretch;
     width: 100%;
     height: auto;
+    overflow-y: visible;
 }
 
 body.force-compact .side-rail,
@@ -135,30 +139,28 @@ body.force-compact .status-inspector {
 }
 
 body.force-compact .top-tabs {
-    display: grid !important;
-    grid-template-columns: repeat(1, minmax(0, 1fr));
+    display: flex !important;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
 }
 
-@media (min-width: 541px) {
-    body.force-compact .top-tabs {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-}
-
-body.force-compact .hero-logo {
-    display: block;
-}
-
-body.force-compact .hero-github {
-    display: flex;
+body.force-compact .top-tabs::-webkit-scrollbar {
+    display: none;
 }
 
 body.force-compact .main-panel {
     padding: 14px 12px;
 }
 
-body.force-compact .hero-title {
-    font-size: 34px;
+body.force-compact .main-panel-topbar {
+    position: static;
+    margin: 0 0 10px;
+    padding: 0;
+    background: transparent;
+    backdrop-filter: none;
 }
 
 body.force-compact .card {
@@ -257,117 +259,13 @@ body {
     background: var(--bg-warm-gradient);
     color: var(--color-text-primary);
     display: flex;
-    justify-content: center;
-    align-items: center;
+    justify-content: stretch;
+    align-items: stretch;
     min-height: 100vh;
-    padding: var(--spacing-lg) var(--spacing-md);
+    padding: 0;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     position: relative;
     overflow-x: hidden;
 }
 
-.fab-install {
-    position: fixed;
-    left: 16px;
-    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-    z-index: 90;
-    display: inline-grid;
-    place-items: center;
-    width: 50px;
-    height: 50px;
-    min-width: 44px;
-    min-height: 44px;
-    padding: 0;
-    border-radius: var(--radius-full);
-    border: 1px solid rgba(255, 255, 255, 0.28);
-    background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.04) 100%),
-        linear-gradient(135deg, var(--color-brand) 0%, var(--color-brand-dark) 100%);
-    color: #fff;
-    font-size: var(--font-size-secondary);
-    font-weight: var(--font-weight-secondary);
-    letter-spacing: 0.015em;
-    box-shadow: var(--shadow-float);
-    cursor: pointer;
-    overflow: hidden;
-    transition:
-        transform var(--transition-fast) var(--ease-spring),
-        box-shadow var(--transition-fast) var(--ease-spring),
-        filter var(--transition-fast) var(--ease-smooth);
-    animation: fabPulse 3.2s ease-in-out infinite;
-}
-
-.fab-install::after {
-    content: "";
-    position: absolute;
-    inset: 1px;
-    border-radius: inherit;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    pointer-events: none;
-}
-
-.fab-install-icon {
-    width: 20px;
-    height: 20px;
-    display: inline-grid;
-    place-items: center;
-    color: #fff;
-    background: transparent;
-    box-shadow: none;
-    flex-shrink: 0;
-}
-
-.fab-install-icon svg {
-    width: 18px;
-    height: 18px;
-}
-
-.fab-install:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-raised);
-    filter: saturate(1.04);
-}
-
-.fab-install:active {
-    transform: translateY(0);
-    filter: saturate(0.98);
-}
-
-@media (max-width: 640px) {
-    .fab-install {
-        left: 12px;
-        bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-        width: 44px;
-        height: 44px;
-        padding: 0;
-        font-size: var(--font-size-secondary);
-    }
-
-    .fab-install-icon {
-        width: 18px;
-        height: 18px;
-    }
-
-    .fab-install-icon svg {
-        width: 16px;
-        height: 16px;
-    }
-}
-
-@keyframes fabPulse {
-    0%,
-    100% {
-        box-shadow: var(--shadow-float);
-    }
-    50% {
-        box-shadow: 0 14px 30px rgba(31, 26, 23, 0.14);
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .fab-install {
-        animation: none;
-        transition: none;
-    }
-}

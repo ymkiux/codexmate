@@ -388,18 +388,13 @@ export function createStartupClaudeMethods(options = {}) {
 
         maybeShowStarPrompt() {
             const storageKey = 'codexmateStarPrompted';
-            let shown = false;
             try {
-                if (localStorage.getItem(storageKey)) {
-                    return;
+                if (!localStorage.getItem(storageKey)) {
+                    localStorage.setItem(storageKey, '1');
                 }
-                this.showMessage('欢迎到 GitHub 点 Star', 'info');
-                shown = true;
-                localStorage.setItem(storageKey, '1');
             } catch (_) {
-                if (!shown) {
-                    this.showMessage('欢迎到 GitHub 点 Star', 'info');
-                }
+                // Ignore storage failures silently. The startup UI should not show
+                // promotional prompts or block normal configuration work.
             }
         }
     };

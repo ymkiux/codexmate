@@ -57,6 +57,8 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /sessionTrashCount/);
     assert.match(html, /id="side-tab-market"/);
     assert.match(html, /id="tab-market"/);
+    assert.match(html, /id="side-tab-docs"/);
+    assert.match(html, /id="tab-docs"/);
     assert.match(html, /id="side-tab-usage"/);
     assert.match(html, /id="tab-usage"/);
     assert.match(html, /data-main-tab="usage"/);
@@ -73,6 +75,16 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /:aria-selected="mainTab === 'market'"/);
     assert.match(html, /id="panel-market"/);
     assert.match(html, /v-show="mainTab === 'market'"/);
+    assert.match(html, /data-main-tab="docs"/);
+    assert.match(html, /onMainTabPointerDown\('docs', \$event\)/);
+    assert.match(html, /onMainTabClick\('docs', \$event\)/);
+    assert.match(html, /aria-controls="panel-docs"/);
+    assert.match(html, /:aria-selected="mainTab === 'docs'"/);
+    assert.match(html, /id="panel-docs"/);
+    assert.match(html, /v-show="mainTab === 'docs'"/);
+    assert.match(html, /CLI 安装文档/);
+    assert.match(html, /installTargetCards/);
+    assert.match(html, /installTroubleshootingTips/);
     assert.doesNotMatch(html, /<span class="selector-title">Skills<\/span>/);
     assert.doesNotMatch(html, /openSkillsManager\(\{ targetApp: 'codex' \}\)/);
     assert.match(html, /loadSkillsMarketOverview\(\{ forceRefresh: true, silent: false \}\)/);
@@ -103,10 +115,12 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /class="side-section" role="navigation" aria-label="配置管理"/);
     assert.match(html, /class="side-section" role="navigation" aria-label="会话管理"/);
     assert.match(html, /class="side-section" role="navigation" aria-label="技能市场"/);
+    assert.match(html, /class="side-section" role="navigation" aria-label="文档"/);
     assert.match(html, /class="side-section" role="navigation" aria-label="设置"/);
     assert.doesNotMatch(sideRail, /role="tablist"/);
     assert.doesNotMatch(sideRail, /role="tab"/);
     assert.match(sideRail, /id="side-tab-config-codex"[\s\S]*:aria-current="mainTab === 'config' && configMode === 'codex' \? 'page' : null"/);
+    assert.match(sideRail, /id="side-tab-docs"[\s\S]*:aria-current="mainTab === 'docs' \? 'page' : null"/);
     assert.match(sideRail, /id="side-tab-settings"[\s\S]*:aria-current="mainTab === 'settings' \? 'page' : null"/);
     assert.match(html, /skillsDefaultRootPath/);
     assert.match(html, /可直接导入/);
@@ -221,7 +235,6 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(modalsBasic, /<div v-if="showClaudeConfigModal" class="modal-overlay" @click\.self="closeClaudeConfigModal">/);
     for (const modalTitleId of [
         'add-provider-modal-title',
-        'install-cli-modal-title',
         'edit-provider-modal-title',
         'add-model-modal-title',
         'manage-models-modal-title',
@@ -231,6 +244,8 @@ test('config template keeps expected config tabs in top and side navigation', ()
         assert.match(modalsBasic, new RegExp(`aria-labelledby="${modalTitleId}"`));
         assert.match(modalsBasic, new RegExp(`id="${modalTitleId}"`));
     }
+    assert.doesNotMatch(modalsBasic, /install-cli-modal-title/);
+    assert.doesNotMatch(modalsBasic, /showInstallModal/);
     assert.match(modalsBasic, /<input v-model="newProvider\.key" class="form-input" type="password" placeholder="sk-\.\.\.">/);
     assert.match(modalsBasic, /<input v-model="editingProvider\.key" class="form-input" type="password" placeholder="留空则保持不变">/);
     assert.match(modalsBasic, /<input v-model="newClaudeConfig\.apiKey" class="form-input" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-\.\.\.">/);
@@ -420,13 +435,13 @@ test('trash item styles stay aligned with session card layout and keep mobile us
     assert.match(styles, /\.session-item:focus-visible\s*\{[\s\S]*outline:\s*3px solid rgba\(201,\s*94,\s*75,\s*0\.25\);[\s\S]*outline-offset:\s*2px;/);
     assert.match(styles, /\.trash-item-title\s*\{[\s\S]*-webkit-line-clamp:\s*2;/);
     assert.match(styles, /\.trash-item-side\s*\{[\s\S]*min-width:\s*132px;/);
-    assert.match(styles, /\.trash-item-actions\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(108px,\s*108px\)\);/);
-    assert.match(styles, /\.trash-item-actions \.btn-mini\s*\{[\s\S]*min-height:\s*36px;/);
+    assert.match(styles, /\.trash-item-actions\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(116px,\s*116px\)\);/);
+    assert.match(styles, /\.trash-item-actions \.btn-mini\s*\{[\s\S]*height:\s*38px;[\s\S]*min-height:\s*38px;[\s\S]*white-space:\s*nowrap;/);
     assert.match(styles, /\.trash-item-path\s*\{[\s\S]*grid-template-columns:\s*48px\s+minmax\(0,\s*1fr\);/);
     assert.match(styles, /\.session-toolbar-grow\s*\{[\s\S]*grid-column:\s*1\s*\/\s*-1;/);
     assert.match(mobile520Block, /\.trash-item-header\s*\{[\s\S]*flex-direction:\s*column;/);
     assert.match(mobile520Block, /\.trash-item-actions\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
-    assert.match(mobile520Block, /\.trash-item-actions \.btn-mini\s*\{[\s\S]*min-height:\s*40px;/);
+    assert.match(mobile520Block, /\.trash-item-actions \.btn-mini\s*\{[\s\S]*min-height:\s*44px;/);
     assert.match(styles, /@media \(max-width: 540px\)\s*\{[\s\S]*\.trash-item\.session-item\s*\{[\s\S]*height:\s*auto;/);
     assert.match(styles, /@media \(max-width: 540px\)\s*\{[\s\S]*\.trash-item-header\s*\{[\s\S]*flex-direction:\s*column;/);
     assert.match(styles, /@media \(max-width: 540px\)\s*\{[\s\S]*\.trash-item-mainline\s*\{[\s\S]*flex-direction:\s*column;/);
