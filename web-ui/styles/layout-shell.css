@@ -40,7 +40,7 @@ body::after {
 }
 
 /* ============================================
-   布局：三栏（侧栏 + 主区 + 状态检查器）
+   布局：双栏（侧栏 + 主区）
    ============================================ */
 .app-shell {
     display: grid;
@@ -130,13 +130,7 @@ body::after {
     color: var(--color-text-primary);
 }
 
-.side-item.active {
-    border-color: rgba(201, 94, 75, 0.18);
-    background: rgba(255, 255, 255, 0.82);
-    color: var(--color-text-primary);
-    box-shadow: none;
-}
-
+.side-item.active,
 .side-item.nav-intent-active {
     border-color: rgba(201, 94, 75, 0.18);
     background: rgba(255, 255, 255, 0.82);
@@ -171,15 +165,20 @@ body::after {
 .side-item-meta {
     font-size: 10px;
     color: var(--color-text-tertiary);
-    display: none;
+    display: flex;
+    visibility: hidden;
+    opacity: 0;
     gap: 5px;
     flex-wrap: wrap;
     line-height: 1.35;
+    min-height: 1.35em;
+    transition: opacity var(--transition-fast) var(--ease-smooth), visibility var(--transition-fast) var(--ease-smooth);
 }
 
 .side-item.active .side-item-meta,
 .side-item.nav-intent-active .side-item-meta {
-    display: flex;
+    visibility: visible;
+    opacity: 1;
 }
 
 .side-item-meta > span {
@@ -213,8 +212,7 @@ body::after {
     font-weight: 700;
 }
 
-.brand-block::after {
-    content: "本地配置与会话工作台";
+.brand-subtitle {
     font-size: 10px;
     line-height: 1.3;
     color: var(--color-text-muted);
