@@ -164,19 +164,16 @@ body::after {
     font-size: 11px;
     color: var(--color-text-muted);
     display: flex;
-    visibility: hidden;
-    opacity: 0;
+    opacity: 1;
     gap: 5px;
     flex-wrap: wrap;
-    line-height: 1.35;
-    min-height: 1.35em;
-    transition: opacity var(--transition-fast) var(--ease-smooth), visibility var(--transition-fast) var(--ease-smooth);
+    line-height: 1.4;
+    min-height: 1.4em;
 }
 
 .side-item.active .side-item-meta,
 .side-item.nav-intent-active .side-item-meta {
-    visibility: visible;
-    opacity: 1;
+    color: var(--color-text-secondary);
 }
 
 .side-item-meta > span {
@@ -195,10 +192,32 @@ body::after {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 6px;
+    gap: 10px;
     margin-bottom: 0;
     padding: 20px;
     border-bottom: 1px solid var(--color-border);
+}
+
+.brand-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.brand-logo {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    object-fit: cover;
+    flex-shrink: 0;
+    box-shadow: var(--shadow-subtle);
+}
+
+.brand-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
 }
 
 .brand-kicker {
@@ -212,9 +231,9 @@ body::after {
 
 .brand-subtitle {
     font-size: 12px;
-    line-height: 1.4;
+    line-height: 1.45;
     color: var(--color-text-secondary);
-    max-width: 18ch;
+    max-width: 22ch;
 }
 
 .brand-title {
