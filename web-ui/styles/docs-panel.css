@@ -1,0 +1,170 @@
+.docs-mode-content {
+    display: grid;
+    gap: 14px;
+}
+
+.docs-overview-section,
+.docs-command-section,
+.docs-help-section {
+    gap: 12px;
+}
+
+.docs-overview-header,
+.docs-section-header {
+    align-items: flex-start;
+}
+
+.docs-section-note {
+    margin-top: 4px;
+}
+
+.docs-toolbar-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.docs-toolbar-card {
+    grid-column: span 4;
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: rgba(255, 253, 252, 0.76);
+}
+
+.docs-toolbar-card-wide {
+    grid-column: span 8;
+}
+
+.docs-summary-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.docs-summary-item {
+    display: grid;
+    gap: 4px;
+    padding: 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: rgba(255, 253, 252, 0.82);
+}
+
+.docs-summary-item-wide {
+    grid-column: span 2;
+}
+
+.docs-summary-label {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.docs-summary-value {
+    font-size: 14px;
+    color: var(--color-text-primary);
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.docs-install-list {
+    margin-top: 0;
+}
+
+.docs-install-row {
+    align-items: flex-start;
+    background: rgba(255, 253, 252, 0.8);
+}
+
+.docs-command-head {
+    display: grid;
+    gap: 4px;
+}
+
+.docs-command-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    font-size: 11px;
+    color: var(--color-text-tertiary);
+}
+
+.docs-copy-btn {
+    min-width: 92px;
+    min-height: 38px;
+    align-self: center;
+}
+
+.docs-help-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.docs-note-card {
+    padding: 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: rgba(255, 253, 252, 0.78);
+}
+
+.docs-note-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    margin-bottom: 8px;
+}
+
+.docs-help-list {
+    margin-top: 0;
+}
+
+.docs-static-list {
+    margin: 0;
+    padding-left: 18px;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    line-height: 1.55;
+}
+
+.docs-static-list li + li {
+    margin-top: 6px;
+}
+
+@media (max-width: 1100px) {
+    .docs-toolbar-card,
+    .docs-toolbar-card-wide {
+        grid-column: span 12;
+    }
+
+    .docs-summary-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .docs-summary-item-wide {
+        grid-column: span 2;
+    }
+}
+
+@media (max-width: 720px) {
+    .docs-summary-strip,
+    .docs-help-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .docs-summary-item-wide {
+        grid-column: span 1;
+    }
+
+    .docs-install-row {
+        flex-direction: column;
+    }
+
+    .docs-copy-btn {
+        width: 100%;
+    }
+}
