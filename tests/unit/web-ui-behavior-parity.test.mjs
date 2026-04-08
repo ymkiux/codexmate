@@ -343,7 +343,16 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     const headMethodKeys = Object.keys(headMethods).sort();
     const extraCurrentMethodKeys = currentMethodKeys.filter((key) => !headMethodKeys.includes(key)).sort();
     const missingCurrentMethodKeys = headMethodKeys.filter((key) => !currentMethodKeys.includes(key)).sort();
-    const allowedExtraCurrentMethodKeys = [];
+    const allowedExtraCurrentMethodKeys = [
+        'canSubmitProvider',
+        'findProviderByName',
+        'getProviderValidation',
+        'isReservedProviderCreationName',
+        'isValidProviderNameInput',
+        'isValidProviderUrlInput',
+        'normalizeProviderDraft',
+        'providerFieldError'
+    ];
     const allowedMissingCurrentMethodKeys = [
         'closeInstallModal',
         'openInstallModal'

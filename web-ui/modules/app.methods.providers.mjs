@@ -1,28 +1,152 @@
+const PROVIDER_NAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
+const RESERVED_LOCAL_PROVIDER_NAME = 'local';
+const RESERVED_PROXY_PROVIDER_NAME = 'codexmate-proxy';
+
+function normalizeText(value) {
+    return typeof value === 'string' ? value.trim() : '';
+}
+
+function normalizeProviderUrl(value) {
+    return normalizeText(value).replace(/\/+$/g, '');
+}
+
+function isValidHttpUrl(value) {
+    if (!value) return false;
+    try {
+        const parsed = new URL(value);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch (_) {
+        return false;
+    }
+}
+
+function isReservedProviderCreationNameInput(name) {
+    const normalized = normalizeText(name).toLowerCase();
+    return normalized === RESERVED_LOCAL_PROVIDER_NAME || normalized === RESERVED_PROXY_PROVIDER_NAME;
+}
+
+function isValidProviderNameInputValue(name) {
+    return PROVIDER_NAME_PATTERN.test(normalizeText(name));
+}
+
+function isValidProviderUrlInputValue(url) {
+    return isValidHttpUrl(normalizeProviderUrl(url));
+}
+
+function findProviderByName(list, name) {
+    const target = normalizeText(name);
+    if (!target) return null;
+    return (Array.isArray(list) ? list : []).find((item) => item && normalizeText(item.name) === target) || null;
+}
+
+function normalizeProviderDraftState(target) {
+    if (!target || typeof target !== 'object') return;
+    if (typeof target.name === 'string') {
+        target.name = target.name.trim();
+    }
+    if (typeof target.url === 'string') {
+        target.url = normalizeProviderUrl(target.url);
+    }
+}
+
+function getProviderValidationForContext(vm, mode = 'add') {
+    const draft = mode === 'edit' ? vm.editingProvider : vm.newProvider;
+    const editingName = mode === 'edit' ? normalizeText(draft && draft.name) : '';
+    const name = normalizeText(draft && draft.name);
+    const url = normalizeProviderUrl(draft && draft.url);
+    const errors = {
+        name: '',
+        url: ''
+    };
+
+    if (mode === 'add') {
+        if (!name) {
+            errors.name = '名称不能为空';
+        } else if (!isValidProviderNameInputValue(name)) {
+            errors.name = '名称仅支持字母/数字/._-';
+        } else if (isReservedProviderCreationNameInput(name)) {
+            errors.name = name.toLowerCase() === RESERVED_LOCAL_PROVIDER_NAME
+                ? 'local provider 为系统保留名称，不可新增'
+                : 'codexmate-proxy 为保留名称，不可手动添加';
+        } else if (findProviderByName(vm.providersList, name)) {
+            errors.name = '名称已存在';
+        }
+    } else if (!editingName) {
+        errors.name = '提供商名称不能为空';
+    }
+
+    if (!url) {
+        errors.url = 'URL 必填';
+    } else if (!isValidProviderUrlInputValue(url)) {
+        errors.url = 'URL 仅支持 http/https';
+    }
+
+    return {
+        mode,
+        name,
+        url,
+        errors,
+        ok: !errors.name && !errors.url
+    };
+}
+
+function canSubmitProviderForContext(vm, mode = 'add') {
+    if (mode === 'edit' && vm.editingProvider && (vm.editingProvider.readOnly || vm.editingProvider.nonEditable)) {
+        return false;
+    }
+    return getProviderValidationForContext(vm, mode).ok;
+}
+
 export function createProvidersMethods(options = {}) {
     const { api } = options;
 
     return {
+        normalizeProviderDraft(mode = 'add') {
+            normalizeProviderDraftState(mode === 'edit' ? this.editingProvider : this.newProvider);
+        },
+
+        isReservedProviderCreationName(name) {
+            return isReservedProviderCreationNameInput(name);
+        },
+
+        isValidProviderNameInput(name) {
+            return isValidProviderNameInputValue(name);
+        },
+
+        isValidProviderUrlInput(url) {
+            return isValidProviderUrlInputValue(url);
+        },
+
+        findProviderByName(name) {
+            return findProviderByName(this.providersList, name);
+        },
+
+        getProviderValidation(mode = 'add') {
+            return getProviderValidationForContext(this, mode);
+        },
+
+        providerFieldError(mode, fieldName) {
+            const validation = getProviderValidationForContext(this, mode);
+            return validation && validation.errors && typeof validation.errors[fieldName] === 'string'
+                ? validation.errors[fieldName]
+                : '';
+        },
+
+        canSubmitProvider(mode = 'add') {
+            return canSubmitProviderForContext(this, mode);
+        },
+
         async addProvider() {
-            const rawName = typeof this.newProvider.name === 'string' ? this.newProvider.name : '';
-            const rawUrl = typeof this.newProvider.url === 'string' ? this.newProvider.url.trim() : '';
-            if (!rawName || !rawUrl) {
-                return this.showMessage('名称和URL必填', 'error');
-            }
-            const name = rawName.trim();
-            if (!name) {
-                return this.showMessage('名称不能为空', 'error');
-            }
-            if (name.toLowerCase() === 'local') {
-                return this.showMessage('local provider 为系统保留名称，不可新增', 'error');
-            }
-            if (this.providersList.some(item => item.name === name)) {
-                return this.showMessage('名称已存在', 'error');
+            normalizeProviderDraftState(this.newProvider);
+            const validation = getProviderValidationForContext(this, 'add');
+            if (!validation.ok) {
+                return this.showMessage(validation.errors.name || validation.errors.url || '名称和URL必填', 'error');
             }
 
             try {
                 const res = await api('add-provider', {
-                    name,
-                    url: rawUrl,
+                    name: validation.name,
+                    url: validation.url,
                     key: this.newProvider.key || ''
                 });
                 if (res.error) {
@@ -49,7 +173,7 @@ export function createProvidersMethods(options = {}) {
                 ? String(providerOrName.name || '')
                 : String(providerOrName);
             const normalized = rawName.trim().toLowerCase();
-            return normalized === 'local';
+            return normalized === RESERVED_LOCAL_PROVIDER_NAME;
         },
 
         providerPillState(provider) {
@@ -89,7 +213,7 @@ export function createProvidersMethods(options = {}) {
             if (!providerOrName) return false;
             if (typeof providerOrName === 'object') {
                 const directName = String(providerOrName.name || '').trim().toLowerCase();
-                if (directName === 'local') {
+                if (directName === RESERVED_LOCAL_PROVIDER_NAME) {
                     return true;
                 }
                 return !!providerOrName.nonDeletable;
@@ -97,7 +221,7 @@ export function createProvidersMethods(options = {}) {
             const name = String(providerOrName).trim();
             if (!name) return false;
             const normalized = name.toLowerCase();
-            if (normalized === 'local') {
+            if (normalized === RESERVED_LOCAL_PROVIDER_NAME) {
                 return true;
             }
             const target = (this.providersList || []).find((item) => item && item.name === name);
@@ -145,7 +269,7 @@ export function createProvidersMethods(options = {}) {
             }
             this.editingProvider = {
                 name: provider.name,
-                url: provider.url || '',
+                url: normalizeProviderUrl(provider.url || ''),
                 key: '',
                 readOnly: !!provider.readOnly,
                 nonEditable: this.isNonDeletableProvider(provider)
@@ -159,13 +283,13 @@ export function createProvidersMethods(options = {}) {
                 this.closeEditModal();
                 return;
             }
-            const url = typeof this.editingProvider.url === 'string' ? this.editingProvider.url.trim() : '';
-            if (!url) {
-                return this.showMessage('URL 必填', 'error');
+            normalizeProviderDraftState(this.editingProvider);
+            const validation = getProviderValidationForContext(this, 'edit');
+            if (!validation.ok) {
+                return this.showMessage(validation.errors.name || validation.errors.url || 'URL 必填', 'error');
             }
 
-            const name = this.editingProvider.name;
-            const params = { name, url };
+            const params = { name: validation.name, url: validation.url };
             if (typeof this.editingProvider.key === 'string' && this.editingProvider.key.trim()) {
                 params.key = this.editingProvider.key;
             }

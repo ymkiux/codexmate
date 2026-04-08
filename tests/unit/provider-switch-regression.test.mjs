@@ -298,7 +298,7 @@ test('updateProvider keeps edit modal open when request throws', async () => {
     assert.strictEqual(context.showEditModal, true);
     assert.deepStrictEqual(context.editingProvider, {
         name: 'alpha',
-        url: ' https://api.example.com/v1 ',
+        url: 'https://api.example.com/v1',
         key: '',
         readOnly: false,
         nonEditable: false
