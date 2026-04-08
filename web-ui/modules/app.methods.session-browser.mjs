@@ -359,8 +359,8 @@ export function createSessionBrowserMethods(options = {}) {
             }
         },
 
-        async loadSessions() {
-            const result = await loadSessionsHelper.call(this, api);
+        async loadSessions(options = {}) {
+            const result = await loadSessionsHelper.call(this, api, options || {});
             this.pruneSessionPinnedMap(this.sessionsList);
             return result;
         },
