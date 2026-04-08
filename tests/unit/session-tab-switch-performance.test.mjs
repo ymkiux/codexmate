@@ -85,6 +85,49 @@ test('switchMainTab prepares session render and loads sessions only when not loa
     assert.strictEqual(calls.loadSessions, 1);
 });
 
+test('switchMainTab defers active session detail hydration until after the sessions tab first paints', async () => {
+    const scheduled = [];
+    const loadOptions = [];
+    let detailLoads = 0;
+    const vm = {
+        mainTab: 'config',
+        configMode: 'codex',
+        sessionsLoadedOnce: false,
+        activeSession: null,
+        activeSessionMessages: [],
+        sessionDetailLoading: false,
+        sessionStandalone: false,
+        teardownSessionTabRender() {},
+        prepareSessionTabRender() {},
+        loadSessions(options) {
+            loadOptions.push(options);
+            this.sessionsLoadedOnce = true;
+            this.activeSession = { sessionId: 'sess-1' };
+            this.activeSessionMessages = [];
+            return Promise.resolve();
+        },
+        loadActiveSessionDetail() {
+            detailLoads += 1;
+            return Promise.resolve();
+        },
+        scheduleAfterFrame(task) {
+            scheduled.push(task);
+        },
+        refreshClaudeModelContext() {}
+    };
+
+    switchMainTab.call(vm, 'sessions');
+    assert.strictEqual(vm.mainTab, 'sessions');
+    assert.deepStrictEqual(loadOptions, [{ includeActiveDetail: false }]);
+    assert.strictEqual(detailLoads, 0);
+
+    await Promise.resolve();
+    assert.strictEqual(scheduled.length, 1);
+    scheduled[0]();
+
+    assert.strictEqual(detailLoads, 1);
+});
+
 test('switchMainTab loads lightweight usage data without preparing session render', () => {
     const calls = {
         teardown: 0,

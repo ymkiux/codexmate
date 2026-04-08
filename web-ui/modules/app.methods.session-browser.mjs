@@ -414,6 +414,14 @@ export function createSessionBrowserMethods(options = {}) {
             this.cancelSessionTimelineSync();
             this.sessionTimelineActiveKey = '';
             this.clearSessionTimelineRefs();
+            if (typeof this.scheduleAfterFrame === 'function') {
+                const selectedSession = this.activeSession;
+                this.scheduleAfterFrame(() => {
+                    if (this.activeSession !== selectedSession) return;
+                    void this.loadActiveSessionDetail();
+                });
+                return;
+            }
             await this.loadActiveSessionDetail();
         },
 
