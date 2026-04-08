@@ -31,3 +31,75 @@ test('getOpenclawParser falls back to JSON helpers when window is unavailable', 
         }
     }
 });
+
+test('fillOpenclawQuickFromConfig reads provider base url and key from root providers with legacy field names', () => {
+    const context = {
+        ...methods,
+        openclawQuick: methods.getOpenclawQuickDefaults()
+    };
+
+    methods.fillOpenclawQuickFromConfig.call(context, {
+        agents: {
+            defaults: {
+                model: {
+                    primary: 'maxx/gpt-4.1'
+                }
+            }
+        },
+        models: {
+            providers: {
+                maxx: {
+                    models: [
+                        {
+                            id: 'gpt-4.1',
+                            name: 'GPT 4.1',
+                            context_window: 128000,
+                            max_tokens: 8192
+                        }
+                    ]
+                }
+            }
+        },
+        providers: {
+            maxx: {
+                base_url: 'https://provider.example.com/v1',
+                preferred_auth_method: 'sk-live',
+                api_type: 'openai-chat'
+            }
+        }
+    });
+
+    assert.deepStrictEqual(context.openclawQuick, {
+        ...methods.getOpenclawQuickDefaults(),
+        providerName: 'maxx',
+        baseUrl: 'https://provider.example.com/v1',
+        apiKey: 'sk-live',
+        apiType: 'openai-chat',
+        modelId: 'gpt-4.1',
+        modelName: 'GPT 4.1',
+        contextWindow: '128000',
+        maxTokens: '8192'
+    });
+});
+
+test('fillOpenclawQuickFromConfig falls back to the sole provider across provider maps', () => {
+    const context = {
+        ...methods,
+        openclawQuick: methods.getOpenclawQuickDefaults()
+    };
+
+    methods.fillOpenclawQuickFromConfig.call(context, {
+        providers: {
+            alpha: {
+                url: 'https://alpha.example.com/v1',
+                apiKey: 'alpha-key',
+                api: 'openai-responses'
+            }
+        }
+    });
+
+    assert.strictEqual(context.openclawQuick.providerName, 'alpha');
+    assert.strictEqual(context.openclawQuick.baseUrl, 'https://alpha.example.com/v1');
+    assert.strictEqual(context.openclawQuick.apiKey, 'alpha-key');
+    assert.strictEqual(context.openclawQuick.apiType, 'openai-responses');
+});

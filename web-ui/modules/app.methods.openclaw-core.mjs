@@ -1,3 +1,28 @@
+function isPlainRecord(value) {
+    return !!(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function readFirstProviderString(records, keys) {
+    for (const record of records) {
+        if (!isPlainRecord(record)) continue;
+        for (const key of keys) {
+            if (typeof record[key] === 'string' && record[key].trim()) {
+                return record[key].trim();
+            }
+        }
+    }
+    return '';
+}
+
+function readPreferredProviderModels(records) {
+    for (const record of records) {
+        if (isPlainRecord(record) && Array.isArray(record.models) && record.models.length) {
+            return record.models;
+        }
+    }
+    return [];
+}
+
 export function createOpenclawCoreMethods() {
     return {
         getOpenclawParser() {
@@ -91,22 +116,21 @@ export function createOpenclawCoreMethods() {
 
         fillOpenclawQuickFromConfig(config) {
             const defaults = this.getOpenclawQuickDefaults();
-            if (!config || typeof config !== 'object' || Array.isArray(config)) {
+            if (!isPlainRecord(config)) {
                 this.openclawQuick = defaults;
                 return;
             }
 
-            const agentDefaults = config.agents && typeof config.agents === 'object' && !Array.isArray(config.agents)
-                && config.agents.defaults && typeof config.agents.defaults === 'object' && !Array.isArray(config.agents.defaults)
+            const agentDefaults = isPlainRecord(config.agents) && isPlainRecord(config.agents.defaults)
                 ? config.agents.defaults
                 : {};
             const modelConfig = agentDefaults.model;
-            const legacyAgent = config.agent && typeof config.agent === 'object' && !Array.isArray(config.agent)
+            const legacyAgent = isPlainRecord(config.agent)
                 ? config.agent
                 : {};
 
             let primaryRef = '';
-            if (modelConfig && typeof modelConfig === 'object' && !Array.isArray(modelConfig) && typeof modelConfig.primary === 'string') {
+            if (isPlainRecord(modelConfig) && typeof modelConfig.primary === 'string') {
                 primaryRef = modelConfig.primary;
             } else if (typeof modelConfig === 'string') {
                 primaryRef = modelConfig;
@@ -114,7 +138,7 @@ export function createOpenclawCoreMethods() {
             if (!primaryRef) {
                 if (typeof legacyAgent.model === 'string') {
                     primaryRef = legacyAgent.model;
-                } else if (legacyAgent.model && typeof legacyAgent.model === 'object' && typeof legacyAgent.model.primary === 'string') {
+                } else if (isPlainRecord(legacyAgent.model) && typeof legacyAgent.model.primary === 'string') {
                     primaryRef = legacyAgent.model.primary;
                 }
             }
@@ -129,41 +153,51 @@ export function createOpenclawCoreMethods() {
                 }
             }
 
-            const providers = config.models && typeof config.models === 'object' && !Array.isArray(config.models)
-                && config.models.providers && typeof config.models.providers === 'object' && !Array.isArray(config.models.providers)
+            const modelProviders = isPlainRecord(config.models) && isPlainRecord(config.models.providers)
                 ? config.models.providers
                 : null;
-            let providerConfig = providerName && providers ? providers[providerName] : null;
-            if (!providerName && providers) {
-                const providerKeys = Object.keys(providers);
+            const rootProviders = isPlainRecord(config.providers)
+                ? config.providers
+                : null;
+            if (!providerName) {
+                const providerKeys = Array.from(new Set([
+                    ...Object.keys(modelProviders || {}),
+                    ...Object.keys(rootProviders || {})
+                ]));
                 if (providerKeys.length === 1) {
                     providerName = providerKeys[0];
-                    providerConfig = providers[providerName];
                 }
             }
 
+            const providerRecords = providerName
+                ? [
+                    modelProviders && modelProviders[providerName],
+                    rootProviders && rootProviders[providerName]
+                ]
+                : [];
+            const providerConfig = providerRecords.find((item) => isPlainRecord(item)) || null;
+            const providerModels = readPreferredProviderModels(providerRecords);
+
             let modelEntry = null;
-            if (providerConfig && typeof providerConfig === 'object' && Array.isArray(providerConfig.models)) {
+            if (providerModels.length) {
                 if (modelId) {
-                    modelEntry = providerConfig.models.find(item => item && item.id === modelId);
+                    modelEntry = providerModels.find(item => item && (item.id === modelId || item.model === modelId));
                 }
-                if (!modelEntry && providerConfig.models.length === 1) {
-                    modelEntry = providerConfig.models[0];
-                    if (!modelId && modelEntry && typeof modelEntry.id === 'string') {
-                        modelId = modelEntry.id;
+                if (!modelEntry && providerModels.length === 1) {
+                    modelEntry = providerModels[0];
+                    if (!modelId && modelEntry) {
+                        if (typeof modelEntry.id === 'string' && modelEntry.id.trim()) {
+                            modelId = modelEntry.id.trim();
+                        } else if (typeof modelEntry.model === 'string' && modelEntry.model.trim()) {
+                            modelId = modelEntry.model.trim();
+                        }
                     }
                 }
             }
 
-            const baseUrl = providerConfig && typeof providerConfig === 'object' && typeof providerConfig.baseUrl === 'string'
-                ? providerConfig.baseUrl
-                : '';
-            const apiKey = providerConfig && typeof providerConfig === 'object' && typeof providerConfig.apiKey === 'string'
-                ? providerConfig.apiKey
-                : '';
-            const apiType = providerConfig && typeof providerConfig === 'object' && typeof providerConfig.api === 'string'
-                ? providerConfig.api
-                : defaults.apiType;
+            const baseUrl = readFirstProviderString(providerRecords, ['baseUrl', 'base_url', 'url']);
+            const apiKey = readFirstProviderString(providerRecords, ['apiKey', 'api_key', 'preferred_auth_method', 'key', 'authToken', 'auth_token', 'token']);
+            const apiType = readFirstProviderString(providerRecords, ['api', 'apiType', 'api_type']) || defaults.apiType;
 
             this.openclawQuick = {
                 ...defaults,
@@ -172,13 +206,15 @@ export function createOpenclawCoreMethods() {
                 apiKey,
                 apiType,
                 modelId: modelId || '',
-                modelName: modelEntry && typeof modelEntry.name === 'string' ? modelEntry.name : '',
+                modelName: modelEntry && typeof modelEntry.name === 'string'
+                    ? modelEntry.name
+                    : (modelEntry && typeof modelEntry.displayName === 'string' ? modelEntry.displayName : ''),
                 contextWindow: modelEntry && typeof modelEntry.contextWindow === 'number'
                     ? String(modelEntry.contextWindow)
-                    : '',
+                    : (modelEntry && typeof modelEntry.context_window === 'number' ? String(modelEntry.context_window) : ''),
                 maxTokens: modelEntry && typeof modelEntry.maxTokens === 'number'
                     ? String(modelEntry.maxTokens)
-                    : ''
+                    : (modelEntry && typeof modelEntry.max_tokens === 'number' ? String(modelEntry.max_tokens) : '')
             };
         },
 
