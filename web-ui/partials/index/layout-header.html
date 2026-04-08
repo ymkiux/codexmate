@@ -196,109 +196,111 @@
 
             </aside>
             <main class="main-panel">
-                <div class="panel-header panel-header-refined" v-if="!sessionStandalone">
-                    <div class="panel-header-copy">
-                        <div class="panel-kicker">{{ mainTab === 'config' ? 'Configuration' : (mainTab === 'sessions' ? 'Sessions' : (mainTab === 'usage' ? 'Usage' : (mainTab === 'market' ? 'Skills' : 'Settings'))) }}</div>
-                        <h1 class="main-title">{{ mainTab === 'config' ? '本地配置控制台' : (mainTab === 'sessions' ? '会话与导出' : (mainTab === 'usage' ? '本地用量与趋势' : (mainTab === 'market' ? 'Skills 安装与同步' : '系统与数据设置'))) }}</h1>
-                        <p class="subtitle">{{ mainTab === 'config' ? '管理 Codex、Claude Code 与 OpenClaw 的本地配置、模型与运行参数。' : (mainTab === 'sessions' ? '浏览、筛选、导出与整理本地会话记录。' : (mainTab === 'usage' ? '查看近 7 / 30 天的会话、消息与来源趋势。' : (mainTab === 'market' ? '整理安装目标、导入来源与分发入口。' : '管理下载、数据目录、回收站与全局行为。'))) }}</p>
+                <div class="main-panel-topbar">
+                    <div class="panel-header panel-header-refined" v-if="!sessionStandalone">
+                        <div class="panel-header-copy">
+                            <div class="panel-kicker">{{ mainTab === 'config' ? 'Configuration' : (mainTab === 'sessions' ? 'Sessions' : (mainTab === 'usage' ? 'Usage' : (mainTab === 'market' ? 'Skills' : 'Settings'))) }}</div>
+                            <h1 class="main-title">{{ mainTab === 'config' ? '本地配置控制台' : (mainTab === 'sessions' ? '会话与导出' : (mainTab === 'usage' ? '本地用量与趋势' : (mainTab === 'market' ? 'Skills 安装与同步' : '系统与数据设置'))) }}</h1>
+                            <p class="subtitle">{{ mainTab === 'config' ? '管理 Codex、Claude Code 与 OpenClaw 的本地配置、模型与运行参数。' : (mainTab === 'sessions' ? '浏览、筛选、导出与整理本地会话记录。' : (mainTab === 'usage' ? '查看近 7 / 30 天的会话、消息与来源趋势。' : (mainTab === 'market' ? '整理安装目标、导入来源与分发入口。' : '管理下载、数据目录、回收站与全局行为。'))) }}</p>
+                        </div>
                     </div>
-                </div>
 
-                <div class="status-strip" v-if="!sessionStandalone && mainTab === 'config'">
-                    <template v-if="isProviderConfigMode">
+                    <div class="status-strip" v-if="!sessionStandalone && mainTab === 'config'">
+                        <template v-if="isProviderConfigMode">
+                            <div class="status-chip">
+                                <span class="label">{{ activeProviderConfigChipLabel }}</span>
+                                <span class="value">{{ currentProvider || '未选择' }}</span>
+                            </div>
+                            <div class="status-chip">
+                                <span class="label">{{ activeProviderModelChipLabel }}</span>
+                                <span class="value">{{ currentModel || '未选择' }}</span>
+                            </div>
+                        </template>
+                        <template v-else-if="configMode === 'claude'">
+                            <div class="status-chip">
+                                <span class="label">Claude 配置</span>
+                                <span class="value">{{ currentClaudeConfig || '未选择' }}</span>
+                            </div>
+                            <div class="status-chip">
+                                <span class="label">Claude 模型</span>
+                                <span class="value">{{ currentClaudeModel || '未选择' }}</span>
+                            </div>
+                        </template>
+                        <template v-else-if="configMode === 'openclaw'">
+                            <div class="status-chip">
+                                <span class="label">OpenClaw 配置</span>
+                                <span class="value">{{ currentOpenclawConfig || '未选择' }}</span>
+                            </div>
+                            <div class="status-chip">
+                                <span class="label">工作区文件</span>
+                                <span class="value">{{ openclawWorkspaceFileName || '未选择' }}</span>
+                            </div>
+                        </template>
+                        <template v-else>
+                            <div class="status-chip">
+                                <span class="label">配置模式</span>
+                                <span class="value">未选择</span>
+                            </div>
+                        </template>
+                    </div>
+                    <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'sessions'">
                         <div class="status-chip">
-                            <span class="label">{{ activeProviderConfigChipLabel }}</span>
-                            <span class="value">{{ currentProvider || '未选择' }}</span>
+                            <span class="label">当前来源</span>
+                            <span class="value">
+                                {{ sessionFilterSource === 'all' ? '全部' : (sessionFilterSource === 'claude' ? 'Claude Code' : 'Codex') }}
+                            </span>
                         </div>
                         <div class="status-chip">
-                            <span class="label">{{ activeProviderModelChipLabel }}</span>
-                            <span class="value">{{ currentModel || '未选择' }}</span>
+                            <span class="label">会话数</span>
+                            <span class="value">{{ sessionsList.length }}</span>
                         </div>
-                    </template>
-                    <template v-else-if="configMode === 'claude'">
+                    </div>
+                    <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'usage'">
                         <div class="status-chip">
-                            <span class="label">Claude 配置</span>
-                            <span class="value">{{ currentClaudeConfig || '未选择' }}</span>
-                        </div>
-                        <div class="status-chip">
-                            <span class="label">Claude 模型</span>
-                            <span class="value">{{ currentClaudeModel || '未选择' }}</span>
-                        </div>
-                    </template>
-                    <template v-else-if="configMode === 'openclaw'">
-                        <div class="status-chip">
-                            <span class="label">OpenClaw 配置</span>
-                            <span class="value">{{ currentOpenclawConfig || '未选择' }}</span>
+                            <span class="label">统计范围</span>
+                            <span class="value">{{ sessionsUsageTimeRange === '30d' ? '近 30 天' : '近 7 天' }}</span>
                         </div>
                         <div class="status-chip">
-                            <span class="label">工作区文件</span>
-                            <span class="value">{{ openclawWorkspaceFileName || '未选择' }}</span>
+                            <span class="label">总会话数</span>
+                            <span class="value">{{ sessionUsageSummaryCards[0]?.value ?? 0 }}</span>
                         </div>
-                    </template>
-                    <template v-else>
                         <div class="status-chip">
-                            <span class="label">配置模式</span>
-                            <span class="value">未选择</span>
+                            <span class="label">总消息数</span>
+                            <span class="value">{{ sessionUsageSummaryCards[1]?.value ?? 0 }}</span>
                         </div>
-                    </template>
-                </div>
-                <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'sessions'">
-                    <div class="status-chip">
-                        <span class="label">当前来源</span>
-                        <span class="value">
-                            {{ sessionFilterSource === 'all' ? '全部' : (sessionFilterSource === 'claude' ? 'Claude Code' : 'Codex') }}
-                        </span>
                     </div>
-                    <div class="status-chip">
-                        <span class="label">会话数</span>
-                        <span class="value">{{ sessionsList.length }}</span>
+                    <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'market'">
+                        <div class="status-chip">
+                            <span class="label">当前目标</span>
+                            <span class="value">{{ skillsTargetLabel }}</span>
+                        </div>
+                        <div class="status-chip">
+                            <span class="label">本地 Skills</span>
+                            <span class="value">{{ skillsList.length }}</span>
+                        </div>
+                        <div class="status-chip">
+                            <span class="label">可导入</span>
+                            <span class="value">{{ skillsImportList.length }}</span>
+                        </div>
+                        <div class="status-chip">
+                            <span class="label">可直接导入</span>
+                            <span class="value">{{ skillsImportConfiguredCount }}</span>
+                        </div>
                     </div>
-                </div>
-                <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'usage'">
-                    <div class="status-chip">
-                        <span class="label">统计范围</span>
-                        <span class="value">{{ sessionsUsageTimeRange === '30d' ? '近 30 天' : '近 7 天' }}</span>
+                    <div
+                        v-if="!sessionStandalone && mainTab === 'config' && isProviderConfigMode && forceCompactLayout && !loading && !initError && displayProvidersList.length > 1"
+                        class="provider-fast-switch">
+                        <label class="provider-fast-switch-label" for="provider-fast-switch-select">快速切换提供商</label>
+                        <select
+                            id="provider-fast-switch-select"
+                            class="provider-fast-switch-select"
+                            :value="displayCurrentProvider"
+                            @change="quickSwitchProvider($event.target.value)">
+                            <option v-for="provider in displayProvidersList" :key="'quick-switch-' + provider.name" :value="provider.name">
+                                {{ provider.name }}
+                            </option>
+                        </select>
                     </div>
-                    <div class="status-chip">
-                        <span class="label">总会话数</span>
-                        <span class="value">{{ sessionUsageSummaryCards[0]?.value ?? 0 }}</span>
-                    </div>
-                    <div class="status-chip">
-                        <span class="label">总消息数</span>
-                        <span class="value">{{ sessionUsageSummaryCards[1]?.value ?? 0 }}</span>
-                    </div>
-                </div>
-                <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'market'">
-                    <div class="status-chip">
-                        <span class="label">当前目标</span>
-                        <span class="value">{{ skillsTargetLabel }}</span>
-                    </div>
-                    <div class="status-chip">
-                        <span class="label">本地 Skills</span>
-                        <span class="value">{{ skillsList.length }}</span>
-                    </div>
-                    <div class="status-chip">
-                        <span class="label">可导入</span>
-                        <span class="value">{{ skillsImportList.length }}</span>
-                    </div>
-                    <div class="status-chip">
-                        <span class="label">可直接导入</span>
-                        <span class="value">{{ skillsImportConfiguredCount }}</span>
-                    </div>
-                </div>
-                <div
-                    v-if="!sessionStandalone && mainTab === 'config' && isProviderConfigMode && forceCompactLayout && !loading && !initError && displayProvidersList.length > 1"
-                    class="provider-fast-switch">
-                    <label class="provider-fast-switch-label" for="provider-fast-switch-select">快速切换提供商</label>
-                    <select
-                        id="provider-fast-switch-select"
-                        class="provider-fast-switch-select"
-                        :value="displayCurrentProvider"
-                        @change="quickSwitchProvider($event.target.value)">
-                        <option v-for="provider in displayProvidersList" :key="'quick-switch-' + provider.name" :value="provider.name">
-                            {{ provider.name }}
-                        </option>
-                    </select>
                 </div>
 
                 <!-- 内容包裹器 - 稳定布局 -->
