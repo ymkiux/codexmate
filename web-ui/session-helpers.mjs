@@ -11,6 +11,27 @@ function clearSessionTimelineRefs(vm) {
     }
 }
 
+function scheduleSessionDetailHydration(vm, options = {}) {
+    if (!vm || typeof vm.loadActiveSessionDetail !== 'function') {
+        return;
+    }
+    const task = () => {
+        if (!vm.activeSession) return;
+        if (vm.mainTab !== 'sessions' && !vm.sessionStandalone) return;
+        if (vm.sessionDetailLoading) return;
+        const currentMessages = Array.isArray(vm.activeSessionMessages) ? vm.activeSessionMessages : [];
+        if (!options.force && currentMessages.length > 0) {
+            return;
+        }
+        void vm.loadActiveSessionDetail(options);
+    };
+    if (typeof vm.scheduleAfterFrame === 'function') {
+        vm.scheduleAfterFrame(task);
+        return;
+    }
+    task();
+}
+
 export function switchMainTab(tab) {
     const nextTab = typeof tab === 'string' ? tab : '';
     const previousTab = this.mainTab;
@@ -43,7 +64,17 @@ export function switchMainTab(tab) {
     }
 
     if (enteringSessionsTab && !this.sessionsLoadedOnce) {
-        this.loadSessions({ includeActiveDetail: true });
+        const canStageInitialSessionDetail = typeof this.scheduleAfterFrame === 'function';
+        const loadResult = this.loadSessions({
+            includeActiveDetail: !canStageInitialSessionDetail
+        });
+        if (canStageInitialSessionDetail) {
+            void Promise.resolve(loadResult)
+                .then(() => {
+                    scheduleSessionDetailHydration(this);
+                })
+                .catch(() => {});
+        }
     }
     if (enteringUsageTab && !this.sessionsUsageLoadedOnce && typeof this.loadSessionsUsage === 'function') {
         this.loadSessionsUsage();
