@@ -3449,13 +3449,14 @@ function addProviderToConfig(params = {}) {
     const url = typeof params.url === 'string' ? params.url.trim() : '';
     const key = typeof params.key === 'string' ? params.key.trim() : '';
     const allowManaged = !!params.allowManaged;
+    const normalizedUrl = normalizeBaseUrl(url);
 
     if (!name) return { error: '名称不能为空' };
     if (!url) return { error: 'URL 不能为空' };
     if (!isValidProviderName(name)) {
         return { error: '名称仅支持字母/数字/._-' };
     }
-    if (!isValidHttpUrl(normalizeBaseUrl(url))) {
+    if (!isValidHttpUrl(normalizedUrl)) {
         return { error: 'URL 仅支持 http/https' };
     }
     if (isReservedProviderNameForCreation(name)) {
@@ -3499,7 +3500,7 @@ function addProviderToConfig(params = {}) {
 
     const lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
     const safeName = escapeTomlBasicString(name);
-    const safeUrl = escapeTomlBasicString(url);
+    const safeUrl = escapeTomlBasicString(normalizedUrl);
     const safeKey = escapeTomlBasicString(key);
     const block = [
         buildModelProviderTableHeader(name),

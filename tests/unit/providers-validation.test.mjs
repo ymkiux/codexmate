@@ -80,6 +80,7 @@ test('addProvider normalizes trimmed values and submits sanitized payload', asyn
     assert.strictEqual(context.showAddModal, false);
     assert.deepStrictEqual(context.newProvider, { name: '', url: '', key: '' });
     assert.deepStrictEqual(loadAllCalls, ['loadAll']);
+    assert.strictEqual(messages.length, 1);
     assert.deepStrictEqual(messages[0], {
         text: '操作成功',
         type: 'success'
@@ -107,6 +108,7 @@ test('updateProvider blocks invalid edit URL and skips api call', async () => {
     await context.updateProvider();
 
     assert.deepStrictEqual(apiCalls, []);
+    assert.strictEqual(messages.length, 1);
     assert.deepStrictEqual(messages[0], {
         text: 'URL 仅支持 http/https',
         type: 'error'
