@@ -362,7 +362,8 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'isValidProviderUrlInput',
         'loadSessionsUsage',
         'normalizeProviderDraft',
-        'providerFieldError'
+        'providerFieldError',
+        'syncDefaultOpenclawConfigEntry'
     ];
     const allowedMissingCurrentMethodKeys = [
         'closeInstallModal',

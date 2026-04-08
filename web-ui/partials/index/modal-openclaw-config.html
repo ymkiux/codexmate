@@ -258,13 +258,14 @@
                         :readonly="openclawSaving || openclawApplying"
                         placeholder="在这里编辑 OpenClaw 配置（JSON5）"></textarea>
                     <div class="template-editor-warning">
-                        保存仅写入本地配置库。点击“保存并应用”后会写入 openclaw.json。
+                        <span v-if="openclawEditing.lockName && openclawEditing.name === '默认配置'">默认配置始终映射当前 openclaw.json，请直接使用“保存并应用”。</span>
+                        <span v-else>保存仅写入本地配置库。点击“保存并应用”后会写入 openclaw.json。</span>
                     </div>
                 </div>
 
                 <div class="btn-group">
                     <button class="btn btn-cancel" @click="closeOpenclawConfigModal" :disabled="openclawSaving || openclawApplying">取消</button>
-                    <button class="btn btn-confirm" @click="saveOpenclawConfig" :disabled="openclawSaving || openclawApplying">
+                    <button class="btn btn-confirm" @click="saveOpenclawConfig" :disabled="openclawSaving || openclawApplying || (openclawEditing.lockName && openclawEditing.name === '默认配置')">
                         {{ openclawSaving ? '保存中...' : '保存' }}
                     </button>
                     <button class="btn btn-confirm secondary" @click="saveAndApplyOpenclawConfig" :disabled="openclawSaving || openclawApplying">

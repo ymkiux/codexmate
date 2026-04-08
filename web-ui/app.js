@@ -364,23 +364,42 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             void this.refreshClaudeSelectionFromSettings({ silent: true });
+            const normalizeOpenclawConfigs = (configs) => {
+                const source = configs && typeof configs === 'object' && !Array.isArray(configs)
+                    ? configs
+                    : {};
+                const defaultEntry = source['默认配置']
+                    && typeof source['默认配置'] === 'object'
+                    && !Array.isArray(source['默认配置'])
+                        ? source['默认配置']
+                        : { content: DEFAULT_OPENCLAW_TEMPLATE };
+                const normalized = {
+                    '默认配置': {
+                        content: typeof defaultEntry.content === 'string' ? defaultEntry.content : DEFAULT_OPENCLAW_TEMPLATE
+                    }
+                };
+                for (const [name, value] of Object.entries(source)) {
+                    if (name === '默认配置') continue;
+                    normalized[name] = value;
+                }
+                return normalized;
+            };
             const savedOpenclawConfigs = localStorage.getItem('openclawConfigs');
             if (savedOpenclawConfigs) {
                 try {
-                    this.openclawConfigs = JSON.parse(savedOpenclawConfigs);
-                    const configNames = Object.keys(this.openclawConfigs);
-                    if (configNames.length > 0) {
-                        this.currentOpenclawConfig = configNames[0];
-                    }
+                    this.openclawConfigs = normalizeOpenclawConfigs(JSON.parse(savedOpenclawConfigs));
                 } catch (e) {
                     console.error('加载 OpenClaw 配置失败:', e);
+                    this.openclawConfigs = normalizeOpenclawConfigs(this.openclawConfigs);
                 }
             } else {
-                const configNames = Object.keys(this.openclawConfigs);
-                if (configNames.length > 0) {
-                    this.currentOpenclawConfig = configNames[0];
-                }
+                this.openclawConfigs = normalizeOpenclawConfigs(this.openclawConfigs);
             }
+            const configNames = Object.keys(this.openclawConfigs);
+            if (configNames.length > 0) {
+                this.currentOpenclawConfig = this.openclawConfigs['默认配置'] ? '默认配置' : configNames[0];
+            }
+            void this.syncDefaultOpenclawConfigEntry({ silent: true });
             this.loadAll();
         },
 
