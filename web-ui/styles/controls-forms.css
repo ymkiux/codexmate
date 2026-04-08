@@ -4,14 +4,14 @@
 .selector-section {
     background: transparent;
     border-radius: 0;
-    padding: 10px 0 0;
-    margin-bottom: 10px;
+    padding: 12px 0 0;
+    margin-bottom: 12px;
     box-shadow: none;
     border: none;
-    border-top: 1px solid rgba(224, 214, 202, 0.72);
+    border-top: 1px solid var(--color-border);
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
 }
 
 .selector-header {
@@ -89,10 +89,10 @@
 }
 
 .health-report {
-    margin-top: 8px;
-    padding: 8px 0 0;
+    margin-top: 10px;
+    padding: 10px 0 0;
     border-radius: 0;
-    border: 1px solid var(--color-border-soft);
+    border: 1px solid var(--color-border);
     border-width: 1px 0 0;
     background: transparent;
     display: grid;
@@ -117,10 +117,10 @@
 }
 
 .health-issue {
-    background: #fff6f5;
+    background: #FEF2F2;
     border-left: 3px solid var(--color-error);
     padding: 8px 10px;
-    border-radius: 10px;
+    border-radius: 8px;
 }
 
 .health-issue-title {
@@ -166,11 +166,11 @@
     min-height: 36px;
     padding: 8px 10px;
     padding-right: 34px;
-    border: 1px solid var(--color-border-soft);
+    border: 1px solid var(--color-border);
     border-radius: 8px;
     font-size: 13px;
     font-weight: var(--font-weight-body);
-    background-color: var(--color-surface-alt);
+    background-color: var(--color-surface);
     color: var(--color-text-primary);
     outline: none;
     cursor: pointer;
@@ -198,11 +198,11 @@
     width: 100%;
     min-height: 36px;
     padding: 8px 10px;
-    border: 1px solid var(--color-border-soft);
+    border: 1px solid var(--color-border);
     border-radius: 8px;
     font-size: 13px;
     font-weight: var(--font-weight-body);
-    background-color: var(--color-surface-alt);
+    background-color: var(--color-surface);
     color: var(--color-text-primary);
     outline: none;
     transition: all var(--transition-fast) var(--ease-smooth);

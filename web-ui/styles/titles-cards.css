@@ -2,10 +2,10 @@
    主标题
    ============================================ */
 .main-title {
-    font-size: clamp(24px, 1.8vw, 30px);
-    font-weight: var(--font-weight-display);
-    line-height: 1.06;
-    letter-spacing: -0.03em;
+    font-size: clamp(18px, 1.3vw, 22px);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
     margin-bottom: 0;
     color: var(--color-text-primary);
     font-family: var(--font-family-display);
@@ -22,11 +22,11 @@
 }
 
 .subtitle {
-    font-size: 12px;
-    color: var(--color-text-tertiary);
-    line-height: 1.5;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    line-height: 1.45;
     margin-bottom: 0;
-    max-width: 68ch;
+    max-width: 72ch;
     letter-spacing: 0;
 }
 
@@ -35,13 +35,13 @@
    ============================================ */
 .segmented-control {
     display: flex;
-    background: rgba(246, 241, 235, 0.78);
+    background: var(--color-surface);
     border-radius: 10px;
     padding: 4px;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
     position: relative;
     box-shadow: none;
-    border: 1px solid rgba(216, 201, 184, 0.26);
+    border: 1px solid var(--color-border);
     backdrop-filter: none;
 }
 
@@ -66,9 +66,9 @@
 }
 
 .segment.active {
-    color: var(--color-text-primary);
-    background: rgba(255, 255, 255, 0.96);
-    box-shadow: inset 0 0 0 1px rgba(216, 201, 184, 0.28);
+    color: var(--color-brand-dark);
+    background: rgba(59, 130, 246, 0.08);
+    box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.14);
 }
 
 /* ============================================
@@ -85,9 +85,9 @@
    卡片
    ============================================ */
 .card {
-    background: rgba(255, 255, 255, 0.92);
-    border-radius: 12px;
-    padding: 10px 11px;
+    background: var(--color-surface);
+    border-radius: 10px;
+    padding: 10px 12px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -99,14 +99,14 @@
     box-shadow: none;
     user-select: none;
     will-change: auto;
-    border: 1px solid rgba(216, 201, 184, 0.3);
+    border: 1px solid var(--color-border);
     position: relative;
     overflow: hidden;
 }
 
 .card:hover {
-    border-color: rgba(201, 94, 75, 0.38);
-    box-shadow: inset 0 0 0 1px rgba(201, 94, 75, 0.04);
+    border-color: var(--color-border-strong);
+    box-shadow: none;
 }
 
 .card::before,
@@ -118,10 +118,11 @@
 
 .card::before {
     left: 0;
-    top: 8px;
-    bottom: 8px;
+    top: 50%;
+    transform: translateY(-50%);
     width: 3px;
-    border-radius: 999px;
+    height: 18px;
+    border-radius: 0 2px 2px 0;
     background: transparent;
     transition: background var(--transition-fast) var(--ease-smooth);
 }
@@ -129,7 +130,7 @@
 .card::after {
     inset: 0;
     border-radius: inherit;
-    background: linear-gradient(120deg, rgba(255, 255, 255, 0.18) 0%, transparent 55%);
+    background: linear-gradient(120deg, rgba(255, 255, 255, 0.1) 0%, transparent 55%);
     opacity: 0;
     transition: opacity var(--transition-fast) var(--ease-smooth);
 }
@@ -140,13 +141,13 @@
 }
 
 .card.active {
-    background: rgba(248, 243, 237, 0.92);
-    border-color: rgba(201, 94, 75, 0.4);
-    box-shadow: inset 0 0 0 1px rgba(201, 94, 75, 0.05);
+    background: rgba(59, 130, 246, 0.08);
+    border-color: rgba(59, 130, 246, 0.2);
+    box-shadow: none;
 }
 
 .card.active::before {
-    background: linear-gradient(180deg, rgba(201, 94, 75, 0.95) 0%, rgba(201, 94, 75, 0.35) 100%);
+    background: var(--color-brand);
 }
 
 .card:hover::after {
@@ -169,20 +170,20 @@
     width: 32px;
     height: 32px;
     border-radius: 8px;
-    background: rgba(244, 237, 228, 0.72);
+    background: rgba(59, 130, 246, 0.1);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: var(--font-size-title);
     font-weight: var(--font-weight-title);
-    color: var(--color-text-secondary);
+    color: var(--color-brand-dark);
     flex-shrink: 0;
     transition: background-color var(--transition-fast) var(--ease-smooth), color var(--transition-fast) var(--ease-smooth);
     box-shadow: none;
 }
 
 .card.active .card-icon {
-    background: rgba(201, 94, 75, 0.14);
+    background: rgba(59, 130, 246, 0.14);
     color: var(--color-brand-dark);
     box-shadow: none;
 }

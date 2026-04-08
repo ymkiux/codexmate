@@ -47,7 +47,8 @@ test('styles include force-compact fallback rules for readability on touch devic
 
 test('styles keep desktop layout wide and session history readable on large screens', () => {
     const styles = readBundledWebUiCss();
-    assert.match(styles, /\.container\s*\{[\s\S]*max-width:\s*2200px;/);
+    assert.match(styles, /\.container\s*\{[\s\S]*max-width:\s*none;[\s\S]*min-height:\s*100vh;/);
+    assert.match(styles, /\.app-shell\s*\{[\s\S]*grid-template-columns:\s*248px\s+minmax\(0,\s*1fr\);[\s\S]*min-height:\s*100vh;/);
     assert.match(styles, /\.session-layout\s*\{[\s\S]*grid-template-columns:\s*minmax\(260px,\s*360px\)\s*minmax\(0,\s*1fr\);/);
     assert.match(styles, /\.session-item\s*\{[\s\S]*min-height:\s*102px;/);
 
