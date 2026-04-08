@@ -136,6 +136,79 @@ test('fillOpenclawQuickFromConfig falls back to the sole configured provider whe
     assert.strictEqual(context.openclawQuick.modelId, 'gpt-5.4');
 });
 
+test('fillOpenclawQuickFromConfig resolves provider aliases with normalized lookup', () => {
+    const context = {
+        ...methods,
+        openclawQuick: methods.getOpenclawQuickDefaults()
+    };
+
+    methods.fillOpenclawQuickFromConfig.call(context, {
+        agents: {
+            defaults: {
+                model: {
+                    primary: 'z.ai/glm-4.5'
+                }
+            }
+        },
+        models: {
+            providers: {
+                zai: {
+                    baseUrl: 'https://zai.example.com/v1',
+                    apiKey: 'zai-key',
+                    api: 'openai-responses',
+                    models: [
+                        {
+                            id: 'glm-4.5',
+                            name: 'GLM 4.5'
+                        }
+                    ]
+                }
+            }
+        }
+    });
+
+    assert.strictEqual(context.openclawQuick.providerName, 'zai');
+    assert.strictEqual(context.openclawQuick.baseUrl, 'https://zai.example.com/v1');
+    assert.strictEqual(context.openclawQuick.apiKey, 'zai-key');
+    assert.strictEqual(context.openclawQuick.modelId, 'glm-4.5');
+    assert.strictEqual(context.openclawQuick.modelName, 'GLM 4.5');
+});
+
+test('fillOpenclawQuickFromConfig treats alias-split provider maps as one configured provider', () => {
+    const context = {
+        ...methods,
+        openclawQuick: methods.getOpenclawQuickDefaults()
+    };
+
+    methods.fillOpenclawQuickFromConfig.call(context, {
+        models: {
+            providers: {
+                zai: {
+                    models: [
+                        {
+                            id: 'glm-4.5',
+                            name: 'GLM 4.5'
+                        }
+                    ]
+                }
+            }
+        },
+        providers: {
+            'z.ai': {
+                base_url: 'https://zai.example.com/v1',
+                api_key: 'zai-key',
+                api_type: 'openai-responses'
+            }
+        }
+    });
+
+    assert.strictEqual(context.openclawQuick.providerName, 'zai');
+    assert.strictEqual(context.openclawQuick.baseUrl, 'https://zai.example.com/v1');
+    assert.strictEqual(context.openclawQuick.apiKey, 'zai-key');
+    assert.strictEqual(context.openclawQuick.modelId, 'glm-4.5');
+    assert.strictEqual(context.openclawQuick.modelName, 'GLM 4.5');
+});
+
 test('fillOpenclawQuickFromConfig renders structured SecretRef values as read-only labels', () => {
     const context = {
         ...methods,
