@@ -43,7 +43,7 @@
     max-width: 100%;
     padding: 6px 10px;
     border: 1px solid var(--color-border);
-    background: var(--color-surface);
+    background: rgba(255, 253, 252, 0.82);
     box-shadow: none;
     display: inline-flex;
     flex-direction: row;
@@ -77,7 +77,7 @@
     padding: 10px 12px;
     border-radius: 10px;
     border: 1px solid var(--color-border);
-    background: var(--color-surface);
+    background: rgba(255, 253, 252, 0.88);
     box-shadow: none;
     display: grid;
     gap: 6px;
@@ -120,7 +120,7 @@
     border: none;
     border-radius: 0;
     box-shadow: none;
-    padding: 0 24px 24px;
+    padding: 0 28px 28px;
     backdrop-filter: none;
     position: relative;
     overflow-x: hidden;
@@ -138,10 +138,10 @@
     align-items: center;
     justify-content: space-between;
     gap: 14px;
-    margin: 0 -24px 14px;
-    padding: 16px 24px;
+    margin: 0 -28px 16px;
+    padding: 18px 28px 16px;
     border-bottom: 1px solid var(--color-border);
-    background: var(--color-surface);
+    background: rgba(255, 253, 252, 0.74);
 }
 
 .panel-header-copy {
@@ -155,7 +155,7 @@
     font-size: 10px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--color-brand);
+    color: var(--color-brand-dark);
     font-weight: 700;
 }
 
@@ -239,9 +239,9 @@
 
 .top-tab.active,
 .top-tab.nav-intent-active {
-    border-color: rgba(59, 130, 246, 0.22);
+    border-color: rgba(199, 116, 98, 0.18);
     color: var(--color-brand-dark);
-    background: rgba(59, 130, 246, 0.08);
+    background: var(--color-brand-light);
     box-shadow: none;
 }
 
@@ -318,7 +318,7 @@
     border-radius: 0;
     box-shadow: none;
     padding: 0;
-    max-width: 980px;
+    max-width: 1040px;
 }
 
 .mode-content {

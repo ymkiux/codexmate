@@ -122,7 +122,7 @@ body::after {
 .side-item.active,
 .side-item.nav-intent-active {
     border-color: transparent;
-    background: rgba(59, 130, 246, 0.08);
+    background: var(--color-brand-light);
     color: var(--color-brand-dark);
     box-shadow: none;
 }
@@ -256,7 +256,7 @@ body::after {
 }
 
 .github-badge:focus-visible {
-    outline: 3px solid rgba(59, 130, 246, 0.18);
+    outline: 3px solid rgba(199, 116, 98, 0.18);
     outline-offset: 2px;
     border-color: var(--color-brand);
     color: var(--color-text-primary);
@@ -336,7 +336,7 @@ body::after {
 .github-badge-rail .github-badge-left {
     padding: 4px;
     border-radius: 999px;
-    background: rgba(59, 130, 246, 0.12);
+    background: var(--color-brand-light);
 }
 
 .github-badge-rail .github-badge-label {
