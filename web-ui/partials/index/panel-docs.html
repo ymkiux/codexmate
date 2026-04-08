@@ -94,9 +94,11 @@
                                             <span>命令：{{ target.bin }}</span>
                                         </div>
                                     </div>
-                                    <code class="install-command">{{ target.command }}</code>
+                                    <div class="docs-command-row">
+                                        <code class="install-command">{{ target.command }}</code>
+                                        <button type="button" class="btn-mini docs-copy-btn" :disabled="!target.command" @click="copyInstallCommand(target.command)">复制命令</button>
+                                    </div>
                                 </div>
-                                <button type="button" class="btn-mini docs-copy-btn" :disabled="!target.command" @click="copyInstallCommand(target.command)">复制命令</button>
                             </div>
                         </div>
                     </div>
