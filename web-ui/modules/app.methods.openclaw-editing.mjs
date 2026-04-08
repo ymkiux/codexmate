@@ -139,7 +139,9 @@ export function createOpenclawEditingMethods() {
             this.openclawEditing.content = this.stringifyOpenclawConfig(config);
             this.refreshOpenclawProviders(config);
             this.refreshOpenclawAgentsList(config);
-            this.fillOpenclawQuickFromConfig(config);
+            this.fillOpenclawQuickFromConfig(config, {
+                authProfilesByProvider: this.openclawAuthProfilesByProvider
+            });
             this.showMessage('已写入', 'success');
         },
 

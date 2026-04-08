@@ -122,6 +122,23 @@ function readFirstProviderDisplayValue(records, keys) {
     };
 }
 
+function readOpenclawAuthProfileDisplayValue(authProfilesByProvider, providerName) {
+    const matchedKey = findNormalizedProviderKey(authProfilesByProvider, providerName) || providerName;
+    const summary = isPlainRecord(authProfilesByProvider) ? authProfilesByProvider[matchedKey] : null;
+    if (!isPlainRecord(summary) || typeof summary.display !== 'string' || !summary.display.trim()) {
+        return {
+            value: '',
+            readOnly: false,
+            kind: 'missing'
+        };
+    }
+    return {
+        value: summary.display.trim(),
+        readOnly: true,
+        kind: 'auth-profile'
+    };
+}
+
 function readPreferredProviderModels(records) {
     for (const record of records) {
         if (isPlainRecord(record) && Array.isArray(record.models) && record.models.length) {
@@ -202,8 +219,10 @@ export function createOpenclawCoreMethods() {
                 providerName: '',
                 baseUrl: '',
                 baseUrlReadOnly: false,
+                baseUrlDisplayKind: 'missing',
                 apiKey: '',
                 apiKeyReadOnly: false,
+                apiKeyDisplayKind: 'missing',
                 apiType: 'openai-responses',
                 modelId: '',
                 modelName: '',
@@ -224,12 +243,15 @@ export function createOpenclawCoreMethods() {
             this.openclawQuick.showKey = !this.openclawQuick.showKey;
         },
 
-        fillOpenclawQuickFromConfig(config) {
+        fillOpenclawQuickFromConfig(config, options = {}) {
             const defaults = this.getOpenclawQuickDefaults();
             if (!isPlainRecord(config)) {
                 this.openclawQuick = defaults;
                 return;
             }
+            const authProfilesByProvider = isPlainRecord(options.authProfilesByProvider)
+                ? options.authProfilesByProvider
+                : (isPlainRecord(this.openclawAuthProfilesByProvider) ? this.openclawAuthProfilesByProvider : {});
 
             const agentDefaults = isPlainRecord(config.agents) && isPlainRecord(config.agents.defaults)
                 ? config.agents.defaults
@@ -319,7 +341,11 @@ export function createOpenclawCoreMethods() {
             }
 
             const baseUrlField = readFirstProviderDisplayValue(providerRecords, ['baseUrl', 'base_url', 'url']);
-            const apiKeyField = readFirstProviderDisplayValue(providerRecords, ['apiKey', 'api_key', 'keyRef', 'key', 'authToken', 'auth_token', 'tokenRef', 'token']);
+            const providerApiKeyField = readFirstProviderDisplayValue(providerRecords, ['apiKey', 'api_key', 'keyRef', 'key', 'authToken', 'auth_token', 'tokenRef', 'token']);
+            const authProfileField = providerName
+                ? readOpenclawAuthProfileDisplayValue(authProfilesByProvider, providerName)
+                : { value: '', readOnly: false, kind: 'missing' };
+            const apiKeyField = providerApiKeyField.value ? providerApiKeyField : authProfileField;
             const apiTypeField = readFirstProviderDisplayValue(providerRecords, ['api', 'apiType', 'api_type']);
 
             this.openclawQuick = {
@@ -327,8 +353,10 @@ export function createOpenclawCoreMethods() {
                 providerName,
                 baseUrl: baseUrlField.value,
                 baseUrlReadOnly: baseUrlField.readOnly,
+                baseUrlDisplayKind: baseUrlField.kind,
                 apiKey: apiKeyField.value,
                 apiKeyReadOnly: apiKeyField.readOnly,
+                apiKeyDisplayKind: apiKeyField.kind,
                 apiType: apiTypeField.value || defaults.apiType,
                 modelId: modelId || '',
                 modelName: modelEntry && typeof modelEntry.name === 'string'
@@ -353,7 +381,9 @@ export function createOpenclawCoreMethods() {
                 }
                 return false;
             }
-            this.fillOpenclawQuickFromConfig(parsed.data);
+            this.fillOpenclawQuickFromConfig(parsed.data, {
+                authProfilesByProvider: this.openclawAuthProfilesByProvider
+            });
             if (!silent) {
                 this.showMessage('已读取配置', 'success');
             }
@@ -452,7 +482,9 @@ export function createOpenclawCoreMethods() {
                 return false;
             }
             this.fillOpenclawStructured(parsed.data);
-            this.fillOpenclawQuickFromConfig(parsed.data);
+            this.fillOpenclawQuickFromConfig(parsed.data, {
+                authProfilesByProvider: this.openclawAuthProfilesByProvider
+            });
             this.refreshOpenclawProviders(parsed.data);
             this.refreshOpenclawAgentsList(parsed.data);
             if (!silent) {

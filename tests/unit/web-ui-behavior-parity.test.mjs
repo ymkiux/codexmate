@@ -319,8 +319,11 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     const headDataKeys = Object.keys(headAppOptions.data()).sort();
     const extraCurrentKeys = currentDataKeys.filter((key) => !headDataKeys.includes(key)).sort();
     const missingCurrentKeys = headDataKeys.filter((key) => !currentDataKeys.includes(key)).sort();
-    const allowedExtraCurrentKeys = parityAgainstHead ? [] : [
+    const allowedExtraCurrentKeys = parityAgainstHead ? [
+        'openclawAuthProfilesByProvider'
+    ] : [
         '__mainTabSwitchState',
+        'openclawAuthProfilesByProvider',
         'sessionsUsageError',
         'sessionsUsageList',
         'sessionsUsageLoadedOnce',

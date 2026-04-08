@@ -49,7 +49,7 @@
                             <div class="form-group">
                                 <label class="form-label">Base URL</label>
                                 <input v-model="openclawQuick.baseUrl" class="form-input" placeholder="https://api.example.com/v1" :readonly="openclawQuick.baseUrlReadOnly">
-                                <div v-if="openclawQuick.baseUrlReadOnly" class="form-hint">检测到结构化引用，快速表单中只读显示；如需修改请使用原文编辑。</div>
+                                <div v-if="openclawQuick.baseUrlReadOnly" class="form-hint">检测到外部引用，快速表单中只读显示；如需修改请使用原文编辑。</div>
                             </div>
                             <div class="form-group">
                                 <label class="form-label">API Key</label>
@@ -59,7 +59,7 @@
                                         {{ openclawQuick.showKey ? '隐藏' : '显示' }}
                                     </button>
                                 </div>
-                                <div v-if="openclawQuick.apiKeyReadOnly" class="form-hint">检测到结构化 SecretRef，快速表单中只读显示；如需修改请使用原文编辑。</div>
+                                <div v-if="openclawQuick.apiKeyReadOnly" class="form-hint">检测到外部认证或引用，快速表单中只读显示；如需修改请使用原文编辑或对应认证配置。</div>
                                 <div v-else class="form-hint">留空表示不覆盖现有 key。</div>
                             </div>
                             <div class="form-group">

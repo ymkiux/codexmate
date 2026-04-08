@@ -55,10 +55,13 @@ export function createOpenclawPersistMethods(options = {}) {
             const silent = !!options.silent;
             return api('get-openclaw-config')
                 .then((res) => {
-                    if (res && !res.error) {
-                        const nextContent = res.exists && typeof res.content === 'string' && res.content.trim()
-                            ? res.content
-                            : defaultOpenclawTemplate;
+                if (res && !res.error) {
+                    this.openclawAuthProfilesByProvider = res && res.authProfilesByProvider && typeof res.authProfilesByProvider === 'object' && !Array.isArray(res.authProfilesByProvider)
+                        ? res.authProfilesByProvider
+                        : {};
+                    const nextContent = res.exists && typeof res.content === 'string' && res.content.trim()
+                        ? res.content
+                        : defaultOpenclawTemplate;
                         syncDefaultOpenclawConfigState(this, nextContent, {
                             path: res.path || this.openclawConfigPath,
                             exists: !!res.exists,
@@ -165,6 +168,9 @@ export function createOpenclawPersistMethods(options = {}) {
                 this.openclawConfigPath = res.path || '';
                 this.openclawConfigExists = !!res.exists;
                 this.openclawLineEnding = res.lineEnding === '\r\n' ? '\r\n' : '\n';
+                this.openclawAuthProfilesByProvider = res && res.authProfilesByProvider && typeof res.authProfilesByProvider === 'object' && !Array.isArray(res.authProfilesByProvider)
+                    ? res.authProfilesByProvider
+                    : {};
                 const hasContent = !!(res.content && res.content.trim());
                 const currentContent = typeof this.openclawEditing.content === 'string'
                     ? this.openclawEditing.content
