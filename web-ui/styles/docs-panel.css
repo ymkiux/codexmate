@@ -76,13 +76,24 @@
 }
 
 .docs-install-row {
-    align-items: flex-start;
+    align-items: stretch;
     background: rgba(255, 253, 252, 0.8);
 }
 
 .docs-command-head {
     display: grid;
     gap: 4px;
+}
+
+.docs-command-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.docs-command-row .install-command {
+    flex: 1;
+    min-width: 0;
 }
 
 .docs-command-meta {
@@ -96,7 +107,7 @@
 .docs-copy-btn {
     min-width: 92px;
     min-height: 38px;
-    align-self: center;
+    flex: 0 0 auto;
 }
 
 .docs-help-grid {
@@ -160,8 +171,9 @@
         grid-column: span 1;
     }
 
-    .docs-install-row {
+    .docs-command-row {
         flex-direction: column;
+        align-items: stretch;
     }
 
     .docs-copy-btn {

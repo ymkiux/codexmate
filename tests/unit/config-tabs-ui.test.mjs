@@ -207,6 +207,9 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(usagePanel, /sessionsUsageTimeRange === '30d'/);
     assert.match(usagePanel, /sessionUsageSummaryCards/);
     assert.match(usagePanel, /sessionUsageCharts\.buckets/);
+    assert.doesNotMatch(usagePanel, /sessionUsageCharts\.topPaths\[0\]\?\.count/);
+    assert.doesNotMatch(html, /sessionUsageSummaryCards\[0\]\?\.value/);
+    assert.doesNotMatch(html, /sessionUsageSummaryCards\[1\]\?\.value/);
     assert.match(html, /class="pin-icon"/);
     assert.match(html, /:aria-selected="mainTab === 'sessions'"/);
     assert.match(html, /:aria-selected="mainTab === 'usage'"/);
@@ -229,6 +232,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /<button class="card-action-btn delete"[^>]*@click="deleteClaudeConfig\(name\)"[^>]*:aria-label="`Delete Claude config \$\{name\}`"[^>]*title="删除">/);
     assert.match(html, /<button class="card-action-btn"[^>]*@click="copyClaudeShareCommand\(name\)"[^>]*disabled[^>]*>/);
     assert.match(html, /<button class="card-action-btn"[^>]*@click="openOpenclawEditModal\(name\)"[^>]*:aria-label="`Edit OpenClaw config \$\{name\}`"[^>]*title="编辑">/);
+    assert.match(html, /<div class="docs-command-row">[\s\S]*<code class="install-command">\{\{ target\.command \}\}<\/code>[\s\S]*<button type="button" class="btn-mini docs-copy-btn"/);
     assert.match(html, /<button class="card-action-btn delete"[^>]*@click="deleteOpenclawConfig\(name\)"[^>]*:aria-label="`Delete OpenClaw config \$\{name\}`"[^>]*title="删除">/);
     assert.match(modalsBasic, /<div v-if="showAddModal" class="modal-overlay" @click\.self="closeAddModal">/);
     assert.match(modalsBasic, /<div v-if="showModelModal" class="modal-overlay" @click\.self="closeModelModal">/);
