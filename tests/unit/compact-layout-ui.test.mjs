@@ -55,6 +55,9 @@ test('styles keep desktop layout wide and session history readable on large scre
     assert.match(styles, /\.main-panel-topbar\s*\{[\s\S]*position:\s*sticky;[\s\S]*top:\s*0;/);
     assert.match(styles, /\.side-item-meta\s*\{[\s\S]*display:\s*flex;[\s\S]*opacity:\s*1;/);
     assert.match(styles, /\.brand-logo\s*\{[\s\S]*width:\s*38px;[\s\S]*height:\s*38px;/);
+    assert.match(styles, /\.content-wrapper\s*\{[\s\S]*max-width:\s*1120px;/);
+    assert.match(styles, /\.trash-item-actions\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(116px,\s*116px\)\);/);
+    assert.match(styles, /\.trash-item-actions\s+\.btn-mini\s*\{[\s\S]*height:\s*38px;[\s\S]*min-height:\s*38px;[\s\S]*white-space:\s*nowrap;/);
     assert.match(styles, /\.session-layout\s*\{[\s\S]*grid-template-columns:\s*minmax\(260px,\s*360px\)\s*minmax\(0,\s*1fr\);/);
     assert.match(styles, /\.session-item\s*\{[\s\S]*min-height:\s*102px;/);
 

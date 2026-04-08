@@ -86,7 +86,7 @@
 
 .trash-item-actions {
     display: grid;
-    grid-template-columns: repeat(2, minmax(108px, 108px));
+    grid-template-columns: repeat(2, minmax(116px, 116px));
     align-self: flex-end;
     justify-content: flex-end;
     gap: 8px;
@@ -94,10 +94,14 @@
 
 .trash-item-actions .btn-mini {
     width: 100%;
-    min-height: 36px;
+    height: 38px;
+    min-height: 38px;
+    padding: 0 12px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    line-height: 1;
+    white-space: nowrap;
 }
 
 .trash-item-time {
