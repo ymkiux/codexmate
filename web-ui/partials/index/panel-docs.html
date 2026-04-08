@@ -1,0 +1,129 @@
+                <div
+                    v-show="mainTab === 'docs'"
+                    class="mode-content docs-mode-content"
+                    id="panel-docs"
+                    role="tabpanel"
+                    aria-labelledby="tab-docs">
+                    <div class="selector-section docs-overview-section">
+                        <div class="selector-header docs-overview-header">
+                            <div>
+                                <span class="selector-title">CLI 安装文档</span>
+                                <div class="skills-panel-note docs-section-note">把原来的悬浮安装入口收进文档页，统一查看 Claude Code / Codex CLI 的安装、升级、卸载命令与常见问题。</div>
+                            </div>
+                        </div>
+
+                        <div class="docs-toolbar-grid">
+                            <div class="docs-toolbar-card">
+                                <label class="form-label" for="docs-install-package-manager">包管理器</label>
+                                <select id="docs-install-package-manager" class="form-input" v-model="installPackageManager">
+                                    <option value="npm">npm</option>
+                                    <option value="pnpm">pnpm</option>
+                                    <option value="bun">bun</option>
+                                </select>
+                            </div>
+
+                            <div class="docs-toolbar-card docs-toolbar-card-wide">
+                                <label class="form-label">镜像源</label>
+                                <div class="install-action-tabs">
+                                    <button type="button" class="btn-mini" :class="{ active: installRegistryPreset === 'default' }" @click="setInstallRegistryPreset('default')">官方</button>
+                                    <button type="button" class="btn-mini" :class="{ active: installRegistryPreset === 'npmmirror' }" @click="setInstallRegistryPreset('npmmirror')">npmmirror</button>
+                                    <button type="button" class="btn-mini" :class="{ active: installRegistryPreset === 'tencent' }" @click="setInstallRegistryPreset('tencent')">腾讯云</button>
+                                    <button type="button" class="btn-mini" :class="{ active: installRegistryPreset === 'custom' }" @click="setInstallRegistryPreset('custom')">自定义</button>
+                                </div>
+                                <input
+                                    v-if="installRegistryPreset === 'custom'"
+                                    v-model="installRegistryCustom"
+                                    class="form-input install-registry-input"
+                                    placeholder="https://registry.example.com">
+                                <div class="form-hint install-registry-hint" v-if="installRegistryPreview">
+                                    命令将附加：--registry={{ installRegistryPreview }}
+                                </div>
+                                <div class="form-hint install-registry-hint" v-else-if="installRegistryPreset === 'custom'">
+                                    请输入完整 URL（含 http/https），将自动附加到命令。
+                                </div>
+                            </div>
+
+                            <div class="docs-toolbar-card docs-toolbar-card-wide">
+                                <label class="form-label">操作</label>
+                                <div class="install-action-tabs">
+                                    <button type="button" class="btn-mini" :class="{ active: installCommandAction === 'install' }" @click="setInstallCommandAction('install')">安装</button>
+                                    <button type="button" class="btn-mini" :class="{ active: installCommandAction === 'update' }" @click="setInstallCommandAction('update')">升级</button>
+                                    <button type="button" class="btn-mini" :class="{ active: installCommandAction === 'uninstall' }" @click="setInstallCommandAction('uninstall')">卸载</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="docs-summary-strip">
+                            <div class="docs-summary-item">
+                                <span class="docs-summary-label">目标数</span>
+                                <strong class="docs-summary-value">{{ installTargetCards.length }}</strong>
+                            </div>
+                            <div class="docs-summary-item">
+                                <span class="docs-summary-label">当前包管理器</span>
+                                <strong class="docs-summary-value">{{ String(installPackageManager || 'npm').toUpperCase() }}</strong>
+                            </div>
+                            <div class="docs-summary-item">
+                                <span class="docs-summary-label">当前操作</span>
+                                <strong class="docs-summary-value">{{ installCommandAction === 'update' ? '升级' : (installCommandAction === 'uninstall' ? '卸载' : '安装') }}</strong>
+                            </div>
+                            <div class="docs-summary-item docs-summary-item-wide">
+                                <span class="docs-summary-label">镜像</span>
+                                <strong class="docs-summary-value">{{ installRegistryPreview || '官方默认' }}</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="selector-section docs-command-section">
+                        <div class="selector-header docs-section-header">
+                            <div>
+                                <span class="selector-title">安装命令</span>
+                                <div class="skills-panel-note docs-section-note">右侧正文直接展示命令卡片，复制即可，不再弹额外模态框。</div>
+                            </div>
+                        </div>
+
+                        <div class="install-list docs-install-list">
+                            <div
+                                class="install-row docs-install-row"
+                                v-for="target in installTargetCards"
+                                :key="'docs-install-command-' + target.id + '-' + installCommandAction">
+                                <div class="install-row-main">
+                                    <div class="docs-command-head">
+                                        <div class="install-row-title">{{ target.name }}</div>
+                                        <div class="docs-command-meta">
+                                            <span>{{ target.packageName }}</span>
+                                            <span>命令：{{ target.bin }}</span>
+                                        </div>
+                                    </div>
+                                    <code class="install-command">{{ target.command }}</code>
+                                </div>
+                                <button type="button" class="btn-mini docs-copy-btn" :disabled="!target.command" @click="copyInstallCommand(target.command)">复制命令</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="selector-section docs-help-section">
+                        <div class="selector-header docs-section-header">
+                            <div>
+                                <span class="selector-title">常见问题</span>
+                                <div class="skills-panel-note docs-section-note">常见权限、PATH、网络镜像问题直接放在文档页底部，减少来回弹窗切换。</div>
+                            </div>
+                        </div>
+
+                        <div class="docs-help-grid">
+                            <div class="docs-note-card">
+                                <div class="docs-note-title">排障提示</div>
+                                <ul class="install-help-list docs-help-list">
+                                    <li v-for="tip in installTroubleshootingTips" :key="tip">{{ tip }}</li>
+                                </ul>
+                            </div>
+                            <div class="docs-note-card">
+                                <div class="docs-note-title">当前策略</div>
+                                <ul class="docs-static-list">
+                                    <li>所有命令按当前包管理器、镜像源和操作类型实时生成。</li>
+                                    <li>自定义镜像仅在安装/升级时附加，卸载命令保持纯净。</li>
+                                    <li>右侧正文保持固定版式，不再使用浮层打断主流程。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>

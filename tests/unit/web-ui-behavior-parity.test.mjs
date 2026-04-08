@@ -319,9 +319,11 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     const headDataKeys = Object.keys(headAppOptions.data()).sort();
     const extraCurrentKeys = currentDataKeys.filter((key) => !headDataKeys.includes(key)).sort();
     const missingCurrentKeys = headDataKeys.filter((key) => !currentDataKeys.includes(key)).sort();
-    const allowedExtraCurrentKeys = [];
-    const allowedMissingCurrentKeys = [
+    const allowedExtraCurrentKeys = parityAgainstHead ? [] : [
         'sessionsViewMode'
+    ];
+    const allowedMissingCurrentKeys = [
+        'showInstallModal'
     ];
     if (parityAgainstHead) {
         const allowedExtraKeySet = new Set(allowedExtraCurrentKeys);
@@ -342,18 +344,24 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     const extraCurrentMethodKeys = currentMethodKeys.filter((key) => !headMethodKeys.includes(key)).sort();
     const missingCurrentMethodKeys = headMethodKeys.filter((key) => !currentMethodKeys.includes(key)).sort();
     const allowedExtraCurrentMethodKeys = [];
+    const allowedMissingCurrentMethodKeys = [
+        'closeInstallModal',
+        'openInstallModal'
+    ];
     if (parityAgainstHead) {
         const allowedExtraMethodKeySet = new Set(allowedExtraCurrentMethodKeys);
+        const allowedMissingMethodKeySet = new Set(allowedMissingCurrentMethodKeys);
         const unexpectedExtraCurrentMethodKeys = extraCurrentMethodKeys.filter((key) => !allowedExtraMethodKeySet.has(key));
+        const unexpectedMissingCurrentMethodKeys = missingCurrentMethodKeys.filter((key) => !allowedMissingMethodKeySet.has(key));
         assert.deepStrictEqual(unexpectedExtraCurrentMethodKeys, [], `unexpected extra method keys against ${parityBaseline.ref}`);
-        assert.deepStrictEqual(missingCurrentMethodKeys, [], `unexpected missing method keys against ${parityBaseline.ref}`);
+        assert.deepStrictEqual(unexpectedMissingCurrentMethodKeys, [], `unexpected missing method keys against ${parityBaseline.ref}`);
     } else {
         assert.deepStrictEqual(extraCurrentMethodKeys, allowedExtraCurrentMethodKeys);
-        assert.deepStrictEqual(missingCurrentMethodKeys, []);
+        assert.deepStrictEqual(missingCurrentMethodKeys, allowedMissingCurrentMethodKeys);
     }
     assert.deepStrictEqual(
         currentMethodKeys.filter((key) => !extraCurrentMethodKeys.includes(key)).sort(),
-        headMethodKeys
+        headMethodKeys.filter((key) => !missingCurrentMethodKeys.includes(key)).sort()
     );
     const currentComputedKeys = Object.keys(currentComputed).sort();
     const headComputedKeys = Object.keys(headComputed).sort();

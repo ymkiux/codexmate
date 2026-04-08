@@ -2,7 +2,8 @@ import assert from 'assert';
 import {
     readBundledWebUiCss,
     readProjectFile,
-    readBundledWebUiScript
+    readBundledWebUiScript,
+    readBundledWebUiHtml
 } from './helpers/web-ui-source.mjs';
 
 test('app script includes compact layout detection and body class toggling', () => {
@@ -28,9 +29,9 @@ test('styles include force-compact fallback rules for readability on touch devic
     assert.match(styles, /body\.force-compact\s*\{/);
     assert.match(styles, /body\.force-compact\s+\.app-shell\s*\{/);
     assert.match(styles, /body\.force-compact\s+\.status-inspector\s*\{[\s\S]*display:\s*none;/);
-    assert.match(styles, /body\.force-compact\s+\.top-tabs\s*\{[\s\S]*display:\s*grid\s*!important;[\s\S]*grid-template-columns:\s*repeat\(1,\s*minmax\(0,\s*1fr\)\);/);
-    assert.match(styles, /@media\s*\(min-width:\s*541px\)\s*\{[\s\S]*body\.force-compact\s+\.top-tabs\s*\{[\s\S]*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
-    assert.match(layoutShell, /@media\s*\(min-width:\s*961px\)\s*\{[\s\S]*body:not\(.force-compact\)\s+#app\s*>\s*\.top-tabs\s*\{[\s\S]*display:\s*none;/);
+    assert.match(styles, /body\.force-compact\s+\.top-tabs\s*\{[\s\S]*display:\s*flex\s*!important;[\s\S]*flex-wrap:\s*nowrap;[\s\S]*overflow-x:\s*auto;/);
+    assert.match(styles, /body\.force-compact\s+\.top-tabs::-webkit-scrollbar\s*\{[\s\S]*display:\s*none;/);
+    assert.match(layoutShell, /@media\s*\(min-width:\s*721px\)\s*\{[\s\S]*body:not\(.force-compact\)\s+#app\s*>\s*\.top-tabs\s*\{[\s\S]*display:\s*none;/);
     assert.doesNotMatch(layoutShell, /^\s*\.top-tabs\s*\{[\s\S]*display:\s*none\s*!important;/m);
     assert.match(styles, /body\.force-compact\s+\.card-subtitle/);
     const compactSubtitleBlock = styles.match(/body\.force-compact\s+\.card-subtitle\s*\{[^}]*\}/);
@@ -47,9 +48,21 @@ test('styles include force-compact fallback rules for readability on touch devic
 
 test('styles keep desktop layout wide and session history readable on large screens', () => {
     const styles = readBundledWebUiCss();
-    assert.match(styles, /\.container\s*\{[\s\S]*max-width:\s*2200px;/);
+    assert.match(styles, /\.container\s*\{[\s\S]*max-width:\s*none;[\s\S]*min-height:\s*100vh;/);
+    assert.match(styles, /\.app-shell\s*\{[\s\S]*grid-template-columns:\s*248px\s+minmax\(0,\s*1fr\);[\s\S]*min-height:\s*100vh;[\s\S]*height:\s*100vh;[\s\S]*overflow:\s*hidden;/);
+    assert.match(styles, /\.side-rail\s*\{[\s\S]*overflow-y:\s*auto;[\s\S]*scrollbar-width:\s*none;/);
+    assert.match(styles, /\.main-panel\s*\{[\s\S]*overflow-y:\s*auto;[\s\S]*height:\s*100vh;[\s\S]*scrollbar-width:\s*none;/);
+    assert.match(styles, /\.main-panel-topbar\s*\{[\s\S]*position:\s*sticky;[\s\S]*top:\s*0;/);
+    assert.match(styles, /\.side-item-meta\s*\{[\s\S]*display:\s*flex;[\s\S]*opacity:\s*1;/);
+    assert.match(styles, /\.brand-logo\s*\{[\s\S]*width:\s*38px;[\s\S]*height:\s*38px;/);
+    assert.match(styles, /\.content-wrapper\s*\{[\s\S]*max-width:\s*1280px;/);
+    assert.match(styles, /\.trash-item-actions\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(116px,\s*116px\)\);/);
+    assert.match(styles, /\.trash-item-actions\s+\.btn-mini\s*\{[\s\S]*height:\s*38px;[\s\S]*min-height:\s*38px;[\s\S]*white-space:\s*nowrap;/);
     assert.match(styles, /\.session-layout\s*\{[\s\S]*grid-template-columns:\s*minmax\(260px,\s*360px\)\s*minmax\(0,\s*1fr\);/);
     assert.match(styles, /\.session-item\s*\{[\s\S]*min-height:\s*102px;/);
+
+    const html = readBundledWebUiHtml();
+    assert.match(html, /class="brand-logo"\s+src="\/res\/logo\.png"/);
 
     const titleBlock = styles.match(/\.session-item-title\s*\{[^}]*\}/);
     assert.ok(titleBlock, 'missing session item title style block');

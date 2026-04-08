@@ -14,29 +14,27 @@
     margin-bottom: var(--spacing-sm);
     max-height: min(52vh, 440px);
     overflow-y: auto;
-    padding-right: 2px;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(166, 149, 130, 0.82) transparent;
+    padding-right: 0;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
 
 .skill-list::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 0;
+    height: 0;
 }
 
 .skill-list::-webkit-scrollbar-track {
     background: transparent;
-    border-radius: 999px;
 }
 
 .skill-list::-webkit-scrollbar-thumb {
-    background: linear-gradient(to bottom, rgba(191, 174, 154, 0.95) 0%, rgba(160, 141, 121, 0.9) 100%);
-    border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.9);
+    background: transparent;
+    border: 0;
 }
 
 .skill-list::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(to bottom, rgba(176, 157, 137, 0.95) 0%, rgba(145, 126, 107, 0.92) 100%);
+    background: transparent;
 }
 
 .skill-item {

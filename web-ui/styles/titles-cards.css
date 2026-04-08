@@ -2,17 +2,17 @@
    主标题
    ============================================ */
 .main-title {
-    font-size: var(--font-size-display);
-    font-weight: var(--font-weight-display);
-    line-height: var(--line-height-tight);
-    letter-spacing: -0.03em;
-    margin-bottom: 10px;
+    font-size: clamp(18px, 1.3vw, 22px);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    margin-bottom: 0;
     color: var(--color-text-primary);
     font-family: var(--font-family-display);
-    background: linear-gradient(135deg, var(--color-text-primary) 0%, rgba(27, 23, 20, 0.78) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    background: none;
+    -webkit-background-clip: border-box;
+    -webkit-text-fill-color: currentColor;
+    background-clip: border-box;
 }
 
 .main-title .accent {
@@ -22,12 +22,12 @@
 }
 
 .subtitle {
-    font-size: var(--font-size-body);
-    color: var(--color-text-tertiary);
-    line-height: var(--line-height-normal);
-    margin-bottom: 20px;
-    max-width: 640px;
-    letter-spacing: 0.01em;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    line-height: 1.58;
+    margin-bottom: 0;
+    max-width: 70ch;
+    letter-spacing: 0;
 }
 
 /* ============================================
@@ -35,30 +35,30 @@
    ============================================ */
 .segmented-control {
     display: flex;
-    background: rgba(255, 255, 255, 0.92);
-    border-radius: var(--radius-xl);
-    padding: 6px;
-    margin-bottom: 20px;
+    background: var(--color-surface);
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 14px;
     position: relative;
-    box-shadow: inset 0 1px 2px rgba(31, 26, 23, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(6px);
+    box-shadow: none;
+    border: 1px solid var(--color-border);
+    backdrop-filter: none;
 }
 
 .segment {
     flex: 1;
-    padding: 11px 16px;
+    padding: 8px 10px;
     border: none;
     background: transparent;
     font-size: var(--font-size-body);
     font-weight: var(--font-weight-secondary);
     color: var(--color-text-secondary);
     cursor: pointer;
-    border-radius: 10px;
-    transition: all var(--transition-normal) var(--ease-spring);
+    border-radius: 8px;
+    transition: color var(--transition-fast) var(--ease-smooth), background-color var(--transition-fast) var(--ease-smooth);
     position: relative;
     z-index: 2;
-    letter-spacing: 0.01em;
+    letter-spacing: 0;
 }
 
 .segment:hover {
@@ -66,9 +66,9 @@
 }
 
 .segment.active {
-    color: var(--color-text-primary);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.8) 100%);
-    box-shadow: var(--shadow-subtle), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    color: var(--color-brand-dark);
+    background: var(--color-brand-light);
+    box-shadow: inset 0 0 0 1px rgba(199, 116, 98, 0.12);
 }
 
 /* ============================================
@@ -77,36 +77,36 @@
 .card-list {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    margin-bottom: 12px;
+    gap: 8px;
+    margin-bottom: 8px;
 }
 
 /* ============================================
    卡片
    ============================================ */
 .card {
-    background: linear-gradient(180deg, #fffdf9 0%, #fff8f2 100%);
-    border-radius: var(--radius-lg);
-    padding: 10px;
+    background: var(--color-surface);
+    border-radius: 10px;
+    padding: 10px 12px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     cursor: pointer;
     transition:
-        transform var(--transition-normal) var(--ease-spring),
-        box-shadow var(--transition-normal) var(--ease-spring),
-        background-color var(--transition-fast) var(--ease-smooth);
-    box-shadow: 0 10px 24px rgba(27, 23, 20, 0.08);
+        border-color var(--transition-fast) var(--ease-smooth),
+        background-color var(--transition-fast) var(--ease-smooth),
+        box-shadow var(--transition-fast) var(--ease-smooth);
+    box-shadow: none;
     user-select: none;
-    will-change: transform;
-    border: 1px solid rgba(216, 201, 184, 0.55);
+    will-change: auto;
+    border: 1px solid var(--color-border);
     position: relative;
     overflow: hidden;
 }
 
 .card:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-card-hover);
+    border-color: var(--color-border-strong);
+    box-shadow: none;
 }
 
 .card::before,
@@ -118,10 +118,11 @@
 
 .card::before {
     left: 0;
-    top: 10px;
-    bottom: 10px;
+    top: 50%;
+    transform: translateY(-50%);
     width: 3px;
-    border-radius: 999px;
+    height: 18px;
+    border-radius: 0 2px 2px 0;
     background: transparent;
     transition: background var(--transition-fast) var(--ease-smooth);
 }
@@ -129,9 +130,9 @@
 .card::after {
     inset: 0;
     border-radius: inherit;
-    background: linear-gradient(120deg, rgba(255, 255, 255, 0.7) 0%, transparent 55%);
+    background: linear-gradient(120deg, rgba(255, 255, 255, 0.1) 0%, transparent 55%);
     opacity: 0;
-    transition: opacity var(--transition-normal) var(--ease-smooth);
+    transition: opacity var(--transition-fast) var(--ease-smooth);
 }
 
 .card:active {
@@ -140,13 +141,13 @@
 }
 
 .card.active {
-    background: linear-gradient(to bottom, rgba(210, 107, 90, 0.14) 0%, rgba(255, 255, 255, 0.98) 100%);
-    border-color: rgba(201, 94, 75, 0.55);
-    box-shadow: 0 10px 28px rgba(210, 107, 90, 0.14);
+    background: var(--color-brand-light);
+    border-color: rgba(199, 116, 98, 0.18);
+    box-shadow: none;
 }
 
 .card.active::before {
-    background: linear-gradient(180deg, rgba(201, 94, 75, 0.95) 0%, rgba(201, 94, 75, 0.35) 100%);
+    background: var(--color-brand);
 }
 
 .card:hover::after {
@@ -160,44 +161,44 @@
 .card-leading {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
+    gap: 10px;
     flex: 1;
     min-width: 0;
 }
 
 .card-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: var(--radius-sm);
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(247, 241, 232, 0.65) 100%);
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(199, 116, 98, 0.1);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: var(--font-size-title);
     font-weight: var(--font-weight-title);
-    color: var(--color-text-secondary);
+    color: var(--color-brand-dark);
     flex-shrink: 0;
-    transition: all var(--transition-normal) var(--ease-spring-soft);
-    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.7);
+    transition: background-color var(--transition-fast) var(--ease-smooth), color var(--transition-fast) var(--ease-smooth);
+    box-shadow: none;
 }
 
 .card.active .card-icon {
-    background: linear-gradient(135deg, var(--color-brand) 0%, var(--color-brand-dark) 100%);
-    color: white;
-    box-shadow: 0 2px 8px rgba(210, 107, 90, 0.3);
+    background: rgba(199, 116, 98, 0.14);
+    color: var(--color-brand-dark);
+    box-shadow: none;
 }
 
 .card-content {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 1px;
     min-width: 0;
 }
 
 .card-title {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     min-width: 0;
     font-size: var(--font-size-body);
     font-weight: var(--font-weight-secondary);
@@ -230,12 +231,12 @@
 }
 
 .card-subtitle {
-    font-size: var(--font-size-secondary);
+    font-size: 12px;
     color: var(--color-text-tertiary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    opacity: 0.8;
+    opacity: 0.9;
 }
 
 .card-trailing {

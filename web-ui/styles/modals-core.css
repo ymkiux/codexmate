@@ -155,9 +155,9 @@
 }
 
 .install-action-tabs .btn-mini.active {
-    background: rgba(201, 94, 75, 0.16);
-    border-color: rgba(201, 94, 75, 0.32);
-    color: var(--color-text-primary);
+    background: var(--color-brand-light);
+    border-color: rgba(199, 116, 98, 0.22);
+    color: var(--color-brand-dark);
 }
 
 .install-registry-input {

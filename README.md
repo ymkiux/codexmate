@@ -141,6 +141,17 @@ npm start run --no-browser
 
 > 约定：自动化测试仅验证服务与 API，不依赖打开页面。
 
+### 开发辅助脚本
+
+```bash
+npm run reset
+npm run reset -- 79
+```
+
+- `npm run reset`：交互输入 PR 编号；留空则回到默认 `origin/main`
+- `npm run reset -- 79`：直接同步到 PR `#79` 的最新 head 快照
+- 脚本会自动完成本地分支切换、工作区清理、未跟踪文件清理与最终状态校验
+
 ## 命令速查
 
 | 命令 | 说明 |

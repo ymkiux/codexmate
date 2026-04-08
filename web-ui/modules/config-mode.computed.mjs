@@ -51,6 +51,7 @@ export function createConfigModeComputed() {
             if (this.mainTab === 'sessions') return '会话浏览';
             if (this.mainTab === 'usage') return 'Usage';
             if (this.mainTab === 'market') return '技能市场';
+            if (this.mainTab === 'docs') return '文档';
             if (this.mainTab === 'settings') return '设置';
             return '未知';
         },
