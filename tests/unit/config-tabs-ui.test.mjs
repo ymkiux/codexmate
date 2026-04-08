@@ -28,6 +28,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /isProviderConfigMode/);
     assert.match(html, /provider-fast-switch-select/);
     assert.match(html, /forceCompactLayout/);
+    assert.match(html, /<script src="\/res\/vue\.global\.prod\.js"><\/script>/);
     assert.match(html, /quickSwitchProvider\(\$event\.target\.value\)/);
     assert.match(html, /onMainTabPointerDown\('sessions', \$event\)/);
     assert.match(html, /onConfigTabPointerDown\('codex', \$event\)/);
@@ -292,6 +293,7 @@ test('web ui script defines provider mode metadata for codex only', () => {
     assert.match(appScript, /this\.switchMainTab\('config'\);/);
     assert.match(appScript, /if \(this\.mainTab === 'config'\) {/);
     assert.match(appScript, /this\.clearMainTabSwitchIntent\('config'\);/);
+    assert.match(appScript, /__mainTabSwitchState:\s*\{[\s\S]*intent:\s*''[\s\S]*pendingTarget:\s*''[\s\S]*pendingConfigMode:\s*''[\s\S]*ticket:\s*0[\s\S]*\}/);
     assert.match(appScript, /setMainTabSwitchIntent\(tab\)/);
     assert.match(appScript, /ensureMainTabSwitchState\(\)/);
     assert.match(appScript, /ensureImmediateNavDomState\(\)/);
