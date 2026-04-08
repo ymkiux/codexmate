@@ -15,8 +15,8 @@ export function switchMainTab(tab) {
     const nextTab = typeof tab === 'string' ? tab : '';
     const previousTab = this.mainTab;
     const leavingSessions = previousTab === 'sessions' && nextTab !== 'sessions';
-    const enteringSessionDataTab = nextTab === 'sessions' || nextTab === 'usage';
-    const shouldLoadSessionDetail = nextTab === 'sessions';
+    const enteringSessionsTab = nextTab === 'sessions';
+    const enteringUsageTab = nextTab === 'usage';
     this.mainTab = nextTab;
 
     if (leavingSessions) {
@@ -42,8 +42,11 @@ export function switchMainTab(tab) {
         }
     }
 
-    if (enteringSessionDataTab && !this.sessionsLoadedOnce) {
-        this.loadSessions({ includeActiveDetail: shouldLoadSessionDetail });
+    if (enteringSessionsTab && !this.sessionsLoadedOnce) {
+        this.loadSessions({ includeActiveDetail: true });
+    }
+    if (enteringUsageTab && !this.sessionsUsageLoadedOnce && typeof this.loadSessionsUsage === 'function') {
+        this.loadSessionsUsage();
     }
     if (nextTab === 'sessions') {
         this.prepareSessionTabRender();

@@ -34,6 +34,16 @@ module.exports = async function testSessions(ctx) {
     const apiSessionsInvalid = await api('list-sessions', { source: 'invalid', limit: 50 });
     assert(apiSessionsInvalid.error, 'list-sessions should fail for invalid source');
 
+    // ========== Usage Session Summary Tests ==========
+    const usageSessions = await api('list-sessions-usage', { source: 'all', limit: 50, forceRefresh: true });
+    assert(Array.isArray(usageSessions.sessions), 'list-sessions-usage missing sessions');
+    assert(usageSessions.sessions.some((item) => item.sessionId === sessionId), 'list-sessions-usage missing codex entry');
+    assert(usageSessions.sessions.some((item) => item.sessionId === claudeSessionId), 'list-sessions-usage missing claude entry');
+    assert(usageSessions.sessions.every((item) => !Object.prototype.hasOwnProperty.call(item, '__messageCountExact')), 'list-sessions-usage should not expose exact hydration markers');
+
+    const usageSessionsInvalid = await api('list-sessions-usage', { source: 'invalid', limit: 50 });
+    assert(usageSessionsInvalid.error, 'list-sessions-usage should fail for invalid source');
+
     // ========== List Sessions Tests - Query ==========
     const claudeCodeQuery = await api('list-sessions', { source: 'claude', query: 'claude code', limit: 50, forceRefresh: true });
     assert(Array.isArray(claudeCodeQuery.sessions), 'claude code query missing sessions');

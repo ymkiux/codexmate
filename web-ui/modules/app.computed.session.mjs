@@ -102,7 +102,7 @@ export function createSessionComputed() {
             return '当前来源暂不支持关键词检索';
         },
         sessionUsageCharts() {
-            return buildUsageChartGroups(this.sessionsList, {
+            return buildUsageChartGroups(this.sessionsUsageList, {
                 range: this.sessionsUsageTimeRange
             });
         },

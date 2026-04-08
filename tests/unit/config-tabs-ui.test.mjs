@@ -206,6 +206,8 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.doesNotMatch(sessionsPanel, /sessionUsageSummaryCards/);
     assert.match(usagePanel, /sessionsUsageTimeRange === '7d'/);
     assert.match(usagePanel, /sessionsUsageTimeRange === '30d'/);
+    assert.match(usagePanel, /sessionsUsageList\.length/);
+    assert.match(usagePanel, /loadSessionsUsage\(\{ forceRefresh: true \}\)/);
     assert.match(usagePanel, /sessionUsageSummaryCards/);
     assert.match(usagePanel, /sessionUsageCharts\.buckets/);
     assert.doesNotMatch(usagePanel, /sessionUsageCharts\.topPaths\[0\]\?\.count/);
@@ -315,7 +317,9 @@ test('web ui script defines provider mode metadata for codex only', () => {
     assert.match(appScript, /isMainTabNavActive\(tab\)/);
     assert.match(appScript, /isConfigModeNavActive\(mode\)/);
     assert.match(appScript, /const isLeavingSessions = previousTab === 'sessions' && targetTab !== 'sessions';/);
-    assert.match(appScript, /const enteringSessionDataTab = nextTab === 'sessions' \|\| nextTab === 'usage';/);
+    assert.match(appScript, /const enteringSessionsTab = nextTab === 'sessions';/);
+    assert.match(appScript, /const enteringUsageTab = nextTab === 'usage';/);
+    assert.match(appScript, /this\.loadSessionsUsage\(\);/);
     assert.match(appScript, /if \(targetTab === previousTab\) {/);
     assert.match(appScript, /const shouldDeferApply = isLeavingSessions;/);
     assert.match(appScript, /if \(isLeavingSessions && !this\.isSessionPanelFastHidden\(\)\) {/);
