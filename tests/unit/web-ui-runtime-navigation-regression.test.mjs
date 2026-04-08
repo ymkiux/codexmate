@@ -238,6 +238,68 @@ test('touch config-tab preselection updates the active item before the committed
     assert.strictEqual(context.isConfigModeNavActive('codex'), false);
 });
 
+test('primeSessionListRender limits initial session list work to the configured batch size', () => {
+    const methods = createNavigationMethods({
+        configModeSet: new Set(['codex', 'claude', 'openclaw']),
+        switchMainTabHelper(tab) {
+            this.mainTab = tab;
+        },
+        loadMoreSessionMessagesHelper() {}
+    });
+    const context = createNavigationContext(methods, {
+        mainTab: 'sessions',
+        sessionListRenderEnabled: true,
+        sessionListVisibleCount: 999,
+        sessionListInitialBatchSize: 120,
+        sortedSessionsList: Array.from({ length: 1000 }, (_, index) => ({ sessionId: `s${index}` })),
+        cancelScheduledSessionListViewportFill() {},
+        scheduleSessionListViewportFill() {
+            this._viewportFillScheduled = (this._viewportFillScheduled || 0) + 1;
+        },
+        $nextTick(callback) {
+            callback();
+        }
+    });
+
+    context.primeSessionListRender();
+
+    assert.strictEqual(context.sessionListVisibleCount, 120);
+    assert.strictEqual(context._viewportFillScheduled, 1);
+});
+
+test('onSessionListScroll grows the rendered session batch near the list bottom', () => {
+    const methods = createNavigationMethods({
+        configModeSet: new Set(['codex', 'claude', 'openclaw']),
+        switchMainTabHelper(tab) {
+            this.mainTab = tab;
+        },
+        loadMoreSessionMessagesHelper() {}
+    });
+    const context = createNavigationContext(methods, {
+        mainTab: 'sessions',
+        sessionListRenderEnabled: true,
+        sessionListVisibleCount: 120,
+        sessionListLoadStep: 160,
+        sessionListRemainingCount: 880,
+        sessionListEl: {
+            scrollHeight: 2000,
+            scrollTop: 1700,
+            clientHeight: 120
+        },
+        expandVisibleSessionList() {
+            this.sessionListVisibleCount += 160;
+        },
+        scheduleSessionListViewportFill() {
+            this._viewportFillScheduled = (this._viewportFillScheduled || 0) + 1;
+        }
+    });
+
+    context.onSessionListScroll();
+
+    assert.strictEqual(context.sessionListVisibleCount, 280);
+    assert.strictEqual(context._viewportFillScheduled, 1);
+});
+
 test('download directory actions clear stale delayed progress resets before scheduling a new one', async () => {
     await verifyDownloadProgressResetCleanup({
         methodName: 'downloadClaudeDirectory',

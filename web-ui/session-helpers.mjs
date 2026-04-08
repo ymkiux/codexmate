@@ -144,6 +144,9 @@ export async function loadSessions(api, options = {}) {
         if (res.error) {
             this.showMessage(res.error, 'error');
             this.sessionsList = [];
+            if (typeof this.primeSessionListRender === 'function') {
+                this.primeSessionListRender();
+            }
             this.activeSession = null;
             this.activeSessionMessages = [];
             this.resetSessionDetailPagination();
@@ -155,6 +158,9 @@ export async function loadSessions(api, options = {}) {
         } else {
             loadSucceeded = true;
             this.sessionsList = Array.isArray(res.sessions) ? res.sessions : [];
+            if (typeof this.primeSessionListRender === 'function') {
+                this.primeSessionListRender();
+            }
             this.syncSessionPathOptionsForSource(
                 this.sessionFilterSource,
                 this.extractPathOptionsFromSessions(this.sessionsList),
@@ -189,6 +195,9 @@ export async function loadSessions(api, options = {}) {
         }
     } catch (e) {
         this.sessionsList = [];
+        if (typeof this.primeSessionListRender === 'function') {
+            this.primeSessionListRender();
+        }
         this.activeSession = null;
         this.activeSessionMessages = [];
         this.resetSessionDetailPagination();
