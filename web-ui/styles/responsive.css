@@ -28,10 +28,8 @@ textarea:focus-visible {
         padding: 12px;
     }
     .app-shell {
-        grid-template-columns: 1fr;
-    }
-    .side-rail {
-        display: none;
+        grid-template-columns: minmax(158px, 176px) minmax(0, 1fr);
+        gap: 12px;
     }
     .main-panel {
         padding: 14px;
@@ -39,13 +37,7 @@ textarea:focus-visible {
         min-height: 0;
     }
     .top-tabs {
-        display: flex !important;
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        overflow-y: hidden;
-        padding-bottom: 2px;
-        margin-left: -2px;
-        margin-right: -2px;
+        display: none !important;
     }
     .status-strip {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -75,6 +67,24 @@ textarea:focus-visible {
 }
 
 @media (max-width: 720px) {
+    .app-shell {
+        grid-template-columns: 1fr;
+    }
+
+    .side-rail {
+        display: none;
+    }
+
+    .top-tabs {
+        display: flex !important;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 2px;
+        margin-left: -2px;
+        margin-right: -2px;
+    }
+
     .main-title {
         font-size: 22px;
     }

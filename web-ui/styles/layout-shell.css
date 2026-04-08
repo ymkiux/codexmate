@@ -188,7 +188,7 @@ body::after {
     word-break: break-word;
 }
 
-@media (min-width: 961px) {
+@media (min-width: 721px) {
     body:not(.force-compact) #app > .top-tabs {
         display: none;
     }
