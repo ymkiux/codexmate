@@ -288,7 +288,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 openclawQuick: {
                     providerName: '',
                     baseUrl: '',
+                    baseUrlReadOnly: false,
                     apiKey: '',
+                    apiKeyReadOnly: false,
                     apiType: 'openai-responses',
                     modelId: '',
                     modelName: '',

@@ -170,7 +170,9 @@ export function createOpenclawEditingMethods() {
             const models = ensureObject(config.models);
             const providers = ensureObject(models.providers);
             const provider = ensureObject(providers[providerName]);
-            const baseUrl = (this.openclawQuick.baseUrl || '').trim();
+            const baseUrl = this.openclawQuick.baseUrlReadOnly
+                ? ''
+                : (this.openclawQuick.baseUrl || '').trim();
             if (!baseUrl && !provider.baseUrl) {
                 this.showMessage('请填写 URL', 'error');
                 return;
@@ -188,7 +190,9 @@ export function createOpenclawEditingMethods() {
             }
 
             const shouldOverrideProvider = !!this.openclawQuick.overrideProvider;
-            const apiKey = (this.openclawQuick.apiKey || '').trim();
+            const apiKey = this.openclawQuick.apiKeyReadOnly
+                ? ''
+                : (this.openclawQuick.apiKey || '').trim();
             const apiType = (this.openclawQuick.apiType || '').trim();
             const setProviderField = (key, value) => {
                 if (!value) return;

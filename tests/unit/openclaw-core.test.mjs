@@ -135,3 +135,55 @@ test('fillOpenclawQuickFromConfig falls back to the sole configured provider whe
     assert.strictEqual(context.openclawQuick.apiType, 'openai-responses');
     assert.strictEqual(context.openclawQuick.modelId, 'gpt-5.4');
 });
+
+test('fillOpenclawQuickFromConfig renders structured SecretRef values as read-only labels', () => {
+    const context = {
+        ...methods,
+        openclawQuick: methods.getOpenclawQuickDefaults()
+    };
+
+    methods.fillOpenclawQuickFromConfig.call(context, {
+        agents: {
+            defaults: {
+                model: {
+                    primary: 'openai/gpt-5'
+                }
+            }
+        },
+        models: {
+            providers: {
+                openai: {
+                    baseUrl: {
+                        source: 'env',
+                        provider: 'default',
+                        id: 'OPENAI_BASE_URL'
+                    },
+                    apiKey: {
+                        source: 'env',
+                        provider: 'default',
+                        id: 'OPENAI_API_KEY'
+                    },
+                    api: 'openai-responses'
+                }
+            }
+        }
+    });
+
+    assert.strictEqual(context.openclawQuick.baseUrl, 'SecretRef(env:default:OPENAI_BASE_URL)');
+    assert.strictEqual(context.openclawQuick.baseUrlReadOnly, true);
+    assert.strictEqual(context.openclawQuick.apiKey, 'SecretRef(env:default:OPENAI_API_KEY)');
+    assert.strictEqual(context.openclawQuick.apiKeyReadOnly, true);
+});
+
+test('formatProviderValue shows readable labels for env template and SecretRef inputs', () => {
+    const context = { ...methods };
+
+    assert.strictEqual(
+        methods.formatProviderValue.call(context, 'apiKey', { source: 'env', provider: 'default', id: 'OPENAI_API_KEY' }),
+        'SecretRef(env:default:OPENAI_API_KEY)'
+    );
+    assert.strictEqual(
+        methods.formatProviderValue.call(context, 'apiKey', '${OPENAI_API_KEY}'),
+        'EnvRef(OPENAI_API_KEY)'
+    );
+});
