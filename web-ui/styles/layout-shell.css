@@ -28,6 +28,8 @@ body::after {
     gap: 0;
     align-items: stretch;
     min-height: 100vh;
+    height: 100vh;
+    overflow: hidden;
     background: var(--color-bg);
 }
 
@@ -48,7 +50,14 @@ body::after {
     border-radius: 0;
     box-shadow: none;
     min-height: 100vh;
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
     backdrop-filter: none;
+}
+
+.side-rail::-webkit-scrollbar {
+    display: none;
 }
 
 .side-rail .brand-title {

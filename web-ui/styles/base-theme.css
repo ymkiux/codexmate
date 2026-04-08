@@ -119,6 +119,9 @@ body.force-compact .provider-fast-switch-select {
 body.force-compact .app-shell {
     grid-template-columns: 1fr;
     gap: 12px;
+    height: auto;
+    min-height: auto;
+    overflow: visible;
 }
 
 body.force-compact .main-panel {
@@ -127,6 +130,7 @@ body.force-compact .main-panel {
     align-self: stretch;
     width: 100%;
     height: auto;
+    overflow-y: visible;
 }
 
 body.force-compact .side-rail,
@@ -149,6 +153,14 @@ body.force-compact .top-tabs::-webkit-scrollbar {
 
 body.force-compact .main-panel {
     padding: 14px 12px;
+}
+
+body.force-compact .main-panel-topbar {
+    position: static;
+    margin: 0 0 10px;
+    padding: 0;
+    background: transparent;
+    backdrop-filter: none;
 }
 
 body.force-compact .card {
