@@ -37,6 +37,7 @@ function createContext(methods, overrides = {}) {
         openclawConfigExists: false,
         openclawLineEnding: '\n',
         openclawAuthProfilesByProvider: {},
+        openclawPendingAuthProfileUpdates: {},
         openclawSaving: false,
         openclawApplying: false,
         openclawFileLoading: false,
@@ -431,6 +432,49 @@ test('saveAndApplyOpenclawConfig closes modal after a successful apply while app
         message: '已保存并应用 OpenClaw 配置（/tmp/openclaw.json）',
         type: 'success'
     }]);
+});
+
+test('saveAndApplyOpenclawConfig forwards pending auth profile updates to the apply api', async () => {
+    const seenCalls = [];
+    const methods = createOpenclawPersistMethods({
+        api: async (_name, payload) => {
+            seenCalls.push(payload);
+            return {
+                success: true,
+                targetPath: '/tmp/openclaw.json'
+            };
+        }
+    });
+    const context = createContext(methods, {
+        showOpenclawConfigModal: true,
+        openclawEditing: {
+            name: 'draft',
+            content: 'draft-content',
+            lockName: false
+        },
+        openclawPendingAuthProfileUpdates: {
+            'openai-codex:default': {
+                profileId: 'openai-codex:default',
+                provider: 'openai-codex',
+                field: 'access',
+                value: 'updated-access-token'
+            }
+        }
+    });
+
+    await methods.saveAndApplyOpenclawConfig.call(context);
+
+    assert.deepStrictEqual(seenCalls, [{
+        content: 'draft-content',
+        lineEnding: '\n',
+        authProfileUpdates: [{
+            profileId: 'openai-codex:default',
+            provider: 'openai-codex',
+            field: 'access',
+            value: 'updated-access-token'
+        }]
+    }]);
+    assert.deepStrictEqual(context.openclawPendingAuthProfileUpdates, {});
 });
 
 test('saveAndApplyOpenclawConfig keeps the default entry synced to the applied system config', async () => {

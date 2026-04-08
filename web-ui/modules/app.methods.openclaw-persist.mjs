@@ -83,6 +83,7 @@ export function createOpenclawPersistMethods(options = {}) {
             const modalToken = (Number(this.openclawModalLoadToken || 0) + 1);
             this.openclawModalLoadToken = modalToken;
             this.openclawEditorTitle = '添加 OpenClaw 配置';
+            this.openclawPendingAuthProfileUpdates = {};
             this.openclawEditing = {
                 name: '',
                 content: '',
@@ -107,6 +108,7 @@ export function createOpenclawPersistMethods(options = {}) {
             const modalToken = (Number(this.openclawModalLoadToken || 0) + 1);
             this.openclawModalLoadToken = modalToken;
             this.openclawEditorTitle = `编辑 OpenClaw 配置: ${name}`;
+            this.openclawPendingAuthProfileUpdates = {};
             this.openclawEditing = {
                 name,
                 content: this.openclawHasContent(existing) ? existing.content : '',
@@ -134,6 +136,7 @@ export function createOpenclawPersistMethods(options = {}) {
             this.openclawEditing = { name: '', content: '', lockName: false };
             this.openclawSaving = false;
             this.openclawApplying = false;
+            this.openclawPendingAuthProfileUpdates = {};
             this.resetOpenclawStructured();
             this.resetOpenclawQuick();
         },
@@ -171,6 +174,7 @@ export function createOpenclawPersistMethods(options = {}) {
                 this.openclawAuthProfilesByProvider = res && res.authProfilesByProvider && typeof res.authProfilesByProvider === 'object' && !Array.isArray(res.authProfilesByProvider)
                     ? res.authProfilesByProvider
                     : {};
+                this.openclawPendingAuthProfileUpdates = {};
                 const hasContent = !!(res.content && res.content.trim());
                 const currentContent = typeof this.openclawEditing.content === 'string'
                     ? this.openclawEditing.content
@@ -281,7 +285,8 @@ export function createOpenclawPersistMethods(options = {}) {
                 const config = this.openclawConfigs[name];
                 const res = await api('apply-openclaw-config', {
                     content: config.content,
-                    lineEnding: this.openclawLineEnding
+                    lineEnding: this.openclawLineEnding,
+                    authProfileUpdates: Object.values(this.openclawPendingAuthProfileUpdates || {})
                 });
                 if (res.error || res.success === false) {
                     this.showMessage(res.error || '应用配置失败', 'error');
@@ -295,6 +300,7 @@ export function createOpenclawPersistMethods(options = {}) {
                     lineEnding: this.openclawLineEnding,
                     persist: true
                 });
+                this.openclawPendingAuthProfileUpdates = {};
                 const targetTip = res.targetPath ? `（${res.targetPath}）` : '';
                 this.showMessage(`已保存并应用 OpenClaw 配置${targetTip}`, 'success');
                 this.closeOpenclawConfigModal({ force: true });
@@ -337,7 +343,8 @@ export function createOpenclawPersistMethods(options = {}) {
             try {
                 const res = await api('apply-openclaw-config', {
                     content: config.content,
-                    lineEnding: this.openclawLineEnding
+                    lineEnding: this.openclawLineEnding,
+                    authProfileUpdates: Object.values(this.openclawPendingAuthProfileUpdates || {})
                 });
                 if (res.error || res.success === false) {
                     this.showMessage(res.error || '应用配置失败', 'error');
@@ -350,6 +357,7 @@ export function createOpenclawPersistMethods(options = {}) {
                         lineEnding: this.openclawLineEnding,
                         persist: true
                     });
+                    this.openclawPendingAuthProfileUpdates = {};
                     const targetTip = res.targetPath ? `（${res.targetPath}）` : '';
                     this.showMessage(`已应用 OpenClaw 配置: ${name}${targetTip}`, 'success');
                 }

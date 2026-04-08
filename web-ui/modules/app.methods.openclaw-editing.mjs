@@ -195,6 +195,18 @@ export function createOpenclawEditingMethods() {
             const apiKey = this.openclawQuick.apiKeyReadOnly
                 ? ''
                 : (this.openclawQuick.apiKey || '').trim();
+            const apiKeySourceKind = typeof this.openclawQuick.apiKeySourceKind === 'string'
+                ? this.openclawQuick.apiKeySourceKind.trim()
+                : '';
+            const apiKeySourceProfileId = typeof this.openclawQuick.apiKeySourceProfileId === 'string'
+                ? this.openclawQuick.apiKeySourceProfileId.trim()
+                : '';
+            const apiKeySourceWriteField = typeof this.openclawQuick.apiKeySourceWriteField === 'string'
+                ? this.openclawQuick.apiKeySourceWriteField.trim()
+                : '';
+            const apiKeySourceOriginalValue = typeof this.openclawQuick.apiKeySourceOriginalValue === 'string'
+                ? this.openclawQuick.apiKeySourceOriginalValue.trim()
+                : '';
             const apiType = (this.openclawQuick.apiType || '').trim();
             const setProviderField = (key, value) => {
                 if (!value) return;
@@ -204,7 +216,24 @@ export function createOpenclawEditingMethods() {
             };
             setProviderField('baseUrl', baseUrl);
             setProviderField('api', apiType);
-            if (apiKey) {
+            if (apiKeySourceKind === 'auth-profile' && apiKeySourceProfileId && apiKeySourceWriteField) {
+                const pending = this.openclawPendingAuthProfileUpdates
+                    && typeof this.openclawPendingAuthProfileUpdates === 'object'
+                    && !Array.isArray(this.openclawPendingAuthProfileUpdates)
+                    ? { ...this.openclawPendingAuthProfileUpdates }
+                    : {};
+                if (apiKey && apiKey !== apiKeySourceOriginalValue) {
+                    pending[apiKeySourceProfileId] = {
+                        profileId: apiKeySourceProfileId,
+                        provider: providerName,
+                        field: apiKeySourceWriteField,
+                        value: apiKey
+                    };
+                } else {
+                    delete pending[apiKeySourceProfileId];
+                }
+                this.openclawPendingAuthProfileUpdates = pending;
+            } else if (apiKey) {
                 setProviderField('apiKey', apiKey);
             }
 
