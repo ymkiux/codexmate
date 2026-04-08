@@ -30,7 +30,7 @@ test('styles include force-compact fallback rules for readability on touch devic
     assert.match(styles, /body\.force-compact\s+\.status-inspector\s*\{[\s\S]*display:\s*none;/);
     assert.match(styles, /body\.force-compact\s+\.top-tabs\s*\{[\s\S]*display:\s*flex\s*!important;[\s\S]*flex-wrap:\s*nowrap;[\s\S]*overflow-x:\s*auto;/);
     assert.match(styles, /body\.force-compact\s+\.top-tabs::-webkit-scrollbar\s*\{[\s\S]*display:\s*none;/);
-    assert.match(layoutShell, /@media\s*\(min-width:\s*961px\)\s*\{[\s\S]*body:not\(.force-compact\)\s+#app\s*>\s*\.top-tabs\s*\{[\s\S]*display:\s*none;/);
+    assert.match(layoutShell, /@media\s*\(min-width:\s*721px\)\s*\{[\s\S]*body:not\(.force-compact\)\s+#app\s*>\s*\.top-tabs\s*\{[\s\S]*display:\s*none;/);
     assert.doesNotMatch(layoutShell, /^\s*\.top-tabs\s*\{[\s\S]*display:\s*none\s*!important;/m);
     assert.match(styles, /body\.force-compact\s+\.card-subtitle/);
     const compactSubtitleBlock = styles.match(/body\.force-compact\s+\.card-subtitle\s*\{[^}]*\}/);
