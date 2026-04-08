@@ -2,7 +2,8 @@ import assert from 'assert';
 import {
     readBundledWebUiCss,
     readProjectFile,
-    readBundledWebUiScript
+    readBundledWebUiScript,
+    readBundledWebUiHtml
 } from './helpers/web-ui-source.mjs';
 
 test('app script includes compact layout detection and body class toggling', () => {
@@ -52,8 +53,13 @@ test('styles keep desktop layout wide and session history readable on large scre
     assert.match(styles, /\.side-rail\s*\{[\s\S]*overflow-y:\s*auto;[\s\S]*scrollbar-width:\s*none;/);
     assert.match(styles, /\.main-panel\s*\{[\s\S]*overflow-y:\s*auto;[\s\S]*height:\s*100vh;[\s\S]*scrollbar-width:\s*none;/);
     assert.match(styles, /\.main-panel-topbar\s*\{[\s\S]*position:\s*sticky;[\s\S]*top:\s*0;/);
+    assert.match(styles, /\.side-item-meta\s*\{[\s\S]*display:\s*flex;[\s\S]*opacity:\s*1;/);
+    assert.match(styles, /\.brand-logo\s*\{[\s\S]*width:\s*38px;[\s\S]*height:\s*38px;/);
     assert.match(styles, /\.session-layout\s*\{[\s\S]*grid-template-columns:\s*minmax\(260px,\s*360px\)\s*minmax\(0,\s*1fr\);/);
     assert.match(styles, /\.session-item\s*\{[\s\S]*min-height:\s*102px;/);
+
+    const html = readBundledWebUiHtml();
+    assert.match(html, /class="brand-logo"\s+src="\/res\/logo\.png"/);
 
     const titleBlock = styles.match(/\.session-item-title\s*\{[^}]*\}/);
     assert.ok(titleBlock, 'missing session item title style block');

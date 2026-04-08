@@ -78,8 +78,13 @@
         <div :class="['app-shell', { standalone: sessionStandalone }]">
             <aside class="side-rail" v-if="!sessionStandalone">
                 <div class="brand-block">
-                    <div class="brand-kicker">Workspace</div>
-                    <div class="brand-title">Codex Mate</div>
+                    <div class="brand-head">
+                        <img class="brand-logo" src="/res/logo.png" alt="Codex Mate logo">
+                        <div class="brand-copy">
+                            <div class="brand-kicker">Workspace</div>
+                            <div class="brand-title">Codex Mate</div>
+                        </div>
+                    </div>
                     <div class="brand-subtitle">本地配置与会话工作台</div>
                 </div>
 
