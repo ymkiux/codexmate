@@ -89,7 +89,7 @@ test('switchMainTab loads sessions for usage tab without preparing session rende
     const calls = {
         teardown: 0,
         prepare: 0,
-        loadSessions: 0
+        loadSessions: []
     };
     const vm = {
         mainTab: 'config',
@@ -101,8 +101,8 @@ test('switchMainTab loads sessions for usage tab without preparing session rende
         prepareSessionTabRender() {
             calls.prepare += 1;
         },
-        loadSessions() {
-            calls.loadSessions += 1;
+        loadSessions(options) {
+            calls.loadSessions.push(options || {});
             this.sessionsLoadedOnce = true;
         },
         refreshClaudeModelContext() {}
@@ -111,11 +111,11 @@ test('switchMainTab loads sessions for usage tab without preparing session rende
     switchMainTab.call(vm, 'usage');
     assert.strictEqual(vm.mainTab, 'usage');
     assert.strictEqual(calls.prepare, 0);
-    assert.strictEqual(calls.loadSessions, 1);
+    assert.deepStrictEqual(calls.loadSessions, [{ includeActiveDetail: false }]);
 
     switchMainTab.call(vm, 'usage');
     assert.strictEqual(calls.prepare, 0);
-    assert.strictEqual(calls.loadSessions, 1);
+    assert.deepStrictEqual(calls.loadSessions, [{ includeActiveDetail: false }]);
 });
 
 test('switchMainTab keeps claude model context refresh behavior', () => {
@@ -457,6 +457,57 @@ test('loadActiveSessionDetail primes visible messages even when timeline is disa
     assert.strictEqual(vm._invalidateReset, true);
     assert.strictEqual(vm.sessionDetailLoading, false);
     assert.strictEqual(vm.activeSessionDetailError, '');
+});
+
+test('loadSessions skips active session detail fetch when explicitly disabled for usage-only aggregation', async () => {
+    const vm = {
+        mainTab: 'usage',
+        sessionStandalone: false,
+        sessionsLoading: false,
+        sessionsLoadedOnce: false,
+        activeSessionDetailError: '',
+        sessionFilterSource: 'all',
+        sessionPathFilter: '',
+        sessionQuery: '',
+        sessionRoleFilter: 'all',
+        timeRangePreset: 'all',
+        sessionTimePreset: 'all',
+        sessionsList: [],
+        activeSession: null,
+        activeSessionMessages: [{ text: 'stale' }],
+        activeSessionDetailClipped: false,
+        sessionTimelineActiveKey: '',
+        sessionMessageRefMap: Object.create(null),
+        _detailLoadCount: 0,
+        showMessage() {},
+        resetSessionDetailPagination() {},
+        resetSessionPreviewMessageRender() {},
+        cancelSessionTimelineSync() {},
+        syncSessionPathOptionsForSource() {},
+        extractPathOptionsFromSessions() {
+            return [];
+        },
+        getSessionExportKey(session) {
+            return session && session.sessionId ? session.sessionId : '';
+        },
+        async loadActiveSessionDetail() {
+            this._detailLoadCount += 1;
+        },
+        loadSessionPathOptions() {
+            return Promise.resolve();
+        }
+    };
+
+    await loadSessions.call(vm, async () => ({
+        sessions: [
+            { sessionId: 'sess-1', source: 'codex', updatedAt: '2026-04-08T10:00:00.000Z', messageCount: 5000, cwd: '/repo' }
+        ]
+    }), { includeActiveDetail: false });
+
+    assert.strictEqual(vm.sessionsLoadedOnce, true);
+    assert.strictEqual(vm._detailLoadCount, 0);
+    assert.strictEqual(vm.activeSession && vm.activeSession.sessionId, 'sess-1');
+    assert.deepStrictEqual(vm.activeSessionMessages, []);
 });
 
 test('loadSessions keeps sessionsLoadedOnce false when initial request fails', async () => {

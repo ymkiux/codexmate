@@ -16,6 +16,7 @@ export function switchMainTab(tab) {
     const previousTab = this.mainTab;
     const leavingSessions = previousTab === 'sessions' && nextTab !== 'sessions';
     const enteringSessionDataTab = nextTab === 'sessions' || nextTab === 'usage';
+    const shouldLoadSessionDetail = nextTab === 'sessions';
     this.mainTab = nextTab;
 
     if (leavingSessions) {
@@ -42,7 +43,7 @@ export function switchMainTab(tab) {
     }
 
     if (enteringSessionDataTab && !this.sessionsLoadedOnce) {
-        this.loadSessions();
+        this.loadSessions({ includeActiveDetail: shouldLoadSessionDetail });
     }
     if (nextTab === 'sessions') {
         this.prepareSessionTabRender();
@@ -89,11 +90,14 @@ export function switchMainTab(tab) {
     }
 }
 
-export async function loadSessions(api) {
+export async function loadSessions(api, options = {}) {
     if (this.sessionsLoading) return;
     this.sessionsLoading = true;
     this.activeSessionDetailError = '';
     let loadSucceeded = false;
+    const includeActiveDetail = options && Object.prototype.hasOwnProperty.call(options, 'includeActiveDetail')
+        ? !!options.includeActiveDetail
+        : (this.mainTab === 'sessions' || !!this.sessionStandalone);
     const params = buildSessionListParams({
         source: this.sessionFilterSource,
         pathFilter: this.sessionPathFilter,
@@ -143,7 +147,9 @@ export async function loadSessions(api) {
                 this.cancelSessionTimelineSync();
                 this.sessionTimelineActiveKey = '';
                 clearSessionTimelineRefs(this);
-                await this.loadActiveSessionDetail();
+                if (includeActiveDetail) {
+                    await this.loadActiveSessionDetail();
+                }
             }
             void this.loadSessionPathOptions({ source: this.sessionFilterSource });
         }
