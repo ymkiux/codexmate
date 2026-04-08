@@ -291,11 +291,16 @@ preferred_auth_method = "shadow-key"
     assert(apiPathsInvalid.error, 'list-session-paths should fail for invalid source');
 
     // ========== Add Provider Tests ==========
-    const addProvider = await api('add-provider', { name: 'e2e-api', url: mockProviderUrl, key: 'sk-e2e-api' });
+    const addProviderInputUrl = `${mockProviderUrl}/`;
+    const addProvider = await api('add-provider', { name: 'e2e-api', url: addProviderInputUrl, key: 'sk-e2e-api' });
     assert(addProvider.success === true, 'add-provider failed');
 
     const apiListAfterAdd = await api('list');
-    assert(Array.isArray(apiListAfterAdd.providers) && apiListAfterAdd.providers.some(p => p.name === 'e2e-api'), 'add-provider not reflected in list');
+    const addedProvider = Array.isArray(apiListAfterAdd.providers)
+        ? apiListAfterAdd.providers.find((p) => p && p.name === 'e2e-api')
+        : null;
+    assert(addedProvider, 'add-provider not reflected in list');
+    assert(addedProvider.url === mockProviderUrl, 'add-provider should persist normalized provider url');
 
     const addProviderEmptyName = await api('add-provider', { name: '', url: mockProviderUrl });
     assert(addProviderEmptyName.error, 'add-provider should reject empty name');
