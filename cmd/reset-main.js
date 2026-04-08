@@ -160,7 +160,7 @@ function promptForPrNumber({ stdin = process.stdin, stdout = process.stdout } = 
 
 async function main({ argv = process.argv.slice(2), stdin = process.stdin, stdout = process.stdout } = {}) {
   try {
-    run('git rev-parse --is-inside-work-tree');
+    run('git rev-parse --is-inside-work-tree', { stdio: 'ignore' });
   } catch (err) {
     console.error('Not inside a git repository.');
     process.exit(1);

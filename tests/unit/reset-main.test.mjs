@@ -114,3 +114,8 @@ test('package.json exposes reset command for reset-main workflow', () => {
     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8').replace(/^\uFEFF/u, ''));
     assert.strictEqual(packageJson.scripts.reset, 'node cmd/reset-main.js');
 });
+
+test('git repository probe stays silent during reset startup', () => {
+    const content = fs.readFileSync(scriptPath, 'utf-8');
+    assert.match(content, /run\('git rev-parse --is-inside-work-tree', \{ stdio: 'ignore' \}\);/);
+});
