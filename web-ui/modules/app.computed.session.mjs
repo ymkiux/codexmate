@@ -112,11 +112,26 @@ export function createSessionComputed() {
         sessionUsageSummaryCards() {
             const summary = this.sessionUsageCharts && this.sessionUsageCharts.summary
                 ? this.sessionUsageCharts.summary
-                : { totalSessions: 0, totalMessages: 0, activeDays: 0 };
+                : { totalSessions: 0, totalMessages: 0, activeDays: 0, avgMessagesPerSession: 0, busiestDay: null, busiestHour: null };
             return [
                 { key: 'sessions', label: '总会话数', value: summary.totalSessions || 0 },
                 { key: 'messages', label: '总消息数', value: summary.totalMessages || 0 },
-                { key: 'days', label: '活跃天数', value: summary.activeDays || 0 }
+                { key: 'days', label: '活跃天数', value: summary.activeDays || 0 },
+                { key: 'avg-messages', label: '平均每会话消息', value: summary.avgMessagesPerSession || 0 },
+                {
+                    key: 'busiest-day',
+                    label: '最忙日',
+                    value: summary.busiestDay && summary.busiestDay.totalSessions > 0
+                        ? `${summary.busiestDay.label} · ${summary.busiestDay.totalSessions}`
+                        : '暂无'
+                },
+                {
+                    key: 'busiest-hour',
+                    label: '高峰时段',
+                    value: summary.busiestHour && summary.busiestHour.count > 0
+                        ? `${summary.busiestHour.label} · ${summary.busiestHour.count}`
+                        : '暂无'
+                }
             ];
         },
         visibleSessionTrashItems() {

@@ -145,6 +145,20 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
     let claudeTotal = 0;
     let messageTotal = 0;
     const pathMap = new Map();
+    const sourceMessageTotals = { codex: 0, claude: 0 };
+    const hourCounts = Array.from({ length: 24 }, (_, hour) => ({
+        key: String(hour).padStart(2, '0'),
+        label: String(hour).padStart(2, '0'),
+        count: 0
+    }));
+    const weekdayLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+    const weekdayCounts = Array.from({ length: 7 }, (_, index) => ({
+        key: String(index),
+        label: weekdayLabels[index],
+        count: 0
+    }));
+    const recentSessions = [];
+    const topSessionsByMessages = [];
 
     for (const session of list) {
         if (!session || typeof session !== 'object') continue;
@@ -169,10 +183,44 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
             claudeTotal += 1;
         }
         messageTotal += messageCount;
+        sourceMessageTotals[source] += messageCount;
+
+        const utcHour = stamp.getUTCHours();
+        if (hourCounts[utcHour]) {
+            hourCounts[utcHour].count += 1;
+        }
+        const dayIndex = (stamp.getUTCDay() + 6) % 7;
+        if (weekdayCounts[dayIndex]) {
+            weekdayCounts[dayIndex].count += 1;
+        }
+
         const cwd = normalizeSessionPathFilter(session.cwd);
         if (cwd) {
-            pathMap.set(cwd, (Number(pathMap.get(cwd)) || 0) + 1);
+            const prev = pathMap.get(cwd) || { count: 0, messageTotal: 0, updatedAtMs: 0 };
+            pathMap.set(cwd, {
+                count: prev.count + 1,
+                messageTotal: prev.messageTotal + messageCount,
+                updatedAtMs: Math.max(prev.updatedAtMs, updatedAtMs)
+            });
         }
+
+        const normalizedTitle = typeof session.title === 'string' && session.title.trim()
+            ? session.title.trim()
+            : (typeof session.sessionId === 'string' && session.sessionId.trim() ? session.sessionId.trim() : '未命名会话');
+        const sessionEntry = {
+            key: `${source}:${session.sessionId || ''}:${session.filePath || normalizedTitle}`,
+            title: normalizedTitle,
+            source,
+            sourceLabel: source === 'codex' ? 'Codex' : 'Claude Code',
+            cwd,
+            messageCount,
+            updatedAt: session.updatedAt || '',
+            updatedAtMs,
+            updatedAtLabel: formatSessionTimelineTimestamp(session.updatedAt || ''),
+            hasExactMessageCount: session.__messageCountExact === true
+        };
+        recentSessions.push(sessionEntry);
+        topSessionsByMessages.push(sessionEntry);
     }
 
     const totalSessions = codexTotal + claudeTotal;
@@ -181,16 +229,41 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
         { key: 'claude', label: 'Claude', value: claudeTotal }
     ].map((item) => ({
         ...item,
-        percent: totalSessions > 0 ? Math.round((item.value / totalSessions) * 100) : 0
+        percent: totalSessions > 0 ? Math.round((item.value / totalSessions) * 100) : 0,
+        messageTotal: sourceMessageTotals[item.key] || 0,
+        messagePercent: messageTotal > 0 ? Math.round(((sourceMessageTotals[item.key] || 0) / messageTotal) * 100) : 0,
+        avgMessages: item.value > 0 ? Math.round(((sourceMessageTotals[item.key] || 0) / item.value) * 10) / 10 : 0
     }));
 
     const topPaths = [...pathMap.entries()]
-        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh-Hans-CN'))
+        .sort((a, b) => b[1].count - a[1].count || b[1].messageTotal - a[1].messageTotal || a[0].localeCompare(b[0], 'zh-Hans-CN'))
         .slice(0, 5)
-        .map(([pathValue, count]) => ({ path: pathValue, count }));
+        .map(([pathValue, meta]) => ({
+            path: pathValue,
+            count: meta.count,
+            messageTotal: meta.messageTotal,
+            updatedAtLabel: meta.updatedAtMs ? formatSessionTimelineTimestamp(new Date(meta.updatedAtMs).toISOString()) : ''
+        }));
+
+    const sortedRecentSessions = recentSessions
+        .sort((a, b) => b.updatedAtMs - a.updatedAtMs || b.messageCount - a.messageCount || a.title.localeCompare(b.title, 'zh-Hans-CN'))
+        .slice(0, 6);
+
+    const sortedTopSessionsByMessages = topSessionsByMessages
+        .sort((a, b) => b.messageCount - a.messageCount || b.updatedAtMs - a.updatedAtMs || a.title.localeCompare(b.title, 'zh-Hans-CN'))
+        .slice(0, 6);
 
     const maxSessionBucket = buckets.reduce((max, item) => Math.max(max, item.totalSessions), 0);
     const maxMessageBucket = buckets.reduce((max, item) => Math.max(max, item.totalMessages), 0);
+    const maxHourCount = hourCounts.reduce((max, item) => Math.max(max, item.count), 0);
+    const maxWeekdayCount = weekdayCounts.reduce((max, item) => Math.max(max, item.count), 0);
+    const busiestDay = [...buckets]
+        .sort((a, b) => b.totalSessions - a.totalSessions || b.totalMessages - a.totalMessages || a.key.localeCompare(b.key, 'zh-Hans-CN'))[0] || null;
+    const busiestHour = [...hourCounts]
+        .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key, 'zh-Hans-CN'))[0] || null;
+    const activeDays = buckets.filter((item) => item.totalSessions > 0).length;
+    const avgMessagesPerSession = totalSessions > 0 ? Math.round((messageTotal / totalSessions) * 10) / 10 : 0;
+    const avgSessionsPerActiveDay = activeDays > 0 ? Math.round((totalSessions / activeDays) * 10) / 10 : 0;
 
     return {
         range,
@@ -200,12 +273,41 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
             totalMessages: messageTotal,
             codexTotal,
             claudeTotal,
-            activeDays: buckets.filter((item) => item.totalSessions > 0).length
+            activeDays,
+            avgMessagesPerSession,
+            avgSessionsPerActiveDay,
+            busiestDay: busiestDay
+                ? {
+                    key: busiestDay.key,
+                    label: busiestDay.label,
+                    totalSessions: busiestDay.totalSessions,
+                    totalMessages: busiestDay.totalMessages
+                }
+                : null,
+            busiestHour: busiestHour
+                ? {
+                    key: busiestHour.key,
+                    label: `${busiestHour.label}:00`,
+                    count: busiestHour.count
+                }
+                : null
         },
         sourceShare,
         topPaths,
+        recentSessions: sortedRecentSessions,
+        topSessionsByMessages: sortedTopSessionsByMessages,
+        hourActivity: hourCounts.map((item) => ({
+            ...item,
+            percent: maxHourCount > 0 ? Math.round((item.count / maxHourCount) * 100) : 0
+        })),
+        weekdayActivity: weekdayCounts.map((item) => ({
+            ...item,
+            percent: maxWeekdayCount > 0 ? Math.round((item.count / maxWeekdayCount) * 100) : 0
+        })),
         maxSessionBucket,
-        maxMessageBucket
+        maxMessageBucket,
+        maxHourCount,
+        maxWeekdayCount
     };
 }
 

@@ -19,9 +19,20 @@ test('buildUsageChartGroups aggregates codex and claude sessions into day bucket
     assert.strictEqual(result.summary.totalMessages, 15);
     assert.strictEqual(result.summary.codexTotal, 2);
     assert.strictEqual(result.summary.claudeTotal, 1);
+    assert.strictEqual(result.summary.avgMessagesPerSession, 5);
+    assert.strictEqual(result.summary.busiestDay.label, '04-06');
+    assert.strictEqual(result.summary.busiestDay.totalSessions, 2);
     assert.strictEqual(result.sourceShare.find(item => item.key === 'codex').percent, 67);
+    assert.strictEqual(result.sourceShare.find(item => item.key === 'codex').messageTotal, 8);
+    assert.strictEqual(result.sourceShare.find(item => item.key === 'claude').avgMessages, 7);
     assert.strictEqual(result.topPaths[0].path, '/a');
     assert.strictEqual(result.topPaths[0].count, 2);
+    assert.strictEqual(result.topPaths[0].messageTotal, 12);
+    assert.strictEqual(result.recentSessions[0].title, '未命名会话');
+    assert.strictEqual(result.recentSessions[0].sourceLabel, 'Claude Code');
+    assert.strictEqual(result.topSessionsByMessages[0].messageCount, 7);
+    assert.strictEqual(result.hourActivity.find(item => item.key === '09').count, 2);
+    assert.strictEqual(result.weekdayActivity.find(item => item.label === '周一').count, 2);
     const lastBucket = result.buckets[result.buckets.length - 1];
     assert.strictEqual(lastBucket.codex, 1);
     assert.strictEqual(lastBucket.claude, 1);
@@ -40,4 +51,7 @@ test('buildUsageChartGroups ignores invalid sessions and keeps empty buckets sta
     assert.strictEqual(result.summary.totalMessages, 0);
     assert.strictEqual(result.buckets.length, 7);
     assert.ok(result.buckets.every((item) => item.totalSessions === 0));
+    assert.ok(result.hourActivity.every((item) => item.count === 0));
+    assert.ok(result.weekdayActivity.every((item) => item.count === 0));
+    assert.deepStrictEqual(result.recentSessions, []);
 });
