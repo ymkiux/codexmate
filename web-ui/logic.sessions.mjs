@@ -160,7 +160,7 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
     const recentSessions = [];
     const topSessionsByMessages = [];
 
-    for (const session of list) {
+    for (const [sessionIndex, session] of list.entries()) {
         if (!session || typeof session !== 'object') continue;
         const source = normalizeSessionSource(session.source, '');
         if (source !== 'codex' && source !== 'claude') continue;
@@ -208,7 +208,14 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
             ? session.title.trim()
             : (typeof session.sessionId === 'string' && session.sessionId.trim() ? session.sessionId.trim() : '未命名会话');
         const sessionEntry = {
-            key: `${source}:${session.sessionId || ''}:${session.filePath || normalizedTitle}`,
+            key: [
+                source,
+                session.sessionId || '',
+                session.filePath || normalizedTitle,
+                String(updatedAtMs),
+                String(messageCount),
+                String(sessionIndex)
+            ].join(':'),
             title: normalizedTitle,
             source,
             sourceLabel: source === 'codex' ? 'Codex' : 'Claude Code',
@@ -220,7 +227,7 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
             hasExactMessageCount: session.__messageCountExact === true
         };
         recentSessions.push(sessionEntry);
-        topSessionsByMessages.push(sessionEntry);
+        topSessionsByMessages.push({ ...sessionEntry });
     }
 
     const totalSessions = codexTotal + claudeTotal;

@@ -259,7 +259,7 @@
 
 .usage-mini-bars {
     display: grid;
-    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-template-columns: repeat(24, minmax(0, 1fr));
     gap: 10px 8px;
     align-items: end;
 }
@@ -384,7 +384,7 @@
     }
 
     .usage-mini-bars {
-        grid-template-columns: repeat(8, minmax(0, 1fr));
+        grid-template-columns: repeat(12, minmax(0, 1fr));
     }
 
     .usage-bar-group {
