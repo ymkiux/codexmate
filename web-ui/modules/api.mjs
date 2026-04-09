@@ -4,12 +4,90 @@ export const API_BASE = (browserLocation && browserLocation.origin && browserLoc
     ? browserLocation.origin
     : 'http://localhost:3737';
 
-async function postApi(action, params = {}) {
-    return await fetch(`${API_BASE}/api`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, params })
-    });
+function createApiFetchSignal(options = {}) {
+    const timeoutMs = Number(options.timeoutMs);
+    const externalSignal = options.signal;
+    const supportsAbort = typeof AbortController !== 'undefined';
+    if (!supportsAbort && !externalSignal) {
+        return {
+            signal: undefined,
+            cleanup() {},
+            didTimeout() {
+                return false;
+            }
+        };
+    }
+
+    const controller = supportsAbort ? new AbortController() : null;
+    let timeoutId = null;
+    let didTimeout = false;
+    let detachExternalAbort = null;
+
+    if (controller && externalSignal) {
+        const abortFromExternal = () => {
+            try {
+                controller.abort(externalSignal.reason);
+            } catch (_) {
+                controller.abort();
+            }
+        };
+        if (externalSignal.aborted) {
+            abortFromExternal();
+        } else if (typeof externalSignal.addEventListener === 'function') {
+            externalSignal.addEventListener('abort', abortFromExternal, { once: true });
+            detachExternalAbort = () => {
+                try {
+                    externalSignal.removeEventListener('abort', abortFromExternal);
+                } catch (_) {}
+            };
+        }
+    }
+
+    if (controller && Number.isFinite(timeoutMs) && timeoutMs > 0) {
+        timeoutId = setTimeout(() => {
+            didTimeout = true;
+            try {
+                controller.abort(new Error(`API request timed out after ${Math.floor(timeoutMs)}ms`));
+            } catch (_) {
+                controller.abort();
+            }
+        }, Math.floor(timeoutMs));
+    }
+
+    return {
+        signal: controller ? controller.signal : externalSignal,
+        cleanup() {
+            if (timeoutId !== null) {
+                clearTimeout(timeoutId);
+            }
+            if (detachExternalAbort) {
+                detachExternalAbort();
+            }
+        },
+        didTimeout() {
+            return didTimeout;
+        }
+    };
+}
+
+async function postApi(action, params = {}, options = {}) {
+    const fetchControl = createApiFetchSignal(options);
+    try {
+        return await fetch(`${API_BASE}/api`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, params }),
+            signal: fetchControl.signal
+        });
+    } catch (error) {
+        if (fetchControl.didTimeout()) {
+            const timeoutMs = Math.max(1, Math.floor(Number(options.timeoutMs) || 0));
+            throw new Error(`API request timed out for ${action} after ${timeoutMs}ms`);
+        }
+        throw error;
+    } finally {
+        fetchControl.cleanup();
+    }
 }
 
 function buildApiResponseContext(action, res, contentType) {
@@ -23,8 +101,8 @@ function withPayloadTooLargeErrorCode(res, payload) {
     return { ...payload, errorCode: 'payload-too-large' };
 }
 
-export async function api(action, params = {}) {
-    const res = await postApi(action, params);
+export async function api(action, params = {}, options = {}) {
+    const res = await postApi(action, params, options);
     const contentType = String(res.headers.get('content-type') || '').toLowerCase();
     if (contentType && !contentType.includes('application/json')) {
         const body = await res.text();
@@ -40,8 +118,8 @@ export async function api(action, params = {}) {
     }
 }
 
-export async function apiWithMeta(action, params = {}) {
-    const res = await postApi(action, params);
+export async function apiWithMeta(action, params = {}, options = {}) {
+    const res = await postApi(action, params, options);
     const contentType = String(res.headers.get('content-type') || '').toLowerCase();
     if (contentType.includes('application/json')) {
         try {

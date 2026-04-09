@@ -103,6 +103,29 @@ test('api surfaces response context for json parse failures', async () => {
     });
 });
 
+test('api reports timeout context when fetch never settles in time', async () => {
+    const fetch = async (_url, options = {}) => {
+        await new Promise((resolve, reject) => {
+            if (options.signal && typeof options.signal.addEventListener === 'function') {
+                options.signal.addEventListener('abort', () => reject(new Error('aborted by timeout')), { once: true });
+            }
+        });
+        return createResponse();
+    };
+
+    await withFetch(fetch, async () => {
+        await assert.rejects(
+            () => api('session-detail', { source: 'codex' }, { timeoutMs: 5 }),
+            (error) => {
+                assert.match(error.message, /session-detail/);
+                assert.match(error.message, /timed out/i);
+                assert.match(error.message, /5ms/);
+                return true;
+            }
+        );
+    });
+});
+
 test('apiWithMeta preserves payload-too-large for json object responses', async () => {
     const fetch = async () => createResponse({
         ok: false,

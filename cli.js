@@ -4492,6 +4492,39 @@ function countConversationMessagesInRecords(records, source) {
     return removeLeadingSystemMessage(messages).length;
 }
 
+function detectConversationRoleFromRawLine(line, source) {
+    const text = typeof line === 'string' ? line : '';
+    if (!text) {
+        return '';
+    }
+
+    if (source === 'codex') {
+        if (!text.includes('"type":"response_item"') || !text.includes('"payload":{"type":"message"')) {
+            return '';
+        }
+        if (text.includes('"role":"assistant"')) return 'assistant';
+        if (text.includes('"role":"user"')) return 'user';
+        if (text.includes('"role":"system"')) return 'system';
+        return '';
+    }
+
+    if (text.includes('"type":"assistant"')) return 'assistant';
+    if (text.includes('"type":"user"')) return 'user';
+    if (text.includes('"type":"system"')) return 'system';
+    return '';
+}
+
+function isBootstrapLikeRawLine(line) {
+    if (!line || typeof line !== 'string') {
+        return false;
+    }
+    const normalized = line.toLowerCase().replace(/\s+/g, ' ').trim();
+    if (!normalized) {
+        return false;
+    }
+    return BOOTSTRAP_TEXT_MARKERS.some(marker => normalized.includes(marker));
+}
+
 async function countConversationMessagesInFile(filePath, source) {
     const fileStat = getFileStatSafe(filePath);
     const cached = readExactMessageCountCache(filePath, source, fileStat);
@@ -4511,36 +4544,12 @@ async function countConversationMessagesInFile(filePath, source) {
         for await (const line of rl) {
             const trimmed = line.trim();
             if (!trimmed) continue;
-
-            let record;
-            try {
-                record = JSON.parse(trimmed);
-            } catch (e) {
-                continue;
-            }
-
-            let role = '';
-            let text = '';
-            if (source === 'codex') {
-                if (record.type === 'response_item' && record.payload && record.payload.type === 'message') {
-                    role = normalizeRole(record.payload.role);
-                    text = extractMessageText(record.payload.content);
-                }
-            } else {
-                role = normalizeRole(record.type);
-                if (role === 'assistant' || role === 'user' || role === 'system') {
-                    const content = record.message ? record.message.content : '';
-                    text = extractMessageText(content);
-                } else {
-                    role = '';
-                }
-            }
+            const role = detectConversationRoleFromRawLine(trimmed, source);
             if (!role) {
                 continue;
             }
 
-            const hasText = text.length > 0;
-            if (leadingSystem && (role === 'system' || (hasText && isBootstrapLikeText(text)))) {
+            if (leadingSystem && (role === 'system' || isBootstrapLikeRawLine(trimmed))) {
                 continue;
             }
 
@@ -4564,11 +4573,13 @@ async function countConversationMessagesInFile(filePath, source) {
     }
 }
 
-function appendSessionDetailTailMessage(state, record, source, lineIndex = -1) {
+function appendSessionDetailTailMessage(state, record, source, lineIndex = -1, options = {}) {
     if (!state || typeof state !== 'object') {
         return;
     }
 
+    const skipLeadingSystem = options && options.skipLeadingSystem !== false;
+    const countMessage = !options || options.countMessage !== false;
     const message = extractMessageFromRecord(record, source);
     if (!message) {
         return;
@@ -4580,12 +4591,14 @@ function appendSessionDetailTailMessage(state, record, source, lineIndex = -1) {
         return;
     }
 
-    if (state.leadingSystem && (role === 'system' || isBootstrapLikeText(text))) {
+    if (skipLeadingSystem && state.leadingSystem && (role === 'system' || isBootstrapLikeText(text))) {
         return;
     }
 
     state.leadingSystem = false;
-    state.totalMessages += 1;
+    if (countMessage) {
+        state.totalMessages += 1;
+    }
     if (!Number.isFinite(state.tailLimit) || state.tailLimit <= 0) {
         return;
     }
@@ -4649,10 +4662,116 @@ function extractSessionDetailPreviewFromRecords(records, source, messageLimit) {
     return state;
 }
 
+function extractSessionDetailPreviewFromCachedTail(filePath, source, messageLimit, exactTotalMessages, stat = null) {
+    const safeMessageLimit = Number.isFinite(Number(messageLimit))
+        ? Math.max(1, Math.floor(Number(messageLimit)))
+        : DEFAULT_SESSION_DETAIL_MESSAGES;
+    const safeExactTotalMessages = Number.isFinite(Number(exactTotalMessages))
+        ? Math.max(0, Math.floor(Number(exactTotalMessages)))
+        : 0;
+    const fileStat = stat || getFileStatSafe(filePath);
+    if (!fileStat || !Number.isFinite(Number(fileStat.size)) || Number(fileStat.size) <= 0 || safeExactTotalMessages <= safeMessageLimit) {
+        return null;
+    }
+
+    const state = {
+        sessionId: '',
+        cwd: '',
+        updatedAt: '',
+        messages: [],
+        tailLimit: safeMessageLimit,
+        totalMessages: safeExactTotalMessages,
+        leadingSystem: false
+    };
+
+    const headRecords = parseJsonlHeadRecords(filePath, Math.min(SESSION_SUMMARY_READ_BYTES, Number(fileStat.size)));
+    for (const record of headRecords) {
+        applySessionDetailRecordMetadata(record, source, state);
+        if (state.sessionId && state.cwd) {
+            break;
+        }
+    }
+
+    let fd;
+    try {
+        fd = fs.openSync(filePath, 'r');
+        let windowSize = Math.min(Number(fileStat.size), Math.max(64 * 1024, safeMessageLimit * 1024));
+        let tailRecords = [];
+
+        while (windowSize > 0) {
+            const start = Math.max(0, Number(fileStat.size) - windowSize);
+            const length = Number(fileStat.size) - start;
+            const buffer = Buffer.alloc(length);
+            fs.readSync(fd, buffer, 0, length, start);
+
+            let text = buffer.toString('utf-8');
+            if (start > 0) {
+                const firstNewlineIndex = text.indexOf('\n');
+                if (firstNewlineIndex === -1) {
+                    if (windowSize >= Number(fileStat.size)) {
+                        return null;
+                    }
+                    windowSize = Math.min(Number(fileStat.size), windowSize * 2);
+                    continue;
+                }
+                text = text.slice(firstNewlineIndex + 1);
+            }
+
+            tailRecords = parseJsonlContent(text);
+            let tailMessageCount = 0;
+            for (const record of tailRecords) {
+                if (extractMessageFromRecord(record, source)) {
+                    tailMessageCount += 1;
+                }
+            }
+
+            if (tailMessageCount >= safeMessageLimit || start === 0 || windowSize >= Number(fileStat.size)) {
+                break;
+            }
+            windowSize = Math.min(Number(fileStat.size), windowSize * 2);
+        }
+
+        if (!Array.isArray(tailRecords) || tailRecords.length === 0) {
+            return null;
+        }
+
+        for (const record of tailRecords) {
+            applySessionDetailRecordMetadata(record, source, state);
+            appendSessionDetailTailMessage(state, record, source, -1, {
+                skipLeadingSystem: false,
+                countMessage: false
+            });
+        }
+
+        return state.messages.length > 0 ? state : null;
+    } catch (e) {
+        return null;
+    } finally {
+        if (fd !== undefined) {
+            try { fs.closeSync(fd); } catch (e) {}
+        }
+    }
+}
+
 async function extractSessionDetailPreviewFromFile(filePath, source, messageLimit) {
     const safeMessageLimit = Number.isFinite(Number(messageLimit))
         ? Math.max(1, Math.floor(Number(messageLimit)))
         : DEFAULT_SESSION_DETAIL_MESSAGES;
+    const fileStat = getFileStatSafe(filePath);
+    const cachedExactTotal = readExactMessageCountCache(filePath, source, fileStat);
+    if (cachedExactTotal !== null && cachedExactTotal > safeMessageLimit) {
+        const fastPreview = extractSessionDetailPreviewFromCachedTail(
+            filePath,
+            source,
+            safeMessageLimit,
+            cachedExactTotal,
+            fileStat
+        );
+        if (fastPreview) {
+            return fastPreview;
+        }
+    }
+
     const state = {
         sessionId: '',
         cwd: '',
@@ -5304,7 +5423,7 @@ function invalidateSessionListCache() {
 }
 
 function parseCodexSessionSummary(filePath) {
-    const records = parseJsonlHeadRecords(filePath);
+    const records = parseJsonlHeadRecords(filePath, SESSION_TITLE_READ_BYTES);
     if (records.length === 0) {
         return null;
     }
@@ -5394,7 +5513,7 @@ function parseCodexSessionSummary(filePath) {
 }
 
 function parseClaudeSessionSummary(filePath) {
-    const records = parseJsonlHeadRecords(filePath);
+    const records = parseJsonlHeadRecords(filePath, SESSION_TITLE_READ_BYTES);
     if (records.length === 0) {
         return null;
     }

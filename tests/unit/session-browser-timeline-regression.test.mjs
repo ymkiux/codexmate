@@ -29,6 +29,55 @@ test('loadSessionPathOptions clears visible loading state when reusing cached so
     assert.strictEqual(context.sessionPathOptionsLoading, false);
 });
 
+test('scheduleSessionPathOptionsWarmup defers path hydration until idle and skips stale warmups', async () => {
+    const methods = createSessionBrowserMethods({
+        api: async () => ({})
+    });
+    const idleTasks = [];
+    const context = {
+        mainTab: 'sessions',
+        sessionStandalone: false,
+        __sessionPathWarmupTicketMap: {},
+        __sessionPathWarmupHandleMap: {},
+        scheduleIdleTask(task) {
+            idleTasks.push(task);
+            return {
+                type: 'idle',
+                id: idleTasks.length
+            };
+        },
+        cancelIdleTask(handle) {
+            this._cancelledHandle = handle;
+        },
+        async loadSessionPathOptions(options) {
+            this._loadCalls = (this._loadCalls || 0) + 1;
+            this._lastLoadOptions = options;
+        }
+    };
+
+    methods.scheduleSessionPathOptionsWarmup.call(context, { source: 'codex' });
+    assert.strictEqual(idleTasks.length, 1);
+    assert.strictEqual(context._loadCalls || 0, 0);
+
+    context.mainTab = 'settings';
+    await idleTasks[0]();
+    assert.strictEqual(context._loadCalls || 0, 0);
+
+    context.mainTab = 'sessions';
+    methods.scheduleSessionPathOptionsWarmup.call(context, { source: 'codex' });
+    methods.scheduleSessionPathOptionsWarmup.call(context, { source: 'codex', forceRefresh: true });
+
+    assert.strictEqual(idleTasks.length, 3);
+    assert.deepStrictEqual(context._cancelledHandle, { type: 'idle', id: 2 });
+
+    await idleTasks[1]();
+    assert.strictEqual(context._loadCalls || 0, 0);
+
+    await idleTasks[2]();
+    assert.strictEqual(context._loadCalls, 1);
+    assert.deepStrictEqual(context._lastLoadOptions, { source: 'codex', forceRefresh: true });
+});
+
 test('selectSession defers detail loading until the next frame when a scheduler is available', async () => {
     const methods = createSessionBrowserMethods({
         api: async () => ({})
@@ -37,6 +86,8 @@ test('selectSession defers detail loading until the next frame when a scheduler 
     let detailLoads = 0;
     const selected = { source: 'codex', sessionId: 's1', filePath: '/tmp/s1.jsonl' };
     const context = {
+        mainTab: 'sessions',
+        sessionStandalone: false,
         activeSession: null,
         activeSessionMessages: [{ text: 'stale' }],
         activeSessionDetailError: 'old',
@@ -69,6 +120,86 @@ test('selectSession defers detail loading until the next frame when a scheduler 
 
     await scheduled[0]();
     assert.strictEqual(detailLoads, 1);
+});
+
+test('selectSession coalesces same-frame rapid re-selection into one detail load', async () => {
+    const methods = createSessionBrowserMethods({
+        api: async () => ({})
+    });
+    const scheduled = [];
+    let detailLoads = 0;
+    const sessionA = { source: 'codex', sessionId: 's1', filePath: '/tmp/s1.jsonl' };
+    const sessionB = { source: 'codex', sessionId: 's2', filePath: '/tmp/s2.jsonl' };
+    const context = {
+        mainTab: 'sessions',
+        sessionStandalone: false,
+        activeSession: null,
+        activeSessionMessages: [],
+        activeSessionDetailError: '',
+        activeSessionDetailClipped: false,
+        sessionTimelineActiveKey: '',
+        getSessionExportKey(session) {
+            return `${session.source}:${session.sessionId}:${session.filePath}`;
+        },
+        resetSessionDetailPagination() {},
+        resetSessionPreviewMessageRender() {},
+        cancelSessionTimelineSync() {},
+        clearSessionTimelineRefs() {},
+        scheduleAfterFrame(task) {
+            scheduled.push(task);
+        },
+        async loadActiveSessionDetail() {
+            detailLoads += 1;
+        }
+    };
+
+    await methods.selectSession.call(context, sessionA);
+    await methods.selectSession.call(context, sessionB);
+    await methods.selectSession.call(context, sessionA);
+
+    assert.strictEqual(scheduled.length, 3);
+    for (const task of scheduled) {
+        await task();
+    }
+
+    assert.strictEqual(detailLoads, 1);
+});
+
+test('selectSession skips deferred detail loading after leaving sessions tab', async () => {
+    const methods = createSessionBrowserMethods({
+        api: async () => ({})
+    });
+    const scheduled = [];
+    let detailLoads = 0;
+    const sessionA = { source: 'codex', sessionId: 's1', filePath: '/tmp/s1.jsonl' };
+    const context = {
+        mainTab: 'sessions',
+        sessionStandalone: false,
+        activeSession: null,
+        activeSessionMessages: [],
+        activeSessionDetailError: '',
+        activeSessionDetailClipped: false,
+        sessionTimelineActiveKey: '',
+        getSessionExportKey(session) {
+            return `${session.source}:${session.sessionId}:${session.filePath}`;
+        },
+        resetSessionDetailPagination() {},
+        resetSessionPreviewMessageRender() {},
+        cancelSessionTimelineSync() {},
+        clearSessionTimelineRefs() {},
+        scheduleAfterFrame(task) {
+            scheduled.push(task);
+        },
+        async loadActiveSessionDetail() {
+            detailLoads += 1;
+        }
+    };
+
+    await methods.selectSession.call(context, sessionA);
+    context.mainTab = 'settings';
+    await scheduled[0]();
+
+    assert.strictEqual(detailLoads, 0);
 });
 
 test('syncSessionTimelineActiveFromScroll reuses container header offset when scroll container has no header', () => {

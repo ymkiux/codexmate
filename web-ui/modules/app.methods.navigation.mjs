@@ -491,11 +491,21 @@ export function createNavigationMethods(options = {}) {
             const listEl = this.sessionListEl || (this.$refs && this.$refs.sessionList) || null;
             if (!listEl) return;
             const remaining = Number(this.sessionListRemainingCount || 0);
-            if (remaining <= 0) return;
             const distanceToBottom = listEl.scrollHeight - (listEl.scrollTop + listEl.clientHeight);
             if (distanceToBottom > 240) return;
-            this.expandVisibleSessionList();
-            this.scheduleSessionListViewportFill();
+            if (remaining > 0) {
+                this.expandVisibleSessionList();
+                this.scheduleSessionListViewportFill();
+                return;
+            }
+            if (
+                this.sessionListHasMoreData
+                && !this.sessionsLoading
+                && !this.sessionListLoadingMore
+                && typeof this.loadMoreSessions === 'function'
+            ) {
+                void this.loadMoreSessions();
+            }
         },
 
         resetSessionPreviewMessageRender() {

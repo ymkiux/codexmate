@@ -52,6 +52,56 @@ test('switchMainTab tears down session heavy render state when leaving sessions 
     assert.strictEqual(calls.refreshClaude, 0);
 });
 
+test('switchMainTab aborts in-flight session detail requests when leaving sessions tab', () => {
+    let aborted = 0;
+    const vm = {
+        mainTab: 'sessions',
+        configMode: 'codex',
+        sessionsLoadedOnce: true,
+        sessionDetailLoading: true,
+        __sessionDetailAbortController: {
+            abort() {
+                aborted += 1;
+            }
+        },
+        teardownSessionTabRender() {},
+        prepareSessionTabRender() {},
+        loadSessions() {},
+        refreshClaudeModelContext() {}
+    };
+
+    switchMainTab.call(vm, 'settings');
+
+    assert.strictEqual(aborted, 1);
+    assert.strictEqual(vm.sessionDetailLoading, false);
+    assert.strictEqual(vm.__sessionDetailAbortController, null);
+});
+
+test('switchMainTab aborts in-flight session list requests when leaving sessions tab', () => {
+    let aborted = 0;
+    const vm = {
+        mainTab: 'sessions',
+        configMode: 'codex',
+        sessionsLoadedOnce: true,
+        sessionsLoading: true,
+        __sessionsListAbortController: {
+            abort() {
+                aborted += 1;
+            }
+        },
+        teardownSessionTabRender() {},
+        prepareSessionTabRender() {},
+        loadSessions() {},
+        refreshClaudeModelContext() {}
+    };
+
+    switchMainTab.call(vm, 'settings');
+
+    assert.strictEqual(aborted, 1);
+    assert.strictEqual(vm.sessionsLoading, false);
+    assert.strictEqual(vm.__sessionsListAbortController, null);
+});
+
 test('switchMainTab prepares session render and loads sessions only when not loaded yet', () => {
     const calls = {
         teardown: 0,
@@ -510,11 +560,62 @@ test('loadActiveSessionDetail primes visible messages even when timeline is disa
     assert.strictEqual(vm.activeSessionDetailError, '');
 });
 
+test('loadActiveSessionDetail clears loading after timeout and surfaces request error', async () => {
+    const vm = {
+        activeSession: {
+            source: 'codex',
+            sessionId: 's1',
+            filePath: 'session.jsonl',
+            sourceLabel: 'Codex'
+        },
+        mainTab: 'sessions',
+        sessionPreviewRenderEnabled: true,
+        sessionTimelineEnabled: false,
+        sessionDetailRequestSeq: 0,
+        sessionDetailLoading: false,
+        sessionDetailInitialMessageLimit: 80,
+        sessionDetailMessageLimit: 80,
+        activeSessionMessages: [{ text: 'stale' }],
+        activeSessionDetailError: '',
+        activeSessionDetailClipped: true,
+        sessionTimelineActiveKey: '',
+        sessionMessageRefMap: Object.create(null),
+        sessionPreviewPendingVisibleCount: 0,
+        resetSessionPreviewMessageRender() {
+            this._resetCount = (this._resetCount || 0) + 1;
+        },
+        resetSessionDetailPagination() {},
+        cancelSessionTimelineSync() {},
+        clearSessionTimelineRefs() {},
+        $nextTick(callback) {
+            callback();
+        }
+    };
+
+    await loadActiveSessionDetail.call(
+        vm,
+        async (_action, _params, options = {}) => {
+            assert.strictEqual(options.timeoutMs, 15000);
+            throw new Error('API request timed out for session-detail after 15000ms');
+        }
+    );
+
+    assert.strictEqual(vm.sessionDetailLoading, false);
+    assert.strictEqual(vm.activeSessionMessages.length, 0);
+    assert.strictEqual(vm.activeSessionDetailClipped, false);
+    assert.match(vm.activeSessionDetailError, /timed out/i);
+    assert.strictEqual(vm._resetCount, 1);
+});
+
 test('loadSessions skips active session detail fetch when explicitly disabled for usage-only aggregation', async () => {
     const vm = {
         mainTab: 'usage',
         sessionStandalone: false,
         sessionsLoading: false,
+        sessionListLoadingMore: false,
+        sessionListRequestLimit: 0,
+        sessionListInitialFetchLimit: 10,
+        sessionListHasMoreData: false,
         sessionsLoadedOnce: false,
         activeSessionDetailError: '',
         sessionFilterSource: 'all',
@@ -556,6 +657,8 @@ test('loadSessions skips active session detail fetch when explicitly disabled fo
     }), { includeActiveDetail: false });
 
     assert.strictEqual(vm.sessionsLoadedOnce, true);
+    assert.strictEqual(vm.sessionListRequestLimit, 10);
+    assert.strictEqual(vm.sessionListHasMoreData, false);
     assert.strictEqual(vm._detailLoadCount, 0);
     assert.strictEqual(vm.activeSession && vm.activeSession.sessionId, 'sess-1');
     assert.deepStrictEqual(vm.activeSessionMessages, []);
@@ -564,7 +667,12 @@ test('loadSessions skips active session detail fetch when explicitly disabled fo
 test('loadSessions keeps sessionsLoadedOnce false when initial request fails', async () => {
     const vm = {
         sessionsLoading: false,
+        sessionListLoadingMore: false,
+        sessionListRequestLimit: 0,
+        sessionListInitialFetchLimit: 10,
+        sessionListHasMoreData: false,
         sessionsLoadedOnce: false,
+        sessionsError: '',
         activeSessionDetailError: '',
         sessionFilterSource: 'all',
         sessionPathFilter: '',
@@ -600,6 +708,129 @@ test('loadSessions keeps sessionsLoadedOnce false when initial request fails', a
     assert.strictEqual(vm.sessionsLoading, false);
     assert.strictEqual(Array.isArray(vm.sessionsList), true);
     assert.strictEqual(vm.sessionsList.length, 0);
+});
+
+test('loadSessions clears loading after timeout and stores the visible list error', async () => {
+    const vm = {
+        sessionsLoading: false,
+        sessionListLoadingMore: false,
+        sessionListRequestLimit: 0,
+        sessionListInitialFetchLimit: 10,
+        sessionListHasMoreData: false,
+        sessionsLoadedOnce: false,
+        sessionsError: '',
+        activeSessionDetailError: '',
+        sessionFilterSource: 'all',
+        sessionPathFilter: '',
+        sessionQuery: '',
+        sessionRoleFilter: 'all',
+        sessionTimePreset: 'all',
+        sessionsList: [{ sessionId: 'old' }],
+        activeSession: { sessionId: 'old' },
+        activeSessionMessages: [{ text: 'old' }],
+        activeSessionDetailClipped: false,
+        sessionTimelineActiveKey: '',
+        sessionMessageRefMap: Object.create(null),
+        showMessage(message) {
+            this._message = message;
+        },
+        resetSessionDetailPagination() {},
+        resetSessionPreviewMessageRender() {},
+        cancelSessionTimelineSync() {},
+        syncSessionPathOptionsForSource() {},
+        extractPathOptionsFromSessions() {
+            return [];
+        },
+        getSessionExportKey(session) {
+            return session && session.sessionId ? session.sessionId : '';
+        },
+        async loadActiveSessionDetail() {},
+        loadSessionPathOptions() {
+            return Promise.resolve();
+        }
+    };
+
+    await loadSessions.call(
+        vm,
+        async (_action, params, options = {}) => {
+            assert.strictEqual(params.limit, 10);
+            assert.strictEqual(options.timeoutMs, 20000);
+            throw new Error('API request timed out for list-sessions after 20000ms');
+        }
+    );
+
+    assert.strictEqual(vm.sessionsLoading, false);
+    assert.strictEqual(vm.sessionsLoadedOnce, false);
+    assert.strictEqual(vm.sessionsList.length, 0);
+    assert.match(vm.sessionsError, /timed out/i);
+    assert.match(vm._message, /timed out/i);
+});
+
+test('loadSessions preserves the existing list when incremental loading fails', async () => {
+    const vm = {
+        sessionsLoading: false,
+        sessionListLoadingMore: false,
+        sessionListRequestLimit: 20,
+        sessionListInitialFetchLimit: 20,
+        sessionListHasMoreData: true,
+        sessionsLoadedOnce: true,
+        sessionsError: '',
+        activeSessionDetailError: '',
+        sessionFilterSource: 'all',
+        sessionPathFilter: '',
+        sessionQuery: '',
+        sessionRoleFilter: 'all',
+        sessionTimePreset: 'all',
+        sessionsList: [{ sessionId: 'old', source: 'codex', cwd: '/repo' }],
+        activeSession: { sessionId: 'old', source: 'codex', cwd: '/repo' },
+        activeSessionMessages: [{ text: 'old' }],
+        activeSessionDetailClipped: false,
+        sessionTimelineActiveKey: '',
+        sessionMessageRefMap: Object.create(null),
+        sessionListVisibleCount: 50,
+        showMessage(message) {
+            this._message = message;
+        },
+        resetSessionDetailPagination() {},
+        resetSessionPreviewMessageRender() {},
+        cancelSessionTimelineSync() {},
+        syncSessionPathOptionsForSource() {},
+        extractPathOptionsFromSessions() {
+            return [];
+        },
+        getSessionExportKey(session) {
+            return session && session.sessionId ? session.sessionId : '';
+        },
+        async loadActiveSessionDetail() {
+            throw new Error('detail should not reload while appending sessions');
+        },
+        loadSessionPathOptions() {
+            return Promise.resolve();
+        }
+    };
+
+    await loadSessions.call(
+        vm,
+        async (_action, params) => {
+            assert.strictEqual(params.limit, 40);
+            throw new Error('append failed');
+        },
+        {
+            limit: 40,
+            includeActiveDetail: false,
+            preserveExistingList: true,
+            preserveActiveDetail: true,
+            preserveVisibleCount: 40
+        }
+    );
+
+    assert.strictEqual(vm.sessionsLoading, false);
+    assert.strictEqual(vm.sessionListLoadingMore, false);
+    assert.strictEqual(vm.sessionsLoadedOnce, true);
+    assert.strictEqual(vm.sessionsList.length, 1);
+    assert.strictEqual(vm.activeSessionMessages.length, 1);
+    assert.match(vm.sessionsError, /append failed/i);
+    assert.match(vm._message, /append failed/i);
 });
 
 test('loadMoreSessionMessages requests older messages and toggles loading flag', async () => {

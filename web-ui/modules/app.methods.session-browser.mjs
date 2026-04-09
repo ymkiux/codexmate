@@ -132,6 +132,68 @@ export function createSessionBrowserMethods(options = {}) {
             }
         },
 
+        scheduleSessionPathOptionsWarmup(options = {}) {
+            const source = options.source === 'claude' ? 'claude' : (options.source === 'all' ? 'all' : 'codex');
+            const forceRefresh = !!options.forceRefresh;
+            const ticketMap = {
+                ...(this.__sessionPathWarmupTicketMap || {})
+            };
+            const nextTicket = (Number(ticketMap[source]) || 0) + 1;
+            ticketMap[source] = nextTicket;
+            this.__sessionPathWarmupTicketMap = ticketMap;
+
+            const handleMap = {
+                ...(this.__sessionPathWarmupHandleMap || {})
+            };
+            const previousHandle = handleMap[source];
+            if (previousHandle) {
+                if (typeof this.cancelIdleTask === 'function') {
+                    this.cancelIdleTask(previousHandle);
+                } else if (previousHandle.type === 'timeout' && Number.isFinite(Number(previousHandle.id))) {
+                    clearTimeout(previousHandle.id);
+                }
+            }
+
+            const run = () => {
+                const liveHandleMap = {
+                    ...(this.__sessionPathWarmupHandleMap || {})
+                };
+                delete liveHandleMap[source];
+                this.__sessionPathWarmupHandleMap = liveHandleMap;
+                const liveTicket = Number((((this.__sessionPathWarmupTicketMap || {})[source])) || 0);
+                if (liveTicket !== nextTicket) {
+                    return;
+                }
+                if (this.mainTab !== 'sessions' && !this.sessionStandalone) {
+                    return;
+                }
+                void this.loadSessionPathOptions({ source, forceRefresh });
+            };
+
+            if (typeof this.scheduleIdleTask === 'function') {
+                handleMap[source] = this.scheduleIdleTask(run, 240);
+                this.__sessionPathWarmupHandleMap = handleMap;
+                return;
+            }
+
+            if (typeof this.scheduleAfterFrame === 'function') {
+                this.__sessionPathWarmupHandleMap = handleMap;
+                this.scheduleAfterFrame(run);
+                return;
+            }
+
+            handleMap[source] = {
+                type: 'timeout',
+                id: setTimeout(run, 0)
+            };
+            this.__sessionPathWarmupHandleMap = handleMap;
+        },
+
+        onSessionPathFilterFocus() {
+            this.refreshSessionPathOptions(this.sessionFilterSource);
+            this.scheduleSessionPathOptionsWarmup({ source: this.sessionFilterSource });
+        },
+
         onSessionResumeYoloChange() {
             const value = this.sessionResumeWithYolo ? '1' : '0';
             localStorage.setItem('codexmateSessionResumeYolo', value);
@@ -286,16 +348,16 @@ export function createSessionBrowserMethods(options = {}) {
         async onSessionSourceChange() {
             this.refreshSessionPathOptions(this.sessionFilterSource);
             this.persistSessionFilterCache();
-            await this.loadSessions();
+            await this.loadSessions({ resetLimit: true });
         },
 
         async onSessionPathFilterChange() {
             this.persistSessionFilterCache();
-            await this.loadSessions();
+            await this.loadSessions({ resetLimit: true });
         },
 
         async onSessionFilterChange() {
-            await this.loadSessions();
+            await this.loadSessions({ resetLimit: true });
         },
 
         async clearSessionFilters() {
@@ -402,6 +464,28 @@ export function createSessionBrowserMethods(options = {}) {
             return result;
         },
 
+        async loadMoreSessions() {
+            if (this.sessionsLoading || this.sessionListLoadingMore || !this.sessionListHasMoreData) {
+                return;
+            }
+            const currentLimit = Number.isFinite(Number(this.sessionListRequestLimit))
+                ? Math.max(1, Math.floor(Number(this.sessionListRequestLimit)))
+                : Math.max(1, Math.floor(Number(this.sessionListInitialFetchLimit) || 10));
+            const step = Number.isFinite(Number(this.sessionListFetchStep))
+                ? Math.max(1, Math.floor(Number(this.sessionListFetchStep)))
+                : 10;
+            const currentVisible = Number.isFinite(Number(this.sessionListVisibleCount))
+                ? Math.max(0, Math.floor(Number(this.sessionListVisibleCount)))
+                : 0;
+            await this.loadSessions({
+                limit: currentLimit + step,
+                includeActiveDetail: false,
+                preserveExistingList: true,
+                preserveActiveDetail: true,
+                preserveVisibleCount: currentVisible + step
+            });
+        },
+
         async selectSession(session) {
             if (!session) return;
             if (this.activeSession && this.getSessionExportKey(this.activeSession) === this.getSessionExportKey(session)) return;
@@ -416,8 +500,12 @@ export function createSessionBrowserMethods(options = {}) {
             this.clearSessionTimelineRefs();
             if (typeof this.scheduleAfterFrame === 'function') {
                 const selectedSession = this.activeSession;
+                const hydrationTicket = (Number(this.__sessionDetailHydrationTicket) || 0) + 1;
+                this.__sessionDetailHydrationTicket = hydrationTicket;
                 this.scheduleAfterFrame(() => {
+                    if (hydrationTicket !== Number(this.__sessionDetailHydrationTicket || 0)) return;
                     if (this.activeSession !== selectedSession) return;
+                    if (this.mainTab !== 'sessions' && !this.sessionStandalone) return;
                     void this.loadActiveSessionDetail();
                 });
                 return;

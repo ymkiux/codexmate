@@ -238,6 +238,57 @@ test('touch config-tab preselection updates the active item before the committed
     assert.strictEqual(context.isConfigModeNavActive('codex'), false);
 });
 
+test('onMainTabClick keeps navigation responsive while the sessions tab is still loading', async () => {
+    let resolveSessionsLoad = null;
+    const methods = createNavigationMethods({
+        configModeSet: new Set(['codex', 'claude', 'openclaw']),
+        switchMainTabHelper(tab) {
+            this._switchCalls = (this._switchCalls || []);
+            this._switchCalls.push(tab);
+            this.mainTab = tab;
+            if (tab !== 'sessions') {
+                return undefined;
+            }
+            this.sessionsLoading = true;
+            this._sessionsLoadPromise = new Promise((resolve) => {
+                resolveSessionsLoad = () => {
+                    this.sessionsLoading = false;
+                    this.sessionsLoadedOnce = true;
+                    resolve();
+                };
+            });
+            return this._sessionsLoadPromise;
+        },
+        loadMoreSessionMessagesHelper() {}
+    });
+    const context = createNavigationContext(methods, {
+        mainTab: 'config',
+        sessionsLoading: false,
+        sessionsLoadedOnce: false,
+        sessionListRenderEnabled: false,
+        sessionPreviewRenderEnabled: false,
+        scheduleAfterFrame(callback) {
+            callback();
+        },
+        cancelScheduledSessionTabDeferredTeardown() {}
+    });
+
+    context.onMainTabClick('sessions');
+
+    assert.strictEqual(context.mainTab, 'sessions');
+    assert.strictEqual(context.sessionsLoading, true);
+
+    context.onMainTabClick('usage');
+    assert.strictEqual(context.mainTab, 'usage');
+
+    resolveSessionsLoad();
+    await context._sessionsLoadPromise;
+
+    assert.strictEqual(context.sessionsLoading, false);
+    assert.strictEqual(context.sessionsLoadedOnce, true);
+    assert.deepStrictEqual(context._switchCalls, ['sessions', 'usage']);
+});
+
 test('primeSessionListRender limits initial session list work to the configured batch size', () => {
     const methods = createNavigationMethods({
         configModeSet: new Set(['codex', 'claude', 'openclaw']),
@@ -298,6 +349,38 @@ test('onSessionListScroll grows the rendered session batch near the list bottom'
 
     assert.strictEqual(context.sessionListVisibleCount, 280);
     assert.strictEqual(context._viewportFillScheduled, 1);
+});
+
+test('onSessionListScroll requests more session data after the rendered list is exhausted', async () => {
+    const methods = createNavigationMethods({
+        configModeSet: new Set(['codex', 'claude', 'openclaw']),
+        switchMainTabHelper(tab) {
+            this.mainTab = tab;
+        },
+        loadMoreSessionMessagesHelper() {}
+    });
+    const context = createNavigationContext(methods, {
+        mainTab: 'sessions',
+        sessionListRenderEnabled: true,
+        sessionListVisibleCount: 50,
+        sessionListRemainingCount: 0,
+        sessionListHasMoreData: true,
+        sessionsLoading: false,
+        sessionListLoadingMore: false,
+        sessionListEl: {
+            scrollHeight: 1200,
+            scrollTop: 920,
+            clientHeight: 120
+        },
+        async loadMoreSessions() {
+            this._loadMoreSessionsCalls = (this._loadMoreSessionsCalls || 0) + 1;
+        }
+    });
+
+    context.onSessionListScroll();
+    await Promise.resolve();
+
+    assert.strictEqual(context._loadMoreSessionsCalls, 1);
 });
 
 test('download directory actions clear stale delayed progress resets before scheduling a new one', async () => {

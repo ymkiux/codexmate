@@ -40,6 +40,8 @@
                             <select
                                 class="session-path-select"
                                 v-model="sessionPathFilter"
+                                @focus="onSessionPathFilterFocus"
+                                @pointerdown="onSessionPathFilterFocus"
                                 @change="onSessionPathFilterChange"
                                 :disabled="sessionsLoading">
                                 <option value="">全部路径</option>
@@ -89,8 +91,12 @@
                     </div>
                 </div>
 
-                <div v-if="sessionsLoading" class="state-message">
+                <div v-if="sessionsLoading && sessionsList.length === 0" class="state-message">
                     会话加载中...
+                </div>
+
+                <div v-else-if="sessionsError && sessionsList.length === 0" class="session-empty">
+                    {{ sessionsError }}
                 </div>
 
                 <div v-else-if="sessionsList.length === 0" class="session-empty">
@@ -99,6 +105,9 @@
 
                 <div v-else class="session-layout">
                     <div v-if="sessionListRenderEnabled" class="session-list" :ref="setSessionListRef" @scroll="onSessionListScroll">
+                        <div v-if="sessionsError" class="session-item-sub session-item-wrap">
+                            {{ sessionsError }}
+                        </div>
                         <div
                             v-for="session in visibleSessionsList"
                             :key="session.source + '-' + session.sessionId + '-' + session.filePath"
@@ -155,8 +164,18 @@
                                 <span class="session-item-time">{{ session.updatedAt || 'unknown time' }}</span>
                             </div>
                         </div>
-                        <div v-if="sessionListRemainingCount > 0" class="session-item-sub session-item-wrap">
-                            继续滚动可加载更多会话（剩余 {{ sessionListRemainingCount }}）
+                        <div
+                            v-if="sessionListLoadingMore || sessionListRemainingCount > 0 || sessionListHasMoreData"
+                            class="session-item-sub session-item-wrap">
+                            {{
+                                sessionListLoadingMore
+                                    ? '加载更多会话中...'
+                                    : (
+                                        sessionListRemainingCount > 0
+                                            ? ('继续滚动可加载更多会话（剩余 ' + sessionListRemainingCount + '）')
+                                            : '继续滚动可加载更多会话'
+                                    )
+                            }}
                         </div>
                     </div>
                     <div v-else class="session-list session-list-placeholder"></div>

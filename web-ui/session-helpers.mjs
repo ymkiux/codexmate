@@ -1,5 +1,8 @@
 ﻿import { buildSessionListParams } from './logic.mjs';
 
+const SESSION_LIST_REQUEST_TIMEOUT_MS = 20000;
+const SESSION_DETAIL_REQUEST_TIMEOUT_MS = 15000;
+
 function clearSessionTimelineRefs(vm) {
     if (typeof vm.clearSessionTimelineRefs === 'function') {
         vm.clearSessionTimelineRefs();
@@ -11,11 +14,80 @@ function clearSessionTimelineRefs(vm) {
     }
 }
 
+function cancelActiveSessionDetailRequest(vm) {
+    if (!vm || !vm.__sessionDetailAbortController || typeof vm.__sessionDetailAbortController.abort !== 'function') {
+        return;
+    }
+    try {
+        vm.__sessionDetailAbortController.abort();
+    } catch (_) {}
+    vm.__sessionDetailAbortController = null;
+}
+
+function cancelActiveSessionsListRequest(vm) {
+    if (!vm || !vm.__sessionsListAbortController || typeof vm.__sessionsListAbortController.abort !== 'function') {
+        return;
+    }
+    try {
+        vm.__sessionsListAbortController.abort();
+    } catch (_) {}
+    vm.__sessionsListAbortController = null;
+}
+
+function resolveSessionListRequestLimit(vm, options = {}) {
+    const rawExplicitLimit = Number(options.limit);
+    if (Number.isFinite(rawExplicitLimit)) {
+        return Math.max(1, Math.floor(rawExplicitLimit));
+    }
+
+    const rawPersistedLimit = Number(vm && vm.sessionListRequestLimit);
+    if (Number.isFinite(rawPersistedLimit) && rawPersistedLimit > 0 && options.resetLimit !== true) {
+        return Math.max(1, Math.floor(rawPersistedLimit));
+    }
+
+    const rawInitialLimit = Number(vm && vm.sessionListInitialFetchLimit);
+    if (Number.isFinite(rawInitialLimit) && rawInitialLimit > 0) {
+        return Math.max(1, Math.floor(rawInitialLimit));
+    }
+
+    return 10;
+}
+
+function applySessionListRenderState(vm, options = {}) {
+    if (!vm) {
+        return;
+    }
+
+    if (Number.isFinite(Number(options.visibleCount))) {
+        const total = Array.isArray(vm.sessionsList) ? vm.sessionsList.length : 0;
+        vm.sessionListVisibleCount = Math.min(
+            total,
+            Math.max(0, Math.floor(Number(options.visibleCount)))
+        );
+        if (typeof vm.$nextTick === 'function' && typeof vm.scheduleSessionListViewportFill === 'function') {
+            vm.$nextTick(() => {
+                if (vm.mainTab !== 'sessions' || !vm.sessionListRenderEnabled) {
+                    return;
+                }
+                vm.scheduleSessionListViewportFill();
+            });
+        }
+        return;
+    }
+
+    if (typeof vm.primeSessionListRender === 'function') {
+        vm.primeSessionListRender();
+    }
+}
+
 function scheduleSessionDetailHydration(vm, options = {}) {
     if (!vm || typeof vm.loadActiveSessionDetail !== 'function') {
         return;
     }
+    const hydrationTicket = (Number(vm.__sessionDetailHydrationTicket) || 0) + 1;
+    vm.__sessionDetailHydrationTicket = hydrationTicket;
     const task = () => {
+        if (hydrationTicket !== Number(vm.__sessionDetailHydrationTicket || 0)) return;
         if (!vm.activeSession) return;
         if (vm.mainTab !== 'sessions' && !vm.sessionStandalone) return;
         if (vm.sessionDetailLoading) return;
@@ -41,6 +113,11 @@ export function switchMainTab(tab) {
     this.mainTab = nextTab;
 
     if (leavingSessions) {
+        cancelActiveSessionsListRequest(this);
+        this.sessionsLoading = false;
+        this.sessionListLoadingMore = false;
+        cancelActiveSessionDetailRequest(this);
+        this.sessionDetailLoading = false;
         const teardown = () => {
             if (this.mainTab === 'sessions') return;
             if (typeof this.finalizeSessionTabTeardown === 'function') {
@@ -125,28 +202,57 @@ export function switchMainTab(tab) {
 }
 
 export async function loadSessions(api, options = {}) {
-    if (this.sessionsLoading) return;
-    this.sessionsLoading = true;
+    const normalizedOptions = options && typeof options === 'object' && !Array.isArray(options)
+        ? options
+        : {};
+    const requestLimit = resolveSessionListRequestLimit(this, normalizedOptions);
+    const preserveExistingList = normalizedOptions.preserveExistingList === true
+        && Array.isArray(this.sessionsList)
+        && this.sessionsList.length > 0;
+    const preserveActiveDetail = preserveExistingList && normalizedOptions.preserveActiveDetail === true;
+    const preserveVisibleCount = Number.isFinite(Number(normalizedOptions.preserveVisibleCount))
+        ? Math.max(0, Math.floor(Number(normalizedOptions.preserveVisibleCount)))
+        : null;
+    cancelActiveSessionsListRequest(this);
+    const requestSeq = (Number(this.__sessionsListRequestSeq) || 0) + 1;
+    this.__sessionsListRequestSeq = requestSeq;
+    const requestController = typeof AbortController !== 'undefined'
+        ? new AbortController()
+        : null;
+    this.__sessionsListAbortController = requestController;
+    this.sessionsLoading = !preserveExistingList;
+    this.sessionListLoadingMore = preserveExistingList;
+    this.sessionsError = '';
     this.activeSessionDetailError = '';
     let loadSucceeded = false;
-    const includeActiveDetail = options && Object.prototype.hasOwnProperty.call(options, 'includeActiveDetail')
-        ? !!options.includeActiveDetail
+    const includeActiveDetail = Object.prototype.hasOwnProperty.call(normalizedOptions, 'includeActiveDetail')
+        ? !!normalizedOptions.includeActiveDetail
         : (this.mainTab === 'sessions' || !!this.sessionStandalone);
     const params = buildSessionListParams({
         source: this.sessionFilterSource,
         pathFilter: this.sessionPathFilter,
         query: this.sessionQuery,
         roleFilter: this.sessionRoleFilter,
-        timeRangePreset: this.sessionTimePreset
+        timeRangePreset: this.sessionTimePreset,
+        limit: requestLimit
     });
     try {
-        const res = await api('list-sessions', params);
+        const res = await api('list-sessions', params, {
+            signal: requestController ? requestController.signal : undefined,
+            timeoutMs: SESSION_LIST_REQUEST_TIMEOUT_MS
+        });
+        if (requestSeq !== Number(this.__sessionsListRequestSeq || 0)) {
+            return;
+        }
         if (res.error) {
+            this.sessionsError = res.error;
             this.showMessage(res.error, 'error');
-            this.sessionsList = [];
-            if (typeof this.primeSessionListRender === 'function') {
-                this.primeSessionListRender();
+            if (preserveExistingList) {
+                return;
             }
+            this.sessionsList = [];
+            this.sessionListHasMoreData = false;
+            applySessionListRenderState(this);
             this.activeSession = null;
             this.activeSessionMessages = [];
             this.resetSessionDetailPagination();
@@ -157,10 +263,13 @@ export async function loadSessions(api, options = {}) {
             clearSessionTimelineRefs(this);
         } else {
             loadSucceeded = true;
+            this.sessionsError = '';
             this.sessionsList = Array.isArray(res.sessions) ? res.sessions : [];
-            if (typeof this.primeSessionListRender === 'function') {
-                this.primeSessionListRender();
-            }
+            this.sessionListRequestLimit = requestLimit;
+            this.sessionListHasMoreData = this.sessionsList.length >= requestLimit;
+            applySessionListRenderState(this, {
+                visibleCount: preserveVisibleCount
+            });
             this.syncSessionPathOptionsForSource(
                 this.sessionFilterSource,
                 this.extractPathOptionsFromSessions(this.sessionsList),
@@ -178,26 +287,40 @@ export async function loadSessions(api, options = {}) {
             } else {
                 const oldKey = this.activeSession ? this.getSessionExportKey(this.activeSession) : '';
                 const matched = this.sessionsList.find(item => this.getSessionExportKey(item) === oldKey);
-                this.activeSession = matched || this.sessionsList[0];
-                this.activeSessionMessages = [];
-                this.resetSessionDetailPagination();
-                this.resetSessionPreviewMessageRender();
-                this.activeSessionDetailError = '';
-                this.activeSessionDetailClipped = false;
-                this.cancelSessionTimelineSync();
-                this.sessionTimelineActiveKey = '';
-                clearSessionTimelineRefs(this);
-                if (includeActiveDetail) {
+                if (preserveActiveDetail && matched) {
+                    this.activeSession = matched;
+                } else {
+                    this.activeSession = matched || this.sessionsList[0];
+                    this.activeSessionMessages = [];
+                    this.resetSessionDetailPagination();
+                    this.resetSessionPreviewMessageRender();
+                    this.activeSessionDetailError = '';
+                    this.activeSessionDetailClipped = false;
+                    this.cancelSessionTimelineSync();
+                    this.sessionTimelineActiveKey = '';
+                    clearSessionTimelineRefs(this);
+                }
+                if (!preserveActiveDetail && includeActiveDetail) {
                     await this.loadActiveSessionDetail();
                 }
             }
-            void this.loadSessionPathOptions({ source: this.sessionFilterSource });
         }
     } catch (e) {
-        this.sessionsList = [];
-        if (typeof this.primeSessionListRender === 'function') {
-            this.primeSessionListRender();
+        if (requestSeq !== Number(this.__sessionsListRequestSeq || 0)) {
+            return;
         }
+        if (requestController && requestController.signal && requestController.signal.aborted) {
+            this.sessionsError = '';
+            return;
+        }
+        if (preserveExistingList) {
+            this.sessionsError = '加载会话失败: ' + e.message;
+            this.showMessage(this.sessionsError, 'error');
+            return;
+        }
+        this.sessionsList = [];
+        this.sessionListHasMoreData = false;
+        applySessionListRenderState(this);
         this.activeSession = null;
         this.activeSessionMessages = [];
         this.resetSessionDetailPagination();
@@ -206,17 +329,26 @@ export async function loadSessions(api, options = {}) {
         this.cancelSessionTimelineSync();
         this.sessionTimelineActiveKey = '';
         clearSessionTimelineRefs(this);
-        this.showMessage('加载会话失败', 'error');
+        this.sessionsError = '加载会话失败: ' + e.message;
+        this.showMessage(this.sessionsError, 'error');
     } finally {
-        this.sessionsLoading = false;
-        if (loadSucceeded) {
-            this.sessionsLoadedOnce = true;
+        if (requestSeq === Number(this.__sessionsListRequestSeq || 0)) {
+            if (this.__sessionsListAbortController === requestController) {
+                this.__sessionsListAbortController = null;
+            }
+            this.sessionsLoading = false;
+            this.sessionListLoadingMore = false;
+            if (loadSucceeded) {
+                this.sessionsLoadedOnce = true;
+            }
         }
     }
 }
 
 export async function loadActiveSessionDetail(api, options = {}) {
     if (!this.activeSession) {
+        cancelActiveSessionDetailRequest(this);
+        this.sessionDetailLoading = false;
         this.activeSessionMessages = [];
         this.resetSessionDetailPagination();
         this.resetSessionPreviewMessageRender();
@@ -228,8 +360,14 @@ export async function loadActiveSessionDetail(api, options = {}) {
         return;
     }
 
+    this.__sessionDetailHydrationTicket = (Number(this.__sessionDetailHydrationTicket) || 0) + 1;
     const currentActiveSession = this.activeSession;
+    cancelActiveSessionDetailRequest(this);
     const requestSeq = ++this.sessionDetailRequestSeq;
+    const requestController = typeof AbortController !== 'undefined'
+        ? new AbortController()
+        : null;
+    this.__sessionDetailAbortController = requestController;
     this.sessionDetailLoading = true;
     this.activeSessionDetailError = '';
     const fallbackLimit = Number.isFinite(this.sessionDetailInitialMessageLimit)
@@ -245,6 +383,9 @@ export async function loadActiveSessionDetail(api, options = {}) {
             sessionId: this.activeSession.sessionId,
             filePath: this.activeSession.filePath,
             messageLimit
+        }, {
+            signal: requestController ? requestController.signal : undefined,
+            timeoutMs: SESSION_DETAIL_REQUEST_TIMEOUT_MS
         });
 
         if (requestSeq !== this.sessionDetailRequestSeq) {
@@ -326,6 +467,10 @@ export async function loadActiveSessionDetail(api, options = {}) {
         if (!this.activeSession || this.activeSession !== currentActiveSession) {
             return;
         }
+        if (requestController && requestController.signal && requestController.signal.aborted) {
+            this.activeSessionDetailError = '';
+            return;
+        }
         this.activeSessionMessages = [];
         this.sessionPreviewPendingVisibleCount = 0;
         this.resetSessionPreviewMessageRender();
@@ -336,6 +481,9 @@ export async function loadActiveSessionDetail(api, options = {}) {
         clearSessionTimelineRefs(this);
     } finally {
         if (requestSeq === this.sessionDetailRequestSeq) {
+            if (this.__sessionDetailAbortController === requestController) {
+                this.__sessionDetailAbortController = null;
+            }
             this.sessionDetailLoading = false;
         }
     }

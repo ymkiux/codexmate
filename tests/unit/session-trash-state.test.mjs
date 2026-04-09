@@ -1476,6 +1476,69 @@ test('readSessionDetail resolves file aliases through getSessionFileArg', async 
     assert.strictEqual(result.filePath, '/tmp/detail.jsonl');
 });
 
+test('extractSessionDetailPreviewFromFile prefers cached tail preview for large sessions', async () => {
+    const extractSessionDetailPreviewFromFileSource = extractFunctionBySignature(
+        cliSource,
+        'async function extractSessionDetailPreviewFromFile(filePath, source, messageLimit) {',
+        'extractSessionDetailPreviewFromFile'
+    );
+
+    let streamReads = 0;
+    let cachedTailCalls = 0;
+    const expected = {
+        sessionId: 'detail-fast',
+        cwd: '/tmp/detail-fast',
+        updatedAt: '2025-03-30T00:00:00.000Z',
+        totalMessages: 1205,
+        messages: [{ role: 'assistant', text: 'latest' }]
+    };
+    const extractSessionDetailPreviewFromFile = instantiateFunction(
+        extractSessionDetailPreviewFromFileSource,
+        'extractSessionDetailPreviewFromFile',
+        {
+            DEFAULT_SESSION_DETAIL_MESSAGES: 300,
+            getFileStatSafe() {
+                return { size: 1024 * 1024, mtimeMs: 1 };
+            },
+            readExactMessageCountCache() {
+                return 1205;
+            },
+            extractSessionDetailPreviewFromCachedTail(filePath, source, messageLimit, exactTotalMessages, stat) {
+                cachedTailCalls += 1;
+                assert.strictEqual(filePath, '/tmp/detail-fast.jsonl');
+                assert.strictEqual(source, 'codex');
+                assert.strictEqual(messageLimit, 300);
+                assert.strictEqual(exactTotalMessages, 1205);
+                assert.deepStrictEqual(stat, { size: 1024 * 1024, mtimeMs: 1 });
+                return expected;
+            },
+            extractSessionDetailPreviewFromRecords() {
+                throw new Error('should not fall back to records');
+            },
+            readJsonlRecords() {
+                throw new Error('should not read fallback records');
+            },
+            fs: {
+                createReadStream() {
+                    streamReads += 1;
+                    throw new Error('stream path should be skipped');
+                }
+            },
+            readline: {
+                createInterface() {
+                    throw new Error('readline should be skipped');
+                }
+            }
+        }
+    );
+
+    const result = await extractSessionDetailPreviewFromFile('/tmp/detail-fast.jsonl', 'codex', 300);
+
+    assert.strictEqual(cachedTailCalls, 1);
+    assert.strictEqual(streamReads, 0);
+    assert.deepStrictEqual(result, expected);
+});
+
 test('readSessionPlain resolves file aliases through getSessionFileArg', async () => {
     const readSessionPlainSource = extractFunctionBySignature(
         cliSource,
