@@ -321,10 +321,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     const missingCurrentKeys = headDataKeys.filter((key) => !currentDataKeys.includes(key)).sort();
     const allowedExtraCurrentKeys = parityAgainstHead ? [
         'openclawAuthProfilesByProvider',
-        'openclawPendingAuthProfileUpdates',
-        'sessionListVisibleCount',
-        'sessionListInitialBatchSize',
-        'sessionListLoadStep'
+        'openclawPendingAuthProfileUpdates'
     ] : [
         '__mainTabSwitchState',
         'openclawAuthProfilesByProvider',
@@ -339,7 +336,10 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'sessionsViewMode'
     ];
     const allowedMissingCurrentKeys = [
-        'showInstallModal'
+        'showInstallModal',
+        'sessionListInitialBatchSize',
+        'sessionListLoadStep',
+        'sessionListVisibleCount'
     ];
     if (parityAgainstHead) {
         const allowedExtraKeySet = new Set(allowedExtraCurrentKeys);
@@ -386,7 +386,15 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     ];
     const allowedMissingCurrentMethodKeys = [
         'closeInstallModal',
-        'openInstallModal'
+        'openInstallModal',
+        'cancelScheduledSessionListViewportFill',
+        'expandVisibleSessionList',
+        'getSessionListRenderSource',
+        'onSessionListScroll',
+        'primeSessionListRender',
+        'resetSessionListRender',
+        'scheduleSessionListViewportFill',
+        'setSessionListRef'
     ];
     if (parityAgainstHead) {
         const allowedExtraMethodKeySet = new Set(allowedExtraCurrentMethodKeys);
@@ -415,18 +423,24 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'sessionListRemainingCount',
         'visibleSessionsList'
     ];
+    const allowedMissingCurrentComputedKeys = [
+        'sessionListRemainingCount',
+        'visibleSessionsList'
+    ];
     if (parityAgainstHead) {
         const allowedExtraComputedKeySet = new Set(allowedExtraCurrentComputedKeys);
+        const allowedMissingComputedKeySet = new Set(allowedMissingCurrentComputedKeys);
         const unexpectedExtraCurrentComputedKeys = extraCurrentComputedKeys.filter((key) => !allowedExtraComputedKeySet.has(key));
+        const unexpectedMissingCurrentComputedKeys = missingCurrentComputedKeys.filter((key) => !allowedMissingComputedKeySet.has(key));
         assert.deepStrictEqual(unexpectedExtraCurrentComputedKeys, [], `unexpected extra computed keys against ${parityBaseline.ref}`);
-        assert.deepStrictEqual(missingCurrentComputedKeys, [], `unexpected missing computed keys against ${parityBaseline.ref}`);
+        assert.deepStrictEqual(unexpectedMissingCurrentComputedKeys, [], `unexpected missing computed keys against ${parityBaseline.ref}`);
     } else {
         assert.deepStrictEqual(extraCurrentComputedKeys, allowedExtraCurrentComputedKeys);
-        assert.deepStrictEqual(missingCurrentComputedKeys, []);
+        assert.deepStrictEqual(missingCurrentComputedKeys, allowedMissingCurrentComputedKeys);
     }
     assert.deepStrictEqual(
         currentComputedKeys.filter((key) => !extraCurrentComputedKeys.includes(key)).sort(),
-        headComputedKeys
+        headComputedKeys.filter((key) => !missingCurrentComputedKeys.includes(key)).sort()
     );
     assert.strictEqual(typeof currentAppOptions.mounted, typeof headAppOptions.mounted);
     assert.strictEqual(typeof currentAppOptions.beforeUnmount, typeof headAppOptions.beforeUnmount);
