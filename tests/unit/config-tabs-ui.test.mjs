@@ -28,6 +28,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /isProviderConfigMode/);
     assert.match(html, /provider-fast-switch-select/);
     assert.match(html, /forceCompactLayout/);
+    assert.match(html, /<script src="\/res\/vue\.global\.js"><\/script>/);
     assert.match(html, /quickSwitchProvider\(\$event\.target\.value\)/);
     assert.match(html, /onMainTabPointerDown\('sessions', \$event\)/);
     assert.match(html, /onConfigTabPointerDown\('codex', \$event\)/);
@@ -205,12 +206,22 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.doesNotMatch(sessionsPanel, /sessionUsageSummaryCards/);
     assert.match(usagePanel, /sessionsUsageTimeRange === '7d'/);
     assert.match(usagePanel, /sessionsUsageTimeRange === '30d'/);
+    assert.match(usagePanel, /sessionsUsageList\.length/);
+    assert.match(usagePanel, /loadSessionsUsage\(\{ forceRefresh: true \}\)/);
     assert.match(usagePanel, /sessionUsageSummaryCards/);
     assert.match(usagePanel, /sessionUsageCharts\.buckets/);
+    assert.doesNotMatch(usagePanel, /sessionUsageCharts\.topPaths\[0\]\?\.count/);
+    assert.doesNotMatch(html, /sessionUsageSummaryCards\[0\]\?\.value/);
+    assert.doesNotMatch(html, /sessionUsageSummaryCards\[1\]\?\.value/);
     assert.match(html, /class="pin-icon"/);
     assert.match(html, /:aria-selected="mainTab === 'sessions'"/);
     assert.match(html, /:aria-selected="mainTab === 'usage'"/);
     assert.match(html, /:aria-selected="mainTab === 'config' && configMode === 'codex'"/);
+    assert.match(html, /v-for="session in sortedSessionsList"/);
+    assert.match(html, /<div v-if="sessionListRenderEnabled" class="session-list">/);
+    assert.doesNotMatch(html, /visibleSessionsList/);
+    assert.doesNotMatch(html, /setSessionListRef/);
+    assert.doesNotMatch(html, /onSessionListScroll/);
     assert.match(html, /v-memo="\[activeSessionExportKey === getSessionExportKey\(session\)/);
     assert.match(html, /v-memo="\[msg\.text,\s*msg\.timestamp,\s*msg\.roleLabel,\s*msg\.normalizedRole\]"/);
     assert.match(html, /v-memo="\[sessionTimelineActiveKey === node\.key,\s*node\.safePercent,\s*node\.title\]"/);
@@ -229,7 +240,8 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /<button class="card-action-btn delete"[^>]*@click="deleteClaudeConfig\(name\)"[^>]*:aria-label="`Delete Claude config \$\{name\}`"[^>]*title="删除">/);
     assert.match(html, /<button class="card-action-btn"[^>]*@click="copyClaudeShareCommand\(name\)"[^>]*disabled[^>]*>/);
     assert.match(html, /<button class="card-action-btn"[^>]*@click="openOpenclawEditModal\(name\)"[^>]*:aria-label="`Edit OpenClaw config \$\{name\}`"[^>]*title="编辑">/);
-    assert.match(html, /<button class="card-action-btn delete"[^>]*@click="deleteOpenclawConfig\(name\)"[^>]*:aria-label="`Delete OpenClaw config \$\{name\}`"[^>]*title="删除">/);
+    assert.match(html, /<div class="docs-command-row">[\s\S]*<code class="install-command">\{\{ target\.command \}\}<\/code>[\s\S]*<button type="button" class="btn-mini docs-copy-btn"/);
+    assert.match(html, /<button v-if="name !== '默认配置'" class="card-action-btn delete"[^>]*@click="deleteOpenclawConfig\(name\)"[^>]*:aria-label="`Delete OpenClaw config \$\{name\}`"[^>]*title="删除">/);
     assert.match(modalsBasic, /<div v-if="showAddModal" class="modal-overlay" @click\.self="closeAddModal">/);
     assert.match(modalsBasic, /<div v-if="showModelModal" class="modal-overlay" @click\.self="closeModelModal">/);
     assert.match(modalsBasic, /<div v-if="showClaudeConfigModal" class="modal-overlay" @click\.self="closeClaudeConfigModal">/);
@@ -268,7 +280,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(openclawModal, /<div class="modal-title" id="openclaw-config-modal-title">{{ openclawEditorTitle }}<\/div>/);
     assert.match(openclawModal, /:readonly="openclawSaving \|\| openclawApplying"/);
     assert.match(openclawModal, /<button class="btn btn-cancel" @click="closeOpenclawConfigModal" :disabled="openclawSaving \|\| openclawApplying">取消<\/button>/);
-    assert.match(openclawModal, /<button class="btn btn-confirm" @click="saveOpenclawConfig" :disabled="openclawSaving \|\| openclawApplying">/);
+    assert.match(openclawModal, /<button class="btn btn-confirm" @click="saveOpenclawConfig" :disabled="openclawSaving \|\| openclawApplying \|\| \(openclawEditing\.lockName && openclawEditing\.name === '默认配置'\)">/);
     assert.match(openclawModal, /<button class="btn btn-confirm secondary" @click="saveAndApplyOpenclawConfig" :disabled="openclawSaving \|\| openclawApplying">/);
     assert.doesNotMatch(baseTheme, /fonts\.googleapis\.com/);
     assert.match(controlsForms, /\.btn-tool-compact:disabled:hover,\s*\.btn-tool-compact\[disabled\]:hover/);
@@ -288,6 +300,7 @@ test('web ui script defines provider mode metadata for codex only', () => {
     assert.match(appScript, /this\.switchMainTab\('config'\);/);
     assert.match(appScript, /if \(this\.mainTab === 'config'\) {/);
     assert.match(appScript, /this\.clearMainTabSwitchIntent\('config'\);/);
+    assert.match(appScript, /__mainTabSwitchState:\s*\{[\s\S]*intent:\s*''[\s\S]*pendingTarget:\s*''[\s\S]*pendingConfigMode:\s*''[\s\S]*ticket:\s*0[\s\S]*\}/);
     assert.match(appScript, /setMainTabSwitchIntent\(tab\)/);
     assert.match(appScript, /ensureMainTabSwitchState\(\)/);
     assert.match(appScript, /ensureImmediateNavDomState\(\)/);
@@ -309,7 +322,9 @@ test('web ui script defines provider mode metadata for codex only', () => {
     assert.match(appScript, /isMainTabNavActive\(tab\)/);
     assert.match(appScript, /isConfigModeNavActive\(mode\)/);
     assert.match(appScript, /const isLeavingSessions = previousTab === 'sessions' && targetTab !== 'sessions';/);
-    assert.match(appScript, /const enteringSessionDataTab = nextTab === 'sessions' \|\| nextTab === 'usage';/);
+    assert.match(appScript, /const enteringSessionsTab = nextTab === 'sessions';/);
+    assert.match(appScript, /const enteringUsageTab = nextTab === 'usage';/);
+    assert.match(appScript, /this\.loadSessionsUsage\(\);/);
     assert.match(appScript, /if \(targetTab === previousTab\) {/);
     assert.match(appScript, /const shouldDeferApply = isLeavingSessions;/);
     assert.match(appScript, /if \(isLeavingSessions && !this\.isSessionPanelFastHidden\(\)\) {/);

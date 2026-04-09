@@ -294,11 +294,11 @@
                         </div>
                         <div class="status-chip">
                             <span class="label">总会话数</span>
-                            <span class="value">{{ sessionUsageSummaryCards[0]?.value ?? 0 }}</span>
+                            <span class="value">{{ sessionUsageSummaryCards[0] ? sessionUsageSummaryCards[0].value : 0 }}</span>
                         </div>
                         <div class="status-chip">
                             <span class="label">总消息数</span>
-                            <span class="value">{{ sessionUsageSummaryCards[1]?.value ?? 0 }}</span>
+                            <span class="value">{{ sessionUsageSummaryCards[1] ? sessionUsageSummaryCards[1].value : 0 }}</span>
                         </div>
                     </div>
                     <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'market'">

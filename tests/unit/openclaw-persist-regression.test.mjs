@@ -36,6 +36,8 @@ function createContext(methods, overrides = {}) {
         openclawConfigPath: '',
         openclawConfigExists: false,
         openclawLineEnding: '\n',
+        openclawAuthProfilesByProvider: {},
+        openclawPendingAuthProfileUpdates: {},
         openclawSaving: false,
         openclawApplying: false,
         openclawFileLoading: false,
@@ -57,6 +59,9 @@ function createContext(methods, overrides = {}) {
         },
         resetOpenclawQuick() {
             this.resetOpenclawQuickCalls += 1;
+        },
+        saveOpenclawConfigs() {
+            return true;
         },
         openclawHasContent(config) {
             return !!(config && typeof config.content === 'string' && config.content.trim());
@@ -116,6 +121,77 @@ test('openOpenclawAddModal does not let a late load clobber typed draft content'
     assert.strictEqual(context.openclawEditing.content, 'typed-draft');
     assert.strictEqual(context.openclawConfigPath, '/tmp/openclaw.json');
     assert.strictEqual(context.openclawFileLoading, false);
+});
+
+test('default openclaw config edit always refreshes from the real config file', async () => {
+    const methods = createOpenclawPersistMethods({
+        api: async () => ({
+            error: '',
+            exists: true,
+            path: '/tmp/openclaw.json',
+            lineEnding: '\n',
+            content: 'real-default-content'
+        }),
+        defaultOpenclawTemplate: 'template-default'
+    });
+    const context = createContext(methods, {
+        openclawConfigs: {
+            '默认配置': {
+                content: 'stale-local-default'
+            },
+            saved: {
+                content: 'saved-local'
+            }
+        },
+        currentOpenclawConfig: 'saved'
+    });
+
+    methods.openOpenclawEditModal.call(context, '默认配置');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.strictEqual(context.openclawEditing.name, '默认配置');
+    assert.strictEqual(context.openclawEditing.content, 'real-default-content');
+    assert.strictEqual(context.openclawConfigPath, '/tmp/openclaw.json');
+    assert.strictEqual(context.openclawConfigExists, true);
+    assert.strictEqual(context.openclawConfigs['默认配置'].content, 'real-default-content');
+    assert.strictEqual(context.currentOpenclawConfig, 'saved');
+});
+
+test('loadOpenclawConfigFromFile keeps auth profile summaries alongside config content', async () => {
+    const methods = createOpenclawPersistMethods({
+        api: async () => ({
+            error: '',
+            exists: true,
+            path: '/tmp/openclaw.json',
+            lineEnding: '\n',
+            content: 'real-default-content',
+            authProfilesByProvider: {
+                'openai-codex': {
+                    provider: 'openai-codex',
+                    profileId: 'openai-codex:default',
+                    type: 'oauth',
+                    display: 'AuthProfile(oauth:openai-codex:default)'
+                }
+            }
+        })
+    });
+    const context = createContext(methods);
+
+    await methods.loadOpenclawConfigFromFile.call(context, {
+        silent: true,
+        force: true,
+        fallbackToTemplate: true
+    });
+
+    assert.deepStrictEqual(context.openclawAuthProfilesByProvider, {
+        'openai-codex': {
+            provider: 'openai-codex',
+            profileId: 'openai-codex:default',
+            type: 'oauth',
+            display: 'AuthProfile(oauth:openai-codex:default)'
+        }
+    });
+    assert.strictEqual(context.openclawEditing.content, 'real-default-content');
 });
 
 test('stale openclaw loads from an earlier modal session are ignored after reopening', async () => {
@@ -229,6 +305,25 @@ test('saveOpenclawConfig closes modal after a successful save while save state i
     }]);
 });
 
+test('saveOpenclawConfig refuses local-only save for the default system config', async () => {
+    const methods = createOpenclawPersistMethods();
+    const context = createContext(methods, {
+        openclawEditing: {
+            name: '默认配置',
+            content: 'draft-content',
+            lockName: true
+        }
+    });
+
+    await methods.saveOpenclawConfig.call(context);
+
+    assert.strictEqual(context.openclawSaving, false);
+    assert.deepStrictEqual(context.shownMessages, [{
+        message: '默认配置代表当前系统配置，请使用“保存并应用”',
+        type: 'info'
+    }]);
+});
+
 test('saveOpenclawConfig ignores save requests while apply is already busy', async () => {
     const methods = createOpenclawPersistMethods();
     const context = createContext(methods, {
@@ -337,6 +432,80 @@ test('saveAndApplyOpenclawConfig closes modal after a successful apply while app
         message: '已保存并应用 OpenClaw 配置（/tmp/openclaw.json）',
         type: 'success'
     }]);
+});
+
+test('saveAndApplyOpenclawConfig forwards pending auth profile updates to the apply api', async () => {
+    const seenCalls = [];
+    const methods = createOpenclawPersistMethods({
+        api: async (_name, payload) => {
+            seenCalls.push(payload);
+            return {
+                success: true,
+                targetPath: '/tmp/openclaw.json'
+            };
+        }
+    });
+    const context = createContext(methods, {
+        showOpenclawConfigModal: true,
+        openclawEditing: {
+            name: 'draft',
+            content: 'draft-content',
+            lockName: false
+        },
+        openclawPendingAuthProfileUpdates: {
+            'openai-codex:default': {
+                profileId: 'openai-codex:default',
+                provider: 'openai-codex',
+                field: 'access',
+                value: 'updated-access-token'
+            }
+        }
+    });
+
+    await methods.saveAndApplyOpenclawConfig.call(context);
+
+    assert.deepStrictEqual(seenCalls, [{
+        content: 'draft-content',
+        lineEnding: '\n',
+        authProfileUpdates: [{
+            profileId: 'openai-codex:default',
+            provider: 'openai-codex',
+            field: 'access',
+            value: 'updated-access-token'
+        }]
+    }]);
+    assert.deepStrictEqual(context.openclawPendingAuthProfileUpdates, {});
+});
+
+test('saveAndApplyOpenclawConfig keeps the default entry synced to the applied system config', async () => {
+    const methods = createOpenclawPersistMethods({
+        api: async () => ({
+            success: true,
+            targetPath: '/tmp/openclaw.json'
+        })
+    });
+    const context = createContext(methods, {
+        openclawConfigs: {
+            '默认配置': {
+                content: 'old-default'
+            },
+            draft: {
+                content: 'draft-content'
+            }
+        },
+        currentOpenclawConfig: 'draft',
+        openclawEditing: {
+            name: 'draft',
+            content: 'draft-content',
+            lockName: true
+        }
+    });
+
+    await methods.saveAndApplyOpenclawConfig.call(context);
+
+    assert.strictEqual(context.openclawConfigs['默认配置'].content, 'draft-content');
+    assert.strictEqual(context.openclawConfigPath, '/tmp/openclaw.json');
+    assert.strictEqual(context.openclawConfigExists, true);
 });
 
 test('saveAndApplyOpenclawConfig ignores apply requests while save is already busy', async () => {

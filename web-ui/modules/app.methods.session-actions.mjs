@@ -389,6 +389,9 @@ export function createSessionActionMethods(options = {}) {
                 }
 
                 this.showMessage('操作成功', 'success');
+                if (typeof this.invalidateSessionsUsageData === 'function') {
+                    this.invalidateSessionsUsageData({ preserveList: true });
+                }
                 try {
                     await this.loadSessions();
                     if (res.sessionId) {
@@ -430,6 +433,9 @@ export function createSessionActionMethods(options = {}) {
                 this.removeSessionPin(session);
                 this.invalidateSessionTrashRequests();
                 this.showMessage('已移入回收站', 'success');
+                if (typeof this.invalidateSessionsUsageData === 'function') {
+                    this.invalidateSessionsUsageData({ preserveList: true });
+                }
                 if (this.sessionTrashLoadedOnce) {
                     this.prependSessionTrashItem(this.buildSessionTrashItemFromSession(session, res), {
                         totalCount: res && res.totalCount !== undefined ? res.totalCount : undefined

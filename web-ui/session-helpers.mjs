@@ -11,11 +11,33 @@ function clearSessionTimelineRefs(vm) {
     }
 }
 
+function scheduleSessionDetailHydration(vm, options = {}) {
+    if (!vm || typeof vm.loadActiveSessionDetail !== 'function') {
+        return;
+    }
+    const task = () => {
+        if (!vm.activeSession) return;
+        if (vm.mainTab !== 'sessions' && !vm.sessionStandalone) return;
+        if (vm.sessionDetailLoading) return;
+        const currentMessages = Array.isArray(vm.activeSessionMessages) ? vm.activeSessionMessages : [];
+        if (!options.force && currentMessages.length > 0) {
+            return;
+        }
+        void vm.loadActiveSessionDetail(options);
+    };
+    if (typeof vm.scheduleAfterFrame === 'function') {
+        vm.scheduleAfterFrame(task);
+        return;
+    }
+    task();
+}
+
 export function switchMainTab(tab) {
     const nextTab = typeof tab === 'string' ? tab : '';
     const previousTab = this.mainTab;
     const leavingSessions = previousTab === 'sessions' && nextTab !== 'sessions';
-    const enteringSessionDataTab = nextTab === 'sessions' || nextTab === 'usage';
+    const enteringSessionsTab = nextTab === 'sessions';
+    const enteringUsageTab = nextTab === 'usage';
     this.mainTab = nextTab;
 
     if (leavingSessions) {
@@ -41,8 +63,21 @@ export function switchMainTab(tab) {
         }
     }
 
-    if (enteringSessionDataTab && !this.sessionsLoadedOnce) {
-        this.loadSessions();
+    if (enteringSessionsTab && !this.sessionsLoadedOnce) {
+        const canStageInitialSessionDetail = typeof this.scheduleAfterFrame === 'function';
+        const loadResult = this.loadSessions({
+            includeActiveDetail: !canStageInitialSessionDetail
+        });
+        if (canStageInitialSessionDetail) {
+            void Promise.resolve(loadResult)
+                .then(() => {
+                    scheduleSessionDetailHydration(this);
+                })
+                .catch(() => {});
+        }
+    }
+    if (enteringUsageTab && !this.sessionsUsageLoadedOnce && typeof this.loadSessionsUsage === 'function') {
+        this.loadSessionsUsage();
     }
     if (nextTab === 'sessions') {
         this.prepareSessionTabRender();
@@ -89,11 +124,14 @@ export function switchMainTab(tab) {
     }
 }
 
-export async function loadSessions(api) {
+export async function loadSessions(api, options = {}) {
     if (this.sessionsLoading) return;
     this.sessionsLoading = true;
     this.activeSessionDetailError = '';
     let loadSucceeded = false;
+    const includeActiveDetail = options && Object.prototype.hasOwnProperty.call(options, 'includeActiveDetail')
+        ? !!options.includeActiveDetail
+        : (this.mainTab === 'sessions' || !!this.sessionStandalone);
     const params = buildSessionListParams({
         source: this.sessionFilterSource,
         pathFilter: this.sessionPathFilter,
@@ -106,6 +144,9 @@ export async function loadSessions(api) {
         if (res.error) {
             this.showMessage(res.error, 'error');
             this.sessionsList = [];
+            if (typeof this.primeSessionListRender === 'function') {
+                this.primeSessionListRender();
+            }
             this.activeSession = null;
             this.activeSessionMessages = [];
             this.resetSessionDetailPagination();
@@ -117,6 +158,9 @@ export async function loadSessions(api) {
         } else {
             loadSucceeded = true;
             this.sessionsList = Array.isArray(res.sessions) ? res.sessions : [];
+            if (typeof this.primeSessionListRender === 'function') {
+                this.primeSessionListRender();
+            }
             this.syncSessionPathOptionsForSource(
                 this.sessionFilterSource,
                 this.extractPathOptionsFromSessions(this.sessionsList),
@@ -143,12 +187,17 @@ export async function loadSessions(api) {
                 this.cancelSessionTimelineSync();
                 this.sessionTimelineActiveKey = '';
                 clearSessionTimelineRefs(this);
-                await this.loadActiveSessionDetail();
+                if (includeActiveDetail) {
+                    await this.loadActiveSessionDetail();
+                }
             }
             void this.loadSessionPathOptions({ source: this.sessionFilterSource });
         }
     } catch (e) {
         this.sessionsList = [];
+        if (typeof this.primeSessionListRender === 'function') {
+            this.primeSessionListRender();
+        }
         this.activeSession = null;
         this.activeSessionMessages = [];
         this.resetSessionDetailPagination();

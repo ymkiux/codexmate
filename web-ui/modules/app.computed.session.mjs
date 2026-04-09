@@ -19,6 +19,9 @@ export function createSessionComputed() {
             const pinnedMap = (this.sessionPinnedMap && typeof this.sessionPinnedMap === 'object')
                 ? this.sessionPinnedMap
                 : {};
+            if (Object.keys(pinnedMap).length === 0) {
+                return list;
+            }
             let hasPinned = false;
             const decorated = list.map((session, index) => {
                 const key = session ? this.getSessionExportKey(session) : '';
@@ -102,7 +105,7 @@ export function createSessionComputed() {
             return '当前来源暂不支持关键词检索';
         },
         sessionUsageCharts() {
-            return buildUsageChartGroups(this.sessionsList, {
+            return buildUsageChartGroups(this.sessionsUsageList, {
                 range: this.sessionsUsageTimeRange
             });
         },

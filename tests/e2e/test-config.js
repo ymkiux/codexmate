@@ -291,11 +291,16 @@ preferred_auth_method = "shadow-key"
     assert(apiPathsInvalid.error, 'list-session-paths should fail for invalid source');
 
     // ========== Add Provider Tests ==========
-    const addProvider = await api('add-provider', { name: 'e2e-api', url: mockProviderUrl, key: 'sk-e2e-api' });
+    const addProviderInputUrl = `${mockProviderUrl}/`;
+    const addProvider = await api('add-provider', { name: 'e2e-api', url: addProviderInputUrl, key: 'sk-e2e-api' });
     assert(addProvider.success === true, 'add-provider failed');
 
     const apiListAfterAdd = await api('list');
-    assert(Array.isArray(apiListAfterAdd.providers) && apiListAfterAdd.providers.some(p => p.name === 'e2e-api'), 'add-provider not reflected in list');
+    const addedProvider = Array.isArray(apiListAfterAdd.providers)
+        ? apiListAfterAdd.providers.find((p) => p && p.name === 'e2e-api')
+        : null;
+    assert(addedProvider, 'add-provider not reflected in list');
+    assert(addedProvider.url === mockProviderUrl, 'add-provider should persist normalized provider url');
 
     const addProviderEmptyName = await api('add-provider', { name: '', url: mockProviderUrl });
     assert(addProviderEmptyName.error, 'add-provider should reject empty name');
@@ -311,10 +316,18 @@ preferred_auth_method = "shadow-key"
 
     const addProviderInvalidName = await api('add-provider', { name: 'bad name', url: mockProviderUrl });
     assert(addProviderInvalidName.error, 'add-provider should reject invalid provider name');
+    const addProviderInvalidUrl = await api('add-provider', { name: 'bad-url', url: 'not-a-url' });
+    assert(addProviderInvalidUrl.error, 'add-provider should reject invalid provider url');
+    const cliAddInvalidUrl = runSync(node, [cliPath, 'add', 'cli-bad-url', 'not-a-url'], { env });
+    assert(cliAddInvalidUrl.status !== 0, 'cli add should reject invalid provider url');
     const apiListAfterInvalidName = await api('list');
     assert(
         !apiListAfterInvalidName.providers.some((item) => item && item.name === 'bad name'),
         'add-provider invalid name should not pollute provider list'
+    );
+    assert(
+        !apiListAfterInvalidName.providers.some((item) => item && item.name === 'bad-url'),
+        'add-provider invalid url should not pollute provider list'
     );
     const apiStatusAfterInvalidName = await api('status');
     assert(apiStatusAfterInvalidName.provider, 'status should remain readable after invalid add-provider');
@@ -1356,6 +1369,8 @@ preferred_auth_method = "shadow-key"
 
     // ========== Update Provider Tests ==========
     const updatedUrl = `${mockProviderUrl}/v2`;
+    const updateProviderInvalidUrl = await api('update-provider', { name: 'e2e-api', url: 'ftp://bad.example.com' });
+    assert(updateProviderInvalidUrl.error, 'update-provider should reject invalid provider url');
     const updateProvider = await api('update-provider', { name: 'e2e-api', url: updatedUrl, key: 'sk-e2e-api-upd' });
     assert(updateProvider.success === true, 'update-provider failed');
 

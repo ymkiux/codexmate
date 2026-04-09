@@ -25,7 +25,7 @@
                     <div class="selector-header">
                         <span class="selector-title">会话来源</span>
                         <div class="selector-actions">
-                            <button class="btn-tool btn-tool-compact" @click="loadSessions" :disabled="sessionsLoading">
+                            <button class="btn-tool btn-tool-compact" @click="loadSessions({ forceRefresh: true })" :disabled="sessionsLoading">
                                 {{ sessionsLoading ? '刷新中...' : '刷新会话' }}
                             </button>
                         </div>

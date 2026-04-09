@@ -359,8 +359,45 @@ export function createSessionBrowserMethods(options = {}) {
             }
         },
 
-        async loadSessions() {
-            const result = await loadSessionsHelper.call(this, api);
+        invalidateSessionsUsageData(options = {}) {
+            this.sessionsUsageLoadedOnce = false;
+            this.sessionsUsageError = '';
+            if (options.preserveList !== true) {
+                this.sessionsUsageList = [];
+            }
+        },
+
+        async loadSessionsUsage(options = {}) {
+            if (this.sessionsUsageLoading) return;
+            this.sessionsUsageLoading = true;
+            this.sessionsUsageError = '';
+            let loadSucceeded = false;
+            try {
+                const res = await api('list-sessions-usage', {
+                    source: 'all',
+                    limit: 200,
+                    forceRefresh: !!options.forceRefresh
+                });
+                if (res.error) {
+                    this.sessionsUsageError = res.error;
+                    this.showMessage(res.error, 'error');
+                    return;
+                }
+                this.sessionsUsageList = Array.isArray(res.sessions) ? res.sessions : [];
+                loadSucceeded = true;
+            } catch (e) {
+                this.sessionsUsageError = '加载 usage 统计失败';
+                this.showMessage('加载 usage 统计失败', 'error');
+            } finally {
+                this.sessionsUsageLoading = false;
+                if (loadSucceeded) {
+                    this.sessionsUsageLoadedOnce = true;
+                }
+            }
+        },
+
+        async loadSessions(options = {}) {
+            const result = await loadSessionsHelper.call(this, api, options || {});
             this.pruneSessionPinnedMap(this.sessionsList);
             return result;
         },
@@ -377,6 +414,14 @@ export function createSessionBrowserMethods(options = {}) {
             this.cancelSessionTimelineSync();
             this.sessionTimelineActiveKey = '';
             this.clearSessionTimelineRefs();
+            if (typeof this.scheduleAfterFrame === 'function') {
+                const selectedSession = this.activeSession;
+                this.scheduleAfterFrame(() => {
+                    if (this.activeSession !== selectedSession) return;
+                    void this.loadActiveSessionDetail();
+                });
+                return;
+            }
             await this.loadActiveSessionDetail();
         },
 

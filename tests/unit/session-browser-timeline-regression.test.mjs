@@ -29,6 +29,48 @@ test('loadSessionPathOptions clears visible loading state when reusing cached so
     assert.strictEqual(context.sessionPathOptionsLoading, false);
 });
 
+test('selectSession defers detail loading until the next frame when a scheduler is available', async () => {
+    const methods = createSessionBrowserMethods({
+        api: async () => ({})
+    });
+    const scheduled = [];
+    let detailLoads = 0;
+    const selected = { source: 'codex', sessionId: 's1', filePath: '/tmp/s1.jsonl' };
+    const context = {
+        activeSession: null,
+        activeSessionMessages: [{ text: 'stale' }],
+        activeSessionDetailError: 'old',
+        activeSessionDetailClipped: true,
+        sessionTimelineActiveKey: 'old',
+        getSessionExportKey(session) {
+            return `${session.source}:${session.sessionId}:${session.filePath}`;
+        },
+        resetSessionDetailPagination() {},
+        resetSessionPreviewMessageRender() {},
+        cancelSessionTimelineSync() {},
+        clearSessionTimelineRefs() {},
+        scheduleAfterFrame(task) {
+            scheduled.push(task);
+        },
+        async loadActiveSessionDetail() {
+            detailLoads += 1;
+        }
+    };
+
+    await methods.selectSession.call(context, selected);
+
+    assert.strictEqual(context.activeSession, selected);
+    assert.deepStrictEqual(context.activeSessionMessages, []);
+    assert.strictEqual(context.activeSessionDetailError, '');
+    assert.strictEqual(context.activeSessionDetailClipped, false);
+    assert.strictEqual(context.sessionTimelineActiveKey, '');
+    assert.strictEqual(detailLoads, 0);
+    assert.strictEqual(scheduled.length, 1);
+
+    await scheduled[0]();
+    assert.strictEqual(detailLoads, 1);
+});
+
 test('syncSessionTimelineActiveFromScroll reuses container header offset when scroll container has no header', () => {
     const methods = createSessionTimelineMethods();
     const headerEl = {

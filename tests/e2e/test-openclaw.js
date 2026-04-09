@@ -1,13 +1,33 @@
+const fs = require('fs');
+const path = require('path');
 const { assert } = require('./helpers');
 
 module.exports = async function testOpenclaw(ctx) {
-    const { api } = ctx;
+    const { api, tmpHome } = ctx;
+    const authAgentDir = path.join(tmpHome, '.openclaw', 'agents', 'main', 'agent');
+    fs.mkdirSync(authAgentDir, { recursive: true });
+    fs.writeFileSync(path.join(authAgentDir, 'auth-profiles.json'), JSON.stringify({
+        version: 1,
+        profiles: {
+            'openai-codex:default': {
+                provider: 'openai-codex',
+                type: 'oauth',
+                access: 'super-secret-token',
+                displayName: 'OpenAI Codex'
+            }
+        }
+    }, null, 2), 'utf-8');
+    fs.writeFileSync(path.join(authAgentDir, 'auth-state.json'), JSON.stringify({}, null, 2), 'utf-8');
 
     // ========== Get OpenClaw Config Tests ==========
     const openclawReadEmpty = await api('get-openclaw-config');
     assert(openclawReadEmpty.exists === false, 'openclaw config should not exist initially');
     assert(typeof openclawReadEmpty.path === 'string', 'get-openclaw-config missing path');
     assert('lineEnding' in openclawReadEmpty, 'get-openclaw-config missing lineEnding');
+    assert(openclawReadEmpty.authProfilesByProvider && openclawReadEmpty.authProfilesByProvider['openai-codex'], 'get-openclaw-config missing auth profile summary');
+    assert(openclawReadEmpty.authProfilesByProvider['openai-codex'].resolvedValue === undefined, 'get-openclaw-config should not expose resolved auth profile secrets');
+    assert(openclawReadEmpty.authProfilesByProvider['openai-codex'].resolvedField === 'access', 'get-openclaw-config missing auth profile write field');
+    assert(openclawReadEmpty.authProfilesByProvider['openai-codex'].editable === true, 'get-openclaw-config missing editable auth profile flag');
 
     // ========== Apply OpenClaw Config Tests ==========
     const openclawInvalid = await api('apply-openclaw-config', { content: '', lineEnding: '\n' });

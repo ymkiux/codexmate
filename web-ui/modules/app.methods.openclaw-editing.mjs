@@ -139,7 +139,9 @@ export function createOpenclawEditingMethods() {
             this.openclawEditing.content = this.stringifyOpenclawConfig(config);
             this.refreshOpenclawProviders(config);
             this.refreshOpenclawAgentsList(config);
-            this.fillOpenclawQuickFromConfig(config);
+            this.fillOpenclawQuickFromConfig(config, {
+                authProfilesByProvider: this.openclawAuthProfilesByProvider
+            });
             this.showMessage('已写入', 'success');
         },
 
@@ -170,7 +172,9 @@ export function createOpenclawEditingMethods() {
             const models = ensureObject(config.models);
             const providers = ensureObject(models.providers);
             const provider = ensureObject(providers[providerName]);
-            const baseUrl = (this.openclawQuick.baseUrl || '').trim();
+            const baseUrl = this.openclawQuick.baseUrlReadOnly
+                ? ''
+                : (this.openclawQuick.baseUrl || '').trim();
             if (!baseUrl && !provider.baseUrl) {
                 this.showMessage('请填写 URL', 'error');
                 return;
@@ -188,7 +192,21 @@ export function createOpenclawEditingMethods() {
             }
 
             const shouldOverrideProvider = !!this.openclawQuick.overrideProvider;
-            const apiKey = (this.openclawQuick.apiKey || '').trim();
+            const apiKey = this.openclawQuick.apiKeyReadOnly
+                ? ''
+                : (this.openclawQuick.apiKey || '').trim();
+            const apiKeySourceKind = typeof this.openclawQuick.apiKeySourceKind === 'string'
+                ? this.openclawQuick.apiKeySourceKind.trim()
+                : '';
+            const apiKeySourceProfileId = typeof this.openclawQuick.apiKeySourceProfileId === 'string'
+                ? this.openclawQuick.apiKeySourceProfileId.trim()
+                : '';
+            const apiKeySourceWriteField = typeof this.openclawQuick.apiKeySourceWriteField === 'string'
+                ? this.openclawQuick.apiKeySourceWriteField.trim()
+                : '';
+            const apiKeySourceOriginalValue = typeof this.openclawQuick.apiKeySourceOriginalValue === 'string'
+                ? this.openclawQuick.apiKeySourceOriginalValue.trim()
+                : '';
             const apiType = (this.openclawQuick.apiType || '').trim();
             const setProviderField = (key, value) => {
                 if (!value) return;
@@ -198,7 +216,24 @@ export function createOpenclawEditingMethods() {
             };
             setProviderField('baseUrl', baseUrl);
             setProviderField('api', apiType);
-            if (apiKey) {
+            if (apiKeySourceKind === 'auth-profile' && apiKeySourceProfileId && apiKeySourceWriteField) {
+                const pending = this.openclawPendingAuthProfileUpdates
+                    && typeof this.openclawPendingAuthProfileUpdates === 'object'
+                    && !Array.isArray(this.openclawPendingAuthProfileUpdates)
+                    ? { ...this.openclawPendingAuthProfileUpdates }
+                    : {};
+                if (apiKey && apiKey !== apiKeySourceOriginalValue) {
+                    pending[apiKeySourceProfileId] = {
+                        profileId: apiKeySourceProfileId,
+                        provider: providerName,
+                        field: apiKeySourceWriteField,
+                        value: apiKey
+                    };
+                } else {
+                    delete pending[apiKeySourceProfileId];
+                }
+                this.openclawPendingAuthProfileUpdates = pending;
+            } else if (apiKey) {
                 setProviderField('apiKey', apiKey);
             }
 
