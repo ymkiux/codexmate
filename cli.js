@@ -2820,13 +2820,16 @@ function normalizeOpenclawWorkspaceFileName(input) {
 
 function readOpenclawConfigFile() {
     const filePath = OPENCLAW_CONFIG_FILE;
+    const authProfilesByProvider = sanitizeOpenclawAuthProfilesForClient(
+        readOpenclawAuthProfilesSummary().providers
+    );
     if (!fs.existsSync(filePath)) {
         return {
             exists: false,
             path: filePath,
             content: '',
             lineEnding: os.EOL === '\r\n' ? '\r\n' : '\n',
-            authProfilesByProvider: readOpenclawAuthProfilesSummary().providers
+            authProfilesByProvider
         };
     }
 
@@ -2837,7 +2840,7 @@ function readOpenclawConfigFile() {
             path: filePath,
             content: stripUtf8Bom(raw),
             lineEnding: detectLineEnding(raw),
-            authProfilesByProvider: readOpenclawAuthProfilesSummary().providers
+            authProfilesByProvider
         };
     } catch (e) {
         return { error: `读取 OpenClaw 配置失败: ${e.message}` };
@@ -3047,6 +3050,22 @@ function readOpenclawAuthProfilesSummary() {
         authStatePath,
         providers: providerSummaries
     };
+}
+
+function sanitizeOpenclawAuthProfilesForClient(providers) {
+    if (!isPlainObject(providers)) {
+        return {};
+    }
+    const sanitized = {};
+    for (const [providerKey, summary] of Object.entries(providers)) {
+        if (!isPlainObject(summary)) {
+            continue;
+        }
+        const normalized = { ...summary };
+        delete normalized.resolvedValue;
+        sanitized[providerKey] = normalized;
+    }
+    return sanitized;
 }
 
 function normalizeOpenclawAuthProfileUpdate(entry) {
@@ -5756,18 +5775,10 @@ async function listSessionUsage(params = {}) {
     const limit = Number.isFinite(rawLimit)
         ? Math.max(1, Math.min(rawLimit, MAX_SESSION_LIST_SIZE))
         : 200;
-    const sessions = await listAllSessions({
+    return await listAllSessionsData({
         source,
         limit,
         forceRefresh: !!params.forceRefresh
-    });
-    return sessions.map((item) => {
-        if (!item || typeof item !== 'object' || Array.isArray(item)) {
-            return item;
-        }
-        const normalized = { ...item };
-        delete normalized.__messageCountExact;
-        return normalized;
     });
 }
 
@@ -11036,12 +11047,16 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             break;
                         case 'list-sessions-usage':
                             {
-                                const source = typeof params.source === 'string' ? params.source.trim().toLowerCase() : '';
+                                const usageParams = isPlainObject(params) ? params : {};
+                                const source = typeof usageParams.source === 'string' ? usageParams.source.trim().toLowerCase() : '';
                                 if (source && source !== 'codex' && source !== 'claude' && source !== 'all') {
                                     result = { error: 'Invalid source. Must be codex, claude, or all' };
                                 } else {
                                     result = {
-                                        sessions: await listSessionUsage(params || {}),
+                                        sessions: await listSessionUsage({
+                                            ...usageParams,
+                                            source: source || 'all'
+                                        }),
                                         source: source || 'all'
                                     };
                                 }

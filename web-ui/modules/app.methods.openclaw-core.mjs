@@ -160,6 +160,19 @@ function readOpenclawAuthProfileDisplayValue(authProfilesByProvider, providerNam
             sourceCredentialType: typeof summary.type === 'string' ? summary.type.trim() : ''
         };
     }
+    const resolvedField = typeof summary.resolvedField === 'string' ? summary.resolvedField.trim() : '';
+    if (summary.editable === true && resolvedField) {
+        return {
+            value: '',
+            readOnly: false,
+            kind: 'auth-profile-value',
+            sourceKind: 'auth-profile',
+            sourceProfileId: typeof summary.profileId === 'string' ? summary.profileId.trim() : '',
+            sourceWriteField: resolvedField,
+            sourceOriginalValue: '',
+            sourceCredentialType: typeof summary.type === 'string' ? summary.type.trim() : ''
+        };
+    }
     if (typeof summary.display !== 'string' || !summary.display.trim()) {
         return {
             value: '',
