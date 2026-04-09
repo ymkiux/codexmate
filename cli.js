@@ -2844,10 +2844,6 @@ function readOpenclawConfigFile() {
     }
 }
 
-function isPlainObject(value) {
-    return !!(value && typeof value === 'object' && !Array.isArray(value));
-}
-
 function normalizeOpenclawProviderId(provider) {
     const normalized = typeof provider === 'string' ? provider.trim().toLowerCase() : '';
     if (!normalized) return '';
