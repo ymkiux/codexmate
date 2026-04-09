@@ -419,14 +419,8 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     const headComputedKeys = Object.keys(headComputed).sort();
     const extraCurrentComputedKeys = currentComputedKeys.filter((key) => !headComputedKeys.includes(key)).sort();
     const missingCurrentComputedKeys = headComputedKeys.filter((key) => !currentComputedKeys.includes(key)).sort();
-    const allowedExtraCurrentComputedKeys = [
-        'sessionListRemainingCount',
-        'visibleSessionsList'
-    ];
-    const allowedMissingCurrentComputedKeys = [
-        'sessionListRemainingCount',
-        'visibleSessionsList'
-    ];
+    const allowedExtraCurrentComputedKeys = [];
+    const allowedMissingCurrentComputedKeys = [];
     if (parityAgainstHead) {
         const allowedExtraComputedKeySet = new Set(allowedExtraCurrentComputedKeys);
         const allowedMissingComputedKeySet = new Set(allowedMissingCurrentComputedKeys);
