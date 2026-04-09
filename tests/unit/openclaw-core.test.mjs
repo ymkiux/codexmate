@@ -298,7 +298,6 @@ test('fillOpenclawQuickFromConfig uses builtin openai-codex defaults and editabl
                 profileId: 'openai-codex:default',
                 type: 'oauth',
                 display: 'AuthProfile(oauth:openai-codex:default)',
-                resolvedValue: 'access-token-value',
                 resolvedField: 'access',
                 editable: true,
                 valueKind: 'oauth-access'
@@ -328,13 +327,13 @@ test('fillOpenclawQuickFromConfig uses builtin openai-codex defaults and editabl
     assert.strictEqual(context.openclawQuick.baseUrl, 'https://chatgpt.com/backend-api');
     assert.strictEqual(context.openclawQuick.baseUrlDisplayKind, 'builtin-default');
     assert.strictEqual(context.openclawQuick.apiType, 'openai-codex-responses');
-    assert.strictEqual(context.openclawQuick.apiKey, 'access-token-value');
+    assert.strictEqual(context.openclawQuick.apiKey, '');
     assert.strictEqual(context.openclawQuick.apiKeyReadOnly, false);
     assert.strictEqual(context.openclawQuick.apiKeyDisplayKind, 'auth-profile-value');
     assert.strictEqual(context.openclawQuick.apiKeySourceKind, 'auth-profile');
     assert.strictEqual(context.openclawQuick.apiKeySourceProfileId, 'openai-codex:default');
     assert.strictEqual(context.openclawQuick.apiKeySourceWriteField, 'access');
-    assert.strictEqual(context.openclawQuick.apiKeySourceOriginalValue, 'access-token-value');
+    assert.strictEqual(context.openclawQuick.apiKeySourceOriginalValue, '');
     assert.strictEqual(context.openclawQuick.apiKeySourceCredentialType, 'oauth');
 });
 

@@ -164,7 +164,6 @@ test('applyOpenclawQuickToText queues auth profile updates instead of inlining e
                 profileId: 'openai-codex:default',
                 type: 'oauth',
                 display: 'AuthProfile(oauth:openai-codex:default)',
-                resolvedValue: 'old-access-token',
                 resolvedField: 'access',
                 editable: true,
                 valueKind: 'oauth-access'
@@ -193,6 +192,7 @@ test('applyOpenclawQuickToText queues auth profile updates instead of inlining e
     context.fillOpenclawQuickFromConfig(config, {
         authProfilesByProvider: context.openclawAuthProfilesByProvider
     });
+    assert.strictEqual(context.openclawQuick.apiKey, '');
     context.openclawQuick.apiKey = 'new-access-token';
     context.openclawQuick.overrideProvider = true;
 
