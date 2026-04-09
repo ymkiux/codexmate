@@ -46,17 +46,6 @@
                             </section>
 
                             <section class="usage-card">
-                                <div class="usage-card-title">来源占比</div>
-                                <div class="usage-list">
-                                    <div v-for="item in sessionUsageCharts.sourceShare" :key="item.key" class="usage-list-row">
-                                        <div class="usage-list-label">{{ item.label }}</div>
-                                        <div class="usage-progress"><div class="usage-progress-fill" :style="{ width: item.percent + '%' }"></div></div>
-                                        <div class="usage-list-value">{{ item.percent }}%</div>
-                                    </div>
-                                </div>
-                            </section>
-
-                            <section class="usage-card">
                                 <div class="usage-card-title">消息趋势</div>
                                 <div class="usage-bars">
                                     <div v-for="bucket in sessionUsageCharts.buckets" :key="bucket.key + '-messages'" class="usage-bar-group">
@@ -69,6 +58,41 @@
                             </section>
 
                             <section class="usage-card">
+                                <div class="usage-card-title">活跃时段</div>
+                                <div class="usage-mini-bars">
+                                    <div v-for="item in sessionUsageCharts.hourActivity" :key="item.key" class="usage-mini-bar-group">
+                                        <div class="usage-mini-bar-track" :title="`${item.label}:00 · ${item.count} 次会话`">
+                                            <div class="usage-mini-bar-fill" :style="{ height: item.percent + '%' }"></div>
+                                        </div>
+                                        <div class="usage-mini-bar-label">{{ item.label }}</div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="usage-card">
+                                <div class="usage-card-title">来源洞察</div>
+                                <div class="usage-list">
+                                    <div v-for="item in sessionUsageCharts.sourceShare" :key="item.key" class="usage-list-row">
+                                        <div class="usage-list-label">{{ item.label }}</div>
+                                        <div class="usage-progress"><div class="usage-progress-fill" :style="{ width: item.percent + '%' }"></div></div>
+                                        <div class="usage-list-value">{{ item.percent }}%</div>
+                                        <div class="usage-list-subvalue">{{ item.value }} 会话 · {{ item.messageTotal }} 消息 · 均值 {{ item.avgMessages }}</div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="usage-card">
+                                <div class="usage-card-title">工作日分布</div>
+                                <div class="usage-list">
+                                    <div v-for="item in sessionUsageCharts.weekdayActivity" :key="item.key" class="usage-list-row usage-list-row-compact">
+                                        <div class="usage-list-label">{{ item.label }}</div>
+                                        <div class="usage-progress"><div class="usage-progress-fill" :style="{ width: item.percent + '%' }"></div></div>
+                                        <div class="usage-list-value">{{ item.count }}</div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="usage-card">
                                 <div class="usage-card-title">高频路径</div>
                                 <div v-if="!sessionUsageCharts.topPaths.length" class="usage-list-value">暂无路径数据</div>
                                 <div v-else class="usage-list">
@@ -76,6 +100,43 @@
                                         <div class="usage-list-label">{{ item.count }} 次</div>
                                         <div class="usage-progress"><div class="usage-progress-fill" :style="{ width: ((item.count / Math.max((sessionUsageCharts.topPaths.length ? sessionUsageCharts.topPaths[0].count : 1), 1)) * 100) + '%' }"></div></div>
                                         <div class="usage-list-value" :title="item.path">{{ item.path }}</div>
+                                        <div class="usage-list-subvalue">{{ item.messageTotal }} 消息<span v-if="item.updatedAtLabel"> · 最近 {{ item.updatedAtLabel }}</span></div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="usage-card">
+                                <div class="usage-card-title">近期活跃会话</div>
+                                <div v-if="!sessionUsageCharts.recentSessions.length" class="usage-list-value">暂无会话数据</div>
+                                <div v-else class="usage-session-list">
+                                    <div v-for="item in sessionUsageCharts.recentSessions" :key="item.key" class="usage-session-item">
+                                        <div class="usage-session-row">
+                                            <div class="usage-session-title" :title="item.title">{{ item.title }}</div>
+                                            <span :class="['pill', item.source === 'codex' ? 'configured' : 'empty']">{{ item.sourceLabel }}</span>
+                                        </div>
+                                        <div class="usage-session-meta">
+                                            <span>{{ item.messageCount }} 消息</span>
+                                            <span v-if="item.updatedAtLabel">{{ item.updatedAtLabel }}</span>
+                                        </div>
+                                        <div v-if="item.cwd" class="usage-session-path" :title="item.cwd">{{ item.cwd }}</div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="usage-card">
+                                <div class="usage-card-title">消息密度最高</div>
+                                <div v-if="!sessionUsageCharts.topSessionsByMessages.length" class="usage-list-value">暂无会话数据</div>
+                                <div v-else class="usage-session-list">
+                                    <div v-for="item in sessionUsageCharts.topSessionsByMessages" :key="item.key + '-messages'" class="usage-session-item">
+                                        <div class="usage-session-row">
+                                            <div class="usage-session-title" :title="item.title">{{ item.title }}</div>
+                                            <div class="usage-inline-stat">{{ item.messageCount }} 消息</div>
+                                        </div>
+                                        <div class="usage-session-meta">
+                                            <span>{{ item.sourceLabel }}</span>
+                                            <span v-if="item.updatedAtLabel">{{ item.updatedAtLabel }}</span>
+                                        </div>
+                                        <div v-if="item.cwd" class="usage-session-path" :title="item.cwd">{{ item.cwd }}</div>
                                     </div>
                                 </div>
                             </section>
