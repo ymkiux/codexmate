@@ -1,5 +1,7 @@
 ﻿<div align="center">
 
+<img src="res/logo.png" alt="Codex Mate logo" width="180" />
+
 # Codex Mate
 
 **Codex / Claude Code / OpenClaw 的本地配置与会话管理工具**

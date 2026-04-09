@@ -1,5 +1,7 @@
 ﻿<div align="center">
 
+<img src="res/logo.png" alt="Codex Mate logo" width="180" />
+
 # Codex Mate
 
 **Local configuration and session manager for Codex / Claude Code / OpenClaw**
