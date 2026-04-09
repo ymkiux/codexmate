@@ -6,7 +6,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const logic = await import(pathToFileURL(path.join(__dirname, '..', '..', 'web-ui', 'logic.mjs')));
+const { createSessionComputed } = await import(
+    pathToFileURL(path.join(__dirname, '..', '..', 'web-ui', 'modules', 'app.computed.session.mjs'))
+);
 const {
+    DEFAULT_SESSION_LIST_FAST_LIMIT,
+    DEFAULT_SESSION_LIST_LIMIT,
     normalizeClaudeValue,
     normalizeClaudeConfig,
     normalizeClaudeSettingsEnv,
@@ -110,9 +115,34 @@ test('buildSessionListParams normalizes source and path filter before building r
         contentScanLimit: 50,
         roleFilter: 'all',
         timeRangePreset: 'all',
-        limit: 200,
+        limit: DEFAULT_SESSION_LIST_LIMIT,
+        forceRefresh: false
+    });
+});
+
+test('buildSessionListParams uses fast limit only for default all-session browsing', () => {
+    const fastParams = buildSessionListParams({
+        source: 'all'
+    });
+    assert.strictEqual(fastParams.limit, DEFAULT_SESSION_LIST_FAST_LIMIT);
+
+    const filteredParams = buildSessionListParams({
+        source: 'all',
+        pathFilter: '/tmp/demo'
+    });
+    assert.strictEqual(filteredParams.limit, DEFAULT_SESSION_LIST_LIMIT);
+
+    const queryParams = buildSessionListParams({
+        source: 'all',
+        query: 'needle'
+    });
+    assert.strictEqual(queryParams.limit, DEFAULT_SESSION_LIST_LIMIT);
+
+    const refreshedParams = buildSessionListParams({
+        source: 'all',
         forceRefresh: true
     });
+    assert.strictEqual(refreshedParams.limit, DEFAULT_SESSION_LIST_LIMIT);
 });
 
 test('matchClaudeConfigFromSettings matches identical config', () => {
@@ -559,7 +589,7 @@ test('buildSessionListParams keeps query for enabled sources', () => {
     });
     assert.strictEqual(paramsCodex.query, 'test');
     assert.strictEqual(paramsCodex.source, 'codex');
-    assert.strictEqual(paramsCodex.limit, 200);
+    assert.strictEqual(paramsCodex.limit, DEFAULT_SESSION_LIST_LIMIT);
 
     const paramsClaude = buildSessionListParams({
         source: 'claude',
@@ -569,7 +599,7 @@ test('buildSessionListParams keeps query for enabled sources', () => {
     assert.strictEqual(paramsClaude.query, 'claude code');
     assert.strictEqual(paramsClaude.source, 'claude');
     assert.strictEqual(paramsClaude.roleFilter, 'user');
-    assert.strictEqual(paramsClaude.limit, 200);
+    assert.strictEqual(paramsClaude.limit, DEFAULT_SESSION_LIST_LIMIT);
 
     const paramsAll = buildSessionListParams({
         source: 'all',
@@ -579,7 +609,7 @@ test('buildSessionListParams keeps query for enabled sources', () => {
     assert.strictEqual(paramsAll.query, 'claudecode');
     assert.strictEqual(paramsAll.source, 'all');
     assert.strictEqual(paramsAll.timeRangePreset, '7d');
-    assert.strictEqual(paramsAll.limit, 200);
+    assert.strictEqual(paramsAll.limit, DEFAULT_SESSION_LIST_LIMIT);
 });
 
 test('buildSessionListParams normalizes unsupported sources to all and preserves query behavior', () => {
@@ -593,10 +623,55 @@ test('buildSessionListParams normalizes unsupported sources to all and preserves
     assert.strictEqual(params.source, 'all');
     assert.strictEqual(params.pathFilter, '/tmp');
     assert.strictEqual(params.roleFilter, 'assistant');
-    assert.strictEqual(params.limit, 200);
-    assert.strictEqual(params.forceRefresh, true);
+    assert.strictEqual(params.limit, DEFAULT_SESSION_LIST_LIMIT);
+    assert.strictEqual(params.forceRefresh, false);
     assert.strictEqual(params.queryScope, 'content');
     assert.strictEqual(params.contentScanLimit, 50);
+});
+
+test('buildSessionListParams preserves explicit forceRefresh requests', () => {
+    const params = buildSessionListParams({
+        source: 'codex',
+        forceRefresh: true
+    });
+    assert.strictEqual(params.source, 'codex');
+    assert.strictEqual(params.forceRefresh, true);
+});
+
+test('sortedSessionsList returns the original list without computing keys when no sessions are pinned', () => {
+    const computed = createSessionComputed();
+    const sessions = [{ sessionId: 'sess-1' }, { sessionId: 'sess-2' }];
+    const result = computed.sortedSessionsList.call({
+        sessionsList: sessions,
+        sessionPinnedMap: {},
+        getSessionExportKey() {
+            throw new Error('should not compute session keys when no pins exist');
+        }
+    });
+
+    assert.strictEqual(result, sessions);
+});
+
+test('sortedSessionsList moves pinned sessions to the front and keeps latest pins first', () => {
+    const computed = createSessionComputed();
+    const sessions = [
+        { sessionId: 'sess-1', source: 'codex', filePath: '/tmp/a', messageCount: 1, updatedAt: '2026-04-09', title: 'A', sourceLabel: 'Codex' },
+        { sessionId: 'sess-2', source: 'claude', filePath: '/tmp/b', messageCount: 2, updatedAt: '2026-04-08', title: 'B', sourceLabel: 'Claude' },
+        { sessionId: 'sess-3', source: 'codex', filePath: '/tmp/c', messageCount: 3, updatedAt: '2026-04-07', title: 'C', sourceLabel: 'Codex' }
+    ];
+    const now = Date.now();
+    const result = computed.sortedSessionsList.call({
+        sessionsList: sessions,
+        sessionPinnedMap: {
+            'claude:sess-2:/tmp/b': now - 1000,
+            'codex:sess-3:/tmp/c': now
+        },
+        getSessionExportKey(session) {
+            return `${session.source}:${session.sessionId}:${session.filePath}`;
+        }
+    });
+
+    assert.deepStrictEqual(result, [sessions[2], sessions[1], sessions[0]]);
 });
 
 test('formatSessionTimelineTimestamp normalizes ISO-like strings for timeline labels', () => {

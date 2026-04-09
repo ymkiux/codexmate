@@ -238,6 +238,164 @@ test('touch config-tab preselection updates the active item before the committed
     assert.strictEqual(context.isConfigModeNavActive('codex'), false);
 });
 
+test('switchMainTab suspends session render immediately while deferring a leave from sessions', () => {
+    const scheduled = [];
+    const methods = createNavigationMethods({
+        configModeSet: new Set(['codex', 'claude', 'openclaw']),
+        switchMainTabHelper(tab) {
+            this.mainTab = tab;
+        },
+        loadMoreSessionMessagesHelper() {}
+    });
+    const context = createNavigationContext(methods, {
+        mainTab: 'sessions',
+        sessionListRenderEnabled: true,
+        sessionPreviewRenderEnabled: true,
+        sessionTabRenderTicket: 7,
+        sessionTimelineActiveKey: 'node-1',
+        sessionTimelineLastSyncAt: 1,
+        sessionTimelineLastScrollTop: 2,
+        sessionTimelineLastAnchorY: 3,
+        sessionTimelineLastDirection: 4,
+        sessionPreviewScrollEl: {},
+        sessionPreviewContainerEl: {},
+        sessionPreviewHeaderEl: {},
+        scheduleAfterFrame(task) {
+            scheduled.push(task);
+        },
+        cancelSessionTimelineSync() {
+            this._cancelTimelineSyncCalls = (this._cancelTimelineSyncCalls || 0) + 1;
+        },
+        invalidateSessionTimelineMeasurementCache() {},
+        clearSessionTimelineRefs() {}
+    });
+
+    context.switchMainTab('settings');
+
+    assert.strictEqual(context.mainTab, 'sessions');
+    assert.strictEqual(context.fastHidden, true);
+    assert.strictEqual(context.sessionListRenderEnabled, false);
+    assert.strictEqual(context.sessionPreviewRenderEnabled, false);
+    assert.strictEqual(context.sessionPreviewScrollEl, null);
+    assert.strictEqual(context.sessionPreviewContainerEl, null);
+    assert.strictEqual(context.sessionPreviewHeaderEl, null);
+    assert.strictEqual(context.sessionTimelineActiveKey, '');
+    assert.strictEqual(context.sessionTimelineLastSyncAt, 0);
+    assert.strictEqual(context.sessionTimelineLastScrollTop, 0);
+    assert.strictEqual(context.sessionTimelineLastAnchorY, 0);
+    assert.strictEqual(context.sessionTimelineLastDirection, 0);
+    assert.strictEqual(context._cancelTimelineSyncCalls, 1);
+    assert.strictEqual(scheduled.length, 1);
+
+    scheduled[0]();
+    assert.strictEqual(context.mainTab, 'settings');
+    assert.strictEqual(context.fastHidden, false);
+});
+
+test('switchMainTab re-primes session render when a deferred leave is canceled by returning to sessions', () => {
+    const scheduled = [];
+    const methods = createNavigationMethods({
+        configModeSet: new Set(['codex', 'claude', 'openclaw']),
+        switchMainTabHelper(tab) {
+            this.mainTab = tab;
+        },
+        loadMoreSessionMessagesHelper() {}
+    });
+    const context = createNavigationContext(methods, {
+        mainTab: 'sessions',
+        sessionListRenderEnabled: true,
+        sessionPreviewRenderEnabled: true,
+        sessionTabRenderTicket: 3,
+        scheduleAfterFrame(task) {
+            scheduled.push(task);
+        },
+        cancelSessionTimelineSync() {},
+        invalidateSessionTimelineMeasurementCache() {},
+        clearSessionTimelineRefs() {},
+        prepareSessionTabRender() {
+            this._prepareCalls = (this._prepareCalls || 0) + 1;
+            this.sessionListRenderEnabled = true;
+            this.sessionPreviewRenderEnabled = true;
+        }
+    });
+
+    context.switchMainTab('settings');
+    assert.strictEqual(context.sessionListRenderEnabled, false);
+    assert.strictEqual(context.sessionPreviewRenderEnabled, false);
+
+    context.switchMainTab('sessions');
+
+    assert.strictEqual(context.mainTab, 'sessions');
+    assert.strictEqual(context._prepareCalls, 1);
+    assert.strictEqual(context.sessionListRenderEnabled, true);
+    assert.strictEqual(context.sessionPreviewRenderEnabled, true);
+    assert.strictEqual(scheduled.length, 2);
+
+    scheduled[0]();
+    scheduled[1]();
+    assert.strictEqual(context.mainTab, 'sessions');
+    assert.strictEqual(context.fastHidden, false);
+});
+
+test('prepareSessionTabRender re-enables list before preview and primes preview rendering', () => {
+    const methods = createNavigationMethods({
+        configModeSet: new Set(['codex', 'claude', 'openclaw']),
+        switchMainTabHelper(tab) {
+            this.mainTab = tab;
+        },
+        loadMoreSessionMessagesHelper() {}
+    });
+    const scheduled = [];
+    const context = createNavigationContext(methods, {
+        mainTab: 'sessions',
+        sessionListRenderEnabled: true,
+        sessionPreviewRenderEnabled: true,
+        sessionTabRenderTicket: 0,
+        sessionPreviewVisibleCount: 24,
+        scheduleAfterFrame(task) {
+            scheduled.push(task);
+        },
+        resetSessionPreviewMessageRender() {
+            this._resetCalls = (this._resetCalls || 0) + 1;
+            this.sessionPreviewVisibleCount = 0;
+        },
+        primeSessionPreviewMessageRender() {
+            this._primeCalls = (this._primeCalls || 0) + 1;
+        },
+        updateSessionTimelineOffset() {
+            this._timelineOffsetCalls = (this._timelineOffsetCalls || 0) + 1;
+        },
+        scheduleSessionTimelineSync() {
+            this._timelineSyncCalls = (this._timelineSyncCalls || 0) + 1;
+        },
+        $nextTick(callback) {
+            this._nextTickCalls = (this._nextTickCalls || 0) + 1;
+            callback();
+        }
+    });
+
+    context.prepareSessionTabRender();
+
+    assert.strictEqual(context.sessionListRenderEnabled, false);
+    assert.strictEqual(context.sessionPreviewRenderEnabled, false);
+    assert.strictEqual(context.sessionPreviewVisibleCount, 0);
+    assert.strictEqual(context._resetCalls, 1);
+    assert.strictEqual(scheduled.length, 1);
+
+    scheduled.shift()();
+    assert.strictEqual(context.sessionListRenderEnabled, true);
+    assert.strictEqual(context.sessionPreviewRenderEnabled, false);
+    assert.strictEqual(scheduled.length, 1);
+
+    scheduled.shift()();
+    assert.strictEqual(context.sessionListRenderEnabled, true);
+    assert.strictEqual(context.sessionPreviewRenderEnabled, true);
+    assert.strictEqual(context._nextTickCalls, 1);
+    assert.strictEqual(context._primeCalls, 1);
+    assert.strictEqual(context._timelineOffsetCalls, 1);
+    assert.strictEqual(context._timelineSyncCalls, 1);
+});
+
 test('download directory actions clear stale delayed progress resets before scheduling a new one', async () => {
     await verifyDownloadProgressResetCleanup({
         methodName: 'downloadClaudeDirectory',

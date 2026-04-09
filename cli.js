@@ -96,6 +96,9 @@ const SESSION_TRASH_INDEX_FILE = path.join(SESSION_TRASH_DIR, 'index.json');
 const OPENCLAW_DIR = path.join(os.homedir(), '.openclaw');
 const OPENCLAW_CONFIG_FILE = path.join(OPENCLAW_DIR, 'openclaw.json');
 const OPENCLAW_WORKSPACE_DIR = path.join(OPENCLAW_DIR, 'workspace');
+const OPENCLAW_DEFAULT_AGENT_ID = 'main';
+const OPENCLAW_AUTH_PROFILES_FILE_NAME = 'auth-profiles.json';
+const OPENCLAW_AUTH_STATE_FILE_NAME = 'auth-state.json';
 const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 const CLAUDE_SETTINGS_FILE = path.join(CLAUDE_DIR, 'settings.json');
 const CLAUDE_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
@@ -2817,12 +2820,16 @@ function normalizeOpenclawWorkspaceFileName(input) {
 
 function readOpenclawConfigFile() {
     const filePath = OPENCLAW_CONFIG_FILE;
+    const authProfilesByProvider = sanitizeOpenclawAuthProfilesForClient(
+        readOpenclawAuthProfilesSummary().providers
+    );
     if (!fs.existsSync(filePath)) {
         return {
             exists: false,
             path: filePath,
             content: '',
-            lineEnding: os.EOL === '\r\n' ? '\r\n' : '\n'
+            lineEnding: os.EOL === '\r\n' ? '\r\n' : '\n',
+            authProfilesByProvider
         };
     }
 
@@ -2832,10 +2839,314 @@ function readOpenclawConfigFile() {
             exists: true,
             path: filePath,
             content: stripUtf8Bom(raw),
-            lineEnding: detectLineEnding(raw)
+            lineEnding: detectLineEnding(raw),
+            authProfilesByProvider
         };
     } catch (e) {
         return { error: `读取 OpenClaw 配置失败: ${e.message}` };
+    }
+}
+
+function normalizeOpenclawProviderId(provider) {
+    const normalized = typeof provider === 'string' ? provider.trim().toLowerCase() : '';
+    if (!normalized) return '';
+    if (normalized === 'modelstudio' || normalized === 'qwencloud') {
+        return 'qwen';
+    }
+    if (normalized === 'z.ai' || normalized === 'z-ai') {
+        return 'zai';
+    }
+    if (normalized === 'opencode-zen') {
+        return 'opencode';
+    }
+    if (normalized === 'opencode-go-auth') {
+        return 'opencode-go';
+    }
+    if (normalized === 'kimi' || normalized === 'kimi-code' || normalized === 'kimi-coding') {
+        return 'kimi';
+    }
+    if (normalized === 'bedrock' || normalized === 'aws-bedrock') {
+        return 'amazon-bedrock';
+    }
+    if (normalized === 'bytedance' || normalized === 'doubao') {
+        return 'volcengine';
+    }
+    if (normalized === 'volcengine-plan') {
+        return 'volcengine';
+    }
+    if (normalized === 'byteplus-plan') {
+        return 'byteplus';
+    }
+    return normalized;
+}
+
+function findNormalizedOpenclawProviderValue(entries, provider) {
+    if (!isPlainObject(entries)) {
+        return undefined;
+    }
+    const providerKey = normalizeOpenclawProviderId(provider);
+    if (!providerKey) {
+        return undefined;
+    }
+    for (const [key, value] of Object.entries(entries)) {
+        if (normalizeOpenclawProviderId(key) === providerKey) {
+            return value;
+        }
+    }
+    return undefined;
+}
+
+function resolveOpenclawStateDir() {
+    const override = typeof process.env.OPENCLAW_STATE_DIR === 'string'
+        ? process.env.OPENCLAW_STATE_DIR.trim()
+        : '';
+    return override ? resolveHomePath(override) : OPENCLAW_DIR;
+}
+
+function resolveOpenclawAgentDir() {
+    const override = [process.env.OPENCLAW_AGENT_DIR, process.env.PI_CODING_AGENT_DIR]
+        .find(value => typeof value === 'string' && value.trim());
+    if (override) {
+        return resolveHomePath(override.trim());
+    }
+    return path.join(resolveOpenclawStateDir(), 'agents', OPENCLAW_DEFAULT_AGENT_ID, 'agent');
+}
+
+function buildOpenclawAuthProfileDisplay(profileId, credential) {
+    const type = typeof credential.type === 'string' && credential.type.trim()
+        ? credential.type.trim()
+        : 'unknown';
+    const parts = [`AuthProfile(${type}:${profileId})`];
+    const label = typeof credential.displayName === 'string' && credential.displayName.trim()
+        ? credential.displayName.trim()
+        : (typeof credential.email === 'string' && credential.email.trim() ? credential.email.trim() : '');
+    if (label) {
+        parts.push(label);
+    }
+    return parts.join(' · ');
+}
+
+function resolveOpenclawAuthProfileEditableValue(credential) {
+    if (!isPlainObject(credential)) {
+        return {
+            resolvedValue: '',
+            resolvedField: '',
+            editable: false,
+            valueKind: 'missing'
+        };
+    }
+    if (credential.type === 'api_key' && typeof credential.key === 'string' && credential.key.trim()) {
+        return {
+            resolvedValue: credential.key.trim(),
+            resolvedField: 'key',
+            editable: true,
+            valueKind: 'api_key'
+        };
+    }
+    if (credential.type === 'token' && typeof credential.token === 'string' && credential.token.trim()) {
+        return {
+            resolvedValue: credential.token.trim(),
+            resolvedField: 'token',
+            editable: true,
+            valueKind: 'token'
+        };
+    }
+    if (credential.type === 'oauth' && typeof credential.access === 'string' && credential.access.trim()) {
+        return {
+            resolvedValue: credential.access.trim(),
+            resolvedField: 'access',
+            editable: true,
+            valueKind: 'oauth-access'
+        };
+    }
+    return {
+        resolvedValue: '',
+        resolvedField: '',
+        editable: false,
+        valueKind: typeof credential.type === 'string' && credential.type.trim()
+            ? credential.type.trim()
+            : 'missing'
+    };
+}
+
+function getOpenclawAuthProfileTypeRank(credential) {
+    const type = typeof credential.type === 'string' ? credential.type.trim().toLowerCase() : '';
+    if (type === 'oauth') return 0;
+    if (type === 'token') return 1;
+    if (type === 'api_key') return 2;
+    return 3;
+}
+
+function readOpenclawAuthProfilesSummary() {
+    const agentDir = resolveOpenclawAgentDir();
+    const authStorePath = path.join(agentDir, OPENCLAW_AUTH_PROFILES_FILE_NAME);
+    const authStatePath = path.join(agentDir, OPENCLAW_AUTH_STATE_FILE_NAME);
+    const storeResult = readJsonObjectFromFile(authStorePath, { profiles: {} });
+    const stateResult = readJsonObjectFromFile(authStatePath, {});
+    const profiles = storeResult.ok && isPlainObject(storeResult.data) && isPlainObject(storeResult.data.profiles)
+        ? storeResult.data.profiles
+        : {};
+    const state = stateResult.ok && isPlainObject(stateResult.data)
+        ? stateResult.data
+        : {};
+    const grouped = new Map();
+
+    for (const [profileId, credential] of Object.entries(profiles)) {
+        if (!isPlainObject(credential)) continue;
+        const provider = typeof credential.provider === 'string' ? credential.provider.trim() : '';
+        const normalizedProvider = normalizeOpenclawProviderId(provider);
+        if (!normalizedProvider) continue;
+        if (!grouped.has(normalizedProvider)) {
+            grouped.set(normalizedProvider, []);
+        }
+        grouped.get(normalizedProvider).push([profileId, credential]);
+    }
+
+    const providerSummaries = {};
+    for (const [providerKey, entries] of grouped.entries()) {
+        const explicitOrder = findNormalizedOpenclawProviderValue(state.order, providerKey);
+        const lastGood = findNormalizedOpenclawProviderValue(state.lastGood, providerKey);
+        let selected = null;
+
+        if (typeof lastGood === 'string' && lastGood.trim()) {
+            selected = entries.find(([profileId]) => profileId === lastGood.trim()) || null;
+        }
+        if (!selected && Array.isArray(explicitOrder)) {
+            for (const candidateId of explicitOrder) {
+                if (typeof candidateId !== 'string' || !candidateId.trim()) continue;
+                selected = entries.find(([profileId]) => profileId === candidateId.trim()) || null;
+                if (selected) break;
+            }
+        }
+        if (!selected) {
+            selected = [...entries].sort((a, b) => {
+                const rankDelta = getOpenclawAuthProfileTypeRank(a[1]) - getOpenclawAuthProfileTypeRank(b[1]);
+                if (rankDelta !== 0) return rankDelta;
+                return String(a[0]).localeCompare(String(b[0]));
+            })[0] || null;
+        }
+        if (!selected) continue;
+
+        const [profileId, credential] = selected;
+        const resolvedValueMeta = resolveOpenclawAuthProfileEditableValue(credential);
+        providerSummaries[providerKey] = {
+            provider: typeof credential.provider === 'string' ? credential.provider.trim() : providerKey,
+            normalizedProvider: providerKey,
+            profileId,
+            type: typeof credential.type === 'string' ? credential.type.trim() : '',
+            display: buildOpenclawAuthProfileDisplay(profileId, credential),
+            displayName: typeof credential.displayName === 'string' ? credential.displayName.trim() : '',
+            email: typeof credential.email === 'string' ? credential.email.trim() : '',
+            resolvedValue: resolvedValueMeta.resolvedValue,
+            resolvedField: resolvedValueMeta.resolvedField,
+            editable: resolvedValueMeta.editable,
+            valueKind: resolvedValueMeta.valueKind
+        };
+    }
+
+    return {
+        agentDir,
+        authStorePath,
+        authStatePath,
+        providers: providerSummaries
+    };
+}
+
+function sanitizeOpenclawAuthProfilesForClient(providers) {
+    if (!isPlainObject(providers)) {
+        return {};
+    }
+    const sanitized = {};
+    for (const [providerKey, summary] of Object.entries(providers)) {
+        if (!isPlainObject(summary)) {
+            continue;
+        }
+        const normalized = { ...summary };
+        delete normalized.resolvedValue;
+        sanitized[providerKey] = normalized;
+    }
+    return sanitized;
+}
+
+function normalizeOpenclawAuthProfileUpdate(entry) {
+    if (!isPlainObject(entry)) return null;
+    const profileId = typeof entry.profileId === 'string' ? entry.profileId.trim() : '';
+    const provider = typeof entry.provider === 'string' ? entry.provider.trim() : '';
+    const field = typeof entry.field === 'string' ? entry.field.trim() : '';
+    const value = typeof entry.value === 'string' ? entry.value.trim() : '';
+    const allowedFields = new Set(['key', 'token', 'access']);
+    if (!profileId || !provider || !allowedFields.has(field) || !value) {
+        return null;
+    }
+    return { profileId, provider, field, value };
+}
+
+function applyOpenclawAuthProfileUpdates(params = {}) {
+    const updates = Array.isArray(params.updates)
+        ? params.updates.map(normalizeOpenclawAuthProfileUpdate).filter(Boolean)
+        : [];
+    if (!updates.length) {
+        return { ok: true, applied: [] };
+    }
+
+    const authSummary = readOpenclawAuthProfilesSummary();
+    const authStorePath = authSummary.authStorePath;
+    const storeResult = readJsonObjectFromFile(authStorePath, { version: 1, profiles: {} });
+    if (!storeResult.ok) {
+        return { ok: false, error: storeResult.error || '读取 OpenClaw auth profile 失败' };
+    }
+    const store = isPlainObject(storeResult.data) ? storeResult.data : { version: 1, profiles: {} };
+    const profiles = isPlainObject(store.profiles) ? { ...store.profiles } : {};
+    const applied = [];
+
+    for (const update of updates) {
+        const existing = profiles[update.profileId];
+        if (!isPlainObject(existing)) {
+            return { ok: false, error: `未找到 OpenClaw 认证配置: ${update.profileId}` };
+        }
+        const existingProvider = typeof existing.provider === 'string' ? existing.provider.trim() : '';
+        if (normalizeOpenclawProviderId(existingProvider) !== normalizeOpenclawProviderId(update.provider)) {
+            return { ok: false, error: `认证配置与 provider 不匹配: ${update.profileId}` };
+        }
+
+        const next = { ...existing };
+        next[update.field] = update.value;
+        if (update.field === 'key') {
+            next.type = 'api_key';
+            delete next.keyRef;
+        } else if (update.field === 'token') {
+            next.type = 'token';
+            delete next.tokenRef;
+        } else if (update.field === 'access') {
+            next.type = 'oauth';
+        }
+        profiles[update.profileId] = next;
+        applied.push({
+            profileId: update.profileId,
+            provider: existingProvider || update.provider,
+            field: update.field
+        });
+    }
+
+    try {
+        ensureDir(path.dirname(authStorePath));
+        const backupPath = fs.existsSync(authStorePath) ? backupFileIfNeededOnce(authStorePath) : '';
+        writeJsonAtomic(authStorePath, {
+            ...store,
+            version: Number(store.version) > 0 ? Number(store.version) : 1,
+            profiles
+        });
+        return {
+            ok: true,
+            applied,
+            authStorePath,
+            backupPath
+        };
+    } catch (e) {
+        return {
+            ok: false,
+            error: e && e.message ? e.message : '写入 OpenClaw auth profile 失败'
+        };
     }
 }
 
@@ -3010,6 +3321,13 @@ function applyOpenclawConfig(params = {}) {
     }
 
     try {
+        const authUpdateResult = applyOpenclawAuthProfileUpdates({ updates: params.authProfileUpdates });
+        if (!authUpdateResult.ok) {
+            return {
+                success: false,
+                error: authUpdateResult.error || '写入 OpenClaw 认证配置失败'
+            };
+        }
         ensureDir(OPENCLAW_DIR);
         const backupPath = backupFileIfNeededOnce(OPENCLAW_CONFIG_FILE);
         fs.writeFileSync(OPENCLAW_CONFIG_FILE, normalized, 'utf-8');
@@ -3019,6 +3337,12 @@ function applyOpenclawConfig(params = {}) {
         };
         if (backupPath) {
             result.backupPath = backupPath;
+        }
+        if (authUpdateResult.authStorePath) {
+            result.authStorePath = authUpdateResult.authStorePath;
+        }
+        if (Array.isArray(authUpdateResult.applied) && authUpdateResult.applied.length) {
+            result.authProfilesUpdated = authUpdateResult.applied;
         }
         return result;
     } catch (e) {
@@ -3449,11 +3773,15 @@ function addProviderToConfig(params = {}) {
     const url = typeof params.url === 'string' ? params.url.trim() : '';
     const key = typeof params.key === 'string' ? params.key.trim() : '';
     const allowManaged = !!params.allowManaged;
+    const normalizedUrl = normalizeBaseUrl(url);
 
     if (!name) return { error: '名称不能为空' };
     if (!url) return { error: 'URL 不能为空' };
     if (!isValidProviderName(name)) {
         return { error: '名称仅支持字母/数字/._-' };
+    }
+    if (!isValidHttpUrl(normalizedUrl)) {
+        return { error: 'URL 仅支持 http/https' };
     }
     if (isReservedProviderNameForCreation(name)) {
         return { error: 'local provider 为系统保留名称，不可新增' };
@@ -3496,7 +3824,7 @@ function addProviderToConfig(params = {}) {
 
     const lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
     const safeName = escapeTomlBasicString(name);
-    const safeUrl = escapeTomlBasicString(url);
+    const safeUrl = escapeTomlBasicString(normalizedUrl);
     const safeKey = escapeTomlBasicString(key);
     const block = [
         buildModelProviderTableHeader(name),
@@ -3532,6 +3860,9 @@ function updateProviderInConfig(params = {}) {
     if (!name) return { error: '名称不能为空' };
     if (!url && key === undefined) {
         return { error: 'URL 或密钥至少填写一项' };
+    }
+    if (url && !isValidHttpUrl(normalizeBaseUrl(url))) {
+        return { error: 'URL 仅支持 http/https' };
     }
     if (isNonEditableProvider(name) && !allowManaged) {
         if (isDefaultLocalProvider(name)) {
@@ -5434,6 +5765,21 @@ async function listAllSessionsData(params = {}) {
         setSessionListCache(cacheKey, result);
     }
     return result;
+}
+
+async function listSessionUsage(params = {}) {
+    const source = params.source === 'codex' || params.source === 'claude'
+        ? params.source
+        : 'all';
+    const rawLimit = Number(params.limit);
+    const limit = Number.isFinite(rawLimit)
+        ? Math.max(1, Math.min(rawLimit, MAX_SESSION_LIST_SIZE))
+        : 200;
+    return await listAllSessionsData({
+        source,
+        limit,
+        forceRefresh: !!params.forceRefresh
+    });
 }
 
 function listSessionPaths(params = {}) {
@@ -8228,7 +8574,7 @@ function cmdUseModel(modelName, silent = false) {
 // 添加提供商
 function cmdAdd(name, baseUrl, apiKey, silent = false) {
     const providerName = typeof name === 'string' ? name.trim() : '';
-    const providerBaseUrl = typeof baseUrl === 'string' ? baseUrl.trim() : '';
+    const providerBaseUrl = normalizeBaseUrl(baseUrl);
 
     if (!providerName || !providerBaseUrl) {
         if (!silent) {
@@ -8249,6 +8595,10 @@ function cmdAdd(name, baseUrl, apiKey, silent = false) {
     if (isBuiltinProxyProvider(providerName)) {
         if (!silent) console.error('错误: codexmate-proxy 为保留名称，不可手动添加');
         throw new Error('codexmate-proxy 为保留名称，不可手动添加');
+    }
+    if (!isValidHttpUrl(providerBaseUrl)) {
+        if (!silent) console.error('错误: URL 仅支持 http/https');
+        throw new Error('URL 仅支持 http/https');
     }
 
     const config = readConfig();
@@ -8307,6 +8657,7 @@ function cmdDelete(name, silent = false) {
 // 更新提供商
 function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
     const allowManaged = !!(options && options.allowManaged);
+    const normalizedBaseUrl = baseUrl === undefined ? undefined : normalizeBaseUrl(baseUrl);
     if (!name) {
         if (!silent) console.error('错误: 提供商名称必填');
         throw new Error('提供商名称必填');
@@ -8334,6 +8685,10 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
     if (ranges.length === 0) {
         if (!silent) console.error('错误: 无法找到提供商配置块');
         throw new Error('无法找到提供商配置块');
+    }
+    if (normalizedBaseUrl !== undefined && !isValidHttpUrl(normalizedBaseUrl)) {
+        if (!silent) console.error('错误: URL 仅支持 http/https');
+        throw new Error('URL 仅支持 http/https');
     }
 
     const replaceTomlStringField = (block, fieldName, rawValue) => {
@@ -8460,8 +8815,8 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
     for (const range of sorted) {
         const providerBlock = newContent.slice(range.start, range.end);
         let updatedBlock = providerBlock;
-        if (baseUrl) {
-            updatedBlock = replaceTomlStringField(updatedBlock, 'base_url', baseUrl);
+        if (normalizedBaseUrl) {
+            updatedBlock = replaceTomlStringField(updatedBlock, 'base_url', normalizedBaseUrl);
         }
         if (apiKey !== undefined) {
             updatedBlock = replaceTomlStringField(updatedBlock, 'preferred_auth_method', apiKey);
@@ -10685,6 +11040,23 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                                 } else {
                                     result = {
                                         sessions: await listAllSessionsData(params),
+                                        source: source || 'all'
+                                    };
+                                }
+                            }
+                            break;
+                        case 'list-sessions-usage':
+                            {
+                                const usageParams = isPlainObject(params) ? params : {};
+                                const source = typeof usageParams.source === 'string' ? usageParams.source.trim().toLowerCase() : '';
+                                if (source && source !== 'codex' && source !== 'claude' && source !== 'all') {
+                                    result = { error: 'Invalid source. Must be codex, claude, or all' };
+                                } else {
+                                    result = {
+                                        sessions: await listSessionUsage({
+                                            ...usageParams,
+                                            source: source || 'all'
+                                        }),
                                         source: source || 'all'
                                     };
                                 }

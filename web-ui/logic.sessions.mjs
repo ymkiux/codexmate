@@ -1,3 +1,32 @@
+export const DEFAULT_SESSION_LIST_LIMIT = 200;
+export const DEFAULT_SESSION_LIST_FAST_LIMIT = 40;
+
+function shouldUseFastSessionBrowseLimit(options = {}) {
+    if (options.forceRefresh) {
+        return false;
+    }
+    const normalizedSource = normalizeSessionSource(options.source, 'all');
+    if (normalizedSource !== 'all') {
+        return false;
+    }
+    const pathFilter = normalizeSessionPathFilter(options.pathFilter);
+    if (pathFilter) {
+        return false;
+    }
+    const query = typeof options.query === 'string' ? options.query.trim() : '';
+    if (query) {
+        return false;
+    }
+    const roleFilter = typeof options.roleFilter === 'string' ? options.roleFilter.trim().toLowerCase() : 'all';
+    if (roleFilter && roleFilter !== 'all') {
+        return false;
+    }
+    const timeRangePreset = typeof options.timeRangePreset === 'string'
+        ? options.timeRangePreset.trim().toLowerCase()
+        : 'all';
+    return !timeRangePreset || timeRangePreset === 'all';
+}
+
 export function isSessionQueryEnabled(source) {
     const normalized = normalizeSessionSource(source, '');
     return normalized === 'codex' || normalized === 'claude' || normalized === 'all';
@@ -25,13 +54,17 @@ export function buildSessionFilterCacheState(source, pathFilter) {
 }
 
 export function buildSessionListParams(options = {}) {
+    const fallbackLimit = shouldUseFastSessionBrowseLimit(options)
+        ? DEFAULT_SESSION_LIST_FAST_LIMIT
+        : DEFAULT_SESSION_LIST_LIMIT;
     const {
         source = 'all',
         pathFilter = '',
         query = '',
         roleFilter = 'all',
         timeRangePreset = 'all',
-        limit = 200
+        limit = fallbackLimit,
+        forceRefresh = false
     } = options;
     const normalizedSource = normalizeSessionSource(source, 'all');
     const normalizedPathFilter = normalizeSessionPathFilter(pathFilter);
@@ -46,7 +79,7 @@ export function buildSessionListParams(options = {}) {
         roleFilter,
         timeRangePreset,
         limit,
-        forceRefresh: true
+        forceRefresh: !!forceRefresh
     };
 }
 

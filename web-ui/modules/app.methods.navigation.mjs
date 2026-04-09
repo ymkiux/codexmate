@@ -297,6 +297,13 @@ export function createNavigationMethods(options = {}) {
             if (targetTab === previousTab) {
                 switchState.ticket += 1;
                 switchState.pendingTarget = '';
+                if (
+                    targetTab === 'sessions'
+                    && typeof this.prepareSessionTabRender === 'function'
+                    && (!this.sessionListRenderEnabled || !this.sessionPreviewRenderEnabled)
+                ) {
+                    this.prepareSessionTabRender();
+                }
                 this.scheduleAfterFrame(() => {
                     this.clearMainTabSwitchIntent(normalizedTab);
                 });
@@ -306,6 +313,9 @@ export function createNavigationMethods(options = {}) {
             const shouldDeferApply = isLeavingSessions;
             if (isLeavingSessions && !this.isSessionPanelFastHidden()) {
                 this.setSessionPanelFastHidden(true);
+            }
+            if (shouldDeferApply && typeof this.suspendSessionTabRender === 'function') {
+                this.suspendSessionTabRender();
             }
             if (!shouldDeferApply) {
                 switchState.ticket += 1;

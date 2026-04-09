@@ -48,17 +48,21 @@
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Base URL</label>
-                                <input v-model="openclawQuick.baseUrl" class="form-input" placeholder="https://api.example.com/v1">
+                                <input v-model="openclawQuick.baseUrl" class="form-input" placeholder="https://api.example.com/v1" :readonly="openclawQuick.baseUrlReadOnly">
+                                <div v-if="openclawQuick.baseUrlDisplayKind === 'builtin-default'" class="form-hint">已按 OpenClaw 内建 provider 默认值回填，可直接修改。</div>
+                                <div v-else-if="openclawQuick.baseUrlReadOnly" class="form-hint">检测到外部引用，快速表单中只读显示；如需修改请使用原文编辑。</div>
                             </div>
                             <div class="form-group">
                                 <label class="form-label">API Key</label>
                                 <div class="list-row">
-                                    <input v-model="openclawQuick.apiKey" class="form-input" :type="openclawQuick.showKey ? 'text' : 'password'" placeholder="sk-...">
-                                    <button class="btn-mini" @click="toggleOpenclawQuickKey">
+                                    <input v-model="openclawQuick.apiKey" class="form-input" :readonly="openclawQuick.apiKeyReadOnly" :type="(openclawQuick.apiKeyReadOnly || openclawQuick.showKey) ? 'text' : 'password'" placeholder="sk-...">
+                                    <button v-if="!openclawQuick.apiKeyReadOnly" class="btn-mini" @click="toggleOpenclawQuickKey">
                                         {{ openclawQuick.showKey ? '隐藏' : '显示' }}
                                     </button>
                                 </div>
-                                <div class="form-hint">留空表示不覆盖现有 key。</div>
+                                <div v-if="openclawQuick.apiKeyDisplayKind === 'auth-profile-value'" class="form-hint">当前值来自 OpenClaw 外部认证配置；修改后在“保存并应用”时会回写对应 auth profile。</div>
+                                <div v-else-if="openclawQuick.apiKeyReadOnly" class="form-hint">检测到外部认证或引用，快速表单中只读显示；如需修改请使用原文编辑或对应认证配置。</div>
+                                <div v-else class="form-hint">留空表示不覆盖现有 key。</div>
                             </div>
                             <div class="form-group">
                                 <label class="form-label">API 类型</label>
@@ -258,13 +262,14 @@
                         :readonly="openclawSaving || openclawApplying"
                         placeholder="在这里编辑 OpenClaw 配置（JSON5）"></textarea>
                     <div class="template-editor-warning">
-                        保存仅写入本地配置库。点击“保存并应用”后会写入 openclaw.json。
+                        <span v-if="openclawEditing.lockName && openclawEditing.name === '默认配置'">默认配置始终映射当前 openclaw.json，请直接使用“保存并应用”。</span>
+                        <span v-else>保存仅写入本地配置库。点击“保存并应用”后会写入 openclaw.json。</span>
                     </div>
                 </div>
 
                 <div class="btn-group">
                     <button class="btn btn-cancel" @click="closeOpenclawConfigModal" :disabled="openclawSaving || openclawApplying">取消</button>
-                    <button class="btn btn-confirm" @click="saveOpenclawConfig" :disabled="openclawSaving || openclawApplying">
+                    <button class="btn btn-confirm" @click="saveOpenclawConfig" :disabled="openclawSaving || openclawApplying || (openclawEditing.lockName && openclawEditing.name === '默认配置')">
                         {{ openclawSaving ? '保存中...' : '保存' }}
                     </button>
                     <button class="btn btn-confirm secondary" @click="saveAndApplyOpenclawConfig" :disabled="openclawSaving || openclawApplying">
