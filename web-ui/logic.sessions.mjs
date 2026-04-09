@@ -185,11 +185,11 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
         messageTotal += messageCount;
         sourceMessageTotals[source] += messageCount;
 
-        const utcHour = stamp.getUTCHours();
-        if (hourCounts[utcHour]) {
-            hourCounts[utcHour].count += 1;
+        const localHour = stamp.getHours();
+        if (hourCounts[localHour]) {
+            hourCounts[localHour].count += 1;
         }
-        const dayIndex = (stamp.getUTCDay() + 6) % 7;
+        const dayIndex = (stamp.getDay() + 6) % 7;
         if (weekdayCounts[dayIndex]) {
             weekdayCounts[dayIndex].count += 1;
         }
