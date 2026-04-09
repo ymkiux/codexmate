@@ -55,3 +55,18 @@ test('buildUsageChartGroups ignores invalid sessions and keeps empty buckets sta
     assert.ok(result.weekdayActivity.every((item) => item.count === 0));
     assert.deepStrictEqual(result.recentSessions, []);
 });
+
+test('buildUsageChartGroups produces stable unique keys for sessions without ids', () => {
+    const now = Date.UTC(2026, 3, 6, 12, 0, 0);
+    const result = buildUsageChartGroups([
+        { source: 'codex', updatedAt: '2026-04-06T09:00:00.000Z', messageCount: 4 },
+        { source: 'codex', updatedAt: '2026-04-06T09:00:00.000Z', messageCount: 4 },
+        { source: 'claude', updatedAt: '2026-04-06T09:00:00.000Z', messageCount: 4 }
+    ], { range: '7d', now });
+
+    const recentKeys = result.recentSessions.map((item) => item.key);
+    const topKeys = result.topSessionsByMessages.map((item) => item.key);
+
+    assert.strictEqual(new Set(recentKeys).size, recentKeys.length);
+    assert.strictEqual(new Set(topKeys).size, topKeys.length);
+});
