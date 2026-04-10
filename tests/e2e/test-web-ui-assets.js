@@ -52,8 +52,14 @@ module.exports = async function testWebUiAssets(ctx) {
     );
     assert(bundledIndex.body.includes('id="settings-panel-trash"'), '/web-ui/index.html should inline settings partials');
     assert(bundledIndex.body.includes('src="/web-ui/app.js"'), '/web-ui/index.html should point to the absolute app entry');
-    assert(bundledIndex.body.includes('src="/res/vue.global.js"'), '/web-ui/index.html should use the compiler-enabled vue runtime');
-    assert(!bundledIndex.body.includes('src="/res/vue.global.prod.js"'), '/web-ui/index.html should not use the prod-only vue runtime');
+    assert(
+        bundledIndex.body.includes('src="/res/vue.global.prod.js"'),
+        '/web-ui/index.html should use the production Vue browser build'
+    );
+    assert(
+        !bundledIndex.body.includes('src="/res/runtime.global.prod.js"'),
+        '/web-ui/index.html should not use the runtime-only Vue build'
+    );
     assert(!bundledIndex.body.includes('src="web-ui/app.js"'), '/web-ui/index.html should not use a relative app entry');
     assert(!/<!--\s*@include\s+/.test(bundledIndex.body), '/web-ui/index.html should not leak include directives');
 
