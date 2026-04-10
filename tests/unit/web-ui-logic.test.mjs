@@ -674,6 +674,40 @@ test('sortedSessionsList moves pinned sessions to the front and keeps latest pin
     assert.deepStrictEqual(result, [sessions[2], sessions[1], sessions[0]]);
 });
 
+test('visibleSessionsList keeps the active session inside the rendered window', () => {
+    const computed = createSessionComputed();
+    const sessions = Array.from({ length: 6 }, (_, index) => ({
+        sessionId: `sess-${index + 1}`,
+        source: 'codex',
+        filePath: `/tmp/${index + 1}.jsonl`
+    }));
+    const result = computed.visibleSessionsList.call({
+        sessionListRenderEnabled: true,
+        sessionListVisibleCount: 2,
+        sortedSessionsList: sessions,
+        activeSession: sessions[4],
+        getSessionExportKey(session) {
+            return `${session.source}:${session.sessionId}:${session.filePath}`;
+        }
+    });
+
+    assert.deepStrictEqual(result, sessions.slice(0, 5));
+});
+
+test('activeSessionVisibleMessages falls back to the initial preview batch before priming completes', () => {
+    const computed = createSessionComputed();
+    const messages = Array.from({ length: 12 }, (_, index) => ({ id: index + 1 }));
+    const result = computed.activeSessionVisibleMessages.call({
+        mainTab: 'sessions',
+        sessionPreviewRenderEnabled: true,
+        activeSessionMessages: messages,
+        sessionPreviewInitialBatchSize: 5,
+        sessionPreviewVisibleCount: 0
+    });
+
+    assert.deepStrictEqual(result, messages.slice(0, 5));
+});
+
 test('formatSessionTimelineTimestamp normalizes ISO-like strings for timeline labels', () => {
     assert.strictEqual(formatSessionTimelineTimestamp('2026-03-23T09:10:11.000Z'), '03-23 09:10:11');
     assert.strictEqual(formatSessionTimelineTimestamp('2026-03-23 19:20:00'), '03-23 19:20:00');

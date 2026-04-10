@@ -10,6 +10,8 @@ test('mounted defers initial loadAll until after window load and a short timer',
     const removedListeners = [];
     const rafCallbacks = [];
     const timeoutCallbacks = [];
+    let refreshClaudeSelectionCalls = 0;
+    let syncDefaultOpenclawCalls = 0;
     const context = {
         sessionResumeWithYolo: true,
         claudeConfigs: {},
@@ -27,9 +29,11 @@ test('mounted defers initial loadAll until after window load and a short timer',
         handleGlobalKeydown() {},
         handleBeforeUnload() {},
         refreshClaudeSelectionFromSettings() {
+            refreshClaudeSelectionCalls += 1;
             return Promise.resolve();
         },
         syncDefaultOpenclawConfigEntry() {
+            syncDefaultOpenclawCalls += 1;
             return Promise.resolve();
         },
         loadAllCalls: 0,
@@ -72,6 +76,8 @@ test('mounted defers initial loadAll until after window load and a short timer',
     });
 
     assert.strictEqual(context.loadAllCalls, 0);
+    assert.strictEqual(refreshClaudeSelectionCalls, 0);
+    assert.strictEqual(syncDefaultOpenclawCalls, 0);
     const loadListener = registeredListeners.find((entry) => entry.name === 'load');
     assert.ok(loadListener, 'mounted should wait for window load before first loadAll');
 
@@ -86,6 +92,8 @@ test('mounted defers initial loadAll until after window load and a short timer',
 
     timeoutCallbacks[0].callback();
     assert.strictEqual(context.loadAllCalls, 1);
+    assert.strictEqual(refreshClaudeSelectionCalls, 1);
+    assert.strictEqual(syncDefaultOpenclawCalls, 1);
     assert.ok(
         removedListeners.some((entry) => entry.name === 'load' && entry.handler === loadListener.handler),
         'mounted should clean up the one-shot load listener after scheduling the initial refresh'

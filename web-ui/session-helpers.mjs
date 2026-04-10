@@ -11,25 +11,21 @@ function clearSessionTimelineRefs(vm) {
     }
 }
 
-function scheduleSessionDetailHydration(vm, options = {}) {
-    if (!vm || typeof vm.loadActiveSessionDetail !== 'function') {
-        return;
-    }
-    const task = () => {
-        if (!vm.activeSession) return;
-        if (vm.mainTab !== 'sessions' && !vm.sessionStandalone) return;
-        if (vm.sessionDetailLoading) return;
-        const currentMessages = Array.isArray(vm.activeSessionMessages) ? vm.activeSessionMessages : [];
-        if (!options.force && currentMessages.length > 0) {
-            return;
-        }
-        void vm.loadActiveSessionDetail(options);
+function normalizeSessionLoadOptions(options = {}) {
+    const normalized = options && typeof options === 'object' ? options : {};
+    return {
+        includeActiveDetail: !!normalized.includeActiveDetail,
+        forceRefresh: !!normalized.forceRefresh
     };
-    if (typeof vm.scheduleAfterFrame === 'function') {
-        vm.scheduleAfterFrame(task);
-        return;
-    }
-    task();
+}
+
+function mergeSessionLoadOptions(baseOptions = {}, nextOptions = {}) {
+    const base = normalizeSessionLoadOptions(baseOptions);
+    const next = normalizeSessionLoadOptions(nextOptions);
+    return {
+        includeActiveDetail: base.includeActiveDetail || next.includeActiveDetail,
+        forceRefresh: base.forceRefresh || next.forceRefresh
+    };
 }
 
 export function switchMainTab(tab) {
@@ -64,17 +60,9 @@ export function switchMainTab(tab) {
     }
 
     if (enteringSessionsTab && !this.sessionsLoadedOnce) {
-        const canStageInitialSessionDetail = typeof this.scheduleAfterFrame === 'function';
-        const loadResult = this.loadSessions({
-            includeActiveDetail: !canStageInitialSessionDetail
+        this.loadSessions({
+            includeActiveDetail: false
         });
-        if (canStageInitialSessionDetail) {
-            void Promise.resolve(loadResult)
-                .then(() => {
-                    scheduleSessionDetailHydration(this);
-                })
-                .catch(() => {});
-        }
     }
     if (enteringUsageTab && !this.sessionsUsageLoadedOnce && typeof this.loadSessionsUsage === 'function') {
         this.loadSessionsUsage();
@@ -125,19 +113,24 @@ export function switchMainTab(tab) {
 }
 
 export async function loadSessions(api, options = {}) {
-    if (this.sessionsLoading) return;
+    if (this.sessionsLoading) {
+        this.__sessionPendingLoadOptions = mergeSessionLoadOptions(
+            this.__sessionPendingLoadOptions,
+            options
+        );
+        return;
+    }
+    const normalizedOptions = normalizeSessionLoadOptions(options);
     this.sessionsLoading = true;
     this.activeSessionDetailError = '';
     let loadSucceeded = false;
-    const includeActiveDetail = options && Object.prototype.hasOwnProperty.call(options, 'includeActiveDetail')
-        ? !!options.includeActiveDetail
-        : (this.mainTab === 'sessions' || !!this.sessionStandalone);
     const params = buildSessionListParams({
         source: this.sessionFilterSource,
         pathFilter: this.sessionPathFilter,
         query: this.sessionQuery,
         roleFilter: this.sessionRoleFilter,
-        timeRangePreset: this.sessionTimePreset
+        timeRangePreset: this.sessionTimePreset,
+        forceRefresh: normalizedOptions.forceRefresh
     });
     try {
         const res = await api('list-sessions', params);
@@ -187,11 +180,10 @@ export async function loadSessions(api, options = {}) {
                 this.cancelSessionTimelineSync();
                 this.sessionTimelineActiveKey = '';
                 clearSessionTimelineRefs(this);
-                if (includeActiveDetail) {
+                if (normalizedOptions.includeActiveDetail) {
                     await this.loadActiveSessionDetail();
                 }
             }
-            void this.loadSessionPathOptions({ source: this.sessionFilterSource });
         }
     } catch (e) {
         this.sessionsList = [];
@@ -211,6 +203,11 @@ export async function loadSessions(api, options = {}) {
         this.sessionsLoading = false;
         if (loadSucceeded) {
             this.sessionsLoadedOnce = true;
+        }
+        const pendingOptions = this.__sessionPendingLoadOptions || null;
+        this.__sessionPendingLoadOptions = null;
+        if (pendingOptions) {
+            return loadSessions.call(this, api, pendingOptions);
         }
     }
 }
@@ -239,12 +236,14 @@ export async function loadActiveSessionDetail(api, options = {}) {
     const messageLimit = Number.isFinite(rawLimit)
         ? Math.max(1, Math.floor(rawLimit))
         : fallbackLimit;
+    const preview = this.mainTab === 'sessions' && !this.sessionStandalone;
     try {
         const res = await api('session-detail', {
             source: this.activeSession.source,
             sessionId: this.activeSession.sessionId,
             filePath: this.activeSession.filePath,
-            messageLimit
+            messageLimit,
+            preview
         });
 
         if (requestSeq !== this.sessionDetailRequestSeq) {
@@ -316,7 +315,21 @@ export async function loadActiveSessionDetail(api, options = {}) {
             }
             this.updateSessionTimelineOffset();
             if (this.sessionTimelineEnabled) {
-                this.scheduleSessionTimelineSync();
+                const currentSession = this.activeSession;
+                const syncTask = () => {
+                    if (this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {
+                        return;
+                    }
+                    if (!this.activeSession || this.activeSession !== currentSession) {
+                        return;
+                    }
+                    this.scheduleSessionTimelineSync();
+                };
+                if (typeof this.scheduleAfterFrame === 'function') {
+                    this.scheduleAfterFrame(syncTask);
+                    return;
+                }
+                syncTask();
             }
         });
     } catch (e) {
