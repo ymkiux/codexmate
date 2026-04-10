@@ -805,6 +805,7 @@ test('createWebServer waits for api readiness probe before auto-opening the brow
     let listenCallback = null;
     let probeRequest = null;
     let probeEndHandler = null;
+    let probePayload = '';
     const execCalls = [];
     const createWebServer = instantiateFunction(createWebServerSource, 'createWebServer', {
         http: {
@@ -831,7 +832,9 @@ test('createWebServer waits for api readiness probe before auto-opening the brow
                     on() {},
                     setTimeout() {},
                     destroy() {},
-                    end() {}
+                    end(payload) {
+                        probePayload = payload;
+                    }
                 };
             }
         },
@@ -898,6 +901,7 @@ test('createWebServer waits for api readiness probe before auto-opening the brow
     assert.strictEqual(probeRequest.options.port, 3737);
     assert.strictEqual(probeRequest.options.path, '/api');
     assert.strictEqual(probeRequest.options.method, 'POST');
+    assert.deepStrictEqual(JSON.parse(probePayload), { action: 'health-check', params: {} });
 
     probeRequest.callback({
         statusCode: 200,
@@ -912,6 +916,138 @@ test('createWebServer waits for api readiness probe before auto-opening the brow
 
     probeEndHandler();
     assert.deepStrictEqual(execCalls, ['start "" "http://127.0.0.1:3737"']);
+});
+
+test('createWebServer health-check does not consume init notice before the first status poll', async () => {
+    let requestHandler = null;
+    let consumed = 0;
+    const createWebServer = instantiateFunction(createWebServerSource, 'createWebServer', {
+        http: {
+            createServer(handler) {
+                requestHandler = handler;
+                return {
+                    listening: false,
+                    on() {},
+                    once() {},
+                    listen() {},
+                    close(callback) {
+                        if (typeof callback === 'function') {
+                            callback();
+                        }
+                    }
+                };
+            }
+        },
+        path,
+        __dirname: '/repo',
+        readBundledWebUiHtml() {
+            return '<!doctype html>';
+        },
+        PUBLIC_WEB_UI_DYNAMIC_ASSETS: new Map(),
+        PUBLIC_WEB_UI_STATIC_ASSETS: new Set(),
+        isPathInside() {
+            return true;
+        },
+        fs: {
+            existsSync() {
+                return false;
+            },
+            statSync() {
+                return {
+                    isFile() {
+                        return false;
+                    }
+                };
+            },
+            createReadStream() {
+                throw new Error('unexpected static asset read');
+            }
+        },
+        formatHostForUrl(value) {
+            return value;
+        },
+        DEFAULT_WEB_OPEN_HOST: '127.0.0.1',
+        isAnyAddressHost() {
+            return false;
+        },
+        process: { env: {}, platform: 'linux' },
+        exec() {},
+        console: {
+            log() {},
+            warn() {},
+            error() {}
+        },
+        setTimeout,
+        Buffer,
+        MAX_API_BODY_SIZE: 1024 * 1024,
+        handleImportSkillsZipUpload() {
+            throw new Error('unexpected import route');
+        },
+        readConfigOrVirtualDefault() {
+            return {
+                config: {},
+                isVirtual: false,
+                errorType: '',
+                reason: ''
+            };
+        },
+        hasConfigLoadError() {
+            return false;
+        },
+        readPositiveIntegerConfigValue() {
+            return 0;
+        },
+        consumeInitNotice() {
+            consumed += 1;
+            return 'startup notice';
+        }
+    });
+
+    createWebServer({
+        htmlPath: '/repo/web-ui/index.html',
+        assetsDir: '/repo/res',
+        webDir: '/repo/web-ui',
+        host: '127.0.0.1',
+        port: 3737,
+        openBrowser: false
+    });
+
+    async function postApi(body) {
+        const listeners = {};
+        const req = {
+            url: '/api',
+            on(event, handler) {
+                listeners[event] = handler;
+            }
+        };
+        const res = {
+            statusCode: null,
+            headers: null,
+            body: '',
+            writeHead(statusCode, headers) {
+                this.statusCode = statusCode;
+                this.headers = headers;
+            },
+            end(bodyText = '') {
+                this.body = bodyText;
+            }
+        };
+        requestHandler(req, res);
+        listeners.data(Buffer.from(JSON.stringify(body), 'utf-8'));
+        await listeners.end();
+        res.payload = JSON.parse(res.body || '{}');
+        return res;
+    }
+
+    const probeResponse = await postApi({ action: 'health-check', params: {} });
+    assert.strictEqual(probeResponse.statusCode, 200);
+    assert.deepStrictEqual(probeResponse.payload, { ok: true });
+    assert.strictEqual(consumed, 0);
+
+    const statusResponse = await postApi({ action: 'status', params: {} });
+    assert.strictEqual(statusResponse.statusCode, 200);
+    assert.strictEqual(statusResponse.payload.initNotice, 'startup notice');
+    assert.strictEqual(consumed, 1);
 });
 
 test('createWebServer retries readiness probe failures before auto-opening the browser', () => {

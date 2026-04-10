@@ -10776,7 +10776,7 @@ const PUBLIC_WEB_UI_STATIC_ASSETS = new Set([
 function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser }) {
     const connections = new Set();
     const probeWebUiReadiness = (callback) => {
-        const payload = JSON.stringify({ action: 'status', params: {} });
+        const payload = JSON.stringify({ action: 'health-check', params: {} });
         const requestOptions = {
             hostname: openHost,
             port,
@@ -10898,6 +10898,9 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                     let result;
 
                     switch (action) {
+                        case 'health-check':
+                            result = { ok: true };
+                            break;
                         case 'status': {
                             const statusConfigResult = readConfigOrVirtualDefault();
                             const config = statusConfigResult.config;
