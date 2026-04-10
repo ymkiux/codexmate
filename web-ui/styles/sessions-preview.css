@@ -9,7 +9,7 @@
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
-    padding-right: 68px;
+    padding-right: 52px;
     display: flex;
     flex-direction: column;
     scrollbar-width: none;
@@ -117,9 +117,9 @@
 .session-timeline {
     position: absolute;
     top: var(--session-preview-header-offset, 72px);
-    right: 8px;
+    right: 4px;
     bottom: 12px;
-    width: 56px;
+    width: 44px;
     height: auto;
     border-radius: 12px;
     border: 1px solid rgba(208, 196, 182, 0.5);
@@ -171,8 +171,8 @@
 
 .session-timeline-current {
     position: absolute;
-    left: 4px;
-    right: 4px;
+    left: 3px;
+    right: 3px;
     bottom: 4px;
     font-size: 10px;
     line-height: 1.2;

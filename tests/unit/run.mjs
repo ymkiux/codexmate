@@ -31,6 +31,7 @@ await import(pathToFileURL(path.join(__dirname, 'agents-modal-guards.test.mjs'))
 await import(pathToFileURL(path.join(__dirname, 'session-actions-standalone.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'session-browser-timeline-regression.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'session-usage.test.mjs')));
+await import(pathToFileURL(path.join(__dirname, 'session-usage-backend.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'agents-diff-ui.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'text-diff.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'claude-settings-sync.test.mjs')));

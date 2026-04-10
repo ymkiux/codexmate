@@ -411,13 +411,58 @@ document.addEventListener('DOMContentLoaded', () => {
                 this.currentOpenclawConfig = this.openclawConfigs['默认配置'] ? '默认配置' : configNames[0];
             }
             void this.syncDefaultOpenclawConfigEntry({ silent: true });
-            this.loadAll();
+            const runInitialLoad = () => {
+                const triggerLoad = () => {
+                    this._initialLoadTimer = 0;
+                    void this.loadAll();
+                };
+                if (typeof requestAnimationFrame === 'function') {
+                    this._initialLoadRafId = requestAnimationFrame(() => {
+                        this._initialLoadRafId = 0;
+                        if (typeof setTimeout === 'function') {
+                            this._initialLoadTimer = setTimeout(triggerLoad, 120);
+                            return;
+                        }
+                        triggerLoad();
+                    });
+                    return;
+                }
+                if (typeof setTimeout === 'function') {
+                    this._initialLoadTimer = setTimeout(triggerLoad, 120);
+                    return;
+                }
+                triggerLoad();
+            };
+            if (document.readyState === 'complete') {
+                runInitialLoad();
+            } else {
+                this._initialLoadOnWindowLoad = () => {
+                    if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+                        window.removeEventListener('load', this._initialLoadOnWindowLoad);
+                    }
+                    this._initialLoadOnWindowLoad = null;
+                    runInitialLoad();
+                };
+                window.addEventListener('load', this._initialLoadOnWindowLoad, { once: true });
+            }
         },
 
         beforeUnmount() {
             this.teardownSessionTabRender();
             this.cancelScheduledSessionTabDeferredTeardown();
             this.disconnectSessionPreviewHeaderResizeObserver();
+            if (this._initialLoadOnWindowLoad) {
+                window.removeEventListener('load', this._initialLoadOnWindowLoad);
+                this._initialLoadOnWindowLoad = null;
+            }
+            if (this._initialLoadRafId) {
+                cancelAnimationFrame(this._initialLoadRafId);
+                this._initialLoadRafId = 0;
+            }
+            if (this._initialLoadTimer) {
+                clearTimeout(this._initialLoadTimer);
+                this._initialLoadTimer = 0;
+            }
             window.removeEventListener('resize', this.onWindowResize);
             window.removeEventListener('keydown', this.handleGlobalKeydown);
             window.removeEventListener('beforeunload', this.handleBeforeUnload);
