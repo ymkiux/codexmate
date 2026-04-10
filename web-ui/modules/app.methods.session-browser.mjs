@@ -404,8 +404,27 @@ export function createSessionBrowserMethods(options = {}) {
 
         async selectSession(session) {
             if (!session) return;
-            if (this.activeSession && this.getSessionExportKey(this.activeSession) === this.getSessionExportKey(session)) return;
+            const isSameSession = this.activeSession
+                && this.getSessionExportKey(this.activeSession) === this.getSessionExportKey(session);
+            if (isSameSession) {
+                if (this.sessionDetailLoading) return;
+                const currentMessages = Array.isArray(this.activeSessionMessages) ? this.activeSessionMessages : [];
+                if (currentMessages.length > 0) return;
+                if (typeof this.scheduleAfterFrame === 'function') {
+                    const selectedSession = this.activeSession;
+                    this.scheduleAfterFrame(() => {
+                        if (this.activeSession !== selectedSession) return;
+                        void this.loadActiveSessionDetail();
+                    });
+                    return;
+                }
+                await this.loadActiveSessionDetail();
+                return;
+            }
             this.activeSession = session;
+            if (typeof this.expandVisibleSessionList === 'function') {
+                this.expandVisibleSessionList(0, { ensureActive: true });
+            }
             this.activeSessionMessages = [];
             this.resetSessionDetailPagination();
             this.resetSessionPreviewMessageRender();

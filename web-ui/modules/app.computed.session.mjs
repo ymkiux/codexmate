@@ -43,6 +43,31 @@ export function createSessionComputed() {
             });
             return decorated.map(item => item.session);
         },
+        visibleSessionsList() {
+            if (!this.sessionListRenderEnabled) {
+                return [];
+            }
+            const list = Array.isArray(this.sortedSessionsList) ? this.sortedSessionsList : [];
+            if (list.length === 0) {
+                return [];
+            }
+            const rawVisibleCount = Number(this.sessionListVisibleCount);
+            const visibleCount = Number.isFinite(rawVisibleCount)
+                ? Math.max(0, Math.floor(rawVisibleCount))
+                : 0;
+            let targetCount = visibleCount > 0 ? Math.min(visibleCount, list.length) : Math.min(list.length, 1);
+            const activeKey = this.activeSession ? this.getSessionExportKey(this.activeSession) : '';
+            if (activeKey) {
+                const activeIndex = list.findIndex((session) => this.getSessionExportKey(session) === activeKey);
+                if (activeIndex >= 0) {
+                    targetCount = Math.max(targetCount, activeIndex + 1);
+                }
+            }
+            if (targetCount >= list.length) {
+                return list;
+            }
+            return list.slice(0, targetCount);
+        },
         activeSessionVisibleMessages() {
             if (this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {
                 return [];
@@ -53,8 +78,10 @@ export function createSessionComputed() {
                 ? Math.max(0, Math.floor(rawCount))
                 : 0;
             if (visibleCount <= 0) {
-                if (!list.length) return [];
-                return list.slice(0, Math.min(8, list.length));
+                const initialBatchSize = Number.isFinite(this.sessionPreviewInitialBatchSize)
+                    ? Math.max(1, Math.floor(this.sessionPreviewInitialBatchSize))
+                    : 12;
+                return list.slice(0, Math.min(initialBatchSize, list.length));
             }
             if (visibleCount >= list.length) return list;
             return list.slice(0, visibleCount);

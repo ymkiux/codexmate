@@ -41,6 +41,7 @@
                                 class="session-path-select"
                                 v-model="sessionPathFilter"
                                 @change="onSessionPathFilterChange"
+                                @focus="loadSessionPathOptions({ source: sessionFilterSource })"
                                 :disabled="sessionsLoading">
                                 <option value="">全部路径</option>
                                 <option v-for="cwd in sessionPathOptions" :key="cwd" :value="cwd">{{ cwd }}</option>
@@ -98,9 +99,13 @@
                 </div>
 
                 <div v-else class="session-layout">
-                    <div v-if="sessionListRenderEnabled" class="session-list">
+                    <div
+                        v-if="sessionListRenderEnabled"
+                        class="session-list"
+                        :ref="setSessionListRef"
+                        @scroll.passive="onSessionListScroll">
                         <div
-                            v-for="session in sortedSessionsList"
+                            v-for="session in visibleSessionsList"
                             :key="session.source + '-' + session.sessionId + '-' + session.filePath"
                             v-memo="[activeSessionExportKey === getSessionExportKey(session), session.messageCount, session.updatedAt, session.title, session.sourceLabel, isSessionPinned(session), sessionsLoading]"
                             :class="[

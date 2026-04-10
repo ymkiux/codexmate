@@ -350,6 +350,7 @@ test('prepareSessionTabRender re-enables list before preview and primes preview 
         mainTab: 'sessions',
         sessionListRenderEnabled: true,
         sessionPreviewRenderEnabled: true,
+        sessionTimelineEnabled: true,
         sessionTabRenderTicket: 0,
         sessionPreviewVisibleCount: 24,
         scheduleAfterFrame(task) {
@@ -393,6 +394,10 @@ test('prepareSessionTabRender re-enables list before preview and primes preview 
     assert.strictEqual(context._nextTickCalls, 1);
     assert.strictEqual(context._primeCalls, 1);
     assert.strictEqual(context._timelineOffsetCalls, 1);
+    assert.strictEqual(context._timelineSyncCalls || 0, 0);
+    assert.strictEqual(scheduled.length, 1);
+
+    scheduled.shift()();
     assert.strictEqual(context._timelineSyncCalls, 1);
 });
 

@@ -71,6 +71,39 @@ test('selectSession defers detail loading until the next frame when a scheduler 
     assert.strictEqual(detailLoads, 1);
 });
 
+test('selectSession reloads the active session when the preview is still empty', async () => {
+    const methods = createSessionBrowserMethods({
+        api: async () => ({})
+    });
+    const scheduled = [];
+    let detailLoads = 0;
+    const selected = { source: 'codex', sessionId: 's1', filePath: '/tmp/s1.jsonl' };
+    const context = {
+        activeSession: selected,
+        activeSessionMessages: [],
+        activeSessionDetailError: '',
+        activeSessionDetailClipped: false,
+        sessionDetailLoading: false,
+        getSessionExportKey(session) {
+            return `${session.source}:${session.sessionId}:${session.filePath}`;
+        },
+        scheduleAfterFrame(task) {
+            scheduled.push(task);
+        },
+        async loadActiveSessionDetail() {
+            detailLoads += 1;
+        }
+    };
+
+    await methods.selectSession.call(context, selected);
+
+    assert.strictEqual(detailLoads, 0);
+    assert.strictEqual(scheduled.length, 1);
+
+    await scheduled[0]();
+    assert.strictEqual(detailLoads, 1);
+});
+
 test('syncSessionTimelineActiveFromScroll reuses container header offset when scroll container has no header', () => {
     const methods = createSessionTimelineMethods();
     const headerEl = {

@@ -181,6 +181,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 sessionPreviewHeaderEl: null,
                 sessionPreviewHeaderResizeObserver: null,
                 sessionListRenderEnabled: false,
+                sessionListVisibleCount: 0,
+                sessionListInitialBatchSize: 80,
+                sessionListLoadStep: 120,
                 sessionPreviewRenderEnabled: false,
                 sessionTabRenderTicket: 0,
                 sessionPreviewVisibleCount: 0,
@@ -374,7 +377,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.error('加载 Claude 配置失败:', e);
                 }
             }
-            void this.refreshClaudeSelectionFromSettings({ silent: true });
             const normalizeOpenclawConfigs = (configs) => {
                 const source = configs && typeof configs === 'object' && !Array.isArray(configs)
                     ? configs
@@ -410,10 +412,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (configNames.length > 0) {
                 this.currentOpenclawConfig = this.openclawConfigs['默认配置'] ? '默认配置' : configNames[0];
             }
-            void this.syncDefaultOpenclawConfigEntry({ silent: true });
             const runInitialLoad = () => {
                 const triggerLoad = () => {
                     this._initialLoadTimer = 0;
+                    void this.refreshClaudeSelectionFromSettings({ silent: true });
+                    void this.syncDefaultOpenclawConfigEntry({ silent: true });
                     void this.loadAll();
                 };
                 if (typeof requestAnimationFrame === 'function') {

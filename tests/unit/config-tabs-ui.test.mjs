@@ -221,11 +221,10 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /:aria-selected="mainTab === 'sessions'"/);
     assert.match(html, /:aria-selected="mainTab === 'usage'"/);
     assert.match(html, /:aria-selected="mainTab === 'config' && configMode === 'codex'"/);
-    assert.match(html, /v-for="session in sortedSessionsList"/);
-    assert.match(html, /<div v-if="sessionListRenderEnabled" class="session-list">/);
-    assert.doesNotMatch(html, /visibleSessionsList/);
-    assert.doesNotMatch(html, /setSessionListRef/);
-    assert.doesNotMatch(html, /onSessionListScroll/);
+    assert.match(html, /v-for="session in visibleSessionsList"/);
+    assert.match(html, /<div[\s\S]*v-if="sessionListRenderEnabled"[\s\S]*class="session-list"/);
+    assert.match(html, /:ref="setSessionListRef"/);
+    assert.match(html, /@scroll\.passive="onSessionListScroll"/);
     assert.match(html, /v-memo="\[activeSessionExportKey === getSessionExportKey\(session\)/);
     assert.match(html, /v-memo="\[msg\.text,\s*msg\.timestamp,\s*msg\.roleLabel,\s*msg\.normalizedRole\]"/);
     assert.match(html, /v-memo="\[sessionTimelineActiveKey === node\.key,\s*node\.safePercent,\s*node\.title\]"/);

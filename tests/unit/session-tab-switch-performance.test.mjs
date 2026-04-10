@@ -85,8 +85,7 @@ test('switchMainTab prepares session render and loads sessions only when not loa
     assert.strictEqual(calls.loadSessions, 1);
 });
 
-test('switchMainTab defers active session detail hydration until after the sessions tab first paints', async () => {
-    const scheduled = [];
+test('switchMainTab keeps initial sessions entry lightweight and skips automatic detail hydration', async () => {
     const loadOptions = [];
     let detailLoads = 0;
     const vm = {
@@ -110,9 +109,7 @@ test('switchMainTab defers active session detail hydration until after the sessi
             detailLoads += 1;
             return Promise.resolve();
         },
-        scheduleAfterFrame(task) {
-            scheduled.push(task);
-        },
+        scheduleAfterFrame() {},
         refreshClaudeModelContext() {}
     };
 
@@ -120,12 +117,8 @@ test('switchMainTab defers active session detail hydration until after the sessi
     assert.strictEqual(vm.mainTab, 'sessions');
     assert.deepStrictEqual(loadOptions, [{ includeActiveDetail: false }]);
     assert.strictEqual(detailLoads, 0);
-
     await Promise.resolve();
-    assert.strictEqual(scheduled.length, 1);
-    scheduled[0]();
-
-    assert.strictEqual(detailLoads, 1);
+    assert.strictEqual(detailLoads, 0);
 });
 
 test('switchMainTab loads lightweight usage data without preparing session render', () => {
@@ -427,6 +420,78 @@ test('deferred teardown is skipped when user quickly switches back to sessions',
     assert.strictEqual(teardownCount, 0);
 });
 
+test('loadSessions replays the latest pending request after an in-flight list refresh completes', async () => {
+    const apiCalls = [];
+    let resolveFirstRequest = null;
+    const firstRequestDone = new Promise((resolve) => {
+        resolveFirstRequest = resolve;
+    });
+    const vm = {
+        sessionsLoading: false,
+        sessionsLoadedOnce: false,
+        sessionFilterSource: 'all',
+        sessionPathFilter: '',
+        sessionQuery: 'first',
+        sessionRoleFilter: 'all',
+        sessionTimePreset: 'all',
+        activeSession: null,
+        activeSessionMessages: [],
+        activeSessionDetailError: '',
+        activeSessionDetailClipped: false,
+        sessionTimelineActiveKey: '',
+        sessionMessageRefMap: Object.create(null),
+        sessionMessageRefBinderMap: Object.create(null),
+        sessionsList: [],
+        getSessionExportKey(session) {
+            return `${session.source}:${session.sessionId}:${session.filePath}`;
+        },
+        syncSessionPathOptionsForSource() {},
+        extractPathOptionsFromSessions() {
+            return [];
+        },
+        primeSessionListRender() {},
+        resetSessionDetailPagination() {},
+        resetSessionPreviewMessageRender() {},
+        cancelSessionTimelineSync() {},
+        showMessage() {}
+    };
+
+    const loadPromise = loadSessions.call(vm, async (_action, params) => {
+        apiCalls.push({ ...params });
+        if (apiCalls.length === 1) {
+            await firstRequestDone;
+            return {
+                sessions: [{
+                    source: 'codex',
+                    sessionId: 'sess-1',
+                    filePath: '/tmp/one.jsonl'
+                }]
+            };
+        }
+        return {
+            sessions: [{
+                source: 'codex',
+                sessionId: 'sess-2',
+                filePath: '/tmp/two.jsonl'
+            }]
+        };
+    }, {});
+
+    vm.sessionQuery = 'second';
+    await loadSessions.call(vm, async () => ({ sessions: [] }), { forceRefresh: true });
+    resolveFirstRequest();
+    await loadPromise;
+
+    assert.strictEqual(apiCalls.length, 2);
+    assert.strictEqual(apiCalls[0].query, 'first');
+    assert.strictEqual(apiCalls[0].forceRefresh, false);
+    assert.strictEqual(apiCalls[1].query, 'second');
+    assert.strictEqual(apiCalls[1].forceRefresh, true);
+    assert.strictEqual(vm.sessionsLoading, false);
+    assert.strictEqual(vm.sessionsLoadedOnce, true);
+    assert.strictEqual(vm.activeSession.sessionId, 'sess-2');
+});
+
 test('session timeline stays always-on and no longer exposes toggle handler', () => {
     const appScript = readBundledWebUiScript();
     assert.match(appScript, /sessionTimelineEnabled:\s*true,/);
@@ -442,6 +507,7 @@ test('session template removes timeline switch button and binds refs by timeline
 });
 
 test('loadActiveSessionDetail primes visible messages even when timeline is disabled', async () => {
+    const apiCalls = [];
     const vm = {
         activeSession: {
             source: 'codex',
@@ -493,13 +559,19 @@ test('loadActiveSessionDetail primes visible messages even when timeline is disa
         }
     };
 
-    await loadActiveSessionDetail.call(vm, async () => ({
+    await loadActiveSessionDetail.call(vm, async (action, params) => {
+        apiCalls.push({ action, params });
+        return {
         messages: [{ role: 'assistant', text: 'hello', timestamp: '2026-03-27 10:00:00' }],
         clipped: false,
         totalMessages: 1,
         messageLimit: 80
-    }));
+        };
+    });
 
+    assert.strictEqual(apiCalls.length, 1);
+    assert.strictEqual(apiCalls[0].action, 'session-detail');
+    assert.strictEqual(apiCalls[0].params.preview, true);
     assert.strictEqual(vm.activeSessionMessages.length, 1);
     assert.strictEqual(vm._primeCount, 1);
     assert.strictEqual(vm._offsetCount, 1);
@@ -510,7 +582,76 @@ test('loadActiveSessionDetail primes visible messages even when timeline is disa
     assert.strictEqual(vm.activeSessionDetailError, '');
 });
 
+test('loadActiveSessionDetail defers timeline sync until after the next frame when timeline is enabled', async () => {
+    const scheduled = [];
+    let syncCount = 0;
+    let offsetCount = 0;
+    const vm = {
+        activeSession: {
+            source: 'codex',
+            sessionId: 's1',
+            filePath: 'session.jsonl',
+            sourceLabel: 'Codex'
+        },
+        mainTab: 'sessions',
+        sessionPreviewRenderEnabled: true,
+        sessionTimelineEnabled: true,
+        sessionDetailRequestSeq: 0,
+        sessionDetailLoading: false,
+        sessionDetailInitialMessageLimit: 80,
+        sessionDetailMessageLimit: 80,
+        activeSessionMessages: [],
+        activeSessionDetailError: '',
+        activeSessionDetailClipped: false,
+        sessionTimelineActiveKey: '',
+        sessionMessageRefMap: Object.create(null),
+        sessionPreviewPendingVisibleCount: 0,
+        normalizeSessionMessage(message) {
+            return {
+                role: message.role || 'assistant',
+                roleLabel: 'Assistant',
+                normalizedRole: message.role || 'assistant',
+                timestamp: message.timestamp || '',
+                text: message.text || ''
+            };
+        },
+        syncActiveSessionMessageCount() {},
+        primeSessionPreviewMessageRender() {},
+        updateSessionTimelineOffset() {
+            offsetCount += 1;
+        },
+        scheduleSessionTimelineSync() {
+            syncCount += 1;
+        },
+        scheduleAfterFrame(task) {
+            scheduled.push(task);
+        },
+        invalidateSessionTimelineMeasurementCache() {},
+        cancelSessionTimelineSync() {},
+        resetSessionPreviewMessageRender() {},
+        resetSessionDetailPagination() {},
+        $nextTick(callback) {
+            callback();
+        }
+    };
+
+    await loadActiveSessionDetail.call(vm, async () => ({
+        messages: [{ role: 'assistant', text: 'hello', timestamp: '2026-03-27 10:00:00' }],
+        clipped: false,
+        totalMessages: 1,
+        messageLimit: 80
+    }));
+
+    assert.strictEqual(offsetCount, 1);
+    assert.strictEqual(syncCount, 0);
+    assert.strictEqual(scheduled.length, 1);
+
+    scheduled[0]();
+    assert.strictEqual(syncCount, 1);
+});
+
 test('loadSessions skips active session detail fetch when explicitly disabled for usage-only aggregation', async () => {
+    let pathLoadCount = 0;
     const vm = {
         mainTab: 'usage',
         sessionStandalone: false,
@@ -545,6 +686,7 @@ test('loadSessions skips active session detail fetch when explicitly disabled fo
             this._detailLoadCount += 1;
         },
         loadSessionPathOptions() {
+            pathLoadCount += 1;
             return Promise.resolve();
         }
     };
@@ -557,6 +699,7 @@ test('loadSessions skips active session detail fetch when explicitly disabled fo
 
     assert.strictEqual(vm.sessionsLoadedOnce, true);
     assert.strictEqual(vm._detailLoadCount, 0);
+    assert.strictEqual(pathLoadCount, 0);
     assert.strictEqual(vm.activeSession && vm.activeSession.sessionId, 'sess-1');
     assert.deepStrictEqual(vm.activeSessionMessages, []);
 });

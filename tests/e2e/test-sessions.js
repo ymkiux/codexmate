@@ -264,7 +264,8 @@ module.exports = async function testSessions(ctx) {
         const restoredIndexlessClaudeSessions = await api('list-sessions', { source: 'claude', limit: 200, forceRefresh: true });
         const restoredIndexlessClaudeItem = restoredIndexlessClaudeSessions.sessions.find(item => item.sessionId === indexlessClaudeSessionId);
         assert(restoredIndexlessClaudeItem, 'restored indexless Claude session should be listed again');
-        assert(restoredIndexlessClaudeItem.messageCount === indexlessClaudeMessageCount, 'restored indexless Claude session should keep exact list messageCount');
+        assert(Number.isFinite(restoredIndexlessClaudeItem.messageCount), 'restored indexless Claude session should keep numeric list messageCount');
+        assert(restoredIndexlessClaudeItem.messageCount >= 0, 'restored indexless Claude session should keep non-negative list messageCount');
 
         const longSessionRecords = [{
             type: 'session_meta',
@@ -287,7 +288,14 @@ module.exports = async function testSessions(ctx) {
         const longSessionsBeforeDelete = await api('list-sessions', { source: 'codex', limit: 200, forceRefresh: true });
         const longSessionListItem = longSessionsBeforeDelete.sessions.find(item => item.sessionId === longSessionId);
         assert(longSessionListItem, 'long codex session should appear in list-sessions');
-        assert(longSessionListItem.messageCount === longMessageCount, 'list-sessions should return exact long-session messageCount');
+        assert(Number.isFinite(longSessionListItem.messageCount), 'list-sessions should return numeric long-session messageCount');
+        assert(longSessionListItem.messageCount >= 0, 'list-sessions should return non-negative long-session messageCount');
+        const longSessionPreview = await api('session-detail', { source: 'codex', sessionId: longSessionId, messageLimit: 80, preview: true });
+        assert(Array.isArray(longSessionPreview.messages), 'session-detail preview should return messages');
+        assert(longSessionPreview.messages.length > 0, 'session-detail preview should keep recent messages');
+        assert(longSessionPreview.messages.length <= 80, 'session-detail preview should respect preview messageLimit');
+        assert(longSessionPreview.clipped === true, 'session-detail preview should stay clipped for long sessions');
+        assert(Number.isFinite(longSessionPreview.totalMessages) === false, 'session-detail preview should avoid exact totalMessages for long sessions');
         const longSessionDetail = await api('session-detail', { source: 'codex', sessionId: longSessionId });
         assert(longSessionDetail.totalMessages === longMessageCount, 'session-detail should return exact long-session totalMessages');
         assert(longSessionDetail.messageLimit === 300, 'session-detail should keep default detail window size');
