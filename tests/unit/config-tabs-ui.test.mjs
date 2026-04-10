@@ -28,7 +28,8 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /isProviderConfigMode/);
     assert.match(html, /provider-fast-switch-select/);
     assert.match(html, /forceCompactLayout/);
-    assert.match(html, /<script src="\/res\/vue\.global\.js"><\/script>/);
+    assert.match(html, /<script src="\/res\/vue\.global\.prod\.js"><\/script>/);
+    assert.doesNotMatch(html, /<script src="\/res\/vue\.global\.js"><\/script>/);
     assert.match(html, /quickSwitchProvider\(\$event\.target\.value\)/);
     assert.match(html, /onMainTabPointerDown\('sessions', \$event\)/);
     assert.match(html, /onConfigTabPointerDown\('codex', \$event\)/);
@@ -69,6 +70,9 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /:aria-selected="mainTab === 'usage'"/);
     assert.match(html, /id="panel-usage"/);
     assert.match(html, /v-show="mainTab === 'usage'"/);
+    assert.match(usagePanel, /sessionsUsageLoading && !sessionsUsageList\.length" class="session-empty">正在加载 Usage 统计\.\.\.</);
+    assert.match(usagePanel, /sessionsUsageError && !sessionsUsageList\.length" class="usage-empty">/);
+    assert.match(usagePanel, /v-else-if="!sessionsUsageList\.length" class="usage-empty">暂无可用于统计的会话数据/);
     assert.match(html, /data-main-tab="market"/);
     assert.match(html, /onMainTabPointerDown\('market', \$event\)/);
     assert.match(html, /onMainTabClick\('market', \$event\)/);

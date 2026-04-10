@@ -335,10 +335,12 @@
     border-radius: 0;
     box-shadow: none;
     padding: 0 0 40px;
-    max-width: 1280px;
+    width: min(100%, 1480px);
+    max-width: none;
 }
 
 .mode-content {
+    width: 100%;
     border-radius: 0;
     background: transparent;
     box-shadow: none;

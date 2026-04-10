@@ -16,7 +16,7 @@
                         </div>
                     </div>
 
-                    <div v-if="sessionsUsageLoading && !sessionsUsageList.length" class="usage-empty">Usage 统计加载中...</div>
+                    <div v-if="sessionsUsageLoading && !sessionsUsageList.length" class="session-empty">正在加载 Usage 统计...</div>
                     <div v-else-if="sessionsUsageError && !sessionsUsageList.length" class="usage-empty">{{ sessionsUsageError }}</div>
                     <div v-else-if="!sessionsUsageList.length" class="usage-empty">暂无可用于统计的会话数据</div>
                     <template v-else>

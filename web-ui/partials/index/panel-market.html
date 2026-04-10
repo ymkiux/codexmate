@@ -8,7 +8,7 @@
                         <div class="selector-header market-overview-header">
                             <div>
                                 <span class="selector-title">Skills 概览</span>
-                                <div class="skills-panel-note">聚焦本地 skills：切换目标、查看已装项、跨应用导入与 ZIP 分发。</div>
+                                <div class="skills-panel-note">切换目标并查看本地 Skills。</div>
                             </div>
                             <div class="settings-tab-actions market-header-actions">
                                 <button type="button" class="btn-tool btn-tool-compact" @click="loadSkillsMarketOverview({ forceRefresh: true, silent: false })" :disabled="loading || !!initError || skillsMarketBusy">
@@ -74,14 +74,14 @@
                             <div class="skills-panel-header">
                                 <div class="skills-panel-title-wrap">
                                     <div class="skills-panel-title">已安装 Skills</div>
-                                    <div class="skills-panel-note">展示当前目录前 6 项；更多操作请进管理弹窗。</div>
+                                    <div class="skills-panel-note">仅显示前 6 项。</div>
                                 </div>
                                 <button type="button" class="btn-mini" @click="refreshSkillsList({ silent: false })" :disabled="loading || !!initError || skillsMarketBusy">
                                     {{ skillsLoading ? '刷新中...' : '刷新本地' }}
                                 </button>
                             </div>
                             <div v-if="skillsLoading && !skillsMarketLocalLoadedOnce" class="skills-empty-state">正在加载本地 Skills...</div>
-                            <div v-else-if="skillsList.length === 0" class="skills-empty-state">当前暂无已安装 skill，可通过 ZIP 或跨应用导入补充。</div>
+                            <div v-else-if="skillsList.length === 0" class="skills-empty-state">当前暂无已安装 skill。</div>
                             <div v-else class="market-preview-list">
                                 <div v-for="skill in skillsMarketInstalledPreview" :key="'market-local-' + skill.name" class="market-preview-item">
                                     <div class="market-preview-main">
@@ -99,14 +99,14 @@
                             <div class="skills-panel-header">
                                 <div class="skills-panel-title-wrap">
                                     <div class="skills-panel-title">可导入来源</div>
-                                    <div class="skills-panel-note">扫描其他应用中的未托管 skill，确认后批量导入到当前 {{ skillsTargetLabel }}。</div>
+                                    <div class="skills-panel-note">扫描并导入到当前 {{ skillsTargetLabel }}。</div>
                                 </div>
                                 <button type="button" class="btn-mini" @click="scanImportableSkills({ silent: false })" :disabled="loading || !!initError || skillsMarketBusy">
                                     {{ skillsScanningImports ? '扫描中...' : '扫描来源' }}
                                 </button>
                             </div>
                             <div v-if="skillsScanningImports && !skillsMarketImportLoadedOnce" class="skills-empty-state">正在扫描可导入 skill...</div>
-                            <div v-else-if="skillsImportList.length === 0" class="skills-empty-state">暂未扫描到可导入 skill，可点击“扫描来源”重试。</div>
+                            <div v-else-if="skillsImportList.length === 0" class="skills-empty-state">暂未扫描到可导入 skill。</div>
                             <div v-else class="market-preview-list">
                                 <div v-for="skill in skillsMarketImportPreview" :key="'market-import-' + buildSkillImportKey(skill)" class="market-preview-item">
                                     <div class="market-preview-main">
@@ -124,21 +124,21 @@
                             <div class="skills-panel-header">
                                 <div class="skills-panel-title-wrap">
                                     <div class="skills-panel-title">分发入口</div>
-                                    <div class="skills-panel-note">本地管理、跨应用导入与 ZIP 导入，均作用于当前安装目标。</div>
+                                    <div class="skills-panel-note">操作均作用于当前安装目标。</div>
                                 </div>
                             </div>
                             <div class="market-action-grid">
                                 <button type="button" class="market-action-card" @click="openSkillsManager" :disabled="loading || !!initError || skillsMarketBusy">
                                     <span class="market-action-title">本地 Skills 管理</span>
-                                    <span class="market-action-copy">查看并管理当前 {{ skillsTargetLabel }} 的已装 skills</span>
+                                    <span class="market-action-copy">管理当前 {{ skillsTargetLabel }} 的已装 skills</span>
                                 </button>
                                 <button type="button" class="market-action-card" @click="scanImportableSkills({ silent: false })" :disabled="loading || !!initError || skillsMarketBusy">
                                     <span class="market-action-title">跨应用导入</span>
-                                    <span class="market-action-copy">扫描其他应用并导入到当前 {{ skillsTargetLabel }}</span>
+                                    <span class="market-action-copy">导入到当前 {{ skillsTargetLabel }}</span>
                                 </button>
                                 <button type="button" class="market-action-card" @click="triggerSkillsZipImport" :disabled="loading || !!initError || skillsMarketBusy">
                                     <span class="market-action-title">ZIP 导入</span>
-                                    <span class="market-action-copy">从 ZIP 安装到当前目标</span>
+                                    <span class="market-action-copy">从 ZIP 导入到当前目标</span>
                                 </button>
                             </div>
                         </div>
@@ -146,26 +146,26 @@
                         <div class="skills-panel market-panel market-panel-wide">
                             <div class="skills-panel-header">
                                 <div class="skills-panel-title-wrap">
-                                    <div class="skills-panel-title">市场说明</div>
+                                    <div class="skills-panel-title">操作说明</div>
                                 </div>
                             </div>
                             <div class="market-preview-list">
                                 <div class="market-preview-item">
                                     <div class="market-preview-main">
                                         <div class="market-preview-title">目标切换</div>
-                                        <div class="market-preview-meta">切换 Codex / Claude Code 后，后续操作都会落到当前 {{ skillsTargetLabel }} 目录。</div>
+                                        <div class="market-preview-meta">当前操作写入 {{ skillsTargetLabel }} 目录。</div>
                                     </div>
                                 </div>
                                 <div class="market-preview-item">
                                     <div class="market-preview-main">
                                         <div class="market-preview-title">跨应用导入</div>
-                                        <div class="market-preview-meta">扫描 `Codex`、`Claude Code` 与 `Agents` 中未托管的 skills，并导入到当前宿主。</div>
+                                        <div class="market-preview-meta">从其他宿主导入未托管 skill。</div>
                                     </div>
                                 </div>
                                 <div class="market-preview-item">
                                     <div class="market-preview-main">
-                                        <div class="market-preview-title">ZIP 分发</div>
-                                        <div class="market-preview-meta">通过压缩包分发技能目录，保持本地可控，不依赖外部目录服务。</div>
+                                        <div class="market-preview-title">ZIP 导入</div>
+                                        <div class="market-preview-meta">从 ZIP 导入本地 skill。</div>
                                     </div>
                                 </div>
                             </div>

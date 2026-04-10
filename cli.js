@@ -5775,11 +5775,21 @@ async function listSessionUsage(params = {}) {
     const limit = Number.isFinite(rawLimit)
         ? Math.max(1, Math.min(rawLimit, MAX_SESSION_LIST_SIZE))
         : 200;
-    return await listAllSessionsData({
+    const sessions = await listAllSessions({
         source,
         limit,
         forceRefresh: !!params.forceRefresh
     });
+    return Array.isArray(sessions)
+        ? sessions.map((item) => {
+            if (!item || typeof item !== 'object' || Array.isArray(item)) {
+                return item;
+            }
+            const normalized = { ...item };
+            delete normalized.__messageCountExact;
+            return normalized;
+        })
+        : [];
 }
 
 function listSessionPaths(params = {}) {
@@ -10765,6 +10775,82 @@ const PUBLIC_WEB_UI_STATIC_ASSETS = new Set([
 
 function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser }) {
     const connections = new Set();
+    const probeWebUiReadiness = (callback) => {
+        const payload = JSON.stringify({ action: 'status', params: {} });
+        const requestOptions = {
+            hostname: openHost,
+            port,
+            path: '/api',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json; charset=utf-8',
+                'Content-Length': Buffer.byteLength(payload, 'utf-8')
+            }
+        };
+        let settled = false;
+        const finish = (ready) => {
+            if (settled) return;
+            settled = true;
+            callback(ready);
+        };
+        const req = http.request(requestOptions, (probeRes) => {
+            if (typeof probeRes.resume === 'function') {
+                probeRes.resume();
+            }
+            probeRes.on('end', () => {
+                finish(probeRes.statusCode === 200);
+            });
+        });
+        req.on('error', () => finish(false));
+        req.setTimeout(1000, () => {
+            try { req.destroy(); } catch (_) {}
+            finish(false);
+        });
+        req.end(payload, 'utf-8');
+    };
+    const openBrowserAfterReady = (url) => {
+        const maxAttempts = 40;
+        const retryDelayMs = 150;
+        let finished = false;
+
+        const finish = (ready) => {
+            if (finished) return;
+            finished = true;
+            if (!ready) {
+                console.warn('! Web UI 就绪探测超时，未自动打开浏览器，请手动访问:', url);
+                return;
+            }
+
+            const platform = process.platform;
+            let command;
+            if (platform === 'win32') {
+                command = `start \"\" \"${url}\"`;
+            } else if (platform === 'darwin') {
+                command = `open \"${url}\"`;
+            } else {
+                command = `xdg-open \"${url}\"`;
+            }
+
+            exec(command, (error) => {
+                if (error) console.warn('无法自动打开浏览器，请手动访问:', url);
+            });
+        };
+        const scheduleProbe = (attempt) => {
+            probeWebUiReadiness((ready) => {
+                if (ready) {
+                    finish(true);
+                    return;
+                }
+                if (attempt >= maxAttempts) {
+                    finish(false);
+                    return;
+                }
+                setTimeout(() => scheduleProbe(attempt + 1), retryDelayMs);
+            });
+        };
+
+        scheduleProbe(1);
+    };
     const writeWebUiAssetError = (res, requestPath, error) => {
         const message = error && error.message ? error.message : String(error);
         console.error(`! Web UI 资源读取失败 [${requestPath}]:`, message);
@@ -11373,21 +11459,8 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
         }
 
         if (!process.env.CODEXMATE_NO_BROWSER && openBrowser) {
-            const platform = process.platform;
-            let command;
             const url = openUrl;
-
-            if (platform === 'win32') {
-                command = `start \"\" \"${url}\"`;
-            } else if (platform === 'darwin') {
-                command = `open \"${url}\"`;
-            } else {
-                command = `xdg-open \"${url}\"`;
-            }
-
-            exec(command, (error) => {
-                if (error) console.warn('无法自动打开浏览器，请手动访问:', url);
-            });
+            openBrowserAfterReady(url);
         }
     });
 

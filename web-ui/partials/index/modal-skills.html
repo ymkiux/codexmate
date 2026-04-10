@@ -3,7 +3,7 @@
                 <div class="modal-header skills-modal-header">
                     <div>
                         <div class="modal-title" id="skills-modal-title">Skills 管理</div>
-                        <div class="skills-modal-subtitle">集中管理当前宿主的本地技能目录，支持检索筛选、多选删除、跨应用导入、ZIP 导入与导出。</div>
+                        <div class="skills-modal-subtitle">管理当前宿主的本地 Skills。</div>
                     </div>
                     <div class="modal-header-actions skills-modal-actions">
                         <div class="market-target-switch market-target-switch-compact" role="group" aria-label="选择 Skills 管理目标">
@@ -62,7 +62,7 @@
                     <div class="skills-panel-header">
                         <div class="skills-panel-title-wrap">
                             <div class="skills-panel-title">本地 Skills</div>
-                            <div class="skills-panel-note">支持关键词检索与状态筛选，勾选后可批量删除当前 {{ skillsTargetLabel }} 本地 skill。</div>
+                            <div class="skills-panel-note">可检索、筛选与批量删除。</div>
                         </div>
                         <button
                             class="btn-mini"
@@ -122,7 +122,7 @@
                     <div class="skills-panel-header">
                         <div class="skills-panel-title-wrap">
                             <div class="skills-import-title">跨应用导入</div>
-                            <div class="skills-panel-note">从其他应用扫描并导入未托管技能，支持多选批量导入到当前 {{ skillsTargetLabel }}。</div>
+                            <div class="skills-panel-note">扫描并导入到当前 {{ skillsTargetLabel }}。</div>
                         </div>
                         <button class="btn-mini" @click="scanImportableSkills" :disabled="skillsLoading || skillsDeleting || skillsScanningImports || skillsImporting || skillsZipImporting || skillsExporting">
                             {{ skillsScanningImports ? '扫描中...' : '扫描可导入' }}
