@@ -806,7 +806,7 @@ test('createWebServer waits for api readiness probe before auto-opening the brow
     let probeRequest = null;
     let probeEndHandler = null;
     let probePayload = '';
-    const execCalls = [];
+    const spawnCalls = [];
     const createWebServer = instantiateFunction(createWebServerSource, 'createWebServer', {
         http: {
             createServer() {
@@ -871,8 +871,14 @@ test('createWebServer waits for api readiness probe before auto-opening the brow
             return false;
         },
         process: { env: {}, platform: 'win32' },
-        exec(command) {
-            execCalls.push(command);
+        spawn(command, args, options) {
+            spawnCalls.push({ command, args, options, unrefCalled: false });
+            return {
+                on() {},
+                unref() {
+                    spawnCalls[spawnCalls.length - 1].unrefCalled = true;
+                }
+            };
         },
         console: {
             log() {},
@@ -895,7 +901,7 @@ test('createWebServer waits for api readiness probe before auto-opening the brow
     });
 
     listenCallback();
-    assert.deepStrictEqual(execCalls, []);
+    assert.deepStrictEqual(spawnCalls, []);
     assert.ok(probeRequest, 'should probe the local api before auto-open');
     assert.strictEqual(probeRequest.options.hostname, '127.0.0.1');
     assert.strictEqual(probeRequest.options.port, 3737);
@@ -912,10 +918,19 @@ test('createWebServer waits for api readiness probe before auto-opening the brow
             }
         }
     });
-    assert.deepStrictEqual(execCalls, []);
+    assert.deepStrictEqual(spawnCalls, []);
 
     probeEndHandler();
-    assert.deepStrictEqual(execCalls, ['start "" "http://127.0.0.1:3737"']);
+    assert.deepStrictEqual(spawnCalls, [{
+        command: 'cmd',
+        args: ['/c', 'start', '', 'http://127.0.0.1:3737'],
+        options: {
+            stdio: 'ignore',
+            detached: true,
+            windowsHide: true
+        },
+        unrefCalled: true
+    }]);
 });
 
 test('createWebServer health-check does not consume init notice before the first status poll', async () => {
@@ -1054,7 +1069,7 @@ test('createWebServer retries readiness probe failures before auto-opening the b
     let listenCallback = null;
     const requestOutcomes = [];
     const timers = [];
-    const execCalls = [];
+    const spawnCalls = [];
     const createWebServer = instantiateFunction(createWebServerSource, 'createWebServer', {
         http: {
             createServer() {
@@ -1136,8 +1151,14 @@ test('createWebServer retries readiness probe failures before auto-opening the b
             return false;
         },
         process: { env: {}, platform: 'linux' },
-        exec(command) {
-            execCalls.push(command);
+        spawn(command, args, options) {
+            spawnCalls.push({ command, args, options, unrefCalled: false });
+            return {
+                on() {},
+                unref() {
+                    spawnCalls[spawnCalls.length - 1].unrefCalled = true;
+                }
+            };
         },
         console: {
             log() {},
@@ -1162,12 +1183,21 @@ test('createWebServer retries readiness probe failures before auto-opening the b
     });
 
     listenCallback();
-    assert.deepStrictEqual(execCalls, []);
+    assert.deepStrictEqual(spawnCalls, []);
     assert.strictEqual(timers.length, 1);
     assert.strictEqual(timers[0].ms, 150);
 
     timers[0].callback();
-    assert.deepStrictEqual(execCalls, ['xdg-open "http://127.0.0.1:3737"']);
+    assert.deepStrictEqual(spawnCalls, [{
+        command: 'xdg-open',
+        args: ['http://127.0.0.1:3737'],
+        options: {
+            stdio: 'ignore',
+            detached: true,
+            windowsHide: true
+        },
+        unrefCalled: true
+    }]);
 });
 
 test('resolveSkillTarget rejects explicit unsupported targets instead of falling back', () => {
