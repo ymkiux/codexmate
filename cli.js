@@ -4789,7 +4789,14 @@ function extractSessionDetailPreviewFromFileFast(filePath, source, messageLimit)
 
         if (position > 0) {
             latest.clipped = latest.clipped || position > 0;
+            return latest;
         }
+        const normalizedMessages = removeLeadingSystemMessage(latest.messages);
+        latest.messages = normalizedMessages.length > safeMessageLimit
+            ? normalizedMessages.slice(-safeMessageLimit)
+            : normalizedMessages;
+        latest.totalMessages = normalizedMessages.length;
+        latest.clipped = latest.totalMessages > latest.messages.length;
         return latest;
     } catch (_) {
         return null;
