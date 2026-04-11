@@ -694,6 +694,33 @@ test('visibleSessionsList keeps the active session inside the rendered window', 
     assert.deepStrictEqual(result, sessions.slice(0, 5));
 });
 
+test('sessionUsageSummaryCards uses compact units for long token and context totals while preserving full values in titles', () => {
+    const computed = createSessionComputed();
+    const cards = computed.sessionUsageSummaryCards.call({
+        sessionUsageCharts: {
+            summary: {
+                totalSessions: 12,
+                totalMessages: 3456,
+                totalTokens: 1234567,
+                totalContextWindow: 256000,
+                activeDays: 7,
+                avgMessagesPerSession: 288,
+                busiestDay: null,
+                busiestHour: null
+            }
+        }
+    });
+
+    const tokensCard = cards.find((card) => card.key === 'tokens');
+    const contextCard = cards.find((card) => card.key === 'context-window');
+    assert(tokensCard, 'missing tokens summary card');
+    assert(contextCard, 'missing context summary card');
+    assert.strictEqual(tokensCard.value, '1.2M');
+    assert.strictEqual(tokensCard.title, '1,234,567');
+    assert.strictEqual(contextCard.value, '256K');
+    assert.strictEqual(contextCard.title, '256,000');
+});
+
 test('activeSessionVisibleMessages falls back to the initial preview batch before priming completes', () => {
     const computed = createSessionComputed();
     const messages = Array.from({ length: 12 }, (_, index) => ({ id: index + 1 }));

@@ -213,6 +213,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(usagePanel, /sessionsUsageList\.length/);
     assert.match(usagePanel, /loadSessionsUsage\(\{ forceRefresh: true \}\)/);
     assert.match(usagePanel, /sessionUsageSummaryCards/);
+    assert.match(usagePanel, /class="usage-summary-value" :title="card\.title \|\| null"/);
     assert.match(usagePanel, /sessionUsageCharts\.buckets/);
     assert.doesNotMatch(usagePanel, /sessionUsageCharts\.topPaths\[0\]\?\.count/);
     assert.doesNotMatch(html, /sessionUsageSummaryCards\[0\]\?\.value/);
