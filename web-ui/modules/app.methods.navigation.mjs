@@ -396,6 +396,116 @@ export function createNavigationMethods(options = {}) {
             this.__sessionTabDeferredTeardownHandle = null;
         },
 
+        setSessionListRef(element) {
+            this.__sessionListRef = element || null;
+            if (this.__sessionListRef && this.mainTab === 'sessions' && this.sessionListRenderEnabled) {
+                this.scheduleSessionListViewportFill();
+            }
+        },
+        getSessionListRenderSource() {
+            return Array.isArray(this.sortedSessionsList) ? this.sortedSessionsList : [];
+        },
+        cancelScheduledSessionListViewportFill() {
+            const handle = this.__sessionListViewportFillHandle || null;
+            if (!handle) return;
+            this.cancelIdleTask(handle);
+            this.__sessionListViewportFillHandle = null;
+        },
+        resetSessionListRender() {
+            this.cancelScheduledSessionListViewportFill();
+            this.sessionListVisibleCount = 0;
+        },
+        expandVisibleSessionList(stepSize, options = {}) {
+            const list = this.getSessionListRenderSource();
+            const total = list.length;
+            if (total <= 0) {
+                this.sessionListVisibleCount = 0;
+                return false;
+            }
+            const rawVisibleCount = Number(this.sessionListVisibleCount);
+            const currentCount = Number.isFinite(rawVisibleCount)
+                ? Math.max(0, Math.floor(rawVisibleCount))
+                : 0;
+            const initialBatchSize = Number.isFinite(this.sessionListInitialBatchSize)
+                ? Math.max(1, Math.floor(this.sessionListInitialBatchSize))
+                : 80;
+            const loadStep = Number.isFinite(stepSize)
+                ? Math.max(0, Math.floor(stepSize))
+                : (Number.isFinite(this.sessionListLoadStep)
+                    ? Math.max(1, Math.floor(this.sessionListLoadStep))
+                    : 120);
+            let nextCount = currentCount > 0
+                ? Math.min(total, currentCount + loadStep)
+                : Math.min(total, initialBatchSize);
+            if (options && options.ensureActive !== false) {
+                const activeKey = this.activeSession ? this.getSessionExportKey(this.activeSession) : '';
+                if (activeKey) {
+                    const activeIndex = list.findIndex((session) => this.getSessionExportKey(session) === activeKey);
+                    if (activeIndex >= 0) {
+                        nextCount = Math.max(nextCount, activeIndex + 1);
+                    }
+                }
+            }
+            nextCount = Math.min(total, nextCount);
+            if (nextCount <= currentCount) {
+                return false;
+            }
+            this.sessionListVisibleCount = nextCount;
+            return true;
+        },
+        scheduleSessionListViewportFill() {
+            this.cancelScheduledSessionListViewportFill();
+            if (this.mainTab !== 'sessions' || !this.sessionListRenderEnabled) {
+                return;
+            }
+            const run = () => {
+                this.__sessionListViewportFillHandle = null;
+                if (this.mainTab !== 'sessions' || !this.sessionListRenderEnabled) {
+                    return;
+                }
+                const list = this.getSessionListRenderSource();
+                const total = list.length;
+                const visibleCount = Number(this.sessionListVisibleCount);
+                const normalizedVisibleCount = Number.isFinite(visibleCount)
+                    ? Math.max(0, Math.floor(visibleCount))
+                    : 0;
+                if (total <= 0 || normalizedVisibleCount >= total) {
+                    return;
+                }
+                const listEl = this.__sessionListRef || null;
+                if (!listEl) {
+                    return;
+                }
+                const clientHeight = Number(listEl.clientHeight) || 0;
+                const scrollHeight = Number(listEl.scrollHeight) || 0;
+                const scrollTop = Number(listEl.scrollTop) || 0;
+                const remaining = Math.max(0, scrollHeight - scrollTop - clientHeight);
+                const shouldGrow = scrollHeight <= (clientHeight + 160) || remaining <= Math.max(160, clientHeight);
+                if (!shouldGrow) {
+                    return;
+                }
+                if (this.expandVisibleSessionList(undefined, { ensureActive: true })) {
+                    this.scheduleSessionListViewportFill();
+                }
+            };
+            this.__sessionListViewportFillHandle = this.scheduleIdleTask(run, 120);
+        },
+        primeSessionListRender() {
+            this.resetSessionListRender();
+            if (this.mainTab !== 'sessions' || !this.sessionListRenderEnabled) {
+                return;
+            }
+            this.expandVisibleSessionList(undefined, { ensureActive: true });
+            this.scheduleSessionListViewportFill();
+        },
+        onSessionListScroll(event) {
+            const nextRef = event && event.currentTarget ? event.currentTarget : this.__sessionListRef;
+            if (nextRef) {
+                this.__sessionListRef = nextRef;
+            }
+            this.scheduleSessionListViewportFill();
+        },
+
         resetSessionPreviewMessageRender() {
             this.sessionPreviewVisibleCount = 0;
             this.invalidateSessionTimelineMeasurementCache();
@@ -434,18 +544,21 @@ export function createNavigationMethods(options = {}) {
             this.sessionTabRenderTicket += 1;
             this.sessionListRenderEnabled = false;
             this.sessionPreviewRenderEnabled = false;
+            this.cancelScheduledSessionListViewportFill();
             this.cancelSessionTimelineSync();
             this.sessionTimelineActiveKey = '';
             this.sessionTimelineLastSyncAt = 0;
             this.sessionTimelineLastScrollTop = 0;
             this.sessionTimelineLastAnchorY = 0;
             this.sessionTimelineLastDirection = 0;
+            this.__sessionListRef = null;
             this.sessionPreviewScrollEl = null;
             this.sessionPreviewContainerEl = null;
             this.sessionPreviewHeaderEl = null;
         },
 
         finalizeSessionTabTeardown() {
+            this.resetSessionListRender();
             this.resetSessionPreviewMessageRender();
             this.sessionPreviewPendingVisibleCount = 0;
             this.clearSessionTimelineRefs();
@@ -460,6 +573,7 @@ export function createNavigationMethods(options = {}) {
             const ticket = ++this.sessionTabRenderTicket;
             this.sessionListRenderEnabled = false;
             this.sessionPreviewRenderEnabled = false;
+            this.resetSessionListRender();
             this.resetSessionPreviewMessageRender();
 
             this.scheduleAfterFrame(() => {
@@ -467,6 +581,7 @@ export function createNavigationMethods(options = {}) {
                     return;
                 }
                 this.sessionListRenderEnabled = true;
+                this.primeSessionListRender();
 
                 this.scheduleAfterFrame(() => {
                     if (ticket !== this.sessionTabRenderTicket || this.mainTab !== 'sessions') {
@@ -479,7 +594,20 @@ export function createNavigationMethods(options = {}) {
                         }
                         this.primeSessionPreviewMessageRender();
                         this.updateSessionTimelineOffset();
-                        this.scheduleSessionTimelineSync();
+                        if (!this.sessionTimelineEnabled) {
+                            return;
+                        }
+                        const syncTask = () => {
+                            if (ticket !== this.sessionTabRenderTicket || this.mainTab !== 'sessions') {
+                                return;
+                            }
+                            this.scheduleSessionTimelineSync();
+                        };
+                        if (typeof this.scheduleAfterFrame === 'function') {
+                            this.scheduleAfterFrame(syncTask);
+                            return;
+                        }
+                        syncTask();
                     });
                 });
             });

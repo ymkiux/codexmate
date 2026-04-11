@@ -5,6 +5,26 @@ import {
 } from '../logic.mjs';
 import { SESSION_TRASH_PAGE_SIZE } from './app.constants.mjs';
 
+function formatUsageSummaryNumber(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric < 0) {
+        return '0';
+    }
+    return Math.floor(numeric).toLocaleString('en-US');
+}
+
+function formatCompactUsageSummaryNumber(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric < 0) {
+        return '0';
+    }
+    return new Intl.NumberFormat('en-US', {
+        notation: 'compact',
+        compactDisplay: 'short',
+        maximumFractionDigits: 1
+    }).format(Math.floor(numeric));
+}
+
 export function createSessionComputed() {
     return {
         isSessionQueryEnabled() {
@@ -43,6 +63,31 @@ export function createSessionComputed() {
             });
             return decorated.map(item => item.session);
         },
+        visibleSessionsList() {
+            if (!this.sessionListRenderEnabled) {
+                return [];
+            }
+            const list = Array.isArray(this.sortedSessionsList) ? this.sortedSessionsList : [];
+            if (list.length === 0) {
+                return [];
+            }
+            const rawVisibleCount = Number(this.sessionListVisibleCount);
+            const visibleCount = Number.isFinite(rawVisibleCount)
+                ? Math.max(0, Math.floor(rawVisibleCount))
+                : 0;
+            let targetCount = visibleCount > 0 ? Math.min(visibleCount, list.length) : Math.min(list.length, 1);
+            const activeKey = this.activeSession ? this.getSessionExportKey(this.activeSession) : '';
+            if (activeKey) {
+                const activeIndex = list.findIndex((session) => this.getSessionExportKey(session) === activeKey);
+                if (activeIndex >= 0) {
+                    targetCount = Math.max(targetCount, activeIndex + 1);
+                }
+            }
+            if (targetCount >= list.length) {
+                return list;
+            }
+            return list.slice(0, targetCount);
+        },
         activeSessionVisibleMessages() {
             if (this.mainTab !== 'sessions' || !this.sessionPreviewRenderEnabled) {
                 return [];
@@ -53,8 +98,10 @@ export function createSessionComputed() {
                 ? Math.max(0, Math.floor(rawCount))
                 : 0;
             if (visibleCount <= 0) {
-                if (!list.length) return [];
-                return list.slice(0, Math.min(8, list.length));
+                const initialBatchSize = Number.isFinite(this.sessionPreviewInitialBatchSize)
+                    ? Math.max(1, Math.floor(this.sessionPreviewInitialBatchSize))
+                    : 12;
+                return list.slice(0, Math.min(initialBatchSize, list.length));
             }
             if (visibleCount >= list.length) return list;
             return list.slice(0, visibleCount);
@@ -112,11 +159,23 @@ export function createSessionComputed() {
         sessionUsageSummaryCards() {
             const summary = this.sessionUsageCharts && this.sessionUsageCharts.summary
                 ? this.sessionUsageCharts.summary
-                : { totalSessions: 0, totalMessages: 0, activeDays: 0, avgMessagesPerSession: 0, busiestDay: null, busiestHour: null };
+                : { totalSessions: 0, totalMessages: 0, totalTokens: 0, totalContextWindow: 0, activeDays: 0, avgMessagesPerSession: 0, busiestDay: null, busiestHour: null };
             return [
-                { key: 'sessions', label: '总会话数', value: summary.totalSessions || 0 },
-                { key: 'messages', label: '总消息数', value: summary.totalMessages || 0 },
-                { key: 'days', label: '活跃天数', value: summary.activeDays || 0 },
+                { key: 'sessions', label: '总会话数', value: formatUsageSummaryNumber(summary.totalSessions || 0) },
+                { key: 'messages', label: '总消息数', value: formatUsageSummaryNumber(summary.totalMessages || 0) },
+                {
+                    key: 'tokens',
+                    label: '总 token 数',
+                    value: formatCompactUsageSummaryNumber(summary.totalTokens || 0),
+                    title: formatUsageSummaryNumber(summary.totalTokens || 0)
+                },
+                {
+                    key: 'context-window',
+                    label: '总上下文数',
+                    value: formatCompactUsageSummaryNumber(summary.totalContextWindow || 0),
+                    title: formatUsageSummaryNumber(summary.totalContextWindow || 0)
+                },
+                { key: 'days', label: '活跃天数', value: formatUsageSummaryNumber(summary.activeDays || 0) },
                 { key: 'avg-messages', label: '平均每会话消息', value: summary.avgMessagesPerSession || 0 },
                 {
                     key: 'busiest-day',

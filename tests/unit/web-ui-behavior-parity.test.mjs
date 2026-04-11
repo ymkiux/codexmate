@@ -320,6 +320,9 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     const extraCurrentKeys = currentDataKeys.filter((key) => !headDataKeys.includes(key)).sort();
     const missingCurrentKeys = headDataKeys.filter((key) => !currentDataKeys.includes(key)).sort();
     const allowedExtraCurrentKeys = parityAgainstHead ? [
+        'sessionListInitialBatchSize',
+        'sessionListLoadStep',
+        'sessionListVisibleCount',
         'openclawAuthProfilesByProvider',
         'openclawPendingAuthProfileUpdates'
     ] : [
@@ -372,6 +375,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'getProviderValidation',
         'invalidateSessionsUsageData',
         'isReservedProviderCreationName',
+        'isSessionLoadNativeDialogEnabled',
         'isValidProviderNameInput',
         'isValidProviderUrlInput',
         'loadSessionsUsage',
@@ -379,9 +383,11 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'normalizeProviderDraft',
         'primeSessionListRender',
         'providerFieldError',
+        'emitSessionLoadNativeDialog',
         'resetSessionListRender',
         'scheduleSessionListViewportFill',
         'setSessionListRef',
+        'hasRenderableSessionTimeline',
         'syncDefaultOpenclawConfigEntry'
     ];
     const allowedMissingCurrentMethodKeys = [
@@ -419,7 +425,9 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     const headComputedKeys = Object.keys(headComputed).sort();
     const extraCurrentComputedKeys = currentComputedKeys.filter((key) => !headComputedKeys.includes(key)).sort();
     const missingCurrentComputedKeys = headComputedKeys.filter((key) => !currentComputedKeys.includes(key)).sort();
-    const allowedExtraCurrentComputedKeys = [];
+    const allowedExtraCurrentComputedKeys = [
+        'visibleSessionsList'
+    ];
     const allowedMissingCurrentComputedKeys = [];
     if (parityAgainstHead) {
         const allowedExtraComputedKeySet = new Set(allowedExtraCurrentComputedKeys);
@@ -1013,7 +1021,7 @@ test('share, copy, and standalone helpers remain aligned with HEAD', async () =>
     });
 });
 
-test('downloadTextFile and activeSessionVisibleMessages stay aligned with HEAD', async () => {
+test('downloadTextFile keeps parity and activeSessionVisibleMessages keeps the initial preview batch before priming completes', async () => {
     const currentDownloadEnv = createDownloadEnvironment();
     await withGlobalOverrides(currentDownloadEnv.globals, () => currentMethods.downloadTextFile.call({}, 'notes.md', 'payload', 'text/plain'));
 
@@ -1026,14 +1034,8 @@ test('downloadTextFile and activeSessionVisibleMessages stay aligned with HEAD',
         mainTab: 'sessions',
         sessionPreviewRenderEnabled: true,
         activeSessionMessages: Array.from({ length: 12 }, (_, index) => ({ id: index + 1 })),
+        sessionPreviewInitialBatchSize: 4,
         sessionPreviewVisibleCount: 0
     });
-    const headVisible = headComputed.activeSessionVisibleMessages.call({
-        mainTab: 'sessions',
-        sessionPreviewRenderEnabled: true,
-        activeSessionMessages: Array.from({ length: 12 }, (_, index) => ({ id: index + 1 })),
-        sessionPreviewVisibleCount: 0
-    });
-
-    assert.deepStrictEqual(currentVisible, headVisible);
+    assert.deepStrictEqual(currentVisible, [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }]);
 });

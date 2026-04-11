@@ -28,7 +28,8 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /isProviderConfigMode/);
     assert.match(html, /provider-fast-switch-select/);
     assert.match(html, /forceCompactLayout/);
-    assert.match(html, /<script src="\/res\/vue\.global\.js"><\/script>/);
+    assert.match(html, /<script src="\/res\/vue\.global\.prod\.js"><\/script>/);
+    assert.doesNotMatch(html, /<script src="\/res\/vue\.global\.js"><\/script>/);
     assert.match(html, /quickSwitchProvider\(\$event\.target\.value\)/);
     assert.match(html, /onMainTabPointerDown\('sessions', \$event\)/);
     assert.match(html, /onConfigTabPointerDown\('codex', \$event\)/);
@@ -69,6 +70,9 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /:aria-selected="mainTab === 'usage'"/);
     assert.match(html, /id="panel-usage"/);
     assert.match(html, /v-show="mainTab === 'usage'"/);
+    assert.match(usagePanel, /sessionsUsageLoading && !sessionsUsageList\.length" class="session-empty">正在加载 Usage 统计\.\.\.</);
+    assert.match(usagePanel, /sessionsUsageError && !sessionsUsageList\.length" class="usage-empty">/);
+    assert.match(usagePanel, /v-else-if="!sessionsUsageList\.length" class="usage-empty">暂无可用于统计的会话数据/);
     assert.match(html, /data-main-tab="market"/);
     assert.match(html, /onMainTabPointerDown\('market', \$event\)/);
     assert.match(html, /onMainTabClick\('market', \$event\)/);
@@ -209,6 +213,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(usagePanel, /sessionsUsageList\.length/);
     assert.match(usagePanel, /loadSessionsUsage\(\{ forceRefresh: true \}\)/);
     assert.match(usagePanel, /sessionUsageSummaryCards/);
+    assert.match(usagePanel, /class="usage-summary-value" :title="card\.title \|\| null"/);
     assert.match(usagePanel, /sessionUsageCharts\.buckets/);
     assert.doesNotMatch(usagePanel, /sessionUsageCharts\.topPaths\[0\]\?\.count/);
     assert.doesNotMatch(html, /sessionUsageSummaryCards\[0\]\?\.value/);
@@ -217,11 +222,10 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /:aria-selected="mainTab === 'sessions'"/);
     assert.match(html, /:aria-selected="mainTab === 'usage'"/);
     assert.match(html, /:aria-selected="mainTab === 'config' && configMode === 'codex'"/);
-    assert.match(html, /v-for="session in sortedSessionsList"/);
-    assert.match(html, /<div v-if="sessionListRenderEnabled" class="session-list">/);
-    assert.doesNotMatch(html, /visibleSessionsList/);
-    assert.doesNotMatch(html, /setSessionListRef/);
-    assert.doesNotMatch(html, /onSessionListScroll/);
+    assert.match(html, /v-for="session in visibleSessionsList"/);
+    assert.match(html, /<div[\s\S]*v-if="sessionListRenderEnabled"[\s\S]*class="session-list"/);
+    assert.match(html, /:ref="setSessionListRef"/);
+    assert.match(html, /@scroll\.passive="onSessionListScroll"/);
     assert.match(html, /v-memo="\[activeSessionExportKey === getSessionExportKey\(session\)/);
     assert.match(html, /v-memo="\[msg\.text,\s*msg\.timestamp,\s*msg\.roleLabel,\s*msg\.normalizedRole\]"/);
     assert.match(html, /v-memo="\[sessionTimelineActiveKey === node\.key,\s*node\.safePercent,\s*node\.title\]"/);

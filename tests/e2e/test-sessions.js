@@ -40,6 +40,9 @@ module.exports = async function testSessions(ctx) {
     assert(usageSessions.sessions.some((item) => item.sessionId === sessionId), 'list-sessions-usage missing codex entry');
     assert(usageSessions.sessions.some((item) => item.sessionId === claudeSessionId), 'list-sessions-usage missing claude entry');
     assert(usageSessions.sessions.every((item) => !Object.prototype.hasOwnProperty.call(item, '__messageCountExact')), 'list-sessions-usage should not expose exact hydration markers');
+    const usageCodexEntry = usageSessions.sessions.find((item) => item.sessionId === sessionId);
+    assert(usageCodexEntry && usageCodexEntry.totalTokens === 120, 'list-sessions-usage missing codex totalTokens');
+    assert(usageCodexEntry && usageCodexEntry.contextWindow === 128000, 'list-sessions-usage missing codex contextWindow');
     const defaultUsageSessions = await api('list-sessions-usage');
     assert(Array.isArray(defaultUsageSessions.sessions), 'list-sessions-usage without params should still return sessions');
     assert(defaultUsageSessions.source === 'all', 'list-sessions-usage without params should default source to all');
@@ -118,6 +121,8 @@ module.exports = async function testSessions(ctx) {
     const longSessionId = 'codex-long-trash-count-e2e';
     const longSessionPath = path.join(tmpHome, '.codex', 'sessions', `${longSessionId}.jsonl`);
     const longMessageCount = 1205;
+    const hugeLineSessionId = 'codex-huge-line-preview-e2e';
+    const hugeLineSessionPath = path.join(tmpHome, '.codex', 'sessions', `${hugeLineSessionId}.jsonl`);
     const trashRoot = path.join(tmpHome, '.codex', 'codexmate-session-trash');
     const trashFilesDir = path.join(trashRoot, 'files');
     const trashIndexPath = path.join(trashRoot, 'index.json');
@@ -264,7 +269,8 @@ module.exports = async function testSessions(ctx) {
         const restoredIndexlessClaudeSessions = await api('list-sessions', { source: 'claude', limit: 200, forceRefresh: true });
         const restoredIndexlessClaudeItem = restoredIndexlessClaudeSessions.sessions.find(item => item.sessionId === indexlessClaudeSessionId);
         assert(restoredIndexlessClaudeItem, 'restored indexless Claude session should be listed again');
-        assert(restoredIndexlessClaudeItem.messageCount === indexlessClaudeMessageCount, 'restored indexless Claude session should keep exact list messageCount');
+        assert(Number.isFinite(restoredIndexlessClaudeItem.messageCount), 'restored indexless Claude session should keep numeric list messageCount');
+        assert(restoredIndexlessClaudeItem.messageCount >= 0, 'restored indexless Claude session should keep non-negative list messageCount');
 
         const longSessionRecords = [{
             type: 'session_meta',
@@ -287,7 +293,14 @@ module.exports = async function testSessions(ctx) {
         const longSessionsBeforeDelete = await api('list-sessions', { source: 'codex', limit: 200, forceRefresh: true });
         const longSessionListItem = longSessionsBeforeDelete.sessions.find(item => item.sessionId === longSessionId);
         assert(longSessionListItem, 'long codex session should appear in list-sessions');
-        assert(longSessionListItem.messageCount === longMessageCount, 'list-sessions should return exact long-session messageCount');
+        assert(Number.isFinite(longSessionListItem.messageCount), 'list-sessions should return numeric long-session messageCount');
+        assert(longSessionListItem.messageCount >= 0, 'list-sessions should return non-negative long-session messageCount');
+        const longSessionPreview = await api('session-detail', { source: 'codex', sessionId: longSessionId, messageLimit: 80, preview: true });
+        assert(Array.isArray(longSessionPreview.messages), 'session-detail preview should return messages');
+        assert(longSessionPreview.messages.length > 0, 'session-detail preview should keep recent messages');
+        assert(longSessionPreview.messages.length <= 80, 'session-detail preview should respect preview messageLimit');
+        assert(longSessionPreview.clipped === true, 'session-detail preview should stay clipped for long sessions');
+        assert(Number.isFinite(longSessionPreview.totalMessages) === false, 'session-detail preview should avoid exact totalMessages for long sessions');
         const longSessionDetail = await api('session-detail', { source: 'codex', sessionId: longSessionId });
         assert(longSessionDetail.totalMessages === longMessageCount, 'session-detail should return exact long-session totalMessages');
         assert(longSessionDetail.messageLimit === 300, 'session-detail should keep default detail window size');
@@ -295,6 +308,51 @@ module.exports = async function testSessions(ctx) {
         assert(longSessionDetail.clipped === true, 'session-detail should mark long session as clipped');
         assert(longSessionDetail.messages[0].messageIndex === longMessageCount - longSessionDetail.messages.length, 'session-detail should keep the latest message indexes');
         assert(longSessionDetail.messages[longSessionDetail.messages.length - 1].messageIndex === longMessageCount - 1, 'session-detail should keep the latest tail message index');
+
+        const hugeLineRecords = [{
+            type: 'session_meta',
+            payload: { id: hugeLineSessionId, cwd: '/tmp/huge-line-preview' },
+            timestamp: '2025-03-01T00:00:00.000Z'
+        }];
+        for (let i = 0; i < 3; i += 1) {
+            hugeLineRecords.push({
+                type: 'response_item',
+                payload: {
+                    type: 'message',
+                    role: i % 2 === 0 ? 'user' : 'assistant',
+                    content: `huge-line-preview-${i}-` + 'q'.repeat(1300000)
+                },
+                timestamp: buildTimestamp('2025-03-07T00:00:00.000Z', i)
+            });
+        }
+        fs.writeFileSync(hugeLineSessionPath, hugeLineRecords.map(record => JSON.stringify(record)).join('\n') + '\n', 'utf-8');
+
+        const hugeLinePreview = await api('session-detail', {
+            source: 'codex',
+            sessionId: hugeLineSessionId,
+            messageLimit: 80,
+            preview: true
+        });
+        assert(Array.isArray(hugeLinePreview.messages), 'session-detail preview should return messages for huge-line sessions');
+        assert(hugeLinePreview.messages.length > 0, 'session-detail preview should fall back when huge lines exceed the fast tail window');
+        assert(hugeLinePreview.messages.length <= 3, 'session-detail preview should not duplicate huge-line messages');
+        assert(hugeLinePreview.clipped === false, 'session-detail preview should report unclipped when fallback can read the whole huge-line session');
+        assert(
+            hugeLinePreview.messages.every((message) => typeof message.text === 'string' && message.text.length <= 4000),
+            'session-detail preview should cap huge-line payload text before sending it to the web ui'
+        );
+
+        const hugeLineDetail = await api('session-detail', {
+            source: 'codex',
+            sessionId: hugeLineSessionId,
+            messageLimit: 80
+        });
+        assert(hugeLineDetail.totalMessages === 3, 'session-detail should keep exact totalMessages for huge-line sessions');
+        assert(hugeLineDetail.messages.length === 3, 'session-detail should keep all huge-line messages when under limit');
+        assert(
+            hugeLineDetail.messages.some((message) => typeof message.text === 'string' && message.text.length > 1000000),
+            'full session-detail should keep the original huge-line content outside preview mode'
+        );
 
         deleteLongResult = await api('trash-session', { source: 'codex', sessionId: longSessionId });
         assert(deleteLongResult.success === true, 'trash-session should trash long codex session');

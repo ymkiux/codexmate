@@ -24,6 +24,8 @@ test('bundled web ui html inlines partials without leaking include directives', 
     assert.match(html, /id="settings-panel-trash"/);
     assert.match(html, /id="settings-panel-device"/);
     assert.match(html, /class="modal modal-wide skills-modal"/);
+    assert.match(html, /<script src="\/res\/vue\.global\.prod\.js"><\/script>/);
+    assert.doesNotMatch(html, /<script src="\/res\/vue\.global\.js"><\/script>/);
     assert.match(html, /<script type="module" src="\/web-ui\/app\.js"><\/script>/);
     assert.doesNotMatch(html, /<script type="module" src="web-ui\/app\.js"><\/script>/);
     assert.doesNotMatch(html, /<!--\s*@include\s+/);

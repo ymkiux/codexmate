@@ -5,6 +5,69 @@ import {
     normalizeSessionPathFilter
 } from '../logic.mjs';
 
+function isSessionLoadNativeDialogEnabled(vm) {
+    if (vm && typeof vm.isSessionLoadNativeDialogEnabled === 'function' && vm.isSessionLoadNativeDialogEnabled !== isSessionLoadNativeDialogEnabled) {
+        try {
+            return !!vm.isSessionLoadNativeDialogEnabled();
+        } catch (_) {
+            // fall through to shared detection
+        }
+    }
+
+    try {
+        if (globalThis && globalThis.__CODEXMATE_SESSION_LOAD_NATIVE_DIALOG__ === true) {
+            return true;
+        }
+    } catch (_) {
+        // ignore global flag lookup failures
+    }
+
+    try {
+        if (typeof localStorage !== 'undefined' && typeof localStorage.getItem === 'function') {
+            const stored = String(localStorage.getItem('codexmateSessionLoadNativeDialog') || '').trim().toLowerCase();
+            if (stored === '1' || stored === 'true' || stored === 'yes' || stored === 'on') {
+                return true;
+            }
+        }
+    } catch (_) {
+        // ignore storage lookup failures
+    }
+
+    try {
+        const search = typeof location !== 'undefined' && location && typeof location.search === 'string'
+            ? location.search
+            : (typeof window !== 'undefined' && window.location && typeof window.location.search === 'string'
+                ? window.location.search
+                : '');
+        if (!search) {
+            return false;
+        }
+        const params = new URLSearchParams(search);
+        const value = String(params.get('sessionLoadNativeDialog') || '').trim().toLowerCase();
+        return value === '1' || value === 'true' || value === 'yes' || value === 'on';
+    } catch (_) {
+        return false;
+    }
+}
+
+function emitSessionLoadNativeDialog(vm, step, details = '') {
+    if (!isSessionLoadNativeDialogEnabled(vm)) {
+        return;
+    }
+    const alertFn = typeof globalThis.alert === 'function'
+        ? globalThis.alert.bind(globalThis)
+        : (typeof window !== 'undefined' && typeof window.alert === 'function'
+            ? window.alert.bind(window)
+            : null);
+    if (!alertFn) {
+        return;
+    }
+    const message = details
+        ? `[codexmate][session-load] ${step}\n${details}`
+        : `[codexmate][session-load] ${step}`;
+    alertFn(message);
+}
+
 export function createSessionBrowserMethods(options = {}) {
     const {
         api,
@@ -84,11 +147,20 @@ export function createSessionBrowserMethods(options = {}) {
             }
         },
 
+        isSessionLoadNativeDialogEnabled() {
+            return isSessionLoadNativeDialogEnabled(this);
+        },
+
+        emitSessionLoadNativeDialog(step, details = '') {
+            emitSessionLoadNativeDialog(this, step, details);
+        },
+
         async loadSessionPathOptions(options = {}) {
             const source = options.source === 'claude' ? 'claude' : (options.source === 'all' ? 'all' : 'codex');
             const forceRefresh = !!options.forceRefresh;
             const loaded = !!this.sessionPathOptionsLoadedMap[source];
             if (!forceRefresh && loaded) {
+                emitSessionLoadNativeDialog(this, 'loadSessionPathOptions:cache-hit', `source=${source}`);
                 if (source === this.sessionFilterSource) {
                     this.sessionPathOptionsLoading = false;
                 }
@@ -101,6 +173,11 @@ export function createSessionBrowserMethods(options = {}) {
             const requestSeq = (Number(nextSeqMap[source]) || 0) + 1;
             nextSeqMap[source] = requestSeq;
             this.sessionPathRequestSeqMap = nextSeqMap;
+            emitSessionLoadNativeDialog(
+                this,
+                'loadSessionPathOptions:start',
+                `source=${source}\nforceRefresh=${forceRefresh}\nrequestSeq=${requestSeq}`
+            );
             if (source === this.sessionFilterSource) {
                 this.sessionPathOptionsLoading = true;
             }
@@ -111,6 +188,11 @@ export function createSessionBrowserMethods(options = {}) {
                     forceRefresh
                 });
                 if (requestSeq !== Number(((this.sessionPathRequestSeqMap || {})[source]) || 0)) {
+                    emitSessionLoadNativeDialog(
+                        this,
+                        'loadSessionPathOptions:stale-response',
+                        `source=${source}\nrequestSeq=${requestSeq}`
+                    );
                     return;
                 }
                 if (res && !res.error && Array.isArray(res.paths)) {
@@ -119,8 +201,24 @@ export function createSessionBrowserMethods(options = {}) {
                         ...this.sessionPathOptionsLoadedMap,
                         [source]: true
                     };
+                    emitSessionLoadNativeDialog(
+                        this,
+                        'loadSessionPathOptions:success',
+                        `source=${source}\npaths=${res.paths.length}`
+                    );
+                } else if (res && res.error) {
+                    emitSessionLoadNativeDialog(
+                        this,
+                        'loadSessionPathOptions:error',
+                        `source=${source}\nerror=${res.error}`
+                    );
                 }
-            } catch (_) {
+            } catch (error) {
+                emitSessionLoadNativeDialog(
+                    this,
+                    'loadSessionPathOptions:exception',
+                    `source=${source}\nerror=${error && error.message ? error.message : String(error)}`
+                );
                 // 路径补全失败不影响会话主流程
             } finally {
                 if (
@@ -129,6 +227,11 @@ export function createSessionBrowserMethods(options = {}) {
                 ) {
                     this.sessionPathOptionsLoading = false;
                 }
+                emitSessionLoadNativeDialog(
+                    this,
+                    'loadSessionPathOptions:complete',
+                    `source=${source}\nrequestSeq=${requestSeq}`
+                );
             }
         },
 
@@ -403,9 +506,50 @@ export function createSessionBrowserMethods(options = {}) {
         },
 
         async selectSession(session) {
-            if (!session) return;
-            if (this.activeSession && this.getSessionExportKey(this.activeSession) === this.getSessionExportKey(session)) return;
+            if (!session) {
+                emitSessionLoadNativeDialog(this, 'selectSession:skip-empty');
+                return;
+            }
+            emitSessionLoadNativeDialog(
+                this,
+                'selectSession:start',
+                `sessionId=${session.sessionId || ''}\nsource=${session.source || ''}`
+            );
+            const isSameSession = this.activeSession
+                && this.getSessionExportKey(this.activeSession) === this.getSessionExportKey(session);
+            if (isSameSession) {
+                emitSessionLoadNativeDialog(this, 'selectSession:same-session', `sessionId=${session.sessionId || ''}`);
+                if (this.sessionDetailLoading) {
+                    emitSessionLoadNativeDialog(this, 'selectSession:skip-detail-loading', `sessionId=${session.sessionId || ''}`);
+                    return;
+                }
+                const currentMessages = Array.isArray(this.activeSessionMessages) ? this.activeSessionMessages : [];
+                if (currentMessages.length > 0) {
+                    emitSessionLoadNativeDialog(
+                        this,
+                        'selectSession:skip-existing-messages',
+                        `sessionId=${session.sessionId || ''}\nmessages=${currentMessages.length}`
+                    );
+                    return;
+                }
+                if (typeof this.scheduleAfterFrame === 'function') {
+                    const selectedSession = this.activeSession;
+                    emitSessionLoadNativeDialog(this, 'selectSession:schedule-detail', `sessionId=${session.sessionId || ''}`);
+                    this.scheduleAfterFrame(() => {
+                        if (this.activeSession !== selectedSession) return;
+                        void this.loadActiveSessionDetail();
+                    });
+                    return;
+                }
+                emitSessionLoadNativeDialog(this, 'selectSession:load-detail-now', `sessionId=${session.sessionId || ''}`);
+                await this.loadActiveSessionDetail();
+                return;
+            }
             this.activeSession = session;
+            emitSessionLoadNativeDialog(this, 'selectSession:activate', `sessionId=${session.sessionId || ''}`);
+            if (typeof this.expandVisibleSessionList === 'function') {
+                this.expandVisibleSessionList(0, { ensureActive: true });
+            }
             this.activeSessionMessages = [];
             this.resetSessionDetailPagination();
             this.resetSessionPreviewMessageRender();
@@ -416,12 +560,14 @@ export function createSessionBrowserMethods(options = {}) {
             this.clearSessionTimelineRefs();
             if (typeof this.scheduleAfterFrame === 'function') {
                 const selectedSession = this.activeSession;
+                emitSessionLoadNativeDialog(this, 'selectSession:schedule-detail', `sessionId=${session.sessionId || ''}`);
                 this.scheduleAfterFrame(() => {
                     if (this.activeSession !== selectedSession) return;
                     void this.loadActiveSessionDetail();
                 });
                 return;
             }
+            emitSessionLoadNativeDialog(this, 'selectSession:load-detail-now', `sessionId=${session.sessionId || ''}`);
             await this.loadActiveSessionDetail();
         },
 
