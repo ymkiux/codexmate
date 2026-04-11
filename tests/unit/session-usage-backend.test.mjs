@@ -105,8 +105,8 @@ test('listSessionBrowse uses lightweight session listing without exact hydration
 
 test('listSessionUsage uses lightweight session listing without exact hydration', async () => {
     const calls = [];
-    const listAllSessions = async (params) => {
-        calls.push({ type: 'listAllSessions', params });
+    const listSessionBrowse = async (params) => {
+        calls.push({ type: 'listSessionBrowse', params });
         return [
             {
                 source: 'codex',
@@ -122,7 +122,7 @@ test('listSessionUsage uses lightweight session listing without exact hydration'
     };
     const listSessionUsage = instantiateListSessionUsage({
         MAX_SESSION_LIST_SIZE: 300,
-        listAllSessions,
+        listSessionBrowse,
         listAllSessionsData
     });
 
@@ -136,7 +136,7 @@ test('listSessionUsage uses lightweight session listing without exact hydration'
         calls,
         [
             {
-                type: 'listAllSessions',
+                type: 'listSessionBrowse',
                 params: {
                     source: 'all',
                     limit: 200,
@@ -156,13 +156,13 @@ test('listSessionUsage uses lightweight session listing without exact hydration'
 
 test('listSessionUsage normalizes source and default limit for lightweight usage aggregation', async () => {
     const calls = [];
-    const listAllSessions = async (params) => {
+    const listSessionBrowse = async (params) => {
         calls.push(params);
         return [];
     };
     const listSessionUsage = instantiateListSessionUsage({
         MAX_SESSION_LIST_SIZE: 300,
-        listAllSessions,
+        listSessionBrowse,
         listAllSessionsData: async () => {
             throw new Error('should not call listAllSessionsData');
         }
