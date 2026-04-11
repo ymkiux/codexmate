@@ -22,6 +22,16 @@ export function createSessionTimelineMethods() {
     };
 
     return {
+        hasRenderableSessionTimeline() {
+            return !!(
+                this.sessionTimelineEnabled
+                && this.mainTab === 'sessions'
+                && this.getMainTabForNav() === 'sessions'
+                && this.sessionPreviewRenderEnabled
+                && Array.isArray(this.sessionTimelineNodes)
+                && this.sessionTimelineNodes.length
+            );
+        },
         setSessionPreviewContainerRef(el) {
             this.sessionPreviewContainerEl = el || null;
             this.updateSessionTimelineOffset();
@@ -33,21 +43,6 @@ export function createSessionTimelineMethods() {
         },
         observeSessionPreviewHeaderResize() {
             this.disconnectSessionPreviewHeaderResizeObserver();
-            if (!this.sessionPreviewHeaderEl || typeof ResizeObserver !== 'function') return;
-            this.sessionPreviewHeaderResizeObserver = new ResizeObserver(() => {
-                this.updateSessionTimelineOffset();
-                this.invalidateSessionTimelineMeasurementCache();
-                if (
-                    this.sessionTimelineEnabled
-                    && this.mainTab === 'sessions'
-                    && this.getMainTabForNav() === 'sessions'
-                    && this.sessionPreviewRenderEnabled
-                    && this.sessionTimelineNodes.length
-                ) {
-                    this.scheduleSessionTimelineSync();
-                }
-            });
-            this.sessionPreviewHeaderResizeObserver.observe(this.sessionPreviewHeaderEl);
         },
         setSessionPreviewHeaderRef(el) {
             this.disconnectSessionPreviewHeaderResizeObserver();
@@ -191,7 +186,18 @@ export function createSessionTimelineMethods() {
         updateSessionTimelineOffset() {
             const container = this.sessionPreviewContainerEl || this.$refs.sessionPreviewContainer;
             if (!container || !container.style) return;
+            if (!this.hasRenderableSessionTimeline()) {
+                if (this.__sessionPreviewHeaderOffsetPx != null) {
+                    container.style.removeProperty('--session-preview-header-offset');
+                    this.__sessionPreviewHeaderOffsetPx = null;
+                }
+                return;
+            }
             const offset = getSessionPreviewHeaderOffset(this);
+            if (this.__sessionPreviewHeaderOffsetPx === offset) {
+                return;
+            }
+            this.__sessionPreviewHeaderOffsetPx = offset;
             container.style.setProperty('--session-preview-header-offset', `${offset}px`);
         },
         bindSessionMessageRef(messageKey, el, ticket = this.sessionTabRenderTicket) {
@@ -237,6 +243,7 @@ export function createSessionTimelineMethods() {
             this.sessionTimelineRafId = 0;
         },
         scheduleSessionTimelineSync() {
+            this.updateSessionTimelineOffset();
             if (this.sessionTimelineRafId) return;
             if (typeof requestAnimationFrame === 'function') {
                 this.sessionTimelineRafId = requestAnimationFrame(() => {

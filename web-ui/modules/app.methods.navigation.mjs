@@ -473,14 +473,14 @@ export function createNavigationMethods(options = {}) {
                     return;
                 }
                 const listEl = this.__sessionListRef || null;
-                let shouldGrow = !listEl;
-                if (listEl) {
-                    const clientHeight = Number(listEl.clientHeight) || 0;
-                    const scrollHeight = Number(listEl.scrollHeight) || 0;
-                    const scrollTop = Number(listEl.scrollTop) || 0;
-                    const remaining = Math.max(0, scrollHeight - scrollTop - clientHeight);
-                    shouldGrow = scrollHeight <= (clientHeight + 160) || remaining <= Math.max(160, clientHeight);
+                if (!listEl) {
+                    return;
                 }
+                const clientHeight = Number(listEl.clientHeight) || 0;
+                const scrollHeight = Number(listEl.scrollHeight) || 0;
+                const scrollTop = Number(listEl.scrollTop) || 0;
+                const remaining = Math.max(0, scrollHeight - scrollTop - clientHeight);
+                const shouldGrow = scrollHeight <= (clientHeight + 160) || remaining <= Math.max(160, clientHeight);
                 if (!shouldGrow) {
                     return;
                 }

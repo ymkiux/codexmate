@@ -401,6 +401,45 @@ test('prepareSessionTabRender re-enables list before preview and primes preview 
     assert.strictEqual(context._timelineSyncCalls, 1);
 });
 
+test('scheduleSessionListViewportFill waits for a measured list element before auto-growing', () => {
+    const methods = createNavigationMethods({
+        configModeSet: new Set(['codex', 'claude', 'openclaw']),
+        switchMainTabHelper(tab) {
+            this.mainTab = tab;
+        },
+        loadMoreSessionMessagesHelper() {}
+    });
+    const idleTasks = [];
+    const context = createNavigationContext(methods, {
+        mainTab: 'sessions',
+        sessionListRenderEnabled: true,
+        sessionListVisibleCount: 0,
+        sessionListInitialBatchSize: 20,
+        sessionListLoadStep: 40,
+        sortedSessionsList: Array.from({ length: 60 }, (_, index) => ({ source: 'codex', sessionId: `sess-${index}`, filePath: `/tmp/sess-${index}.jsonl` })),
+        activeSession: null,
+        __sessionListRef: null,
+        scheduleIdleTask(task) {
+            idleTasks.push(task);
+            return task;
+        },
+        cancelIdleTask() {},
+        getSessionExportKey(session) {
+            return `${session.source}:${session.sessionId}:${session.filePath}`;
+        }
+    });
+
+    context.primeSessionListRender();
+
+    assert.strictEqual(context.sessionListVisibleCount, 20);
+    assert.strictEqual(idleTasks.length, 1);
+
+    idleTasks.shift()();
+
+    assert.strictEqual(context.sessionListVisibleCount, 20);
+    assert.strictEqual(idleTasks.length, 0);
+});
+
 test('download directory actions clear stale delayed progress resets before scheduling a new one', async () => {
     await verifyDownloadProgressResetCleanup({
         methodName: 'downloadClaudeDirectory',

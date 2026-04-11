@@ -265,3 +265,77 @@ test('timeline header offset uses sessionPreviewHeaderEl when container header i
     methods.jumpToSessionTimelineNode.call(context, 'm1');
     assert.strictEqual(lastScrollTo, 248);
 });
+
+test('updateSessionTimelineOffset skips container writes until the timeline is actually renderable', () => {
+    const methods = createSessionTimelineMethods();
+    const writes = [];
+    const removals = [];
+    const context = {
+        sessionTimelineEnabled: true,
+        mainTab: 'sessions',
+        sessionPreviewRenderEnabled: true,
+        sessionTimelineNodes: [],
+        sessionPreviewContainerEl: {
+            style: {
+                setProperty(name, value) {
+                    writes.push({ name, value });
+                },
+                removeProperty(name) {
+                    removals.push(name);
+                }
+            },
+            querySelector() {
+                return null;
+            }
+        },
+        $refs: {},
+        getMainTabForNav() {
+            return 'sessions';
+        },
+        hasRenderableSessionTimeline: methods.hasRenderableSessionTimeline
+    };
+
+    methods.updateSessionTimelineOffset.call(context);
+
+    assert.deepStrictEqual(writes, []);
+    assert.deepStrictEqual(removals, []);
+});
+
+test('updateSessionTimelineOffset writes once when timeline nodes are present and skips duplicate offsets', () => {
+    const methods = createSessionTimelineMethods();
+    const writes = [];
+    const context = {
+        sessionTimelineEnabled: true,
+        mainTab: 'sessions',
+        sessionPreviewRenderEnabled: true,
+        sessionTimelineNodes: [{ key: 'm1' }],
+        sessionPreviewHeaderEl: {
+            getBoundingClientRect() {
+                return { height: 40 };
+            }
+        },
+        sessionPreviewContainerEl: {
+            style: {
+                setProperty(name, value) {
+                    writes.push({ name, value });
+                },
+                removeProperty() {}
+            },
+            querySelector() {
+                return null;
+            }
+        },
+        $refs: {},
+        getMainTabForNav() {
+            return 'sessions';
+        },
+        hasRenderableSessionTimeline: methods.hasRenderableSessionTimeline
+    };
+
+    methods.updateSessionTimelineOffset.call(context);
+    methods.updateSessionTimelineOffset.call(context);
+
+    assert.deepStrictEqual(writes, [
+        { name: '--session-preview-header-offset', value: '52px' }
+    ]);
+});

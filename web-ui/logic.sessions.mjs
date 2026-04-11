@@ -1,5 +1,5 @@
 export const DEFAULT_SESSION_LIST_LIMIT = 200;
-export const DEFAULT_SESSION_LIST_FAST_LIMIT = 40;
+export const DEFAULT_SESSION_LIST_FAST_LIMIT = 20;
 
 function shouldUseFastSessionBrowseLimit(options = {}) {
     if (options.forceRefresh) {
