@@ -13,6 +13,18 @@ function formatUsageSummaryNumber(value) {
     return Math.floor(numeric).toLocaleString('en-US');
 }
 
+function formatCompactUsageSummaryNumber(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric < 0) {
+        return '0';
+    }
+    return new Intl.NumberFormat('en-US', {
+        notation: 'compact',
+        compactDisplay: 'short',
+        maximumFractionDigits: 1
+    }).format(Math.floor(numeric));
+}
+
 export function createSessionComputed() {
     return {
         isSessionQueryEnabled() {
@@ -151,8 +163,18 @@ export function createSessionComputed() {
             return [
                 { key: 'sessions', label: '总会话数', value: formatUsageSummaryNumber(summary.totalSessions || 0) },
                 { key: 'messages', label: '总消息数', value: formatUsageSummaryNumber(summary.totalMessages || 0) },
-                { key: 'tokens', label: '总 token 数', value: formatUsageSummaryNumber(summary.totalTokens || 0) },
-                { key: 'context-window', label: '总上下文数', value: formatUsageSummaryNumber(summary.totalContextWindow || 0) },
+                {
+                    key: 'tokens',
+                    label: '总 token 数',
+                    value: formatCompactUsageSummaryNumber(summary.totalTokens || 0),
+                    title: formatUsageSummaryNumber(summary.totalTokens || 0)
+                },
+                {
+                    key: 'context-window',
+                    label: '总上下文数',
+                    value: formatCompactUsageSummaryNumber(summary.totalContextWindow || 0),
+                    title: formatUsageSummaryNumber(summary.totalContextWindow || 0)
+                },
                 { key: 'days', label: '活跃天数', value: formatUsageSummaryNumber(summary.activeDays || 0) },
                 { key: 'avg-messages', label: '平均每会话消息', value: summary.avgMessagesPerSession || 0 },
                 {
