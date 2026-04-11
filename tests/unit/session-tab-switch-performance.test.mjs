@@ -826,3 +826,35 @@ test('loadMoreSessionMessages requests older messages and toggles loading flag',
     assert.deepStrictEqual(vm.lastOptions, { preserveVisibleCount: true });
     assert.strictEqual(vm.sessionPreviewLoadingMore, false);
 });
+
+test('loadMoreSessionMessages ignores clipped preview counts that only echo the current loaded window', async () => {
+    const vm = {
+        mainTab: 'sessions',
+        sessionPreviewRenderEnabled: true,
+        activeSessionMessages: Array.from({ length: 80 }, (_, idx) => ({ id: idx })),
+        sessionPreviewVisibleCount: 80,
+        sessionPreviewLoadStep: 24,
+        sessionDetailLoading: false,
+        activeSessionDetailClipped: true,
+        activeSession: { messageCount: 80 },
+        sessionDetailMessageLimit: 80,
+        sessionDetailFetchStep: 80,
+        sessionDetailMessageLimitCap: 1000,
+        sessionPreviewPendingVisibleCount: 0,
+        sessionPreviewLoadingMore: false,
+        fetchCount: 0,
+        async loadActiveSessionDetail(options) {
+            this.fetchCount += 1;
+            this.lastOptions = options;
+            assert.strictEqual(this.sessionPreviewLoadingMore, true);
+        }
+    };
+
+    await loadMoreSessionMessages.call(vm);
+
+    assert.strictEqual(vm.fetchCount, 1);
+    assert.strictEqual(vm.sessionDetailMessageLimit, 160);
+    assert.strictEqual(vm.sessionPreviewPendingVisibleCount, 104);
+    assert.deepStrictEqual(vm.lastOptions, { preserveVisibleCount: true });
+    assert.strictEqual(vm.sessionPreviewLoadingMore, false);
+});
