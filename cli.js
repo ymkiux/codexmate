@@ -4780,15 +4780,15 @@ function extractSessionDetailPreviewFromFileFast(filePath, source, messageLimit)
 
             totalBytesRead += bytesRead;
             combined = Buffer.concat([chunk.subarray(0, bytesRead), combined]);
-            latest = extractSessionDetailPreviewFromTailText(combined.toString('utf-8'), source, messageLimit);
+            latest = extractSessionDetailPreviewFromTailText(combined.toString('utf-8'), source, safeMessageLimit);
             if (latest.messages.length >= safeMessageLimit) {
-                latest.clipped = position > 0;
+                latest.clipped = latest.clipped || position > 0;
                 return latest;
             }
         }
 
         if (position > 0) {
-            latest.clipped = true;
+            latest.clipped = latest.clipped || position > 0;
         }
         return latest;
     } catch (_) {
