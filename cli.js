@@ -122,6 +122,7 @@ const CODEXMATE_MANAGED_MARKER = '# codexmate-managed: true';
 const SESSION_LIST_CACHE_TTL_MS = 4000;
 const SESSION_SUMMARY_READ_BYTES = 256 * 1024;
 const SESSION_CONTENT_READ_BYTES = SESSION_SUMMARY_READ_BYTES;
+const SESSION_PREVIEW_MESSAGE_TEXT_MAX_LENGTH = 4000;
 const EXACT_MESSAGE_COUNT_CACHE_MAX_ENTRIES = 800;
 const DEFAULT_CONTENT_SCAN_LIMIT = 50;
 const SESSION_SCAN_FACTOR = 4;
@@ -7973,10 +7974,16 @@ async function readSessionDetail(params = {}) {
     const startIndex = hasExactTotalMessages
         ? Math.max(0, extracted.totalMessages - clippedMessages.length)
         : 0;
-    const indexedMessages = clippedMessages.map((message, messageIndex) => ({
-        ...message,
-        messageIndex: startIndex + messageIndex
-    }));
+    const indexedMessages = clippedMessages.map((message, messageIndex) => {
+        const normalizedMessage = {
+            ...message,
+            messageIndex: startIndex + messageIndex
+        };
+        if (preview && typeof normalizedMessage.text === 'string') {
+            normalizedMessage.text = truncateText(normalizedMessage.text, SESSION_PREVIEW_MESSAGE_TEXT_MAX_LENGTH);
+        }
+        return normalizedMessage;
+    });
 
     return {
         source,
