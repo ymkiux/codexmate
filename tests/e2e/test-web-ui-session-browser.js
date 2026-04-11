@@ -179,6 +179,7 @@ module.exports = async function testWebUiSessionBrowser(ctx) {
     const hotSessionId = 'session-browser-hot-large-e2e';
     const hotSessionMessageCount = 1325;
     const hugeLineSessionId = 'session-browser-huge-line-e2e';
+    const initialHugeLineSessionId = 'session-browser-huge-line-initial-e2e';
 
     for (let i = 0; i < denseListSessionCount; i += 1) {
         const sessionId = `session-browser-list-${String(i).padStart(3, '0')}`;
@@ -214,6 +215,24 @@ module.exports = async function testWebUiSessionBrowser(ctx) {
         cwd: '/tmp/session-browser-hot-large'
     }));
 
+    writeCodexSessionFile(
+        sessionsDir,
+        initialHugeLineSessionId,
+        [{
+            type: 'session_meta',
+            payload: { id: initialHugeLineSessionId, cwd: '/tmp/session-browser-huge-line-initial' },
+            timestamp: '2025-04-04T00:00:00.000Z'
+        }].concat(Array.from({ length: 2 }, (_, index) => ({
+            type: 'response_item',
+            payload: {
+                type: 'message',
+                role: index % 2 === 0 ? 'user' : 'assistant',
+                content: `session-browser-huge-line-initial-${index}-` + 'z'.repeat(1300000)
+            },
+            timestamp: createIso(Date.parse('2025-04-04T00:00:00.000Z'), index + 1)
+        })))
+    );
+
     const { appOptions, withGlobalOverrides } = await getBundledWebUiHarness();
     const vm = createWebUiVm(appOptions);
     vm.mainTab = 'settings';
@@ -231,15 +250,33 @@ module.exports = async function testWebUiSessionBrowser(ctx) {
         );
         await flushScheduledFrames(vm);
         await waitForCondition(
-            () => vm.activeSession && vm.activeSession.sessionId === hotSessionId && vm.sessionDetailLoading === false && vm.activeSessionMessages.length > 0,
+            () => vm.activeSession && vm.activeSession.sessionId === initialHugeLineSessionId && vm.sessionDetailLoading === false && vm.activeSessionMessages.length > 0,
             'session browser switchMainTab did not finish detail hydration'
         );
     });
 
-    assert(vm.sessionsList.length >= denseListSessionCount + 2, 'session browser should load the large isolated codex dataset');
+    assert(vm.sessionsList.length >= denseListSessionCount + 3, 'session browser should load the large isolated codex dataset');
     assert(vm.sessionsList.every((item) => String(item.filePath || '').startsWith(sessionsDir)), 'session browser e2e should stay inside the isolated tmp HOME dataset');
-    assert(vm.activeSession && vm.activeSession.sessionId === hotSessionId, 'session browser should select the newest hot session from the isolated dataset');
+    assert(vm.activeSession && vm.activeSession.sessionId === initialHugeLineSessionId, 'session browser should select the newest session from the isolated dataset on tab entry');
     assert(vm.visibleSessionsList.length === vm.sessionListInitialBatchSize, 'session browser should render only the first session list batch initially');
+    assert(vm.activeSessionMessages.length > 0, 'session browser should hydrate the initially selected huge-line session on tab entry');
+    assert(vm.activeSessionMessages.length <= 2, 'session browser should not duplicate the initial huge-line preview messages');
+    assert(vm.activeSessionMessages.every((message) => typeof message.text === 'string' && message.text.length <= 4000), 'session browser should cap huge-line preview text on initial tab entry');
+    assert(vm.activeSessionDetailClipped === false, 'session browser should fully recover small huge-line sessions on initial tab entry');
+    assert(vm.activeSessionVisibleMessages.length === vm.activeSessionMessages.length, 'session browser should render all truncated huge-line preview messages on initial tab entry');
+
+    const hotSession = vm.sessionsList.find((item) => item.sessionId === hotSessionId);
+    assert(hotSession, 'session browser should list the hot large regression session');
+
+    await withGlobalOverrides({ fetch, localStorage }, async () => {
+        await vm.selectSession(hotSession);
+        await flushScheduledFrames(vm);
+        await waitForCondition(
+            () => vm.activeSession && vm.activeSession.sessionId === hotSessionId && vm.sessionDetailLoading === false && vm.activeSessionMessages.length > 0,
+            'session browser hot large selection did not finish loading'
+        );
+    });
+
     assert(vm.activeSessionMessages.length === vm.sessionDetailInitialMessageLimit, 'session browser preview should hydrate only the initial detail window for huge sessions');
     assert(vm.activeSessionDetailClipped === true, 'session browser preview should stay clipped for huge sessions');
     assert(vm.activeSessionVisibleMessages.length === vm.sessionPreviewInitialBatchSize, 'session browser should render only the first preview batch initially');

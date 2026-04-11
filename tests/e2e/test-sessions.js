@@ -334,6 +334,10 @@ module.exports = async function testSessions(ctx) {
         assert(hugeLinePreview.messages.length > 0, 'session-detail preview should fall back when huge lines exceed the fast tail window');
         assert(hugeLinePreview.messages.length <= 3, 'session-detail preview should not duplicate huge-line messages');
         assert(hugeLinePreview.clipped === false, 'session-detail preview should report unclipped when fallback can read the whole huge-line session');
+        assert(
+            hugeLinePreview.messages.every((message) => typeof message.text === 'string' && message.text.length <= 4000),
+            'session-detail preview should cap huge-line payload text before sending it to the web ui'
+        );
 
         const hugeLineDetail = await api('session-detail', {
             source: 'codex',
@@ -342,6 +346,10 @@ module.exports = async function testSessions(ctx) {
         });
         assert(hugeLineDetail.totalMessages === 3, 'session-detail should keep exact totalMessages for huge-line sessions');
         assert(hugeLineDetail.messages.length === 3, 'session-detail should keep all huge-line messages when under limit');
+        assert(
+            hugeLineDetail.messages.some((message) => typeof message.text === 'string' && message.text.length > 1000000),
+            'full session-detail should keep the original huge-line content outside preview mode'
+        );
 
         deleteLongResult = await api('trash-session', { source: 'codex', sessionId: longSessionId });
         assert(deleteLongResult.success === true, 'trash-session should trash long codex session');
