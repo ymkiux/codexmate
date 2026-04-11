@@ -182,6 +182,7 @@ export async function loadSessions(api, options = {}) {
         timeRangePreset: this.sessionTimePreset,
         forceRefresh: normalizedOptions.forceRefresh
     });
+    let pendingOptions = null;
     try {
         const res = await api('list-sessions', params);
         if (res.error) {
@@ -254,11 +255,11 @@ export async function loadSessions(api, options = {}) {
         if (loadSucceeded) {
             this.sessionsLoadedOnce = true;
         }
-        const pendingOptions = this.__sessionPendingLoadOptions || null;
+        pendingOptions = this.__sessionPendingLoadOptions || null;
         this.__sessionPendingLoadOptions = null;
-        if (pendingOptions) {
-            return loadSessions.call(this, api, pendingOptions);
-        }
+    }
+    if (pendingOptions) {
+        return loadSessions.call(this, api, pendingOptions);
     }
 }
 

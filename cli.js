@@ -6119,7 +6119,7 @@ async function listSessionUsage(params = {}) {
     const limit = Number.isFinite(rawLimit)
         ? Math.max(1, Math.min(rawLimit, MAX_SESSION_LIST_SIZE))
         : 200;
-    const sessions = await listAllSessions({
+    const sessions = await listSessionBrowse({
         source,
         limit,
         forceRefresh: !!params.forceRefresh
