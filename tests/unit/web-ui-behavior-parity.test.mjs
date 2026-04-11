@@ -385,6 +385,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'resetSessionListRender',
         'scheduleSessionListViewportFill',
         'setSessionListRef',
+        'hasRenderableSessionTimeline',
         'syncDefaultOpenclawConfigEntry'
     ];
     const allowedMissingCurrentMethodKeys = [
