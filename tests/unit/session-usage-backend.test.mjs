@@ -23,6 +23,7 @@ function extractFunction(content, funcName) {
 const listSessionUsageSrc = extractFunction(cliContent, 'listSessionUsage');
 const listSessionBrowseSrc = extractFunction(cliContent, 'listSessionBrowse');
 const buildSessionInventoryCacheKeySrc = extractFunction(cliContent, 'buildSessionInventoryCacheKey');
+const cloneSessionInventoryCacheValueSrc = extractFunction(cliContent, 'cloneSessionInventoryCacheValue');
 const getSessionInventoryCacheSrc = extractFunction(cliContent, 'getSessionInventoryCache');
 const registerSessionFileLookupEntriesSrc = extractFunction(cliContent, 'registerSessionFileLookupEntries');
 const setSessionInventoryCacheSrc = extractFunction(cliContent, 'setSessionInventoryCache');
@@ -198,6 +199,7 @@ test('listSessionInventoryBySource reuses cached summaries and registers session
     const listSessionInventoryBySource = instantiateFunctionBundle(
         [
             buildSessionInventoryCacheKeySrc,
+            cloneSessionInventoryCacheValueSrc,
             getSessionInventoryCacheSrc,
             registerSessionFileLookupEntriesSrc,
             setSessionInventoryCacheSrc,
@@ -233,6 +235,123 @@ test('listSessionInventoryBySource reuses cached summaries and registers session
     assert.strictEqual(codexCalls.length, 1);
     assert.deepStrictEqual(first, second);
     assert.strictEqual(g_sessionFileLookupCache.codex.get('sess-1'), '/tmp/sess-1.jsonl');
+});
+
+test('listSessionInventoryBySource returns cloned cache entries so UI-side mutations do not leak back into cache', () => {
+    const g_sessionInventoryCache = new Map();
+    const g_sessionFileLookupCache = {
+        codex: new Map(),
+        claude: new Map()
+    };
+    const listSessionInventoryBySource = instantiateFunctionBundle(
+        [
+            buildSessionInventoryCacheKeySrc,
+            cloneSessionInventoryCacheValueSrc,
+            getSessionInventoryCacheSrc,
+            registerSessionFileLookupEntriesSrc,
+            setSessionInventoryCacheSrc,
+            listSessionInventoryBySourceSrc
+        ],
+        'listSessionInventoryBySource',
+        {
+            g_sessionInventoryCache,
+            g_sessionFileLookupCache,
+            SESSION_LIST_CACHE_TTL_MS: 4000,
+            SESSION_INVENTORY_CACHE_MAX_ENTRIES: 12,
+            listCodexSessions() {
+                return [{
+                    source: 'codex',
+                    sessionId: 'sess-1',
+                    filePath: '/tmp/sess-1.jsonl',
+                    match: {
+                        hit: true,
+                        count: 1,
+                        snippets: ['alpha']
+                    }
+                }];
+            },
+            listClaudeSessions() {
+                throw new Error('claude inventory should not be used');
+            },
+            Date: { now: () => 1000 },
+            Number,
+            Math,
+            Map,
+            Array
+        }
+    );
+
+    const first = listSessionInventoryBySource('codex', 120, {}, { forceRefresh: false });
+    first[0].title = 'mutated';
+    first[0].match.snippets.push('beta');
+
+    const second = listSessionInventoryBySource('codex', 120, {}, { forceRefresh: false });
+
+    assert.strictEqual(second[0].title, undefined);
+    assert.deepStrictEqual(second[0].match.snippets, ['alpha']);
+});
+
+test('listSessionInventoryBySource discards invalid non-array cache entries and rebuilds from source', () => {
+    const buildSessionInventoryCacheKey = instantiateFunctionBundle(
+        [buildSessionInventoryCacheKeySrc],
+        'buildSessionInventoryCacheKey',
+        { Number, Math }
+    );
+    const cacheKey = buildSessionInventoryCacheKey('codex', 120, {});
+    const g_sessionInventoryCache = new Map([
+        [cacheKey, {
+            timestamp: 1000,
+            source: 'codex',
+            value: { broken: true }
+        }]
+    ]);
+    const g_sessionFileLookupCache = {
+        codex: new Map(),
+        claude: new Map()
+    };
+    let codexCalls = 0;
+    const listSessionInventoryBySource = instantiateFunctionBundle(
+        [
+            buildSessionInventoryCacheKeySrc,
+            cloneSessionInventoryCacheValueSrc,
+            getSessionInventoryCacheSrc,
+            registerSessionFileLookupEntriesSrc,
+            setSessionInventoryCacheSrc,
+            listSessionInventoryBySourceSrc
+        ],
+        'listSessionInventoryBySource',
+        {
+            g_sessionInventoryCache,
+            g_sessionFileLookupCache,
+            SESSION_LIST_CACHE_TTL_MS: 4000,
+            SESSION_INVENTORY_CACHE_MAX_ENTRIES: 12,
+            listCodexSessions() {
+                codexCalls += 1;
+                return [{
+                    source: 'codex',
+                    sessionId: 'sess-1',
+                    filePath: '/tmp/sess-1.jsonl'
+                }];
+            },
+            listClaudeSessions() {
+                throw new Error('claude inventory should not be used');
+            },
+            Date: { now: () => 1000 },
+            Number,
+            Math,
+            Map,
+            Array
+        }
+    );
+
+    const result = listSessionInventoryBySource('codex', 120, {}, { forceRefresh: false });
+
+    assert.strictEqual(codexCalls, 1);
+    assert.deepStrictEqual(result, [{
+        source: 'codex',
+        sessionId: 'sess-1',
+        filePath: '/tmp/sess-1.jsonl'
+    }]);
 });
 
 test('listSessionPaths reuses cached lightweight inventory and dedupes cwd values', () => {

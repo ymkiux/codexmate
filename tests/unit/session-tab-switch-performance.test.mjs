@@ -85,8 +85,9 @@ test('switchMainTab prepares session render and loads sessions only when not loa
     assert.strictEqual(calls.loadSessions, 1);
 });
 
-test('switchMainTab keeps initial sessions entry lightweight and skips automatic detail hydration', async () => {
+test('switchMainTab keeps initial sessions entry lightweight and hydrates the active preview after the first frame', async () => {
     const loadOptions = [];
+    const scheduled = [];
     let detailLoads = 0;
     const vm = {
         mainTab: 'config',
@@ -109,7 +110,9 @@ test('switchMainTab keeps initial sessions entry lightweight and skips automatic
             detailLoads += 1;
             return Promise.resolve();
         },
-        scheduleAfterFrame() {},
+        scheduleAfterFrame(task) {
+            scheduled.push(task);
+        },
         refreshClaudeModelContext() {}
     };
 
@@ -118,7 +121,9 @@ test('switchMainTab keeps initial sessions entry lightweight and skips automatic
     assert.deepStrictEqual(loadOptions, [{ includeActiveDetail: false }]);
     assert.strictEqual(detailLoads, 0);
     await Promise.resolve();
-    assert.strictEqual(detailLoads, 0);
+    assert.strictEqual(scheduled.length, 1);
+    scheduled[0]();
+    assert.strictEqual(detailLoads, 1);
 });
 
 test('switchMainTab loads lightweight usage data without preparing session render', () => {
@@ -490,6 +495,51 @@ test('loadSessions replays the latest pending request after an in-flight list re
     assert.strictEqual(vm.sessionsLoading, false);
     assert.strictEqual(vm.sessionsLoadedOnce, true);
     assert.strictEqual(vm.activeSession.sessionId, 'sess-2');
+});
+
+test('loadSessions hydrates the active session detail by default when sessions tab is active', async () => {
+    const vm = {
+        mainTab: 'sessions',
+        sessionStandalone: false,
+        sessionsLoading: false,
+        sessionsLoadedOnce: false,
+        activeSessionDetailError: '',
+        sessionFilterSource: 'all',
+        sessionPathFilter: '',
+        sessionQuery: '',
+        sessionRoleFilter: 'all',
+        sessionTimePreset: 'all',
+        sessionsList: [],
+        activeSession: null,
+        activeSessionMessages: [],
+        activeSessionDetailClipped: false,
+        sessionTimelineActiveKey: '',
+        sessionMessageRefMap: Object.create(null),
+        _detailLoadCount: 0,
+        showMessage() {},
+        resetSessionDetailPagination() {},
+        resetSessionPreviewMessageRender() {},
+        cancelSessionTimelineSync() {},
+        syncSessionPathOptionsForSource() {},
+        extractPathOptionsFromSessions() {
+            return [];
+        },
+        getSessionExportKey(session) {
+            return session && session.sessionId ? session.sessionId : '';
+        },
+        async loadActiveSessionDetail() {
+            this._detailLoadCount += 1;
+        }
+    };
+
+    await loadSessions.call(vm, async () => ({
+        sessions: [
+            { sessionId: 'sess-1', source: 'codex', updatedAt: '2026-04-08T10:00:00.000Z', messageCount: 42, cwd: '/repo' }
+        ]
+    }), {});
+
+    assert.strictEqual(vm._detailLoadCount, 1);
+    assert.strictEqual(vm.activeSession.sessionId, 'sess-1');
 });
 
 test('session timeline stays always-on and no longer exposes toggle handler', () => {

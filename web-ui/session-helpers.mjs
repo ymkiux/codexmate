@@ -11,10 +11,18 @@ function clearSessionTimelineRefs(vm) {
     }
 }
 
+function hasOwnOption(options, key) {
+    return !!options && typeof options === 'object' && Object.prototype.hasOwnProperty.call(options, key);
+}
+
 function normalizeSessionLoadOptions(options = {}) {
     const normalized = options && typeof options === 'object' ? options : {};
+    const hasIncludeActiveDetail = hasOwnOption(normalized, 'includeActiveDetail');
     return {
-        includeActiveDetail: !!normalized.includeActiveDetail,
+        hasIncludeActiveDetail,
+        includeActiveDetail: hasIncludeActiveDetail
+            ? normalized.includeActiveDetail !== false
+            : false,
         forceRefresh: !!normalized.forceRefresh
     };
 }
@@ -23,9 +31,42 @@ function mergeSessionLoadOptions(baseOptions = {}, nextOptions = {}) {
     const base = normalizeSessionLoadOptions(baseOptions);
     const next = normalizeSessionLoadOptions(nextOptions);
     return {
-        includeActiveDetail: base.includeActiveDetail || next.includeActiveDetail,
+        hasIncludeActiveDetail: base.hasIncludeActiveDetail || next.hasIncludeActiveDetail,
+        includeActiveDetail: (base.hasIncludeActiveDetail && base.includeActiveDetail)
+            || (next.hasIncludeActiveDetail && next.includeActiveDetail),
         forceRefresh: base.forceRefresh || next.forceRefresh
     };
+}
+
+function shouldIncludeActiveSessionDetail(vm, options = {}) {
+    if (options.hasIncludeActiveDetail) {
+        return options.includeActiveDetail;
+    }
+    return vm.mainTab === 'sessions' || !!vm.sessionStandalone;
+}
+
+function scheduleSessionDetailHydration(vm, options = {}) {
+    if (!vm || typeof vm.loadActiveSessionDetail !== 'function') {
+        return;
+    }
+    const hydrationTicket = (Number(vm.__sessionDetailHydrationTicket) || 0) + 1;
+    vm.__sessionDetailHydrationTicket = hydrationTicket;
+    const task = () => {
+        if (hydrationTicket !== Number(vm.__sessionDetailHydrationTicket || 0)) return;
+        if (!vm.activeSession) return;
+        if (vm.mainTab !== 'sessions' && !vm.sessionStandalone) return;
+        if (vm.sessionDetailLoading) return;
+        const currentMessages = Array.isArray(vm.activeSessionMessages) ? vm.activeSessionMessages : [];
+        if (!options.force && currentMessages.length > 0) {
+            return;
+        }
+        void vm.loadActiveSessionDetail(options);
+    };
+    if (typeof vm.scheduleAfterFrame === 'function') {
+        vm.scheduleAfterFrame(task);
+        return;
+    }
+    task();
 }
 
 export function switchMainTab(tab) {
@@ -60,9 +101,17 @@ export function switchMainTab(tab) {
     }
 
     if (enteringSessionsTab && !this.sessionsLoadedOnce) {
-        this.loadSessions({
-            includeActiveDetail: false
+        const canStageInitialSessionDetail = typeof this.scheduleAfterFrame === 'function';
+        const loadResult = this.loadSessions({
+            includeActiveDetail: !canStageInitialSessionDetail
         });
+        if (canStageInitialSessionDetail) {
+            void Promise.resolve(loadResult)
+                .then(() => {
+                    scheduleSessionDetailHydration(this);
+                })
+                .catch(() => {});
+        }
     }
     if (enteringUsageTab && !this.sessionsUsageLoadedOnce && typeof this.loadSessionsUsage === 'function') {
         this.loadSessionsUsage();
@@ -121,6 +170,7 @@ export async function loadSessions(api, options = {}) {
         return;
     }
     const normalizedOptions = normalizeSessionLoadOptions(options);
+    const includeActiveDetail = shouldIncludeActiveSessionDetail(this, normalizedOptions);
     this.sessionsLoading = true;
     this.activeSessionDetailError = '';
     let loadSucceeded = false;
@@ -180,7 +230,7 @@ export async function loadSessions(api, options = {}) {
                 this.cancelSessionTimelineSync();
                 this.sessionTimelineActiveKey = '';
                 clearSessionTimelineRefs(this);
-                if (normalizedOptions.includeActiveDetail) {
+                if (includeActiveDetail) {
                     await this.loadActiveSessionDetail();
                 }
             }
