@@ -216,16 +216,24 @@ module.exports = async function testWebUiSessionBrowser(ctx) {
 
     const { appOptions, withGlobalOverrides } = await getBundledWebUiHarness();
     const vm = createWebUiVm(appOptions);
-    vm.mainTab = 'sessions';
+    vm.mainTab = 'settings';
     vm.sessionFilterSource = 'codex';
-    vm.prepareSessionTabRender();
-    await flushScheduledFrames(vm);
 
     const fetch = createApiFetch(api);
     const localStorage = createLocalStorage();
 
     await withGlobalOverrides({ fetch, localStorage }, async () => {
-        await vm.loadSessions({ forceRefresh: true, includeActiveDetail: true });
+        vm.switchMainTab('sessions');
+        await flushScheduledFrames(vm);
+        await waitForCondition(
+            () => vm.mainTab === 'sessions' && vm.sessionsLoadedOnce === true && vm.sessionsLoading === false && !!vm.activeSession,
+            'session browser switchMainTab did not finish list loading'
+        );
+        await flushScheduledFrames(vm);
+        await waitForCondition(
+            () => vm.activeSession && vm.activeSession.sessionId === hotSessionId && vm.sessionDetailLoading === false && vm.activeSessionMessages.length > 0,
+            'session browser switchMainTab did not finish detail hydration'
+        );
     });
 
     assert(vm.sessionsList.length >= denseListSessionCount + 2, 'session browser should load the large isolated codex dataset');
