@@ -144,6 +144,8 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
     let codexTotal = 0;
     let claudeTotal = 0;
     let messageTotal = 0;
+    let totalTokens = 0;
+    let totalContextWindow = 0;
     const pathMap = new Map();
     const sourceMessageTotals = { codex: 0, claude: 0 };
     const hourCounts = Array.from({ length: 24 }, (_, hour) => ({
@@ -173,6 +175,12 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
         const messageCount = Number.isFinite(Number(session.messageCount))
             ? Math.max(0, Math.floor(Number(session.messageCount)))
             : 0;
+        const sessionTotalTokens = Number.isFinite(Number(session.totalTokens))
+            ? Math.max(0, Math.floor(Number(session.totalTokens)))
+            : 0;
+        const sessionContextWindow = Number.isFinite(Number(session.contextWindow))
+            ? Math.max(0, Math.floor(Number(session.contextWindow)))
+            : 0;
         bucket.totalSessions += 1;
         bucket.totalMessages += messageCount;
         if (source === 'codex') {
@@ -183,6 +191,8 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
             claudeTotal += 1;
         }
         messageTotal += messageCount;
+        totalTokens += sessionTotalTokens;
+        totalContextWindow += sessionContextWindow;
         sourceMessageTotals[source] += messageCount;
 
         const utcHour = stamp.getUTCHours();
@@ -278,6 +288,8 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
         summary: {
             totalSessions,
             totalMessages: messageTotal,
+            totalTokens,
+            totalContextWindow,
             codexTotal,
             claudeTotal,
             activeDays,

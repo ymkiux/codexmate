@@ -5,6 +5,14 @@ import {
 } from '../logic.mjs';
 import { SESSION_TRASH_PAGE_SIZE } from './app.constants.mjs';
 
+function formatUsageSummaryNumber(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric < 0) {
+        return '0';
+    }
+    return Math.floor(numeric).toLocaleString('en-US');
+}
+
 export function createSessionComputed() {
     return {
         isSessionQueryEnabled() {
@@ -139,11 +147,13 @@ export function createSessionComputed() {
         sessionUsageSummaryCards() {
             const summary = this.sessionUsageCharts && this.sessionUsageCharts.summary
                 ? this.sessionUsageCharts.summary
-                : { totalSessions: 0, totalMessages: 0, activeDays: 0, avgMessagesPerSession: 0, busiestDay: null, busiestHour: null };
+                : { totalSessions: 0, totalMessages: 0, totalTokens: 0, totalContextWindow: 0, activeDays: 0, avgMessagesPerSession: 0, busiestDay: null, busiestHour: null };
             return [
-                { key: 'sessions', label: '总会话数', value: summary.totalSessions || 0 },
-                { key: 'messages', label: '总消息数', value: summary.totalMessages || 0 },
-                { key: 'days', label: '活跃天数', value: summary.activeDays || 0 },
+                { key: 'sessions', label: '总会话数', value: formatUsageSummaryNumber(summary.totalSessions || 0) },
+                { key: 'messages', label: '总消息数', value: formatUsageSummaryNumber(summary.totalMessages || 0) },
+                { key: 'tokens', label: '总 token 数', value: formatUsageSummaryNumber(summary.totalTokens || 0) },
+                { key: 'context-window', label: '总上下文数', value: formatUsageSummaryNumber(summary.totalContextWindow || 0) },
+                { key: 'days', label: '活跃天数', value: formatUsageSummaryNumber(summary.activeDays || 0) },
                 { key: 'avg-messages', label: '平均每会话消息', value: summary.avgMessagesPerSession || 0 },
                 {
                     key: 'busiest-day',

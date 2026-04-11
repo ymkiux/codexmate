@@ -10,13 +10,15 @@ const { buildUsageChartGroups } = logic;
 test('buildUsageChartGroups aggregates codex and claude sessions into day buckets', () => {
     const now = Date.UTC(2026, 3, 6, 12, 0, 0);
     const result = buildUsageChartGroups([
-        { source: 'codex', updatedAt: '2026-04-06T08:00:00.000Z', messageCount: 5, cwd: '/a' },
-        { source: 'claude', updatedAt: '2026-04-06T09:00:00.000Z', messageCount: 7, cwd: '/a' },
-        { source: 'codex', updatedAt: '2026-04-05T09:00:00.000Z', messageCount: 3, cwd: '/b' }
+        { source: 'codex', updatedAt: '2026-04-06T08:00:00.000Z', messageCount: 5, totalTokens: 120, contextWindow: 32000, cwd: '/a' },
+        { source: 'claude', updatedAt: '2026-04-06T09:00:00.000Z', messageCount: 7, totalTokens: 230, contextWindow: 64000, cwd: '/a' },
+        { source: 'codex', updatedAt: '2026-04-05T09:00:00.000Z', messageCount: 3, totalTokens: 90, contextWindow: 16000, cwd: '/b' }
     ], { range: '7d', now });
 
     assert.strictEqual(result.summary.totalSessions, 3);
     assert.strictEqual(result.summary.totalMessages, 15);
+    assert.strictEqual(result.summary.totalTokens, 440);
+    assert.strictEqual(result.summary.totalContextWindow, 112000);
     assert.strictEqual(result.summary.codexTotal, 2);
     assert.strictEqual(result.summary.claudeTotal, 1);
     assert.strictEqual(result.summary.avgMessagesPerSession, 5);
@@ -44,11 +46,13 @@ test('buildUsageChartGroups ignores invalid sessions and keeps empty buckets sta
     const result = buildUsageChartGroups([
         null,
         { source: 'other', updatedAt: '2026-04-06T08:00:00.000Z', messageCount: 9 },
-        { source: 'codex', updatedAt: 'bad-date', messageCount: 2 }
+        { source: 'codex', updatedAt: 'bad-date', messageCount: 2, totalTokens: 50, contextWindow: 1000 }
     ], { range: '7d', now });
 
     assert.strictEqual(result.summary.totalSessions, 0);
     assert.strictEqual(result.summary.totalMessages, 0);
+    assert.strictEqual(result.summary.totalTokens, 0);
+    assert.strictEqual(result.summary.totalContextWindow, 0);
     assert.strictEqual(result.buckets.length, 7);
     assert.ok(result.buckets.every((item) => item.totalSessions === 0));
     assert.ok(result.hourActivity.every((item) => item.count === 0));

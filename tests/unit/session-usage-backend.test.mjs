@@ -112,6 +112,8 @@ test('listSessionUsage uses lightweight session listing without exact hydration'
                 source: 'codex',
                 sessionId: 'sess-1',
                 messageCount: 12,
+                totalTokens: 345,
+                contextWindow: 128000,
                 __messageCountExact: false
             }
         ];
@@ -149,7 +151,9 @@ test('listSessionUsage uses lightweight session listing without exact hydration'
         {
             source: 'codex',
             sessionId: 'sess-1',
-            messageCount: 12
+            messageCount: 12,
+            totalTokens: 345,
+            contextWindow: 128000
         }
     ]);
 });
