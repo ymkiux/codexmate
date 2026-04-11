@@ -11182,18 +11182,27 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
             }
 
             const platform = process.platform;
-            let command;
-            if (platform === 'win32') {
-                command = `start \"\" \"${url}\"`;
-            } else if (platform === 'darwin') {
-                command = `open \"${url}\"`;
-            } else {
-                command = `xdg-open \"${url}\"`;
-            }
+            const commandSpec = platform === 'win32'
+                ? { command: 'cmd', args: ['/c', 'start', '', url] }
+                : (platform === 'darwin'
+                    ? { command: 'open', args: [url] }
+                    : { command: 'xdg-open', args: [url] });
 
-            exec(command, (error) => {
-                if (error) console.warn('无法自动打开浏览器，请手动访问:', url);
-            });
+            try {
+                const child = spawn(commandSpec.command, commandSpec.args, {
+                    stdio: 'ignore',
+                    detached: true,
+                    windowsHide: true
+                });
+                child.on('error', () => {
+                    console.warn('无法自动打开浏览器，请手动访问:', url);
+                });
+                if (typeof child.unref === 'function') {
+                    child.unref();
+                }
+            } catch (_) {
+                console.warn('无法自动打开浏览器，请手动访问:', url);
+            }
         };
         const scheduleProbe = (attempt) => {
             probeWebUiReadiness((ready) => {
