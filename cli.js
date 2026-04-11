@@ -4803,7 +4803,7 @@ function extractSessionDetailPreviewFromFileFast(filePath, source, messageLimit)
 async function extractSessionDetailPreviewFromFile(filePath, source, messageLimit, options = {}) {
     if (options && options.preview) {
         const fastPreview = extractSessionDetailPreviewFromFileFast(filePath, source, messageLimit);
-        if (fastPreview) {
+        if (fastPreview && (!fastPreview.clipped || fastPreview.messages.length > 0)) {
             return fastPreview;
         }
     }
