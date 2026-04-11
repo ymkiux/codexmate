@@ -801,6 +801,405 @@ test('createWebServer returns 500 when fallback bundled html generation throws',
     ]);
 });
 
+test('createWebServer waits for api readiness probe before auto-opening the browser', () => {
+    let listenCallback = null;
+    let probeRequest = null;
+    let probeEndHandler = null;
+    let probePayload = '';
+    const spawnCalls = [];
+    const createWebServer = instantiateFunction(createWebServerSource, 'createWebServer', {
+        http: {
+            createServer() {
+                return {
+                    listening: false,
+                    on() {},
+                    once() {},
+                    listen(_port, _host, callback) {
+                        this.listening = true;
+                        listenCallback = callback;
+                    },
+                    close(callback) {
+                        this.listening = false;
+                        if (typeof callback === 'function') {
+                            callback();
+                        }
+                    }
+                };
+            },
+            request(options, callback) {
+                probeRequest = { options, callback };
+                return {
+                    on() {},
+                    setTimeout() {},
+                    destroy() {},
+                    end(payload) {
+                        probePayload = payload;
+                    }
+                };
+            }
+        },
+        path,
+        __dirname: '/repo',
+        readBundledWebUiHtml() {
+            return '<!doctype html>';
+        },
+        PUBLIC_WEB_UI_DYNAMIC_ASSETS: new Map(),
+        PUBLIC_WEB_UI_STATIC_ASSETS: new Set(),
+        isPathInside() {
+            return true;
+        },
+        fs: {
+            existsSync() {
+                return false;
+            },
+            statSync() {
+                return {
+                    isFile() {
+                        return false;
+                    }
+                };
+            },
+            createReadStream() {
+                throw new Error('unexpected static asset read');
+            }
+        },
+        formatHostForUrl(value) {
+            return value;
+        },
+        DEFAULT_WEB_OPEN_HOST: '127.0.0.1',
+        isAnyAddressHost() {
+            return false;
+        },
+        process: { env: {}, platform: 'win32' },
+        spawn(command, args, options) {
+            spawnCalls.push({ command, args, options, unrefCalled: false });
+            return {
+                on() {},
+                unref() {
+                    spawnCalls[spawnCalls.length - 1].unrefCalled = true;
+                }
+            };
+        },
+        console: {
+            log() {},
+            warn() {},
+            error() {}
+        },
+        setTimeout() {
+            throw new Error('unexpected retry');
+        },
+        Buffer
+    });
+
+    createWebServer({
+        htmlPath: '/repo/web-ui/index.html',
+        assetsDir: '/repo/res',
+        webDir: '/repo/web-ui',
+        host: '127.0.0.1',
+        port: 3737,
+        openBrowser: true
+    });
+
+    listenCallback();
+    assert.deepStrictEqual(spawnCalls, []);
+    assert.ok(probeRequest, 'should probe the local api before auto-open');
+    assert.strictEqual(probeRequest.options.hostname, '127.0.0.1');
+    assert.strictEqual(probeRequest.options.port, 3737);
+    assert.strictEqual(probeRequest.options.path, '/api');
+    assert.strictEqual(probeRequest.options.method, 'POST');
+    assert.deepStrictEqual(JSON.parse(probePayload), { action: 'health-check', params: {} });
+
+    probeRequest.callback({
+        statusCode: 200,
+        resume() {},
+        on(event, handler) {
+            if (event === 'end') {
+                probeEndHandler = handler;
+            }
+        }
+    });
+    assert.deepStrictEqual(spawnCalls, []);
+
+    probeEndHandler();
+    assert.deepStrictEqual(spawnCalls, [{
+        command: 'cmd',
+        args: ['/c', 'start', '', 'http://127.0.0.1:3737'],
+        options: {
+            stdio: 'ignore',
+            detached: true,
+            windowsHide: true
+        },
+        unrefCalled: true
+    }]);
+});
+
+test('createWebServer health-check does not consume init notice before the first status poll', async () => {
+    let requestHandler = null;
+    let consumed = 0;
+    const createWebServer = instantiateFunction(createWebServerSource, 'createWebServer', {
+        http: {
+            createServer(handler) {
+                requestHandler = handler;
+                return {
+                    listening: false,
+                    on() {},
+                    once() {},
+                    listen() {},
+                    close(callback) {
+                        if (typeof callback === 'function') {
+                            callback();
+                        }
+                    }
+                };
+            }
+        },
+        path,
+        __dirname: '/repo',
+        readBundledWebUiHtml() {
+            return '<!doctype html>';
+        },
+        PUBLIC_WEB_UI_DYNAMIC_ASSETS: new Map(),
+        PUBLIC_WEB_UI_STATIC_ASSETS: new Set(),
+        isPathInside() {
+            return true;
+        },
+        fs: {
+            existsSync() {
+                return false;
+            },
+            statSync() {
+                return {
+                    isFile() {
+                        return false;
+                    }
+                };
+            },
+            createReadStream() {
+                throw new Error('unexpected static asset read');
+            }
+        },
+        formatHostForUrl(value) {
+            return value;
+        },
+        DEFAULT_WEB_OPEN_HOST: '127.0.0.1',
+        isAnyAddressHost() {
+            return false;
+        },
+        process: { env: {}, platform: 'linux' },
+        exec() {},
+        console: {
+            log() {},
+            warn() {},
+            error() {}
+        },
+        setTimeout,
+        Buffer,
+        MAX_API_BODY_SIZE: 1024 * 1024,
+        handleImportSkillsZipUpload() {
+            throw new Error('unexpected import route');
+        },
+        readConfigOrVirtualDefault() {
+            return {
+                config: {},
+                isVirtual: false,
+                errorType: '',
+                reason: ''
+            };
+        },
+        hasConfigLoadError() {
+            return false;
+        },
+        readPositiveIntegerConfigValue() {
+            return 0;
+        },
+        consumeInitNotice() {
+            consumed += 1;
+            return 'startup notice';
+        }
+    });
+
+    createWebServer({
+        htmlPath: '/repo/web-ui/index.html',
+        assetsDir: '/repo/res',
+        webDir: '/repo/web-ui',
+        host: '127.0.0.1',
+        port: 3737,
+        openBrowser: false
+    });
+
+    async function postApi(body) {
+        const listeners = {};
+        const req = {
+            url: '/api',
+            on(event, handler) {
+                listeners[event] = handler;
+            }
+        };
+        const res = {
+            statusCode: null,
+            headers: null,
+            body: '',
+            writeHead(statusCode, headers) {
+                this.statusCode = statusCode;
+                this.headers = headers;
+            },
+            end(bodyText = '') {
+                this.body = bodyText;
+            }
+        };
+        requestHandler(req, res);
+        listeners.data(Buffer.from(JSON.stringify(body), 'utf-8'));
+        await listeners.end();
+        res.payload = JSON.parse(res.body || '{}');
+        return res;
+    }
+
+    const probeResponse = await postApi({ action: 'health-check', params: {} });
+    assert.strictEqual(probeResponse.statusCode, 200);
+    assert.deepStrictEqual(probeResponse.payload, { ok: true });
+    assert.strictEqual(consumed, 0);
+
+    const statusResponse = await postApi({ action: 'status', params: {} });
+    assert.strictEqual(statusResponse.statusCode, 200);
+    assert.strictEqual(statusResponse.payload.initNotice, 'startup notice');
+    assert.strictEqual(consumed, 1);
+});
+
+test('createWebServer retries readiness probe failures before auto-opening the browser', () => {
+    let listenCallback = null;
+    const requestOutcomes = [];
+    const timers = [];
+    const spawnCalls = [];
+    const createWebServer = instantiateFunction(createWebServerSource, 'createWebServer', {
+        http: {
+            createServer() {
+                return {
+                    listening: false,
+                    on() {},
+                    once() {},
+                    listen(_port, _host, callback) {
+                        this.listening = true;
+                        listenCallback = callback;
+                    },
+                    close(callback) {
+                        this.listening = false;
+                        if (typeof callback === 'function') {
+                            callback();
+                        }
+                    }
+                };
+            },
+            request(_options, callback) {
+                const outcome = requestOutcomes.shift();
+                const handlers = {};
+                return {
+                    on(event, handler) {
+                        handlers[event] = handler;
+                    },
+                    setTimeout() {},
+                    destroy() {},
+                    end() {
+                        if (outcome === 'error') {
+                            handlers.error(new Error('connection refused'));
+                            return;
+                        }
+                        let endHandler = null;
+                        callback({
+                            statusCode: outcome,
+                            resume() {},
+                            on(event, handler) {
+                                if (event === 'end') {
+                                    endHandler = handler;
+                                }
+                            }
+                        });
+                        endHandler();
+                    }
+                };
+            }
+        },
+        path,
+        __dirname: '/repo',
+        readBundledWebUiHtml() {
+            return '<!doctype html>';
+        },
+        PUBLIC_WEB_UI_DYNAMIC_ASSETS: new Map(),
+        PUBLIC_WEB_UI_STATIC_ASSETS: new Set(),
+        isPathInside() {
+            return true;
+        },
+        fs: {
+            existsSync() {
+                return false;
+            },
+            statSync() {
+                return {
+                    isFile() {
+                        return false;
+                    }
+                };
+            },
+            createReadStream() {
+                throw new Error('unexpected static asset read');
+            }
+        },
+        formatHostForUrl(value) {
+            return value;
+        },
+        DEFAULT_WEB_OPEN_HOST: '127.0.0.1',
+        isAnyAddressHost() {
+            return false;
+        },
+        process: { env: {}, platform: 'linux' },
+        spawn(command, args, options) {
+            spawnCalls.push({ command, args, options, unrefCalled: false });
+            return {
+                on() {},
+                unref() {
+                    spawnCalls[spawnCalls.length - 1].unrefCalled = true;
+                }
+            };
+        },
+        console: {
+            log() {},
+            warn() {},
+            error() {}
+        },
+        setTimeout(callback, ms) {
+            timers.push({ callback, ms });
+            return timers.length;
+        },
+        Buffer
+    });
+
+    requestOutcomes.push('error', 200);
+    createWebServer({
+        htmlPath: '/repo/web-ui/index.html',
+        assetsDir: '/repo/res',
+        webDir: '/repo/web-ui',
+        host: '127.0.0.1',
+        port: 3737,
+        openBrowser: true
+    });
+
+    listenCallback();
+    assert.deepStrictEqual(spawnCalls, []);
+    assert.strictEqual(timers.length, 1);
+    assert.strictEqual(timers[0].ms, 150);
+
+    timers[0].callback();
+    assert.deepStrictEqual(spawnCalls, [{
+        command: 'xdg-open',
+        args: ['http://127.0.0.1:3737'],
+        options: {
+            stdio: 'ignore',
+            detached: true,
+            windowsHide: true
+        },
+        unrefCalled: true
+    }]);
+});
+
 test('resolveSkillTarget rejects explicit unsupported targets instead of falling back', () => {
     assert.strictEqual(resolveSkillTarget({ targetApp: 'claud' }), null);
     assert.strictEqual(resolveSkillTarget({ targetApp: 'claud', target: 'claude' }), null);

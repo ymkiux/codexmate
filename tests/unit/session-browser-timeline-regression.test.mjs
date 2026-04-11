@@ -71,6 +71,39 @@ test('selectSession defers detail loading until the next frame when a scheduler 
     assert.strictEqual(detailLoads, 1);
 });
 
+test('selectSession reloads the active session when the preview is still empty', async () => {
+    const methods = createSessionBrowserMethods({
+        api: async () => ({})
+    });
+    const scheduled = [];
+    let detailLoads = 0;
+    const selected = { source: 'codex', sessionId: 's1', filePath: '/tmp/s1.jsonl' };
+    const context = {
+        activeSession: selected,
+        activeSessionMessages: [],
+        activeSessionDetailError: '',
+        activeSessionDetailClipped: false,
+        sessionDetailLoading: false,
+        getSessionExportKey(session) {
+            return `${session.source}:${session.sessionId}:${session.filePath}`;
+        },
+        scheduleAfterFrame(task) {
+            scheduled.push(task);
+        },
+        async loadActiveSessionDetail() {
+            detailLoads += 1;
+        }
+    };
+
+    await methods.selectSession.call(context, selected);
+
+    assert.strictEqual(detailLoads, 0);
+    assert.strictEqual(scheduled.length, 1);
+
+    await scheduled[0]();
+    assert.strictEqual(detailLoads, 1);
+});
+
 test('syncSessionTimelineActiveFromScroll reuses container header offset when scroll container has no header', () => {
     const methods = createSessionTimelineMethods();
     const headerEl = {
@@ -231,4 +264,78 @@ test('timeline header offset uses sessionPreviewHeaderEl when container header i
 
     methods.jumpToSessionTimelineNode.call(context, 'm1');
     assert.strictEqual(lastScrollTo, 248);
+});
+
+test('updateSessionTimelineOffset skips container writes until the timeline is actually renderable', () => {
+    const methods = createSessionTimelineMethods();
+    const writes = [];
+    const removals = [];
+    const context = {
+        sessionTimelineEnabled: true,
+        mainTab: 'sessions',
+        sessionPreviewRenderEnabled: true,
+        sessionTimelineNodes: [],
+        sessionPreviewContainerEl: {
+            style: {
+                setProperty(name, value) {
+                    writes.push({ name, value });
+                },
+                removeProperty(name) {
+                    removals.push(name);
+                }
+            },
+            querySelector() {
+                return null;
+            }
+        },
+        $refs: {},
+        getMainTabForNav() {
+            return 'sessions';
+        },
+        hasRenderableSessionTimeline: methods.hasRenderableSessionTimeline
+    };
+
+    methods.updateSessionTimelineOffset.call(context);
+
+    assert.deepStrictEqual(writes, []);
+    assert.deepStrictEqual(removals, []);
+});
+
+test('updateSessionTimelineOffset writes once when timeline nodes are present and skips duplicate offsets', () => {
+    const methods = createSessionTimelineMethods();
+    const writes = [];
+    const context = {
+        sessionTimelineEnabled: true,
+        mainTab: 'sessions',
+        sessionPreviewRenderEnabled: true,
+        sessionTimelineNodes: [{ key: 'm1' }],
+        sessionPreviewHeaderEl: {
+            getBoundingClientRect() {
+                return { height: 40 };
+            }
+        },
+        sessionPreviewContainerEl: {
+            style: {
+                setProperty(name, value) {
+                    writes.push({ name, value });
+                },
+                removeProperty() {}
+            },
+            querySelector() {
+                return null;
+            }
+        },
+        $refs: {},
+        getMainTabForNav() {
+            return 'sessions';
+        },
+        hasRenderableSessionTimeline: methods.hasRenderableSessionTimeline
+    };
+
+    methods.updateSessionTimelineOffset.call(context);
+    methods.updateSessionTimelineOffset.call(context);
+
+    assert.deepStrictEqual(writes, [
+        { name: '--session-preview-header-offset', value: '52px' }
+    ]);
 });

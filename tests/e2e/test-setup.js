@@ -87,6 +87,21 @@ module.exports = async function testSetup(ctx) {
             type: 'response_item',
             payload: { type: 'message', role: 'assistant', content: 'world' },
             timestamp: '2025-01-01T00:00:02.000Z'
+        },
+        {
+            type: 'event_msg',
+            payload: {
+                type: 'token_usage',
+                info: {
+                    total_token_usage: {
+                        input_tokens: 80,
+                        output_tokens: 40,
+                        total_tokens: 120
+                    },
+                    model_context_window: 128000
+                }
+            },
+            timestamp: '2025-01-01T00:00:03.000Z'
         }
     ];
     fs.writeFileSync(sessionPath, sessionRecords.map(record => JSON.stringify(record)).join('\n') + '\n', 'utf-8');

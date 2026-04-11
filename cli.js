@@ -122,11 +122,19 @@ const CODEXMATE_MANAGED_MARKER = '# codexmate-managed: true';
 const SESSION_LIST_CACHE_TTL_MS = 4000;
 const SESSION_SUMMARY_READ_BYTES = 256 * 1024;
 const SESSION_CONTENT_READ_BYTES = SESSION_SUMMARY_READ_BYTES;
+const SESSION_PREVIEW_MESSAGE_TEXT_MAX_LENGTH = 4000;
 const EXACT_MESSAGE_COUNT_CACHE_MAX_ENTRIES = 800;
 const DEFAULT_CONTENT_SCAN_LIMIT = 50;
 const SESSION_SCAN_FACTOR = 4;
 const SESSION_SCAN_MIN_FILES = 800;
+const SESSION_BROWSE_SCAN_FACTOR = 2;
+const SESSION_BROWSE_MIN_FILES = 120;
+const SESSION_BROWSE_SUMMARY_READ_BYTES = 64 * 1024;
+const SESSION_INVENTORY_CACHE_MAX_ENTRIES = 12;
 const MAX_SESSION_PATH_LIST_SIZE = 2000;
+const FAST_SESSION_DETAIL_PREVIEW_FILE_BYTES = 256 * 1024;
+const FAST_SESSION_DETAIL_PREVIEW_CHUNK_BYTES = 64 * 1024;
+const FAST_SESSION_DETAIL_PREVIEW_MAX_BYTES = 1024 * 1024;
 const AGENTS_FILE_NAME = 'AGENTS.md';
 const CODEX_SKILLS_DIR = path.join(CONFIG_DIR, 'skills');
 const CLAUDE_SKILLS_DIR = path.join(CLAUDE_DIR, 'skills');
@@ -504,6 +512,11 @@ stream_idle_timeout_ms = 300000
 
 let g_initNotice = '';
 let g_sessionListCache = new Map();
+let g_sessionInventoryCache = new Map();
+let g_sessionFileLookupCache = {
+    codex: new Map(),
+    claude: new Map()
+};
 let g_exactMessageCountCache = new Map();
 let g_modelsCache = new Map();
 let g_modelsInFlight = new Map();
@@ -4664,7 +4677,145 @@ function extractSessionDetailPreviewFromRecords(records, source, messageLimit) {
     return state;
 }
 
-async function extractSessionDetailPreviewFromFile(filePath, source, messageLimit) {
+function extractSessionDetailPreviewFromTailText(text, source, messageLimit) {
+    const safeMessageLimit = Number.isFinite(Number(messageLimit))
+        ? Math.max(1, Math.floor(Number(messageLimit)))
+        : DEFAULT_SESSION_DETAIL_MESSAGES;
+    const state = {
+        sessionId: '',
+        cwd: '',
+        updatedAt: '',
+        messages: [],
+        tailLimit: safeMessageLimit,
+        totalMessages: null,
+        clipped: false
+    };
+    const lines = typeof text === 'string' && text
+        ? text.split(/\r?\n/)
+        : [];
+
+    for (let lineIndex = lines.length - 1; lineIndex >= 0; lineIndex -= 1) {
+        const trimmed = lines[lineIndex].trim();
+        if (!trimmed) {
+            continue;
+        }
+
+        let record;
+        try {
+            record = JSON.parse(trimmed);
+        } catch (_) {
+            continue;
+        }
+
+        if (record && record.timestamp && !state.updatedAt) {
+            state.updatedAt = toIsoTime(record.timestamp, '');
+        }
+        if ((!state.sessionId || !state.cwd) && record) {
+            applySessionDetailRecordMetadata(record, source, state);
+        }
+
+        const message = extractMessageFromRecord(record, source);
+        if (!message) {
+            continue;
+        }
+
+        const role = normalizeRole(message.role);
+        const textValue = typeof message.text === 'string' ? message.text : '';
+        if (!role || !textValue) {
+            continue;
+        }
+
+        if (state.messages.length >= safeMessageLimit) {
+            state.clipped = true;
+            break;
+        }
+
+        state.messages.unshift({
+            role,
+            text: textValue,
+            timestamp: toIsoTime(record && record.timestamp, ''),
+            recordLineIndex: -1
+        });
+    }
+
+    return state;
+}
+
+function extractSessionDetailPreviewFromFileFast(filePath, source, messageLimit) {
+    const fileStat = getFileStatSafe(filePath);
+    if (!fileStat || !Number.isFinite(fileStat.size) || fileStat.size <= FAST_SESSION_DETAIL_PREVIEW_FILE_BYTES) {
+        return null;
+    }
+    const safeMessageLimit = Number.isFinite(Number(messageLimit))
+        ? Math.max(1, Math.floor(Number(messageLimit)))
+        : DEFAULT_SESSION_DETAIL_MESSAGES;
+
+    let fd = null;
+    let position = fileStat.size;
+    let totalBytesRead = 0;
+    let combined = Buffer.alloc(0);
+    let latest = {
+        sessionId: '',
+        cwd: '',
+        updatedAt: '',
+        messages: [],
+        totalMessages: null,
+        clipped: false
+    };
+
+    try {
+        fd = fs.openSync(filePath, 'r');
+        while (position > 0 && totalBytesRead < FAST_SESSION_DETAIL_PREVIEW_MAX_BYTES) {
+            const remainingBudget = FAST_SESSION_DETAIL_PREVIEW_MAX_BYTES - totalBytesRead;
+            const chunkSize = Math.min(FAST_SESSION_DETAIL_PREVIEW_CHUNK_BYTES, position, remainingBudget);
+            if (chunkSize <= 0) {
+                break;
+            }
+
+            position -= chunkSize;
+            const chunk = Buffer.allocUnsafe(chunkSize);
+            const bytesRead = fs.readSync(fd, chunk, 0, chunkSize, position);
+            if (bytesRead <= 0) {
+                break;
+            }
+
+            totalBytesRead += bytesRead;
+            combined = Buffer.concat([chunk.subarray(0, bytesRead), combined]);
+            latest = extractSessionDetailPreviewFromTailText(combined.toString('utf-8'), source, safeMessageLimit);
+            if (latest.messages.length >= safeMessageLimit) {
+                latest.clipped = latest.clipped || position > 0;
+                return latest;
+            }
+        }
+
+        if (position > 0) {
+            latest.clipped = latest.clipped || position > 0;
+            return latest;
+        }
+        const normalizedMessages = removeLeadingSystemMessage(latest.messages);
+        latest.messages = normalizedMessages.length > safeMessageLimit
+            ? normalizedMessages.slice(-safeMessageLimit)
+            : normalizedMessages;
+        latest.totalMessages = normalizedMessages.length;
+        latest.clipped = latest.totalMessages > latest.messages.length;
+        return latest;
+    } catch (_) {
+        return null;
+    } finally {
+        if (fd !== null) {
+            try { fs.closeSync(fd); } catch (e) {}
+        }
+    }
+}
+
+async function extractSessionDetailPreviewFromFile(filePath, source, messageLimit, options = {}) {
+    if (options && options.preview) {
+        const fastPreview = extractSessionDetailPreviewFromFileFast(filePath, source, messageLimit);
+        if (fastPreview && (!fastPreview.clipped || fastPreview.messages.length > 0)) {
+            return fastPreview;
+        }
+    }
+
     const safeMessageLimit = Number.isFinite(Number(messageLimit))
         ? Math.max(1, Math.floor(Number(messageLimit)))
         : DEFAULT_SESSION_DETAIL_MESSAGES;
@@ -5314,12 +5465,260 @@ function setSessionListCache(cacheKey, value) {
     }
 }
 
-function invalidateSessionListCache() {
-    g_sessionListCache.clear();
+function buildSessionInventoryCacheKey(source, limit, options = {}) {
+    const normalizedSource = source === 'claude' ? 'claude' : 'codex';
+    const normalizedLimit = Number.isFinite(Number(limit))
+        ? Math.max(1, Math.floor(Number(limit)))
+        : 1;
+    const scanFactor = Number.isFinite(Number(options.scanFactor))
+        ? Math.max(1, Number(options.scanFactor))
+        : '';
+    const minFiles = Number.isFinite(Number(options.minFiles))
+        ? Math.max(1, Math.floor(Number(options.minFiles)))
+        : '';
+    const targetCount = Number.isFinite(Number(options.targetCount))
+        ? Math.max(1, Math.floor(Number(options.targetCount)))
+        : '';
+    const scanCount = Number.isFinite(Number(options.scanCount))
+        ? Math.max(1, Math.floor(Number(options.scanCount)))
+        : '';
+    const maxFilesScanned = Number.isFinite(Number(options.maxFilesScanned))
+        ? Math.max(1, Math.floor(Number(options.maxFilesScanned)))
+        : '';
+    const summaryReadBytes = Number.isFinite(Number(options.summaryReadBytes))
+        ? Math.max(1024, Math.floor(Number(options.summaryReadBytes)))
+        : '';
+    const titleReadBytes = Number.isFinite(Number(options.titleReadBytes))
+        ? Math.max(1024, Math.floor(Number(options.titleReadBytes)))
+        : '';
+    return [
+        'inventory',
+        normalizedSource,
+        normalizedLimit,
+        scanFactor,
+        minFiles,
+        targetCount,
+        scanCount,
+        maxFilesScanned,
+        summaryReadBytes,
+        titleReadBytes
+    ].join(':');
 }
 
-function parseCodexSessionSummary(filePath) {
-    const records = parseJsonlHeadRecords(filePath);
+function cloneSessionInventoryCacheValue(value) {
+    if (!Array.isArray(value)) {
+        return null;
+    }
+    return value.map((item) => {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) {
+            return item;
+        }
+        const cloned = { ...item };
+        if (item.match && typeof item.match === 'object' && !Array.isArray(item.match)) {
+            cloned.match = {
+                ...item.match,
+                snippets: Array.isArray(item.match.snippets)
+                    ? [...item.match.snippets]
+                    : []
+            };
+        }
+        return cloned;
+    });
+}
+
+function getSessionInventoryCache(cacheKey, forceRefresh = false) {
+    if (forceRefresh) {
+        g_sessionInventoryCache.delete(cacheKey);
+        return null;
+    }
+
+    const cached = g_sessionInventoryCache.get(cacheKey);
+    if (!cached) {
+        return null;
+    }
+
+    if ((Date.now() - cached.timestamp) > SESSION_LIST_CACHE_TTL_MS) {
+        g_sessionInventoryCache.delete(cacheKey);
+        return null;
+    }
+
+    const clonedValue = cloneSessionInventoryCacheValue(cached.value);
+    if (!Array.isArray(clonedValue)) {
+        g_sessionInventoryCache.delete(cacheKey);
+        return null;
+    }
+
+    return clonedValue;
+}
+
+function registerSessionFileLookupEntries(source, sessions = []) {
+    const normalizedSource = source === 'claude' ? 'claude' : 'codex';
+    const store = g_sessionFileLookupCache[normalizedSource];
+    if (!(store instanceof Map) || !Array.isArray(sessions)) {
+        return;
+    }
+    for (const session of sessions) {
+        if (!session || typeof session !== 'object' || Array.isArray(session)) {
+            continue;
+        }
+        const sessionId = typeof session.sessionId === 'string' ? session.sessionId.trim().toLowerCase() : '';
+        const filePath = typeof session.filePath === 'string' ? session.filePath.trim() : '';
+        if (!sessionId || !filePath) {
+            continue;
+        }
+        store.set(sessionId, filePath);
+    }
+}
+
+function setSessionInventoryCache(cacheKey, source, value) {
+    const storedValue = cloneSessionInventoryCacheValue(value);
+    if (!Array.isArray(storedValue)) {
+        return;
+    }
+    g_sessionInventoryCache.set(cacheKey, {
+        timestamp: Date.now(),
+        source,
+        value: storedValue
+    });
+    registerSessionFileLookupEntries(source, storedValue);
+
+    if (g_sessionInventoryCache.size > SESSION_INVENTORY_CACHE_MAX_ENTRIES) {
+        const firstKey = g_sessionInventoryCache.keys().next().value;
+        if (firstKey) {
+            g_sessionInventoryCache.delete(firstKey);
+        }
+    }
+}
+
+function listSessionInventoryBySource(source, limit, scanOptions = {}, options = {}) {
+    const normalizedSource = source === 'claude' ? 'claude' : 'codex';
+    const forceRefresh = !!options.forceRefresh;
+    const cacheKey = buildSessionInventoryCacheKey(normalizedSource, limit, scanOptions);
+    const cached = getSessionInventoryCache(cacheKey, forceRefresh);
+    if (cached) {
+        return cached;
+    }
+
+    const sessions = normalizedSource === 'claude'
+        ? listClaudeSessions(limit, scanOptions)
+        : listCodexSessions(limit, scanOptions);
+    setSessionInventoryCache(cacheKey, normalizedSource, sessions);
+    return sessions;
+}
+
+function invalidateSessionListCache() {
+    g_sessionListCache.clear();
+    g_sessionInventoryCache.clear();
+    g_sessionFileLookupCache = {
+        codex: new Map(),
+        claude: new Map()
+    };
+}
+
+function readNonNegativeInteger(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric < 0) {
+        return null;
+    }
+    return Math.floor(numeric);
+}
+
+function readTotalTokensFromUsage(usage) {
+    if (!usage || typeof usage !== 'object' || Array.isArray(usage)) {
+        return null;
+    }
+    const explicitTotal = readNonNegativeInteger(usage.total_tokens ?? usage.totalTokens);
+    if (explicitTotal !== null) {
+        return explicitTotal;
+    }
+    const inputTokens = readNonNegativeInteger(usage.input_tokens ?? usage.inputTokens);
+    const outputTokens = readNonNegativeInteger(usage.output_tokens ?? usage.outputTokens);
+    const reasoningOutputTokens = readNonNegativeInteger(usage.reasoning_output_tokens ?? usage.reasoningOutputTokens);
+    if (inputTokens === null && outputTokens === null && reasoningOutputTokens === null) {
+        return null;
+    }
+    return (inputTokens || 0) + (outputTokens || 0) + (reasoningOutputTokens || 0);
+}
+
+function readContextWindowValue(target) {
+    if (!target || typeof target !== 'object' || Array.isArray(target)) {
+        return null;
+    }
+    return readNonNegativeInteger(
+        target.model_context_window
+        ?? target.modelContextWindow
+        ?? target.context_window
+        ?? target.contextWindow
+    );
+}
+
+function applySessionUsageSummaryFromRecord(state, record, source) {
+    if (!state || typeof state !== 'object' || !record || typeof record !== 'object' || Array.isArray(record)) {
+        return;
+    }
+
+    let totalTokens = null;
+    let contextWindow = null;
+
+    if (source === 'codex') {
+        const payload = record.payload && typeof record.payload === 'object' && !Array.isArray(record.payload)
+            ? record.payload
+            : null;
+        const info = payload && payload.info && typeof payload.info === 'object' && !Array.isArray(payload.info)
+            ? payload.info
+            : null;
+        totalTokens = readTotalTokensFromUsage(info && info.total_token_usage)
+            ?? readTotalTokensFromUsage(payload && payload.total_token_usage)
+            ?? readTotalTokensFromUsage(payload && payload.usage);
+        contextWindow = readContextWindowValue(info)
+            ?? readContextWindowValue(payload);
+    } else {
+        const message = record.message && typeof record.message === 'object' && !Array.isArray(record.message)
+            ? record.message
+            : null;
+        const payload = record.payload && typeof record.payload === 'object' && !Array.isArray(record.payload)
+            ? record.payload
+            : null;
+        totalTokens = readTotalTokensFromUsage(record.usage)
+            ?? readTotalTokensFromUsage(message && message.usage)
+            ?? readTotalTokensFromUsage(payload && payload.usage);
+        contextWindow = readContextWindowValue(record)
+            ?? readContextWindowValue(message)
+            ?? readContextWindowValue(payload);
+    }
+
+    if (totalTokens !== null) {
+        state.totalTokens = Math.max(readNonNegativeInteger(state.totalTokens) || 0, totalTokens);
+    }
+    if (contextWindow !== null) {
+        state.contextWindow = Math.max(readNonNegativeInteger(state.contextWindow) || 0, contextWindow);
+    }
+}
+
+function applySessionUsageSummaryFromIndexEntry(state, entry) {
+    if (!state || typeof state !== 'object' || !entry || typeof entry !== 'object' || Array.isArray(entry)) {
+        return;
+    }
+    const totalTokens = readNonNegativeInteger(entry.totalTokens)
+        ?? readTotalTokensFromUsage(entry.totalTokenUsage)
+        ?? readTotalTokensFromUsage(entry.usage);
+    const contextWindow = readContextWindowValue(entry);
+    if (totalTokens !== null) {
+        state.totalTokens = Math.max(readNonNegativeInteger(state.totalTokens) || 0, totalTokens);
+    }
+    if (contextWindow !== null) {
+        state.contextWindow = Math.max(readNonNegativeInteger(state.contextWindow) || 0, contextWindow);
+    }
+}
+
+function parseCodexSessionSummary(filePath, options = {}) {
+    const summaryReadBytes = Number.isFinite(Number(options.summaryReadBytes))
+        ? Math.max(1024, Math.floor(Number(options.summaryReadBytes)))
+        : SESSION_SUMMARY_READ_BYTES;
+    const titleReadBytes = Number.isFinite(Number(options.titleReadBytes))
+        ? Math.max(1024, Math.floor(Number(options.titleReadBytes)))
+        : SESSION_TITLE_READ_BYTES;
+    const records = parseJsonlHeadRecords(filePath, summaryReadBytes);
     if (records.length === 0) {
         return null;
     }
@@ -5337,12 +5736,19 @@ function parseCodexSessionSummary(filePath) {
     let updatedAt = stat.mtime.toISOString();
     let firstPrompt = '';
     let messageCount = 0;
+    let totalTokens = 0;
+    let contextWindow = 0;
+    const usageState = { totalTokens, contextWindow };
     const previewMessages = [];
 
     for (const record of records) {
         if (record.timestamp) {
             updatedAt = updateLatestIso(updatedAt, record.timestamp);
         }
+
+        applySessionUsageSummaryFromRecord(usageState, record, 'codex');
+        totalTokens = usageState.totalTokens || 0;
+        contextWindow = usageState.contextWindow || 0;
 
         if (record.type === 'session_meta' && record.payload) {
             sessionId = record.payload.id || sessionId;
@@ -5368,7 +5774,7 @@ function parseCodexSessionSummary(filePath) {
     }
 
     if (!firstPrompt) {
-        const titleRecords = parseJsonlHeadRecords(filePath, SESSION_TITLE_READ_BYTES);
+        const titleRecords = parseJsonlHeadRecords(filePath, titleReadBytes);
         const titleMessages = [];
         for (const record of titleRecords) {
             if (record.type === 'response_item' && record.payload && record.payload.type === 'message') {
@@ -5401,15 +5807,23 @@ function parseCodexSessionSummary(filePath) {
         createdAt,
         updatedAt,
         messageCount,
-        __messageCountExact: isSessionSummaryMessageCountExact(stat),
+        totalTokens,
+        contextWindow,
+        __messageCountExact: isSessionSummaryMessageCountExact(stat, summaryReadBytes),
         filePath,
         keywords: [],
         capabilities: {}
     };
 }
 
-function parseClaudeSessionSummary(filePath) {
-    const records = parseJsonlHeadRecords(filePath);
+function parseClaudeSessionSummary(filePath, options = {}) {
+    const summaryReadBytes = Number.isFinite(Number(options.summaryReadBytes))
+        ? Math.max(1024, Math.floor(Number(options.summaryReadBytes)))
+        : SESSION_SUMMARY_READ_BYTES;
+    const titleReadBytes = Number.isFinite(Number(options.titleReadBytes))
+        ? Math.max(1024, Math.floor(Number(options.titleReadBytes)))
+        : SESSION_TITLE_READ_BYTES;
+    const records = parseJsonlHeadRecords(filePath, summaryReadBytes);
     if (records.length === 0) {
         return null;
     }
@@ -5425,6 +5839,9 @@ function parseClaudeSessionSummary(filePath) {
     let cwd = '';
     let firstPrompt = '';
     let messageCount = 0;
+    let totalTokens = 0;
+    let contextWindow = 0;
+    const usageState = { totalTokens, contextWindow };
     const previewMessages = [];
     let createdAt = '';
     let updatedAt = stat.mtime.toISOString();
@@ -5436,6 +5853,10 @@ function parseClaudeSessionSummary(filePath) {
         if (record.timestamp) {
             updatedAt = updateLatestIso(updatedAt, record.timestamp);
         }
+
+        applySessionUsageSummaryFromRecord(usageState, record, 'claude');
+        totalTokens = usageState.totalTokens || 0;
+        contextWindow = usageState.contextWindow || 0;
 
         if (!cwd && record.cwd) {
             cwd = record.cwd;
@@ -5459,7 +5880,7 @@ function parseClaudeSessionSummary(filePath) {
     }
 
     if (!firstPrompt) {
-        const titleRecords = parseJsonlHeadRecords(filePath, SESSION_TITLE_READ_BYTES);
+        const titleRecords = parseJsonlHeadRecords(filePath, titleReadBytes);
         const titleMessages = [];
         for (const record of titleRecords) {
             const role = normalizeRole(record.type);
@@ -5491,7 +5912,9 @@ function parseClaudeSessionSummary(filePath) {
         createdAt,
         updatedAt,
         messageCount,
-        __messageCountExact: isSessionSummaryMessageCountExact(stat),
+        totalTokens,
+        contextWindow,
+        __messageCountExact: isSessionSummaryMessageCountExact(stat, summaryReadBytes),
         filePath,
         keywords: [],
         capabilities: { code: true }
@@ -5515,6 +5938,12 @@ function listCodexSessions(limit, options = {}) {
     const maxFilesScanned = Number.isFinite(Number(options.maxFilesScanned))
         ? Math.max(scanCount, Math.floor(Number(options.maxFilesScanned)))
         : Math.max(scanCount * 2, minFiles);
+    const summaryReadBytes = Number.isFinite(Number(options.summaryReadBytes))
+        ? Math.max(1024, Math.floor(Number(options.summaryReadBytes)))
+        : SESSION_SUMMARY_READ_BYTES;
+    const titleReadBytes = Number.isFinite(Number(options.titleReadBytes))
+        ? Math.max(1024, Math.floor(Number(options.titleReadBytes)))
+        : SESSION_TITLE_READ_BYTES;
     const files = collectRecentJsonlFiles(codexSessionsDir, {
         returnCount: scanCount,
         maxFilesScanned
@@ -5522,7 +5951,10 @@ function listCodexSessions(limit, options = {}) {
     const sessions = [];
 
     for (const filePath of files) {
-        const summary = parseCodexSessionSummary(filePath);
+        const summary = parseCodexSessionSummary(filePath, {
+            summaryReadBytes,
+            titleReadBytes
+        });
         if (summary) {
             sessions.push(summary);
         }
@@ -5556,6 +5988,12 @@ function listClaudeSessions(limit, options = {}) {
     const maxFilesScanned = Number.isFinite(Number(options.maxFilesScanned))
         ? Math.max(scanCount, Math.floor(Number(options.maxFilesScanned)))
         : Math.max(scanCount * 2, minFiles);
+    const summaryReadBytes = Number.isFinite(Number(options.summaryReadBytes))
+        ? Math.max(1024, Math.floor(Number(options.summaryReadBytes)))
+        : SESSION_SUMMARY_READ_BYTES;
+    const titleReadBytes = Number.isFinite(Number(options.titleReadBytes))
+        ? Math.max(1024, Math.floor(Number(options.titleReadBytes)))
+        : SESSION_TITLE_READ_BYTES;
 
     const sessions = [];
     let projectDirs = [];
@@ -5597,8 +6035,15 @@ function listClaudeSessions(limit, options = {}) {
             const createdAt = toIsoTime(entry.created, '');
             let title = truncateText(entry.summary || entry.firstPrompt || sessionId, 120);
             let messageCount = Number.isFinite(entry.messageCount) ? Math.max(0, entry.messageCount - 1) : 0;
+            let totalTokens = 0;
+            let contextWindow = 0;
 
-            const quickRecords = parseJsonlHeadRecords(filePath, SESSION_SUMMARY_READ_BYTES);
+            const usageState = { totalTokens, contextWindow };
+            applySessionUsageSummaryFromIndexEntry(usageState, entry);
+            totalTokens = usageState.totalTokens || 0;
+            contextWindow = usageState.contextWindow || 0;
+
+            const quickRecords = parseJsonlHeadRecords(filePath, summaryReadBytes);
             if (quickRecords.length > 0) {
                 const filteredCount = countConversationMessagesInRecords(quickRecords, 'claude');
                 if (filteredCount > 0 || messageCount === 0) {
@@ -5607,12 +6052,15 @@ function listClaudeSessions(limit, options = {}) {
 
                 const quickMessages = [];
                 for (const record of quickRecords) {
+                    applySessionUsageSummaryFromRecord(usageState, record, 'claude');
                     const role = normalizeRole(record.type);
                     if (role === 'assistant' || role === 'user' || role === 'system') {
                         const content = record.message ? record.message.content : '';
                         quickMessages.push({ role, text: extractMessageText(content) });
                     }
                 }
+                totalTokens = usageState.totalTokens || 0;
+                contextWindow = usageState.contextWindow || 0;
                 const filteredQuickMessages = removeLeadingSystemMessage(quickMessages);
                 const firstUser = filteredQuickMessages.find(item => item.role === 'user' && item.text);
                 if (firstUser) {
@@ -5636,7 +6084,9 @@ function listClaudeSessions(limit, options = {}) {
                 createdAt,
                 updatedAt,
                 messageCount,
-                __messageCountExact: quickRecords.length > 0 && isSessionSummaryMessageCountExact(fileStat),
+                totalTokens,
+                contextWindow,
+                __messageCountExact: quickRecords.length > 0 && isSessionSummaryMessageCountExact(fileStat, summaryReadBytes),
                 filePath,
                 keywords,
                 capabilities
@@ -5659,7 +6109,10 @@ function listClaudeSessions(limit, options = {}) {
             ignoreSubPath: `${path.sep}subagents${path.sep}`
         });
         for (const filePath of fallbackFiles) {
-            const summary = parseClaudeSessionSummary(filePath);
+            const summary = parseClaudeSessionSummary(filePath, {
+                summaryReadBytes,
+                titleReadBytes
+            });
             if (summary) {
                 sessions.push(summary);
             }
@@ -5686,7 +6139,8 @@ async function listAllSessions(params = {}) {
     const hasPathFilter = !!normalizedPathFilter;
     const queryTokens = expandSessionQueryTokens(normalizeQueryTokens(params.query));
     const hasQuery = queryTokens.length > 0;
-    const cacheKey = hasQuery ? '' : `${source}:${limit}:${normalizedPathFilter}`;
+    const browseLightweight = params.browseLightweight === true && !hasQuery && !hasPathFilter;
+    const cacheKey = hasQuery ? '' : `${browseLightweight ? 'browse' : 'default'}:${source}:${limit}:${normalizedPathFilter}`;
     if (!hasQuery) {
         const cached = getSessionListCache(cacheKey, forceRefresh);
         if (cached) {
@@ -5699,14 +6153,21 @@ async function listAllSessions(params = {}) {
             scanFactor: SESSION_SCAN_FACTOR * 2,
             minFiles: SESSION_SCAN_MIN_FILES * 2
         }
-        : {};
+        : (browseLightweight
+            ? {
+                scanFactor: SESSION_BROWSE_SCAN_FACTOR,
+                minFiles: SESSION_BROWSE_MIN_FILES,
+                summaryReadBytes: SESSION_BROWSE_SUMMARY_READ_BYTES,
+                titleReadBytes: SESSION_BROWSE_SUMMARY_READ_BYTES
+            }
+            : {});
 
     let sessions = [];
     if (source === 'all' || source === 'codex') {
-        sessions = sessions.concat(listCodexSessions(limit, scanOptions));
+        sessions = sessions.concat(listSessionInventoryBySource('codex', limit, scanOptions, { forceRefresh }));
     }
     if (source === 'all' || source === 'claude') {
-        sessions = sessions.concat(listClaudeSessions(limit, scanOptions));
+        sessions = sessions.concat(listSessionInventoryBySource('claude', limit, scanOptions, { forceRefresh }));
     }
 
     if (hasPathFilter) {
@@ -5767,6 +6228,23 @@ async function listAllSessionsData(params = {}) {
     return result;
 }
 
+async function listSessionBrowse(params = {}) {
+    const sessions = await listAllSessions({
+        ...params,
+        browseLightweight: true
+    });
+    return Array.isArray(sessions)
+        ? sessions.map((item) => {
+            if (!item || typeof item !== 'object' || Array.isArray(item)) {
+                return item;
+            }
+            const normalized = { ...item };
+            delete normalized.__messageCountExact;
+            return normalized;
+        })
+        : [];
+}
+
 async function listSessionUsage(params = {}) {
     const source = params.source === 'codex' || params.source === 'claude'
         ? params.source
@@ -5775,11 +6253,21 @@ async function listSessionUsage(params = {}) {
     const limit = Number.isFinite(rawLimit)
         ? Math.max(1, Math.min(rawLimit, MAX_SESSION_LIST_SIZE))
         : 200;
-    return await listAllSessionsData({
+    const sessions = await listSessionBrowse({
         source,
         limit,
         forceRefresh: !!params.forceRefresh
     });
+    return Array.isArray(sessions)
+        ? sessions.map((item) => {
+            if (!item || typeof item !== 'object' || Array.isArray(item)) {
+                return item;
+            }
+            const normalized = { ...item };
+            delete normalized.__messageCountExact;
+            return normalized;
+        })
+        : [];
 }
 
 function listSessionPaths(params = {}) {
@@ -5803,15 +6291,17 @@ function listSessionPaths(params = {}) {
     const scanOptions = {
         scanFactor: SESSION_SCAN_FACTOR * 2,
         minFiles: SESSION_SCAN_MIN_FILES * 2,
-        targetCount: Math.max(gatherLimit * 2, 1000)
+        targetCount: Math.max(gatherLimit * 2, 1000),
+        summaryReadBytes: SESSION_BROWSE_SUMMARY_READ_BYTES,
+        titleReadBytes: SESSION_BROWSE_SUMMARY_READ_BYTES
     };
 
     let sessions = [];
     if (validSource === 'all' || validSource === 'codex') {
-        sessions = sessions.concat(listCodexSessions(gatherLimit, scanOptions));
+        sessions = sessions.concat(listSessionInventoryBySource('codex', gatherLimit, scanOptions, { forceRefresh }));
     }
     if (validSource === 'all' || validSource === 'claude') {
-        sessions = sessions.concat(listClaudeSessions(gatherLimit, scanOptions));
+        sessions = sessions.concat(listSessionInventoryBySource('claude', gatherLimit, scanOptions, { forceRefresh }));
     }
 
     const dedupedPaths = [];
@@ -5853,6 +6343,14 @@ function resolveSessionFilePath(source, filePath, sessionId) {
 
     if (typeof sessionId === 'string' && sessionId.trim()) {
         const targetId = sessionId.trim().toLowerCase();
+        const lookupStore = g_sessionFileLookupCache[source === 'claude' ? 'claude' : 'codex'];
+        if (lookupStore instanceof Map && lookupStore.has(targetId)) {
+            const cachedPath = lookupStore.get(targetId);
+            if (cachedPath && fs.existsSync(cachedPath) && isPathInside(cachedPath, root)) {
+                return cachedPath;
+            }
+            lookupStore.delete(targetId);
+        }
         const files = collectJsonlFiles(root, 5000);
         const matchedFile = files.find(item => path.basename(item, '.jsonl').toLowerCase() === targetId);
         if (matchedFile && fs.existsSync(matchedFile)) {
@@ -6502,6 +7000,8 @@ function buildSessionSummaryFallback(source, filePath, sessionId = '') {
         createdAt: '',
         updatedAt: '',
         messageCount: 0,
+        totalTokens: 0,
+        contextWindow: 0,
         filePath,
         keywords: [],
         capabilities: source === 'claude' ? { code: true } : {}
@@ -7592,16 +8092,26 @@ async function readSessionDetail(params = {}) {
     const messageLimit = Number.isFinite(rawLimit)
         ? Math.max(1, Math.min(rawLimit, MAX_SESSION_DETAIL_MESSAGES))
         : DEFAULT_SESSION_DETAIL_MESSAGES;
+    const preview = params.preview === true || params.preview === 'true';
 
-    const extracted = await extractSessionDetailPreviewFromFile(filePath, source, messageLimit);
+    const extracted = await extractSessionDetailPreviewFromFile(filePath, source, messageLimit, { preview });
     const sessionId = extracted.sessionId || params.sessionId || path.basename(filePath, '.jsonl');
     const sourceLabel = source === 'codex' ? 'Codex' : 'Claude Code';
     const clippedMessages = Array.isArray(extracted.messages) ? extracted.messages : [];
-    const startIndex = Math.max(0, extracted.totalMessages - clippedMessages.length);
-    const indexedMessages = clippedMessages.map((message, messageIndex) => ({
-        ...message,
-        messageIndex: startIndex + messageIndex
-    }));
+    const hasExactTotalMessages = Number.isFinite(extracted.totalMessages);
+    const startIndex = hasExactTotalMessages
+        ? Math.max(0, extracted.totalMessages - clippedMessages.length)
+        : 0;
+    const indexedMessages = clippedMessages.map((message, messageIndex) => {
+        const normalizedMessage = {
+            ...message,
+            messageIndex: startIndex + messageIndex
+        };
+        if (preview && typeof normalizedMessage.text === 'string') {
+            normalizedMessage.text = truncateText(normalizedMessage.text, SESSION_PREVIEW_MESSAGE_TEXT_MAX_LENGTH);
+        }
+        return normalizedMessage;
+    });
 
     return {
         source,
@@ -7609,8 +8119,10 @@ async function readSessionDetail(params = {}) {
         sessionId,
         cwd: extracted.cwd || '',
         updatedAt: extracted.updatedAt || '',
-        totalMessages: extracted.totalMessages,
-        clipped: extracted.totalMessages > indexedMessages.length,
+        totalMessages: hasExactTotalMessages ? extracted.totalMessages : null,
+        clipped: typeof extracted.clipped === 'boolean'
+            ? extracted.clipped
+            : (hasExactTotalMessages ? extracted.totalMessages > indexedMessages.length : false),
         messageLimit,
         messages: indexedMessages,
         filePath
@@ -10765,6 +11277,91 @@ const PUBLIC_WEB_UI_STATIC_ASSETS = new Set([
 
 function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser }) {
     const connections = new Set();
+    const probeWebUiReadiness = (callback) => {
+        const payload = JSON.stringify({ action: 'health-check', params: {} });
+        const requestOptions = {
+            hostname: openHost,
+            port,
+            path: '/api',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json; charset=utf-8',
+                'Content-Length': Buffer.byteLength(payload, 'utf-8')
+            }
+        };
+        let settled = false;
+        const finish = (ready) => {
+            if (settled) return;
+            settled = true;
+            callback(ready);
+        };
+        const req = http.request(requestOptions, (probeRes) => {
+            if (typeof probeRes.resume === 'function') {
+                probeRes.resume();
+            }
+            probeRes.on('end', () => {
+                finish(probeRes.statusCode === 200);
+            });
+        });
+        req.on('error', () => finish(false));
+        req.setTimeout(1000, () => {
+            try { req.destroy(); } catch (_) {}
+            finish(false);
+        });
+        req.end(payload, 'utf-8');
+    };
+    const openBrowserAfterReady = (url) => {
+        const maxAttempts = 40;
+        const retryDelayMs = 150;
+        let finished = false;
+
+        const finish = (ready) => {
+            if (finished) return;
+            finished = true;
+            if (!ready) {
+                console.warn('! Web UI 就绪探测超时，未自动打开浏览器，请手动访问:', url);
+                return;
+            }
+
+            const platform = process.platform;
+            const commandSpec = platform === 'win32'
+                ? { command: 'cmd', args: ['/c', 'start', '', url] }
+                : (platform === 'darwin'
+                    ? { command: 'open', args: [url] }
+                    : { command: 'xdg-open', args: [url] });
+
+            try {
+                const child = spawn(commandSpec.command, commandSpec.args, {
+                    stdio: 'ignore',
+                    detached: true,
+                    windowsHide: true
+                });
+                child.on('error', () => {
+                    console.warn('无法自动打开浏览器，请手动访问:', url);
+                });
+                if (typeof child.unref === 'function') {
+                    child.unref();
+                }
+            } catch (_) {
+                console.warn('无法自动打开浏览器，请手动访问:', url);
+            }
+        };
+        const scheduleProbe = (attempt) => {
+            probeWebUiReadiness((ready) => {
+                if (ready) {
+                    finish(true);
+                    return;
+                }
+                if (attempt >= maxAttempts) {
+                    finish(false);
+                    return;
+                }
+                setTimeout(() => scheduleProbe(attempt + 1), retryDelayMs);
+            });
+        };
+
+        scheduleProbe(1);
+    };
     const writeWebUiAssetError = (res, requestPath, error) => {
         const message = error && error.message ? error.message : String(error);
         console.error(`! Web UI 资源读取失败 [${requestPath}]:`, message);
@@ -10812,6 +11409,9 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                     let result;
 
                     switch (action) {
+                        case 'health-check':
+                            result = { ok: true };
+                            break;
                         case 'status': {
                             const statusConfigResult = readConfigOrVirtualDefault();
                             const config = statusConfigResult.config;
@@ -11039,7 +11639,7 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                                     result = { error: 'Invalid source. Must be codex, claude, or all' };
                                 } else {
                                     result = {
-                                        sessions: await listAllSessionsData(params),
+                                        sessions: await listSessionBrowse(params),
                                         source: source || 'all'
                                     };
                                 }
@@ -11373,21 +11973,8 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
         }
 
         if (!process.env.CODEXMATE_NO_BROWSER && openBrowser) {
-            const platform = process.platform;
-            let command;
             const url = openUrl;
-
-            if (platform === 'win32') {
-                command = `start \"\" \"${url}\"`;
-            } else if (platform === 'darwin') {
-                command = `open \"${url}\"`;
-            } else {
-                command = `xdg-open \"${url}\"`;
-            }
-
-            exec(command, (error) => {
-                if (error) console.warn('无法自动打开浏览器，请手动访问:', url);
-            });
+            openBrowserAfterReady(url);
         }
     });
 
@@ -12766,7 +13353,7 @@ function createWorkflowToolCatalog() {
                 }
                 return {
                     source: source || 'all',
-                    sessions: await listAllSessionsData({
+                    sessions: await listSessionBrowse({
                         ...args,
                         source: source || 'all'
                     })
@@ -13135,7 +13722,7 @@ function createMcpTools(options = {}) {
                 source: source || 'all'
             };
             return {
-                sessions: await listAllSessionsData(normalizedInput),
+                sessions: await listSessionBrowse(normalizedInput),
                 source: source || 'all'
             };
         }
@@ -13548,7 +14135,7 @@ function createMcpResources() {
                 }
                 const payload = {
                     source: normalizedSource || 'all',
-                    sessions: await listAllSessionsData({
+                    sessions: await listSessionBrowse({
                         source: normalizedSource || 'all',
                         query,
                         pathFilter,

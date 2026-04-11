@@ -674,6 +674,67 @@ test('sortedSessionsList moves pinned sessions to the front and keeps latest pin
     assert.deepStrictEqual(result, [sessions[2], sessions[1], sessions[0]]);
 });
 
+test('visibleSessionsList keeps the active session inside the rendered window', () => {
+    const computed = createSessionComputed();
+    const sessions = Array.from({ length: 6 }, (_, index) => ({
+        sessionId: `sess-${index + 1}`,
+        source: 'codex',
+        filePath: `/tmp/${index + 1}.jsonl`
+    }));
+    const result = computed.visibleSessionsList.call({
+        sessionListRenderEnabled: true,
+        sessionListVisibleCount: 2,
+        sortedSessionsList: sessions,
+        activeSession: sessions[4],
+        getSessionExportKey(session) {
+            return `${session.source}:${session.sessionId}:${session.filePath}`;
+        }
+    });
+
+    assert.deepStrictEqual(result, sessions.slice(0, 5));
+});
+
+test('sessionUsageSummaryCards uses compact units for long token and context totals while preserving full values in titles', () => {
+    const computed = createSessionComputed();
+    const cards = computed.sessionUsageSummaryCards.call({
+        sessionUsageCharts: {
+            summary: {
+                totalSessions: 12,
+                totalMessages: 3456,
+                totalTokens: 1234567,
+                totalContextWindow: 256000,
+                activeDays: 7,
+                avgMessagesPerSession: 288,
+                busiestDay: null,
+                busiestHour: null
+            }
+        }
+    });
+
+    const tokensCard = cards.find((card) => card.key === 'tokens');
+    const contextCard = cards.find((card) => card.key === 'context-window');
+    assert(tokensCard, 'missing tokens summary card');
+    assert(contextCard, 'missing context summary card');
+    assert.strictEqual(tokensCard.value, '1.2M');
+    assert.strictEqual(tokensCard.title, '1,234,567');
+    assert.strictEqual(contextCard.value, '256K');
+    assert.strictEqual(contextCard.title, '256,000');
+});
+
+test('activeSessionVisibleMessages falls back to the initial preview batch before priming completes', () => {
+    const computed = createSessionComputed();
+    const messages = Array.from({ length: 12 }, (_, index) => ({ id: index + 1 }));
+    const result = computed.activeSessionVisibleMessages.call({
+        mainTab: 'sessions',
+        sessionPreviewRenderEnabled: true,
+        activeSessionMessages: messages,
+        sessionPreviewInitialBatchSize: 5,
+        sessionPreviewVisibleCount: 0
+    });
+
+    assert.deepStrictEqual(result, messages.slice(0, 5));
+});
+
 test('formatSessionTimelineTimestamp normalizes ISO-like strings for timeline labels', () => {
     assert.strictEqual(formatSessionTimelineTimestamp('2026-03-23T09:10:11.000Z'), '03-23 09:10:11');
     assert.strictEqual(formatSessionTimelineTimestamp('2026-03-23 19:20:00'), '03-23 19:20:00');
