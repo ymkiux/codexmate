@@ -456,7 +456,7 @@ export async function loadMoreSessionMessages(stepSize) {
         : 1000;
 
     let nextLimit = Math.max(currentLimit + fetchStep, targetVisible);
-    if (totalKnown > 0) {
+    if (totalKnown > total) {
         nextLimit = Math.min(nextLimit, totalKnown);
     }
     nextLimit = Math.min(nextLimit, limitCap);
