@@ -47,6 +47,7 @@ const readExplicitSessionProviderFromRecordSrc = extractFunction(cliContent, 're
 const readSessionProviderFromRecordSrc = extractFunction(cliContent, 'readSessionProviderFromRecord');
 const applySessionUsageSummaryFromRecordSrc = extractFunction(cliContent, 'applySessionUsageSummaryFromRecord');
 const parseCodexSessionSummarySrc = extractFunction(cliContent, 'parseCodexSessionSummary');
+const parseClaudeSessionSummarySrc = extractFunction(cliContent, 'parseClaudeSessionSummary');
 
 function instantiateListSessionUsage(bindings = {}) {
     const bindingNames = Object.keys(bindings);
@@ -142,7 +143,14 @@ test('listSessionUsage uses lightweight session listing without exact hydration'
     const listSessionUsage = instantiateListSessionUsage({
         MAX_SESSION_USAGE_LIST_SIZE: 2000,
         listSessionBrowse,
-        listAllSessionsData
+        listAllSessionsData,
+        SESSION_BROWSE_SUMMARY_READ_BYTES: 65536,
+        parseCodexSessionSummary() {
+            throw new Error('should not parse codex summary when model is not needed');
+        },
+        parseClaudeSessionSummary() {
+            throw new Error('should not parse claude summary when model is not needed');
+        }
     });
 
     const result = await listSessionUsage({
@@ -184,6 +192,13 @@ test('listSessionUsage normalizes source and default limit for lightweight usage
     const listSessionUsage = instantiateListSessionUsage({
         MAX_SESSION_USAGE_LIST_SIZE: 2000,
         listSessionBrowse,
+        SESSION_BROWSE_SUMMARY_READ_BYTES: 65536,
+        parseCodexSessionSummary() {
+            return null;
+        },
+        parseClaudeSessionSummary() {
+            return null;
+        },
         listAllSessionsData: async () => {
             throw new Error('should not call listAllSessionsData');
         }
@@ -206,6 +221,71 @@ test('listSessionUsage normalizes source and default limit for lightweight usage
             source: 'all',
             limit: 2000,
             forceRefresh: false
+        }
+    ]);
+});
+
+test('listSessionUsage backfills missing model metadata from parsed session summaries', async () => {
+    const codexParses = [];
+    const claudeParses = [];
+    const listSessionUsage = instantiateListSessionUsage({
+        MAX_SESSION_USAGE_LIST_SIZE: 2000,
+        SESSION_BROWSE_SUMMARY_READ_BYTES: 65536,
+        async listSessionBrowse() {
+            return [
+                {
+                    source: 'codex',
+                    sessionId: 'codex-1',
+                    filePath: '/tmp/codex-1.jsonl',
+                    provider: 'maxx'
+                },
+                {
+                    source: 'claude',
+                    sessionId: 'claude-1',
+                    filePath: '/tmp/claude-1.jsonl'
+                },
+                {
+                    source: 'codex',
+                    sessionId: 'codex-2',
+                    filePath: '/tmp/codex-2.jsonl',
+                    model: 'already-there'
+                }
+            ];
+        },
+        parseCodexSessionSummary(filePath, options) {
+            codexParses.push({ filePath, options });
+            return filePath === '/tmp/codex-1.jsonl'
+                ? { model: 'gpt-5.3-codex', provider: 'maxx' }
+                : null;
+        },
+        parseClaudeSessionSummary(filePath, options) {
+            claudeParses.push({ filePath, options });
+            return filePath === '/tmp/claude-1.jsonl'
+                ? { model: 'claude-3-7-sonnet', provider: 'claude' }
+                : null;
+        },
+        listAllSessionsData: async () => {
+            throw new Error('should not call listAllSessionsData');
+        }
+    });
+
+    const result = await listSessionUsage({ source: 'all', limit: 50, forceRefresh: true });
+
+    assert.strictEqual(result[0].model, 'gpt-5.3-codex');
+    assert.strictEqual(result[0].provider, 'maxx');
+    assert.strictEqual(result[1].model, 'claude-3-7-sonnet');
+    assert.strictEqual(result[1].provider, 'claude');
+    assert.strictEqual(result[2].model, 'already-there');
+    assert.deepStrictEqual(codexParses, [
+        {
+            filePath: '/tmp/codex-1.jsonl',
+            options: { summaryReadBytes: 65536, titleReadBytes: 65536 }
+        }
+    ]);
+    assert.deepStrictEqual(claudeParses, [
+        {
+            filePath: '/tmp/claude-1.jsonl',
+            options: { summaryReadBytes: 65536, titleReadBytes: 65536 }
         }
     ]);
 });
@@ -329,6 +409,82 @@ test('parseCodexSessionSummary reads token totals and model data from tail recor
         assert.strictEqual(result.outputTokens, 3032);
         assert.strictEqual(result.reasoningOutputTokens, 1515);
         assert.strictEqual(result.contextWindow, 258400);
+    } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+});
+
+test('parseClaudeSessionSummary reads model from session index and tail records', () => {
+    const parseClaudeSessionSummary = instantiateFunctionBundle(
+        [
+            getFileHeadTextSrc,
+            getFileTailTextSrc,
+            parseJsonlContentSrc,
+            parseJsonlHeadRecordsSrc,
+            parseJsonlTailRecordsSrc,
+            isSessionSummaryMessageCountExactSrc,
+            removeLeadingSystemMessageSrc,
+            readNonNegativeIntegerSrc,
+            readTotalTokensFromUsageSrc,
+            readUsageTotalsFromUsageSrc,
+            readContextWindowValueSrc,
+            applyUsageTotalsToStateSrc,
+            readSessionModelFromRecordSrc,
+            readExplicitSessionProviderFromRecordSrc,
+            readSessionProviderFromRecordSrc,
+            applySessionUsageSummaryFromRecordSrc,
+            parseClaudeSessionSummarySrc
+        ],
+        'parseClaudeSessionSummary',
+        {
+            fs,
+            path,
+            Buffer,
+            SESSION_SUMMARY_READ_BYTES: 512,
+            SESSION_TITLE_READ_BYTES: 512,
+            toIsoTime(value, fallback = '') {
+                const iso = new Date(value).toISOString();
+                return iso === 'Invalid Date' ? fallback : iso;
+            },
+            updateLatestIso(current, next) {
+                const currentMs = Date.parse(current || '');
+                const nextMs = Date.parse(next || '');
+                if (!Number.isFinite(nextMs)) return current || '';
+                if (!Number.isFinite(currentMs) || nextMs > currentMs) return new Date(nextMs).toISOString();
+                return current || '';
+            },
+            normalizeRole(role) {
+                return typeof role === 'string' ? role.trim().toLowerCase() : '';
+            },
+            extractMessageText(content) {
+                if (typeof content === 'string') return content;
+                if (Array.isArray(content)) {
+                    return content.map((item) => item && item.text ? item.text : '').join(' ').trim();
+                }
+                return '';
+            },
+            truncateText(text) {
+                return typeof text === 'string' ? text : '';
+            },
+            isBootstrapLikeText() {
+                return false;
+            }
+        }
+    );
+
+    const tempDir = fs.mkdtempSync(path.join(__dirname, 'tmp-session-usage-claude-'));
+    const filePath = path.join(tempDir, 'claude-tail.jsonl');
+    fs.writeFileSync(filePath, [
+        JSON.stringify({ type: 'user', message: { content: 'hello from claude' }, timestamp: '2026-04-12T09:07:26.690Z' }),
+        JSON.stringify({ type: 'assistant', message: { content: 'hi there' }, timestamp: '2026-04-12T09:07:27.690Z' }),
+        JSON.stringify({ type: 'assistant', message: { model: 'claude-3-7-sonnet', usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15 } }, timestamp: '2026-04-12T09:11:35.588Z' })
+    ].join('\n'));
+
+    try {
+        const result = parseClaudeSessionSummary(filePath, { summaryReadBytes: 512, titleReadBytes: 512 });
+        assert(result, 'expected claude session summary');
+        assert.strictEqual(result.model, 'claude-3-7-sonnet');
+        assert.strictEqual(result.totalTokens, 15);
     } finally {
         fs.rmSync(tempDir, { recursive: true, force: true });
     }
