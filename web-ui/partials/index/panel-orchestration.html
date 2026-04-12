@@ -8,8 +8,8 @@
                         <div class="task-hero-main">
                             <div>
                                 <div class="task-hero-kicker">Task orchestration</div>
-                                <div class="selector-title">把需求拆成可执行编排，不要手动盯每一步</div>
-                                <div class="skills-panel-note task-hero-copy">只保留常用输入。先写目标，再预览，最后执行或入队。</div>
+                                <div class="selector-title">把需求拆成可执行步骤</div>
+                                <div class="skills-panel-note task-hero-copy">先写目标，再预览，再执行。</div>
                             </div>
                             <div class="task-hero-actions settings-tab-actions task-header-actions">
                                 <button type="button" class="btn-tool btn-tool-compact" @click="loadTaskOrchestrationOverview({ forceRefresh: true, includeDetail: true })" :disabled="taskOrchestration.loading">
@@ -34,7 +34,7 @@
                                     <div class="task-flow-step">1</div>
                                     <div>
                                         <div class="task-flow-title">先把结果写清楚</div>
-                                        <div class="task-flow-copy">只保留真正影响执行的输入，别让页面先把人绕晕。</div>
+                                        <div class="task-flow-copy">只写会影响执行的内容。</div>
                                     </div>
                                 </div>
 
@@ -78,7 +78,7 @@
                                     <div class="task-flow-step">2</div>
                                     <div>
                                         <div class="task-flow-title">选择执行方式</div>
-                                        <div class="task-flow-copy">默认只露出常用项，细节收进高级设置。</div>
+                                        <div class="task-flow-copy">常用项默认展开，其余放高级设置。</div>
                                     </div>
                                 </div>
 
@@ -155,8 +155,8 @@
                                 <div class="task-flow-head">
                                     <div class="task-flow-step">3</div>
                                     <div>
-                                        <div class="task-flow-title">先预览，再决定怎么跑</div>
-                                        <div class="task-flow-copy">按钮只保留三件事，别再让一排动作抢注意力。</div>
+                                        <div class="task-flow-title">先预览，再执行</div>
+                                        <div class="task-flow-copy">先确认计划，再决定立即执行还是入队。</div>
                                     </div>
                                 </div>
                                 <div class="task-action-row task-action-row-prominent">
@@ -175,7 +175,7 @@
                                         </button>
                                     </div>
                                 </div>
-                                <div class="task-action-caption">预览不会真的开跑。需要批量处理时再加入队列。</div>
+                                <div class="task-action-caption">预览不会执行。批量任务再入队。</div>
                             </div>
                         </section>
                     </div>
@@ -185,13 +185,13 @@
                         class="selector-section task-stage-card">
                         <div class="task-stage-empty">
                             <div>
-                                <div class="selector-title">工作区会在需要时再展开</div>
-                                <div class="skills-panel-note">先写目标。点“预览计划”后，再展开下面的计划和执行区。</div>
+                                <div class="selector-title">有内容时再展开工作区</div>
+                                <div class="skills-panel-note">先写目标，再预览计划。</div>
                             </div>
                             <div class="task-stage-strip">
-                                <div class="task-stage-pill">先写目标</div>
-                                <div class="task-stage-pill">再预览计划</div>
-                                <div class="task-stage-pill">最后执行或入队</div>
+                                <div class="task-stage-pill">写目标</div>
+                                <div class="task-stage-pill">预览</div>
+                                <div class="task-stage-pill">执行或入队</div>
                             </div>
                         </div>
                     </section>
@@ -206,7 +206,7 @@
                             <div class="selector-header task-section-header">
                                 <div>
                                     <span class="selector-title">计划预览</span>
-                                    <div class="skills-panel-note">先确认节点、波次和依赖，再决定是否开跑。</div>
+                                    <div class="skills-panel-note">先确认节点、波次和依赖。</div>
                                 </div>
                             </div>
                             <div v-if="taskOrchestration.planIssues.length" class="task-issues-list">
@@ -261,7 +261,7 @@
                             <div class="selector-header task-section-header">
                                 <div>
                                     <span class="selector-title">执行工作台</span>
-                                    <div class="skills-panel-note">只在有内容时展开，避免空卡片占满视线。</div>
+                                    <div class="skills-panel-note">有内容时才展开。</div>
                                 </div>
                                 <div class="settings-tab-actions task-header-actions">
                                     <button type="button" class="btn-tool btn-tool-compact" @click="loadTaskOrchestrationOverview({ forceRefresh: true, includeDetail: true })" :disabled="taskOrchestration.loading">
@@ -286,7 +286,7 @@
                             <div v-if="taskOrchestration.workspaceTab === 'queue' || (!taskOrchestration.runs.length && !taskOrchestration.selectedRunId && !taskOrchestration.selectedRunError)" class="task-workbench-panel">
                                 <div v-if="!taskOrchestration.queue.length" class="task-empty-state">
                                     <div class="task-empty-title">当前没有排队任务</div>
-                                    <div class="task-empty-copy">想批量处理时，先把任务加入队列，再点“开始消费队列”。</div>
+                                    <div class="task-empty-copy">批量任务可先入队，再启动队列。</div>
                                 </div>
                                 <div v-else class="task-runtime-list">
                                     <div
@@ -315,7 +315,7 @@
                             <div v-else-if="taskOrchestration.workspaceTab === 'runs' || (!taskOrchestration.queue.length && taskOrchestration.runs.length && !taskOrchestration.selectedRunId && !taskOrchestration.selectedRunError)" class="task-workbench-panel">
                                 <div v-if="!taskOrchestration.runs.length" class="task-empty-state">
                                     <div class="task-empty-title">还没有运行记录</div>
-                                    <div class="task-empty-copy">执行一次编排后，这里会显示最近运行历史和摘要。</div>
+                                    <div class="task-empty-copy">执行后会显示最近运行记录。</div>
                                 </div>
                                 <div v-else class="task-runtime-list">
                                     <button
@@ -352,7 +352,7 @@
                                 <div v-if="taskOrchestration.selectedRunError" class="task-issue-item">{{ taskOrchestration.selectedRunError }}</div>
                                 <div v-if="!taskOrchestrationSelectedRun" class="task-empty-state">
                                     <div class="task-empty-title">选择一条运行记录查看详情</div>
-                                    <div class="task-empty-copy">你可以在这里检查节点状态、错误、摘要和日志，决定是否重试或取消。</div>
+                                    <div class="task-empty-copy">这里会显示节点状态、摘要和日志。</div>
                                 </div>
                                 <template v-else>
                                     <div class="task-detail-summary-strip">

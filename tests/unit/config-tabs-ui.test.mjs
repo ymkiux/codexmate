@@ -70,7 +70,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /id="panel-orchestration"/);
     assert.match(html, /v-show="mainTab === 'orchestration'"/);
     assert.match(orchestrationPanel, /Task orchestration/);
-    assert.match(orchestrationPanel, /把需求拆成可执行编排，不要手动盯每一步/);
+    assert.match(orchestrationPanel, /把需求拆成可执行步骤/);
     assert.match(orchestrationPanel, /@click="previewTaskPlan\(\)"/);
     assert.match(orchestrationPanel, /@click="runTaskOrchestration\(\)"/);
     assert.match(orchestrationPanel, /@click="addTaskOrchestrationToQueue\(\)"/);
@@ -92,7 +92,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(orchestrationPanel, /taskOrchestration\.queue\.length \|\| taskOrchestration\.runs\.length \|\| taskOrchestration\.selectedRunId \|\| taskOrchestration\.selectedRunError/);
     assert.match(orchestrationPanel, /taskOrchestration\.plan \|\| taskOrchestration\.planIssues\.length \|\| taskOrchestration\.planWarnings\.length \|\| taskOrchestration\.lastError/);
     assert.match(orchestrationPanel, /class="selector-section task-stage-card"/);
-    assert.match(orchestrationPanel, /工作区会在需要时再展开/);
+    assert.match(orchestrationPanel, /有内容时再展开工作区/);
     assert.match(orchestrationPanel, /class="btn-tool task-action-preview" @click="previewTaskPlan\(\)"/);
     assert.match(orchestrationPanel, /class="task-action-row-right task-action-row-right-prominent"/);
     assert.match(orchestrationPanel, /class="task-action-caption"/);
