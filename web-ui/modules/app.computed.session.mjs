@@ -63,6 +63,35 @@ function formatUsageRangeLabel(range) {
     return '近 7 天';
 }
 
+function formatUsageEstimateDiagnostic(summary, rangeLabel) {
+    if (!summary || typeof summary !== 'object') {
+        return `${rangeLabel} 内暂无可估算会话`;
+    }
+    const totalSessions = Number.isFinite(Number(summary.totalSessions))
+        ? Math.max(0, Math.floor(Number(summary.totalSessions)))
+        : 0;
+    const estimatedSessions = Number.isFinite(Number(summary.estimatedSessions))
+        ? Math.max(0, Math.floor(Number(summary.estimatedSessions)))
+        : 0;
+    const missingPricingSessions = Number.isFinite(Number(summary.missingPricingSessions))
+        ? Math.max(0, Math.floor(Number(summary.missingPricingSessions)))
+        : 0;
+    const missingTokenSessions = Number.isFinite(Number(summary.missingTokenSessions))
+        ? Math.max(0, Math.floor(Number(summary.missingTokenSessions)))
+        : 0;
+    const parts = [];
+    if (estimatedSessions > 0 || totalSessions > 0) {
+        parts.push(`覆盖 ${estimatedSessions}/${totalSessions} 个会话`);
+    }
+    if (missingPricingSessions > 0) {
+        parts.push(`${missingPricingSessions} 个缺少模型单价`);
+    }
+    if (missingTokenSessions > 0) {
+        parts.push(`${missingTokenSessions} 个缺少 token 拆分`);
+    }
+    return parts.length ? parts.join('，') : `${rangeLabel} 内暂无可估算会话`;
+}
+
 function formatUsageDuration(value, options = {}) {
     const numeric = Number(value);
     if (!Number.isFinite(numeric) || numeric <= 0) {
@@ -192,6 +221,8 @@ function estimateUsageCostSummary(sessions, providersList, currentProvider) {
     let estimatedTokens = 0;
     let configuredSessions = 0;
     let catalogSessions = 0;
+    let missingPricingSessions = 0;
+    let missingTokenSessions = 0;
 
     for (const session of list) {
         if (!session || typeof session !== 'object') continue;
@@ -201,6 +232,7 @@ function estimateUsageCostSummary(sessions, providersList, currentProvider) {
             : 0;
         totalTokens += totalSessionTokens;
         if (!pricing) {
+            missingPricingSessions += 1;
             continue;
         }
         const inputTokens = Number.isFinite(Number(session.inputTokens)) ? Math.max(0, Math.floor(Number(session.inputTokens))) : null;
@@ -208,6 +240,7 @@ function estimateUsageCostSummary(sessions, providersList, currentProvider) {
         const outputTokens = Number.isFinite(Number(session.outputTokens)) ? Math.max(0, Math.floor(Number(session.outputTokens))) : null;
         const reasoningOutputTokens = Number.isFinite(Number(session.reasoningOutputTokens)) ? Math.max(0, Math.floor(Number(session.reasoningOutputTokens))) : 0;
         if (inputTokens === null && outputTokens === null && reasoningOutputTokens === 0) {
+            missingTokenSessions += 1;
             continue;
         }
         const billableInputTokens = Math.max(0, (inputTokens || 0) - cachedInputTokens);
@@ -238,7 +271,9 @@ function estimateUsageCostSummary(sessions, providersList, currentProvider) {
         coveragePercent,
         hasEstimate: estimatedSessions > 0,
         configuredSessions,
-        catalogSessions
+        catalogSessions,
+        missingPricingSessions,
+        missingTokenSessions
     };
 }
 
@@ -405,9 +440,7 @@ export function createSessionComputed() {
                     key: 'estimated-cost',
                     label: `预估费用 · ${usageRangeLabel}`,
                     value: estimatedCost.hasEstimate ? formatUsageEstimatedCost(estimatedCost.totalCostUsd) : '暂无',
-                    note: estimatedCost.hasEstimate
-                        ? `覆盖 ${estimatedCost.estimatedSessions}/${estimatedCost.totalSessions} 个会话`
-                        : `${usageRangeLabel} 内暂无可估算会话`,
+                    note: formatUsageEstimateDiagnostic(estimatedCost, usageRangeLabel),
                     title: estimatedCost.hasEstimate
                         ? `${estimatedCost.catalogSessions > 0
                             ? (estimatedCost.configuredSessions > 0 ? '按 Provider 配置 + 公开模型目录单价估算' : '按公开模型目录单价估算')
