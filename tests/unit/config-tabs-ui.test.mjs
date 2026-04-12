@@ -77,7 +77,12 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(orchestrationPanel, /class="settings-tab-actions task-header-actions"/);
     assert.match(orchestrationPanel, /class="task-onboarding-card"/);
     assert.match(orchestrationPanel, /class="task-template-chip-group"/);
+    assert.match(orchestrationPanel, /class="task-workflow-suggestions"/);
+    assert.match(orchestrationPanel, /@click="appendTaskWorkflowId\(workflow.id \|\| workflow.name\)"/);
     assert.match(orchestrationPanel, /class="task-config-strip"/);
+    assert.match(orchestrationPanel, /class="task-readiness-card"/);
+    assert.match(orchestrationPanel, /taskOrchestrationDraftReadiness.summary/);
+    assert.match(orchestrationPanel, /taskOrchestrationDraftChecklist/);
     assert.match(orchestrationPanel, /class="task-action-help"/);
     assert.match(orchestrationPanel, /class="btn-tool task-action-preview" @click="previewTaskPlan\(\)"/);
     assert.match(orchestrationPanel, /class="task-action-row-right"/);
@@ -86,7 +91,9 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(taskOrchestrationStyles, /\.task-section-header\s*\{[\s\S]*align-items:\s*center;[\s\S]*justify-content:\s*space-between;/);
     assert.match(taskOrchestrationStyles, /\.task-onboarding-card,[\s\S]*\.task-empty-state\s*\{[\s\S]*border:\s*1px solid/);
     assert.match(taskOrchestrationStyles, /\.task-onboarding-steps\s*\{[\s\S]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\);/);
-    assert.match(taskOrchestrationStyles, /\.task-template-chip-group\s*\{[\s\S]*display:\s*flex;[\s\S]*flex-wrap:\s*wrap;/);
+    assert.match(taskOrchestrationStyles, /\.task-template-chip-group,[\s\S]*\.task-workflow-suggestions\s*\{[\s\S]*display:\s*flex;[\s\S]*flex-wrap:\s*wrap;/);
+    assert.match(taskOrchestrationStyles, /\.task-readiness-card\s*\{[\s\S]*margin-top:\s*12px;[\s\S]*padding:\s*12px 14px;/);
+    assert.match(taskOrchestrationStyles, /\.task-readiness-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/);
     assert.match(taskOrchestrationStyles, /\.task-section-header \.settings-tab-actions\s*\{[\s\S]*flex-wrap:\s*nowrap;[\s\S]*margin-left:\s*auto;/);
     assert.match(taskOrchestrationStyles, /\.task-action-row\s*\{[\s\S]*align-items:\s*center;[\s\S]*justify-content:\s*flex-start;[\s\S]*flex-wrap:\s*wrap;/);
     assert.match(taskOrchestrationStyles, /\.task-action-row-right\s*\{[\s\S]*display:\s*flex;[\s\S]*justify-content:\s*flex-start;[\s\S]*flex-wrap:\s*nowrap;/);

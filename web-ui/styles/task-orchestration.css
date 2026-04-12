@@ -33,6 +33,7 @@
 .task-onboarding-card,
 .task-template-block,
 .task-config-strip,
+.task-readiness-card,
 .task-action-help,
 .task-empty-state {
     border: 1px solid var(--color-border-soft);
@@ -72,14 +73,16 @@
     padding: 12px 14px;
 }
 
-.task-template-chip-group {
+.task-template-chip-group,
+.task-workflow-suggestions {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
     margin-top: 10px;
 }
 
-.task-template-chip {
+.task-template-chip,
+.task-workflow-chip {
     border: 1px solid var(--color-border);
     background: var(--color-surface);
     color: var(--color-text-primary);
@@ -94,10 +97,22 @@
         color var(--transition-fast) var(--ease-smooth);
 }
 
-.task-template-chip:hover {
+.task-template-chip:hover,
+.task-workflow-chip:hover {
     background: var(--color-brand-light);
     border-color: var(--color-brand);
     color: var(--color-brand-dark);
+}
+
+.task-workflow-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.task-workflow-chip small {
+    color: var(--color-text-secondary);
+    font-size: 11px;
 }
 
 .task-field-wide {
@@ -136,6 +151,64 @@
     flex-wrap: wrap;
     gap: 10px;
     margin-top: 12px;
+}
+
+.task-readiness-card {
+    margin-top: 12px;
+    padding: 12px 14px;
+}
+
+.task-readiness-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.task-readiness-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+}
+
+.task-readiness-copy {
+    margin-top: 6px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--color-text-secondary);
+}
+
+.task-readiness-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.task-readiness-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+}
+
+.task-readiness-item strong {
+    font-size: 12px;
+    color: var(--color-text-primary);
+}
+
+.task-readiness-item span {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+}
+
+.task-readiness-item.done {
+    border-color: rgba(81, 154, 91, 0.24);
+    background: rgba(81, 154, 91, 0.08);
 }
 
 .task-toggle {
@@ -396,11 +469,13 @@
 
 @media (max-width: 720px) {
     .task-composer-grid,
-    .task-onboarding-steps {
+    .task-onboarding-steps,
+    .task-readiness-grid {
         grid-template-columns: 1fr;
     }
 
-    .task-section-header {
+    .task-section-header,
+    .task-readiness-head {
         align-items: flex-start;
     }
 

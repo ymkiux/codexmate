@@ -102,6 +102,20 @@ export function createTaskOrchestrationMethods(options = {}) {
             return dependsOn.length > 0 ? dependsOn.join(', ') : '无';
         },
 
+        appendTaskWorkflowId(workflowId) {
+            const state = this.ensureTaskOrchestrationState();
+            const normalizedWorkflowId = typeof workflowId === 'string' ? workflowId.trim() : '';
+            if (!normalizedWorkflowId) {
+                return;
+            }
+            const nextWorkflowIds = normalizeLines(state.workflowIdsText);
+            if (!nextWorkflowIds.includes(normalizedWorkflowId)) {
+                nextWorkflowIds.push(normalizedWorkflowId);
+            }
+            state.selectedEngine = 'workflow';
+            state.workflowIdsText = nextWorkflowIds.join('\n');
+        },
+
         async loadTaskOrchestrationOverview(options = {}) {
             const state = this.ensureTaskOrchestrationState();
             if (state.loading && !options.forceRefresh) {

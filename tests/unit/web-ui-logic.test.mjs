@@ -9,6 +9,12 @@ const logic = await import(pathToFileURL(path.join(__dirname, '..', '..', 'web-u
 const { createSessionComputed } = await import(
     pathToFileURL(path.join(__dirname, '..', '..', 'web-ui', 'modules', 'app.computed.session.mjs'))
 );
+const { createMainTabsComputed } = await import(
+    pathToFileURL(path.join(__dirname, '..', '..', 'web-ui', 'modules', 'app.computed.main-tabs.mjs'))
+);
+const { createTaskOrchestrationMethods } = await import(
+    pathToFileURL(path.join(__dirname, '..', '..', 'web-ui', 'modules', 'app.methods.task-orchestration.mjs'))
+);
 const {
     DEFAULT_SESSION_LIST_FAST_LIMIT,
     DEFAULT_SESSION_LIST_LIMIT,
@@ -1193,4 +1199,76 @@ test('buildSessionTimelineNodes clamps maxMarkers into 1..80 and falls back on n
         assert.strictEqual(last.endIndex, messages.length - 1);
         assert.ok(last.safePercent >= 6 && last.safePercent <= 94);
     }
+});
+
+test('taskOrchestrationDraftReadiness highlights missing workflow ids and preview needs', () => {
+    const computed = createMainTabsComputed();
+    const context = {
+        taskOrchestration: {
+            target: '批量检查配置并整理结果',
+            notes: '',
+            workflowIdsText: '',
+            followUpsText: '整理结论',
+            selectedEngine: 'workflow',
+            allowWrite: true,
+            dryRun: false,
+            plan: null,
+            planIssues: [],
+            planWarnings: []
+        }
+    };
+    context.taskOrchestrationDraftMetrics = computed.taskOrchestrationDraftMetrics.call(context);
+    context.taskOrchestrationDraftChecklist = computed.taskOrchestrationDraftChecklist.call(context);
+    const readiness = computed.taskOrchestrationDraftReadiness.call(context);
+
+    assert.strictEqual(readiness.tone, 'warn');
+    assert.strictEqual(readiness.title, '缺少 Workflow');
+    assert.match(readiness.summary, /还没指定可复用流程/);
+    assert.strictEqual(context.taskOrchestrationDraftChecklist[1].done, false);
+    assert.match(context.taskOrchestrationDraftChecklist[2].detail, /建议补说明/);
+});
+
+test('taskOrchestrationDraftReadiness marks ready plans as executable', () => {
+    const computed = createMainTabsComputed();
+    const context = {
+        taskOrchestration: {
+            target: '修复 review 评论并补回归测试',
+            notes: '不要改无关模块',
+            workflowIdsText: '',
+            followUpsText: '更新 PR 摘要\n继续看新增 review',
+            selectedEngine: 'codex',
+            allowWrite: true,
+            dryRun: false,
+            plan: {
+                nodes: [{ id: 'node-1' }, { id: 'node-2' }]
+            },
+            planIssues: [],
+            planWarnings: []
+        }
+    };
+    context.taskOrchestrationDraftMetrics = computed.taskOrchestrationDraftMetrics.call(context);
+    context.taskOrchestrationDraftChecklist = computed.taskOrchestrationDraftChecklist.call(context);
+    const readiness = computed.taskOrchestrationDraftReadiness.call(context);
+
+    assert.strictEqual(readiness.tone, 'success');
+    assert.strictEqual(readiness.title, '可以执行');
+    assert.strictEqual(context.taskOrchestrationDraftMetrics.followUpCount, 2);
+    assert.strictEqual(context.taskOrchestrationDraftChecklist[3].done, true);
+});
+
+test('appendTaskWorkflowId deduplicates ids and forces workflow engine', () => {
+    const methods = createTaskOrchestrationMethods({ api: async () => ({}) });
+    const context = {
+        taskOrchestration: {
+            workflowIdsText: 'diagnose-config',
+            selectedEngine: 'codex'
+        },
+        ensureTaskOrchestrationState: methods.ensureTaskOrchestrationState
+    };
+
+    methods.appendTaskWorkflowId.call(context, 'safe-provider-switch');
+    methods.appendTaskWorkflowId.call(context, 'diagnose-config');
+
+    assert.strictEqual(context.taskOrchestration.selectedEngine, 'workflow');
+    assert.strictEqual(context.taskOrchestration.workflowIdsText, 'diagnose-config\nsafe-provider-switch');
 });
