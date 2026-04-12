@@ -251,6 +251,8 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(usagePanel, /sessionUsageSummaryCards/);
     assert.match(usagePanel, /class="usage-summary-value" :title="card\.title \|\| null"/);
     assert.match(usagePanel, /v-if="card\.note" class="usage-summary-note"/);
+    assert.match(usagePanel, /sessionUsageCharts\.usedModels/);
+    assert.match(usagePanel, /class="usage-model-list"/);
     assert.match(usagePanel, /sessionUsageCharts\.buckets/);
     assert.doesNotMatch(usagePanel, /sessionUsageCharts\.topPaths\[0\]\?\.count/);
     assert.doesNotMatch(html, /sessionUsageSummaryCards\[0\]\?\.value/);
