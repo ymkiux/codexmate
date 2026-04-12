@@ -155,6 +155,10 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /<div[\s\S]*v-show="settingsTab === 'backup'"[\s\S]*id="settings-panel-backup"[\s\S]*aria-labelledby="settings-tab-backup">/);
     assert.match(html, /<div[\s\S]*v-show="settingsTab === 'trash'"[\s\S]*id="settings-panel-trash"[\s\S]*aria-labelledby="settings-tab-trash">/);
     assert.match(html, /<div[\s\S]*v-show="settingsTab === 'device'"[\s\S]*id="settings-panel-device"[\s\S]*aria-labelledby="settings-tab-device">/);
+    assert.match(html, /id="settings-panel-backup"[\s\S]*?<span class="selector-title">分享命令前缀<\/span>/);
+    assert.match(html, /<select class="model-select" :value="shareCommandPrefix" @change="setShareCommandPrefix\(\$event\.target\.value\)">/);
+    assert.match(html, /<option value="npm start">npm start<\/option>/);
+    assert.match(html, /<option value="codexmate">codexmate<\/option>/);
     assert.match(html, /id="settings-panel-device"[\s\S]*?<span class="selector-title">配置重置<\/span>/);
     assert.match(html, /id="settings-panel-device"[\s\S]*?@click="resetConfig"/);
     assert.doesNotMatch(
@@ -233,8 +237,10 @@ test('config template keeps expected config tabs in top and side navigation', ()
         /<button[\s\S]*?@click="copyProviderShareCommand\(provider\)"[\s\S]*?aria-label="Share import command">/
     );
     assert(providerShareButton, 'provider share button should exist');
-    assert.match(providerShareButton[0], /disabled/);
-    assert.match(providerShareButton[0], /title="分享命令（暂不可用）"/);
+    assert.match(providerShareButton[0], /:class="\{ loading: providerShareLoading\[provider\.name\], disabled: !shouldAllowProviderShare\(provider\) \}"/);
+    assert.match(providerShareButton[0], /:disabled="providerShareLoading\[provider\.name\] \|\| !shouldAllowProviderShare\(provider\)"/);
+    assert.match(providerShareButton[0], /:title="shouldAllowProviderShare\(provider\) \? '分享命令' : '不可分享'"/);
+    assert.doesNotMatch(html, /<span class="selector-title">local 本地端口<\/span>/);
     assert.match(html, /<button class="btn-icon" @click="showModelModal = true" aria-label="Add model" title="添加模型" v-if="modelsSource === 'legacy'">\+<\/button>/);
     assert.match(html, /<button class="btn-icon" @click="showModelListModal = true" aria-label="Manage models" title="管理模型" v-if="modelsSource === 'legacy'">≡<\/button>/);
     assert.match(html, /<button class="card-action-btn"[^>]*@click="openHealthCheckDialog\(\{ providerName: provider\.name, locked: true \}\)"[^>]*:aria-label="`Open health dialog for \$\{provider\.name\}`"[^>]*title="检测对话">/);

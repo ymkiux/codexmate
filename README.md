@@ -48,6 +48,7 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 - provider / model 切换（`switch` / `use`）
 - Codex `config.toml` 模板确认后写入
 - Claude Code 多配置方案管理与一键应用
+- 分享命令前缀切换（`npm start` / `codexmate`），用于复制 provider / Claude 导入命令，选择持久化到浏览器本地缓存
 - OpenClaw JSON5 配置方案管理
 
 **会话管理**
@@ -212,6 +213,11 @@ codexmate codex --model gpt-5.3-codex --follow-up "步骤1" --follow-up "步骤2
 - 展示当前目标的本地 skills 根目录、已安装项和可导入项
 - 扫描 `Codex` / `Claude Code` / `Agents` 目录中的可导入来源
 - 支持跨应用导入、ZIP 导入 / 导出、批量删除
+
+### 设置标签页
+- 支持切换分享命令前缀：`npm start` / `codexmate`
+- 影响 Web UI 中复制出来的 provider 分享命令与 Claude 导入命令
+- 选择持久化到浏览器本地缓存，刷新页面后仍保留
 
 ## MCP
 
