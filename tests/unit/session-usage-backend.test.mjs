@@ -354,6 +354,31 @@ test('listSessionUsage scans the full session file so middle model names are not
     }
 });
 
+test('readSessionModelsFromRecord scans nested model keys without treating provider as model', () => {
+    const readSessionModelsFromRecord = instantiateFunctionBundle(
+        [readSessionModelsFromRecordSrc],
+        'readSessionModelsFromRecord'
+    );
+
+    const result = readSessionModelsFromRecord({
+        payload: {
+            model_provider: 'maxx',
+            info: {
+                selected_model: 'gpt-5.3-codex',
+                nested_models: ['gpt-5.2-codex', 'gpt-5.3-codex']
+            },
+            model_config: {
+                slug: 'gpt-5.1-codex-max'
+            }
+        },
+        message: {
+            model_name: 'gpt-5.3-codex'
+        }
+    });
+
+    assert.deepStrictEqual(result, ['gpt-5.3-codex', 'gpt-5.2-codex', 'gpt-5.1-codex-max']);
+});
+
 test('parseCodexSessionSummary reads token totals and model data from tail records', () => {
     const parseCodexSessionSummary = instantiateFunctionBundle(
         [
@@ -385,8 +410,9 @@ test('parseCodexSessionSummary reads token totals and model data from tail recor
             SESSION_TITLE_READ_BYTES: 512,
             SESSION_USAGE_TAIL_READ_BYTES: 256,
             toIsoTime(value, fallback = '') {
-                const iso = new Date(value).toISOString();
-                return iso === 'Invalid Date' ? fallback : iso;
+                const date = new Date(value);
+                if (!Number.isFinite(date.getTime())) return fallback;
+                return date.toISOString();
             },
             updateLatestIso(current, next) {
                 const currentMs = Date.parse(current || '');
@@ -517,8 +543,9 @@ test('parseClaudeSessionSummary reads model from session index and tail records'
             SESSION_SUMMARY_READ_BYTES: 512,
             SESSION_TITLE_READ_BYTES: 512,
             toIsoTime(value, fallback = '') {
-                const iso = new Date(value).toISOString();
-                return iso === 'Invalid Date' ? fallback : iso;
+                const date = new Date(value);
+                if (!Number.isFinite(date.getTime())) return fallback;
+                return date.toISOString();
             },
             updateLatestIso(current, next) {
                 const currentMs = Date.parse(current || '');

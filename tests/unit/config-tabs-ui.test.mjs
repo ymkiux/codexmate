@@ -18,6 +18,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     const baseTheme = readProjectFile('web-ui/styles/base-theme.css');
     const controlsForms = readProjectFile('web-ui/styles/controls-forms.css');
     const taskOrchestrationStyles = readProjectFile('web-ui/styles/task-orchestration.css');
+    const bundledStyles = readBundledWebUiCss();
     const sideRail = html.match(/<aside class="side-rail"[\s\S]*?<\/aside>/)?.[0] || '';
     const topTabModes = [...html.matchAll(/id="tab-config-([a-z]+)"/g)]
         .map((match) => match[1]);
@@ -80,13 +81,16 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(orchestrationPanel, /class="task-template-chip-group"/);
     assert.match(orchestrationPanel, /class="task-workflow-suggestions"/);
     assert.match(orchestrationPanel, /@click="appendTaskWorkflowId\(workflow.id \|\| workflow.name\)"/);
-    assert.match(orchestrationPanel, /class="task-draft-overview"/);
+    assert.match(orchestrationPanel, /class="[^"]*task-draft-overview[^"]*"/);
     assert.match(orchestrationPanel, /class="task-advanced-panel"/);
     assert.match(orchestrationPanel, /taskOrchestrationDraftReadiness.summary/);
-    assert.match(orchestrationPanel, /taskOrchestrationDraftChecklist/);
+    assert.match(orchestrationPanel, /taskOrchestrationDraftReadiness.title/);
+    assert.match(orchestrationPanel, /class="task-config-strip"/);
     assert.match(orchestrationPanel, /taskOrchestration.workspaceTab === 'queue'/);
     assert.match(orchestrationPanel, /taskOrchestration.workspaceTab === 'runs'/);
     assert.match(orchestrationPanel, /taskOrchestration.workspaceTab === 'detail'/);
+    assert.match(orchestrationPanel, /taskOrchestration\.queue\.length \|\| taskOrchestration\.runs\.length \|\| taskOrchestration\.selectedRunId \|\| taskOrchestration\.selectedRunError/);
+    assert.match(orchestrationPanel, /taskOrchestration\.plan \|\| taskOrchestration\.planIssues\.length \|\| taskOrchestration\.planWarnings\.length \|\| taskOrchestration\.lastError/);
     assert.match(orchestrationPanel, /class="selector-section task-stage-card"/);
     assert.match(orchestrationPanel, /工作区会在需要时再展开/);
     assert.match(orchestrationPanel, /class="btn-tool task-action-preview" @click="previewTaskPlan\(\)"/);
@@ -95,15 +99,17 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(orchestrationPanel, /class="task-empty-state"/);
     assert.match(orchestrationPanel, /taskOrchestration.selectedRunError/);
     assert.match(orchestrationPanel, /taskOrchestrationSelectedRunNodes/);
-    assert.match(taskOrchestrationStyles, /\.task-layout-grid-primary\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\);/);
-    assert.match(taskOrchestrationStyles, /\.task-layout-grid-secondary\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\);/);
-    assert.match(taskOrchestrationStyles, /\.task-hero-card,[\s\S]*\.task-empty-state\s*\{[\s\S]*border:\s*1px solid/);
-    assert.match(taskOrchestrationStyles, /\.task-template-chip-group,[\s\S]*\.task-workflow-suggestions\s*\{[\s\S]*display:\s*flex;[\s\S]*flex-wrap:\s*wrap;/);
-    assert.match(taskOrchestrationStyles, /\.task-checklist-inline\s*\{[\s\S]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/);
-    assert.match(taskOrchestrationStyles, /\.task-stage-empty\s*\{[\s\S]*display:\s*flex;/);
-    assert.match(taskOrchestrationStyles, /\.task-workbench-tabs\s*\{[\s\S]*display:\s*flex;/);
-    assert.match(taskOrchestrationStyles, /\.task-action-row-right\s*\{[\s\S]*display:\s*flex;[\s\S]*flex-wrap:\s*wrap;/);
-    assert.match(taskOrchestrationStyles, /\.task-runtime-item-actions\s*\{[\s\S]*flex-direction:\s*row;[\s\S]*align-items:\s*center;/);
+    for (const styles of [taskOrchestrationStyles, bundledStyles]) {
+        assert.match(styles, /\.task-layout-grid-primary\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\);/);
+        assert.match(styles, /\.task-layout-grid-secondary\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\);/);
+        assert.match(styles, /\.task-hero-card,[\s\S]*\.task-empty-state\s*\{[\s\S]*border:\s*1px solid/);
+        assert.match(styles, /\.task-template-chip-group,[\s\S]*\.task-workflow-suggestions\s*\{[\s\S]*display:\s*flex;[\s\S]*flex-wrap:\s*wrap;/);
+        assert.match(styles, /\.task-checklist-inline\s*\{[\s\S]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/);
+        assert.match(styles, /\.task-stage-empty\s*\{[\s\S]*display:\s*flex;/);
+        assert.match(styles, /\.task-workbench-tabs\s*\{[\s\S]*display:\s*flex;/);
+        assert.match(styles, /\.task-action-row-right\s*\{[\s\S]*display:\s*flex;[\s\S]*flex-wrap:\s*wrap;/);
+        assert.match(styles, /\.task-runtime-item-actions\s*\{[\s\S]*flex-direction:\s*row;[\s\S]*align-items:\s*center;/);
+    }
     assert.match(html, /id="side-tab-market"/);
     assert.match(html, /id="tab-market"/);
     assert.match(html, /id="side-tab-docs"/);
@@ -120,6 +126,8 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(usagePanel, /sessionsUsageLoading && !sessionsUsageList\.length" class="session-empty">正在加载 Usage 统计\.\.\.</);
     assert.match(usagePanel, /sessionsUsageError && !sessionsUsageList\.length" class="usage-empty">/);
     assert.match(usagePanel, /v-else-if="!sessionsUsageList\.length" class="usage-empty">暂无可用于统计的会话数据/);
+    assert.match(usagePanel, /sessionUsageCharts\.modelCoverage\.missingModelSessionsPreview\.length/);
+    assert.match(usagePanel, /当前仍缺模型名的会话/);
     assert.match(html, /data-main-tab="market"/);
     assert.match(html, /onMainTabPointerDown\('market', \$event\)/);
     assert.match(html, /onMainTabClick\('market', \$event\)/);

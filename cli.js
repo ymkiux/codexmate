@@ -4647,55 +4647,94 @@ function readSessionModelsFromRecord(record) {
     if (!record || typeof record !== 'object' || Array.isArray(record)) {
         return [];
     }
-    const payload = record.payload && typeof record.payload === 'object' && !Array.isArray(record.payload)
-        ? record.payload
-        : null;
-    const info = payload && payload.info && typeof payload.info === 'object' && !Array.isArray(payload.info)
-        ? payload.info
-        : null;
-    const collaborationMode = payload && payload.collaboration_mode && typeof payload.collaboration_mode === 'object' && !Array.isArray(payload.collaboration_mode)
-        ? payload.collaboration_mode
-        : null;
-    const collaborationSettings = collaborationMode && collaborationMode.settings && typeof collaborationMode.settings === 'object' && !Array.isArray(collaborationMode.settings)
-        ? collaborationMode.settings
-        : null;
-    const message = record.message && typeof record.message === 'object' && !Array.isArray(record.message)
-        ? record.message
-        : null;
-    const candidates = [
-        payload && payload.model,
-        payload && payload.model_name,
-        payload && payload.model_id,
-        payload && payload.modelId,
-        info && info.model,
-        info && info.model_name,
-        info && info.model_id,
-        info && info.modelId,
-        collaborationSettings && collaborationSettings.model,
-        collaborationSettings && collaborationSettings.model_name,
-        collaborationSettings && collaborationSettings.model_id,
-        collaborationSettings && collaborationSettings.modelId,
-        message && message.model,
-        message && message.model_name,
-        message && message.model_id,
-        message && message.modelId,
-        record.model,
-        record.modelName,
-        record.model_name,
-        record.model_id,
-        record.modelId
-    ];
     const models = [];
-    for (const candidate of candidates) {
+
+    const pushModel = (candidate) => {
+        if (Array.isArray(candidate)) {
+            for (const item of candidate) {
+                pushModel(item);
+            }
+            return;
+        }
         if (typeof candidate !== 'string') {
-            continue;
+            return;
         }
         const normalized = candidate.trim();
         if (!normalized || models.includes(normalized)) {
-            continue;
+            return;
         }
         models.push(normalized);
-    }
+    };
+
+    const shouldReadModelKey = (key) => {
+        const normalized = typeof key === 'string'
+            ? key.trim().toLowerCase().replace(/[^a-z0-9]/g, '')
+            : '';
+        if (!normalized || normalized.includes('provider')) {
+            return false;
+        }
+        return normalized === 'model'
+            || normalized === 'models'
+            || normalized.endsWith('model')
+            || normalized.endsWith('models')
+            || normalized.includes('modelname')
+            || normalized.includes('modelid')
+            || normalized.includes('modelslug')
+            || normalized.includes('selectedmodel')
+            || normalized.includes('defaultmodel')
+            || normalized.includes('modelconfig');
+    };
+
+    const pushObjectModelCandidates = (value) => {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) {
+            return;
+        }
+        pushModel(value.model);
+        pushModel(value.models);
+        pushModel(value.name);
+        pushModel(value.id);
+        pushModel(value.slug);
+        pushModel(value.model_name);
+        pushModel(value.model_id);
+        pushModel(value.modelId);
+        pushModel(value.model_slug);
+        pushModel(value.modelSlug);
+        pushModel(value.default_model);
+        pushModel(value.defaultModel);
+        pushModel(value.selected_model);
+        pushModel(value.selectedModel);
+    };
+
+    const seen = new Set();
+    const visit = (value, keyHint = '') => {
+        if (Array.isArray(value)) {
+            if (shouldReadModelKey(keyHint)) {
+                pushModel(value);
+            }
+            for (const item of value) {
+                visit(item, keyHint);
+            }
+            return;
+        }
+        if (!value || typeof value !== 'object') {
+            if (shouldReadModelKey(keyHint)) {
+                pushModel(value);
+            }
+            return;
+        }
+        if (seen.has(value)) {
+            return;
+        }
+        seen.add(value);
+        if (shouldReadModelKey(keyHint)) {
+            pushObjectModelCandidates(value);
+        }
+        for (const [childKey, childValue] of Object.entries(value)) {
+            visit(childValue, childKey);
+        }
+    };
+
+    visit(record);
     return models;
 }
 
