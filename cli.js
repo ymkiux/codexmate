@@ -9319,25 +9319,7 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             result = buildInstallStatusReport();
                             break;
                         case 'list':
-                            const listConfigResult = readConfigOrVirtualDefault();
-                            const listConfig = listConfigResult.config;
-                            const providers = listConfig.model_providers || {};
-                            const current = listConfig.model_provider;
-                            result = {
-                                configReady: !listConfigResult.isVirtual,
-                                configErrorType: listConfigResult.errorType || '',
-                                configNotice: listConfigResult.reason || '',
-                                providers: Object.entries(providers).map(([name, p]) => ({
-                                    name,
-                                    url: p.base_url || '',
-                                    key: maskKey(p.preferred_auth_method || ''),
-                                    hasKey: !!(p.preferred_auth_method && p.preferred_auth_method.trim()),
-                                    current: name === current,
-                                    readOnly: isBuiltinManagedProvider(name),
-                                    nonDeletable: isNonDeletableProvider(name),
-                                    nonEditable: isNonEditableProvider(name)
-                                }))
-                            };
+                            result = buildMcpProviderListPayload();
                             break;
                         case 'models':
                             {
@@ -11521,6 +11503,25 @@ function buildMcpProviderListPayload() {
             url: p.base_url || '',
             key: maskKey(p.preferred_auth_method || ''),
             hasKey: !!(p.preferred_auth_method && p.preferred_auth_method.trim()),
+            models: Array.isArray(p.models)
+                ? p.models
+                    .filter((model) => model && typeof model === 'object' && !Array.isArray(model))
+                    .map((model) => ({
+                        id: typeof model.id === 'string' ? model.id : '',
+                        name: typeof model.name === 'string' ? model.name : '',
+                        cost: model.cost && typeof model.cost === 'object' && !Array.isArray(model.cost)
+                            ? {
+                                input: model.cost.input,
+                                output: model.cost.output,
+                                cacheRead: model.cost.cacheRead,
+                                cacheWrite: model.cost.cacheWrite
+                            }
+                            : null,
+                        contextWindow: model.contextWindow,
+                        maxTokens: model.maxTokens
+                    }))
+                    .filter((model) => model.id)
+                : [],
             current: name === current,
             readOnly: isBuiltinManagedProvider(name),
             nonDeletable: isNonDeletableProvider(name),

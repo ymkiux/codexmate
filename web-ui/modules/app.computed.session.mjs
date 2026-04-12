@@ -353,7 +353,7 @@ export function createSessionComputed() {
                     value: estimatedCost.hasEstimate ? formatUsageEstimatedCost(estimatedCost.totalCostUsd) : '暂无',
                     title: estimatedCost.hasEstimate
                         ? `按已知模型单价估算，覆盖 ${estimatedCost.estimatedSessions}/${estimatedCost.totalSessions} 个会话，约 ${estimatedCost.coveragePercent}% token`
-                        : '缺少可匹配的模型单价或 token 拆分，暂时无法估算'
+                        : '缺少可匹配的模型单价或 token 拆分。请先在 Provider 配置里补 models.cost，或确认 session 已记录 input/output token。'
                 },
                 {
                     key: 'active-duration',

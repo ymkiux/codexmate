@@ -64,6 +64,30 @@
     margin-top: 14px;
 }
 
+.task-action-row > .btn-tool,
+.task-section-header .settings-tab-actions > .btn-tool-compact {
+    min-height: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+}
+
+.task-action-row > .btn-tool {
+    flex: 1 1 120px;
+}
+
+.task-section-header .settings-tab-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.task-section-header .settings-tab-actions > .btn-tool-compact {
+    min-width: 88px;
+}
+
 .task-plan-summary-item {
     min-width: 120px;
     padding: 10px 12px;
@@ -179,6 +203,16 @@
     align-items: flex-end;
 }
 
+.task-runtime-item-actions .btn-mini {
+    min-width: 72px;
+    min-height: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+}
+
 .pill.success {
     background: rgba(81, 154, 91, 0.14);
     color: #285d31;
@@ -219,5 +253,9 @@
 @media (max-width: 720px) {
     .task-composer-grid {
         grid-template-columns: 1fr;
+    }
+
+    .task-action-row > .btn-tool {
+        flex-basis: calc(50% - 5px);
     }
 }

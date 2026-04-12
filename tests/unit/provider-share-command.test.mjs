@@ -1182,7 +1182,21 @@ test('buildMcpProviderListPayload keeps regular providers editable', () => {
                     model_providers: {
                         openai: {
                             base_url: 'https://api.openai.com/v1',
-                            preferred_auth_method: 'sk-live'
+                            preferred_auth_method: 'sk-live',
+                            models: [
+                                {
+                                    id: 'gpt-5.3-codex',
+                                    name: 'GPT-5.3 Codex',
+                                    cost: {
+                                        input: 2,
+                                        output: 8,
+                                        cacheRead: 0.5,
+                                        cacheWrite: 0
+                                    },
+                                    contextWindow: 256000,
+                                    maxTokens: 8192
+                                }
+                            ]
                         }
                     }
                 }
@@ -1202,6 +1216,20 @@ test('buildMcpProviderListPayload keeps regular providers editable', () => {
     assert.strictEqual(openai.nonEditable, false);
     assert.strictEqual(openai.nonDeletable, false);
     assert.strictEqual(openai.current, true);
+    assert.deepStrictEqual(openai.models, [
+        {
+            id: 'gpt-5.3-codex',
+            name: 'GPT-5.3 Codex',
+            cost: {
+                input: 2,
+                output: 8,
+                cacheRead: 0.5,
+                cacheWrite: 0
+            },
+            contextWindow: 256000,
+            maxTokens: 8192
+        }
+    ]);
 });
 
 test('applyCodexConfigDirect applies provider config without local proxy indirection', async () => {

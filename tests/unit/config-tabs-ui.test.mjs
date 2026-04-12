@@ -67,7 +67,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /:aria-selected="mainTab === 'orchestration'"/);
     assert.match(html, /id="panel-orchestration"/);
     assert.match(html, /v-show="mainTab === 'orchestration'"/);
-    assert.match(orchestrationPanel, /<span class="selector-title">任务目标<\/span>/);
+    assert.match(orchestrationPanel, /<span class="selector-title">任务编排<\/span>/);
     assert.match(orchestrationPanel, /@click="previewTaskPlan\(\)"/);
     assert.match(orchestrationPanel, /@click="runTaskOrchestration\(\)"/);
     assert.match(orchestrationPanel, /@click="addTaskOrchestrationToQueue\(\)"/);
