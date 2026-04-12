@@ -49,6 +49,42 @@ function formatUsageEstimatedCost(value) {
     }).format(numeric);
 }
 
+function formatUsageDuration(value, options = {}) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+        return '0分';
+    }
+    const totalMinutes = Math.floor(numeric / 60000);
+    if (totalMinutes <= 0) {
+        return '<1分';
+    }
+    const maxParts = Number.isFinite(Number(options.maxParts))
+        ? Math.max(1, Math.floor(Number(options.maxParts)))
+        : 2;
+    const units = [
+        { label: '天', value: 24 * 60 },
+        { label: '小时', value: 60 },
+        { label: '分', value: 1 }
+    ];
+    let remainingMinutes = totalMinutes;
+    const parts = [];
+    for (const unit of units) {
+        if (remainingMinutes < unit.value && unit.value !== 1) {
+            continue;
+        }
+        const count = unit.value === 1 ? remainingMinutes : Math.floor(remainingMinutes / unit.value);
+        if (count <= 0) {
+            continue;
+        }
+        parts.push(`${count}${unit.label}`);
+        remainingMinutes -= count * unit.value;
+        if (parts.length >= maxParts) {
+            break;
+        }
+    }
+    return parts.length ? parts.join(' ') : '0分';
+}
+
 function buildUsagePricingIndex(providersList = []) {
     const byProvider = new Map();
     const byModel = new Map();
@@ -290,7 +326,7 @@ export function createSessionComputed() {
         sessionUsageSummaryCards() {
             const summary = this.sessionUsageCharts && this.sessionUsageCharts.summary
                 ? this.sessionUsageCharts.summary
-                : { totalSessions: 0, totalMessages: 0, totalTokens: 0, totalContextWindow: 0, activeDays: 0, avgMessagesPerSession: 0, busiestDay: null, busiestHour: null };
+                : { totalSessions: 0, totalMessages: 0, totalTokens: 0, totalContextWindow: 0, activeDurationMs: 0, totalDurationMs: 0, activeDays: 0, avgMessagesPerSession: 0, busiestDay: null, busiestHour: null };
             const estimatedCost = estimateUsageCostSummary(
                 this.sessionsUsageList,
                 this.providersList,
@@ -313,11 +349,23 @@ export function createSessionComputed() {
                 },
                 {
                     key: 'estimated-cost',
-                    label: '约费用',
+                    label: '预估费用',
                     value: estimatedCost.hasEstimate ? formatUsageEstimatedCost(estimatedCost.totalCostUsd) : '暂无',
                     title: estimatedCost.hasEstimate
                         ? `按已知模型单价估算，覆盖 ${estimatedCost.estimatedSessions}/${estimatedCost.totalSessions} 个会话，约 ${estimatedCost.coveragePercent}% token`
                         : '缺少可匹配的模型单价或 token 拆分，暂时无法估算'
+                },
+                {
+                    key: 'active-duration',
+                    label: '活跃时长',
+                    value: formatUsageDuration(summary.activeDurationMs || 0),
+                    title: `累计会话跨度 ${formatUsageDuration(summary.activeDurationMs || 0, { maxParts: 3 })}`
+                },
+                {
+                    key: 'total-duration',
+                    label: '总时长',
+                    value: formatUsageDuration(summary.totalDurationMs || 0),
+                    title: `整体时间跨度 ${formatUsageDuration(summary.totalDurationMs || 0, { maxParts: 3 })}`
                 },
                 { key: 'days', label: '活跃天数', value: formatUsageSummaryNumber(summary.activeDays || 0) },
                 { key: 'avg-messages', label: '平均每会话消息', value: summary.avgMessagesPerSession || 0 },

@@ -10,15 +10,17 @@ const { buildUsageChartGroups } = logic;
 test('buildUsageChartGroups aggregates codex and claude sessions into day buckets', () => {
     const now = Date.UTC(2026, 3, 6, 12, 0, 0);
     const result = buildUsageChartGroups([
-        { source: 'codex', updatedAt: '2026-04-06T08:00:00.000Z', messageCount: 5, totalTokens: 120, contextWindow: 32000, cwd: '/a' },
-        { source: 'claude', updatedAt: '2026-04-06T09:00:00.000Z', messageCount: 7, totalTokens: 230, contextWindow: 64000, cwd: '/a' },
-        { source: 'codex', updatedAt: '2026-04-05T09:00:00.000Z', messageCount: 3, totalTokens: 90, contextWindow: 16000, cwd: '/b' }
+        { source: 'codex', createdAt: '2026-04-06T07:30:00.000Z', updatedAt: '2026-04-06T08:00:00.000Z', messageCount: 5, totalTokens: 120, contextWindow: 32000, cwd: '/a' },
+        { source: 'claude', createdAt: '2026-04-06T08:15:00.000Z', updatedAt: '2026-04-06T09:00:00.000Z', messageCount: 7, totalTokens: 230, contextWindow: 64000, cwd: '/a' },
+        { source: 'codex', createdAt: '2026-04-05T08:00:00.000Z', updatedAt: '2026-04-05T09:00:00.000Z', messageCount: 3, totalTokens: 90, contextWindow: 16000, cwd: '/b' }
     ], { range: '7d', now });
 
     assert.strictEqual(result.summary.totalSessions, 3);
     assert.strictEqual(result.summary.totalMessages, 15);
     assert.strictEqual(result.summary.totalTokens, 440);
     assert.strictEqual(result.summary.totalContextWindow, 112000);
+    assert.strictEqual(result.summary.activeDurationMs, 8100000);
+    assert.strictEqual(result.summary.totalDurationMs, 90000000);
     assert.strictEqual(result.summary.codexTotal, 2);
     assert.strictEqual(result.summary.claudeTotal, 1);
     assert.strictEqual(result.summary.avgMessagesPerSession, 5);
