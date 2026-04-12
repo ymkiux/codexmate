@@ -42,6 +42,7 @@ const readTotalTokensFromUsageSrc = extractFunction(cliContent, 'readTotalTokens
 const readUsageTotalsFromUsageSrc = extractFunction(cliContent, 'readUsageTotalsFromUsage');
 const readContextWindowValueSrc = extractFunction(cliContent, 'readContextWindowValue');
 const applyUsageTotalsToStateSrc = extractFunction(cliContent, 'applyUsageTotalsToState');
+const readSessionModelsFromRecordSrc = extractFunction(cliContent, 'readSessionModelsFromRecord');
 const readSessionModelFromRecordSrc = extractFunction(cliContent, 'readSessionModelFromRecord');
 const readExplicitSessionProviderFromRecordSrc = extractFunction(cliContent, 'readExplicitSessionProviderFromRecord');
 const readSessionProviderFromRecordSrc = extractFunction(cliContent, 'readSessionProviderFromRecord');
@@ -255,13 +256,13 @@ test('listSessionUsage backfills missing model metadata from parsed session summ
         parseCodexSessionSummary(filePath, options) {
             codexParses.push({ filePath, options });
             return filePath === '/tmp/codex-1.jsonl'
-                ? { model: 'gpt-5.3-codex', provider: 'maxx' }
+                ? { model: 'gpt-5.3-codex', models: ['gpt-5.3-codex', 'gpt-5.2-codex'], provider: 'maxx' }
                 : null;
         },
         parseClaudeSessionSummary(filePath, options) {
             claudeParses.push({ filePath, options });
             return filePath === '/tmp/claude-1.jsonl'
-                ? { model: 'claude-3-7-sonnet', provider: 'claude' }
+                ? { model: 'claude-3-7-sonnet', models: ['claude-3-7-sonnet'], provider: 'claude' }
                 : null;
         },
         listAllSessionsData: async () => {
@@ -272,8 +273,10 @@ test('listSessionUsage backfills missing model metadata from parsed session summ
     const result = await listSessionUsage({ source: 'all', limit: 50, forceRefresh: true });
 
     assert.strictEqual(result[0].model, 'gpt-5.3-codex');
+    assert.deepStrictEqual(result[0].models, ['gpt-5.3-codex', 'gpt-5.2-codex']);
     assert.strictEqual(result[0].provider, 'maxx');
     assert.strictEqual(result[1].model, 'claude-3-7-sonnet');
+    assert.deepStrictEqual(result[1].models, ['claude-3-7-sonnet']);
     assert.strictEqual(result[1].provider, 'claude');
     assert.strictEqual(result[2].model, 'already-there');
     assert.deepStrictEqual(codexParses, [
@@ -305,6 +308,7 @@ test('parseCodexSessionSummary reads token totals and model data from tail recor
             readUsageTotalsFromUsageSrc,
             readContextWindowValueSrc,
             applyUsageTotalsToStateSrc,
+            readSessionModelsFromRecordSrc,
             readSessionModelFromRecordSrc,
             readExplicitSessionProviderFromRecordSrc,
             readSessionProviderFromRecordSrc,
@@ -375,8 +379,15 @@ test('parseCodexSessionSummary reads token totals and model data from tail recor
             timestamp: '2026-04-12T09:11:35.573Z',
             type: 'turn_context',
             payload: {
-                model: 'gpt-5.3-codex',
+                model: 'gpt-5.2-codex',
                 model_context_window: 258400
+            }
+        }),
+        JSON.stringify({
+            timestamp: '2026-04-12T09:11:35.580Z',
+            type: 'event_msg',
+            payload: {
+                model: 'gpt-5.3-codex'
             }
         }),
         JSON.stringify({
@@ -403,6 +414,7 @@ test('parseCodexSessionSummary reads token totals and model data from tail recor
         assert(result, 'expected codex session summary');
         assert.strictEqual(result.provider, 'maxx');
         assert.strictEqual(result.model, 'gpt-5.3-codex');
+        assert.deepStrictEqual(result.models, ['gpt-5.2-codex', 'gpt-5.3-codex']);
         assert.strictEqual(result.totalTokens, 352001);
         assert.strictEqual(result.inputTokens, 348969);
         assert.strictEqual(result.cachedInputTokens, 305664);
@@ -429,6 +441,7 @@ test('parseClaudeSessionSummary reads model from session index and tail records'
             readUsageTotalsFromUsageSrc,
             readContextWindowValueSrc,
             applyUsageTotalsToStateSrc,
+            readSessionModelsFromRecordSrc,
             readSessionModelFromRecordSrc,
             readExplicitSessionProviderFromRecordSrc,
             readSessionProviderFromRecordSrc,
@@ -476,7 +489,7 @@ test('parseClaudeSessionSummary reads model from session index and tail records'
     const filePath = path.join(tempDir, 'claude-tail.jsonl');
     fs.writeFileSync(filePath, [
         JSON.stringify({ type: 'user', message: { content: 'hello from claude' }, timestamp: '2026-04-12T09:07:26.690Z' }),
-        JSON.stringify({ type: 'assistant', message: { content: 'hi there' }, timestamp: '2026-04-12T09:07:27.690Z' }),
+        JSON.stringify({ type: 'assistant', message: { content: 'hi there', model: 'claude-3-5-sonnet' }, timestamp: '2026-04-12T09:07:27.690Z' }),
         JSON.stringify({ type: 'assistant', message: { model: 'claude-3-7-sonnet', usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15 } }, timestamp: '2026-04-12T09:11:35.588Z' })
     ].join('\n'));
 
@@ -484,6 +497,7 @@ test('parseClaudeSessionSummary reads model from session index and tail records'
         const result = parseClaudeSessionSummary(filePath, { summaryReadBytes: 512, titleReadBytes: 512 });
         assert(result, 'expected claude session summary');
         assert.strictEqual(result.model, 'claude-3-7-sonnet');
+        assert.deepStrictEqual(result.models, ['claude-3-5-sonnet', 'claude-3-7-sonnet']);
         assert.strictEqual(result.totalTokens, 15);
     } finally {
         fs.rmSync(tempDir, { recursive: true, force: true });
