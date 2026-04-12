@@ -52,6 +52,9 @@ export function createDashboardComputed() {
             if (this.codexApplying || this.configTemplateApplying || this.openclawApplying) tasks.push('配置应用');
             if (this.agentsSaving) tasks.push('AGENTS 保存');
             if (this.skillsLoading || this.skillsDeleting || this.skillsScanningImports || this.skillsImporting || this.skillsZipImporting || this.skillsExporting) tasks.push('Skills 管理');
+            if (this.taskOrchestration && (this.taskOrchestration.loading || this.taskOrchestration.planning || this.taskOrchestration.running || this.taskOrchestration.queueAdding || this.taskOrchestration.queueStarting || this.taskOrchestration.retrying || this.taskOrchestration.selectedRunLoading)) {
+                tasks.push('任务编排');
+            }
             return tasks.length ? tasks.join(' / ') : '空闲';
         },
         inspectorMessageSummary() {

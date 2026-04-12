@@ -1,0 +1,258 @@
+                <div
+                    v-show="mainTab === 'orchestration'"
+                    class="mode-content"
+                    id="panel-orchestration"
+                    role="tabpanel"
+                    aria-labelledby="tab-orchestration">
+                    <div class="task-layout-grid">
+                        <section class="selector-section task-composer-card">
+                            <div class="selector-header task-section-header">
+                                <div>
+                                    <span class="selector-title">任务目标</span>
+                                    <div class="skills-panel-note">复用本地 Codex / workflow 能力生成计划、排队执行并回看历史 runs。</div>
+                                </div>
+                                <div class="settings-tab-actions">
+                                    <button type="button" class="btn-tool btn-tool-compact" @click="loadTaskOrchestrationOverview({ forceRefresh: true, includeDetail: true })" :disabled="taskOrchestration.loading">
+                                        {{ taskOrchestration.loading ? '刷新中...' : '刷新概览' }}
+                                    </button>
+                                    <button type="button" class="btn-tool btn-tool-compact" @click="resetTaskOrchestrationDraft()" :disabled="taskOrchestration.running || taskOrchestration.queueAdding || taskOrchestration.planning">
+                                        重置草稿
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="selector-grid task-composer-grid">
+                                <label class="selector-field task-field task-field-wide">
+                                    <span class="selector-label">任务目标</span>
+                                    <textarea v-model="taskOrchestration.target" class="task-textarea" rows="4" placeholder="例如：新增任务编排 Tab，并补上 CLI / API / 最小测试"></textarea>
+                                </label>
+                                <label class="selector-field">
+                                    <span class="selector-label">任务标题</span>
+                                    <input v-model="taskOrchestration.title" type="text" placeholder="可选，默认从目标自动提取">
+                                </label>
+                                <label class="selector-field">
+                                    <span class="selector-label">执行引擎</span>
+                                    <select v-model="taskOrchestration.selectedEngine">
+                                        <option value="codex">Codex</option>
+                                        <option value="workflow">Workflow</option>
+                                    </select>
+                                </label>
+                                <label class="selector-field">
+                                    <span class="selector-label">并发度</span>
+                                    <input v-model="taskOrchestration.concurrency" type="number" min="1" max="8">
+                                </label>
+                                <label class="selector-field">
+                                    <span class="selector-label">自动修复回合</span>
+                                    <input v-model="taskOrchestration.autoFixRounds" type="number" min="0" max="5">
+                                </label>
+                                <label class="selector-field task-field-wide">
+                                    <span class="selector-label">补充说明</span>
+                                    <textarea v-model="taskOrchestration.notes" class="task-textarea" rows="3" placeholder="例如：不要重写现有架构，只做增量实现"></textarea>
+                                </label>
+                                <label class="selector-field task-field-wide">
+                                    <span class="selector-label">Follow-up（每行一条）</span>
+                                    <textarea v-model="taskOrchestration.followUpsText" class="task-textarea" rows="3" placeholder="例如：\n继续处理 review 评论\n最后补回归测试"></textarea>
+                                </label>
+                                <label class="selector-field task-field-wide">
+                                    <span class="selector-label">Workflow IDs（每行一条，可选）</span>
+                                    <textarea v-model="taskOrchestration.workflowIdsText" class="task-textarea" rows="3" placeholder="例如：\ndiagnose-config\nsafe-provider-switch"></textarea>
+                                </label>
+                            </div>
+
+                            <div class="task-toggle-row">
+                                <label class="task-toggle">
+                                    <input v-model="taskOrchestration.allowWrite" type="checkbox">
+                                    <span>允许写入工作区</span>
+                                </label>
+                                <label class="task-toggle">
+                                    <input v-model="taskOrchestration.dryRun" type="checkbox">
+                                    <span>Dry run</span>
+                                </label>
+                            </div>
+
+                            <div class="task-action-row">
+                                <button type="button" class="btn-tool" @click="previewTaskPlan()" :disabled="taskOrchestration.planning || taskOrchestration.running || !taskOrchestration.target.trim()">
+                                    {{ taskOrchestration.planning ? '规划中...' : '预览计划' }}
+                                </button>
+                                <button type="button" class="btn-tool btn-primary" @click="runTaskOrchestration()" :disabled="taskOrchestration.running || !taskOrchestration.target.trim()">
+                                    {{ taskOrchestration.running ? '启动中...' : '执行计划' }}
+                                </button>
+                                <button type="button" class="btn-tool" @click="addTaskOrchestrationToQueue()" :disabled="taskOrchestration.queueAdding || !taskOrchestration.target.trim()">
+                                    {{ taskOrchestration.queueAdding ? '加入中...' : '加入队列' }}
+                                </button>
+                                <button type="button" class="btn-tool" @click="startTaskQueueRunner()" :disabled="taskOrchestration.queueStarting">
+                                    {{ taskOrchestration.queueStarting ? '启动中...' : '启动队列' }}
+                                </button>
+                            </div>
+                        </section>
+
+                        <section class="selector-section task-plan-card">
+                            <div class="selector-header task-section-header">
+                                <div>
+                                    <span class="selector-title">计划预览</span>
+                                    <div class="skills-panel-note">展示生成后的 DAG、波次和节点依赖。</div>
+                                </div>
+                            </div>
+                            <div v-if="taskOrchestration.planIssues.length" class="task-issues-list">
+                                <div v-for="issue in taskOrchestration.planIssues" :key="issue.code + issue.message" class="task-issue-item">
+                                    {{ issue.message }}
+                                </div>
+                            </div>
+                            <div v-if="taskOrchestration.planWarnings.length" class="task-warning-list">
+                                <div v-for="warning in taskOrchestration.planWarnings" :key="warning" class="task-warning-item">
+                                    {{ warning }}
+                                </div>
+                            </div>
+                            <div v-if="!taskOrchestration.plan" class="session-empty">先输入任务目标，再点“预览计划”。</div>
+                            <template v-else>
+                                <div class="task-plan-summary-strip">
+                                    <div class="task-plan-summary-item">
+                                        <span class="task-plan-summary-label">节点数</span>
+                                        <strong>{{ taskOrchestration.plan.nodes.length }}</strong>
+                                    </div>
+                                    <div class="task-plan-summary-item">
+                                        <span class="task-plan-summary-label">波次</span>
+                                        <strong>{{ taskOrchestration.plan.waves.length }}</strong>
+                                    </div>
+                                    <div class="task-plan-summary-item">
+                                        <span class="task-plan-summary-label">引擎</span>
+                                        <strong>{{ taskOrchestration.plan.engine }}</strong>
+                                    </div>
+                                </div>
+                                <div class="task-wave-list">
+                                    <div v-for="wave in taskOrchestration.plan.waves" :key="wave.label" class="task-wave-card">
+                                        <div class="task-wave-title">{{ wave.label }}</div>
+                                        <div class="task-wave-nodes">{{ wave.nodeIds.join(', ') }}</div>
+                                    </div>
+                                </div>
+                                <div class="task-node-list">
+                                    <div v-for="node in taskOrchestration.plan.nodes" :key="node.id" class="task-node-card">
+                                        <div class="task-node-head">
+                                            <div>
+                                                <div class="task-node-title">{{ node.title || node.id }}</div>
+                                                <div class="task-node-meta">{{ node.id }} · {{ node.kind }}<span v-if="node.workflowId"> · {{ node.workflowId }}</span></div>
+                                            </div>
+                                            <span :class="['pill', node.write ? 'configured' : 'empty']">{{ node.write ? 'write' : 'read-only' }}</span>
+                                        </div>
+                                        <div class="task-node-deps">依赖：{{ formatTaskNodeDependencies(node) }}</div>
+                                    </div>
+                                </div>
+                            </template>
+                        </section>
+                    </div>
+
+                    <div class="task-runtime-grid">
+                        <section class="selector-section task-runtime-card">
+                            <div class="selector-header task-section-header">
+                                <div>
+                                    <span class="selector-title">队列</span>
+                                    <div class="skills-panel-note">本地持久化队列，支持后台启动与取消。</div>
+                                </div>
+                            </div>
+                            <div v-if="!taskOrchestration.queue.length" class="session-empty">当前没有排队任务。</div>
+                            <div v-else class="task-runtime-list">
+                                <button
+                                    v-for="item in taskOrchestration.queue"
+                                    :key="item.taskId"
+                                    type="button"
+                                    class="task-runtime-item"
+                                    @click="item.lastRunId ? selectTaskRun(item.lastRunId) : null">
+                                    <div class="task-runtime-item-main">
+                                        <div class="task-runtime-item-title">{{ item.title || item.target || item.taskId }}</div>
+                                        <div class="task-runtime-item-meta">{{ item.taskId }} · {{ item.updatedAt || item.createdAt }}</div>
+                                        <div v-if="item.lastSummary" class="task-runtime-item-summary">{{ item.lastSummary }}</div>
+                                    </div>
+                                    <div class="task-runtime-item-actions">
+                                        <span :class="['pill', taskRunStatusTone(item.status)]">{{ item.status }}</span>
+                                        <button type="button" class="btn-mini" @click.stop="cancelTaskRunFromUi(item.taskId)" :disabled="item.status !== 'queued' && item.status !== 'running'">取消</button>
+                                    </div>
+                                </button>
+                            </div>
+                        </section>
+
+                        <section class="selector-section task-runtime-card">
+                            <div class="selector-header task-section-header">
+                                <div>
+                                    <span class="selector-title">历史 Runs</span>
+                                    <div class="skills-panel-note">最近执行记录，点开查看节点日志和结果摘要。</div>
+                                </div>
+                            </div>
+                            <div v-if="!taskOrchestration.runs.length" class="session-empty">还没有运行记录。</div>
+                            <div v-else class="task-runtime-list">
+                                <button
+                                    v-for="item in taskOrchestration.runs"
+                                    :key="item.runId"
+                                    type="button"
+                                    :class="['task-runtime-item', { active: taskOrchestration.selectedRunId === item.runId }]"
+                                    @click="selectTaskRun(item.runId)">
+                                    <div class="task-runtime-item-main">
+                                        <div class="task-runtime-item-title">{{ item.title || item.taskId || item.runId }}</div>
+                                        <div class="task-runtime-item-meta">{{ item.runId }} · {{ item.durationMs || 0 }}ms</div>
+                                        <div v-if="item.summary" class="task-runtime-item-summary">{{ item.summary }}</div>
+                                    </div>
+                                    <div class="task-runtime-item-actions">
+                                        <span :class="['pill', taskRunStatusTone(item.status)]">{{ item.status }}</span>
+                                    </div>
+                                </button>
+                            </div>
+                        </section>
+                    </div>
+
+                    <section class="selector-section task-detail-card">
+                        <div class="selector-header task-section-header">
+                            <div>
+                                <span class="selector-title">运行详情</span>
+                                <div class="skills-panel-note">查看摘要、节点状态、自动修复尝试与日志。</div>
+                            </div>
+                            <div class="settings-tab-actions">
+                                <button type="button" class="btn-tool btn-tool-compact" @click="taskOrchestration.selectedRunId ? loadTaskRunDetail(taskOrchestration.selectedRunId) : null" :disabled="!taskOrchestration.selectedRunId || taskOrchestration.selectedRunLoading">
+                                    {{ taskOrchestration.selectedRunLoading ? '刷新中...' : '刷新详情' }}
+                                </button>
+                                <button type="button" class="btn-tool btn-tool-compact" @click="retryTaskRunFromUi(taskOrchestration.selectedRunId)" :disabled="!taskOrchestration.selectedRunId || taskOrchestration.retrying">
+                                    {{ taskOrchestration.retrying ? '重试中...' : '重试 run' }}
+                                </button>
+                                <button type="button" class="btn-tool btn-tool-compact" @click="cancelTaskRunFromUi(taskOrchestration.selectedRunId)" :disabled="!taskOrchestrationSelectedRun || !taskOrchestrationSelectedRun.run || !isTaskRunActive(taskOrchestrationSelectedRun.run.status)">
+                                    取消运行
+                                </button>
+                            </div>
+                        </div>
+
+                        <div v-if="!taskOrchestrationSelectedRun" class="session-empty">选择一个 run 查看详情。</div>
+                        <template v-else>
+                            <div class="task-detail-summary-strip">
+                                <div class="task-plan-summary-item">
+                                    <span class="task-plan-summary-label">状态</span>
+                                    <strong>{{ taskOrchestrationSelectedRun.run.status }}</strong>
+                                </div>
+                                <div class="task-plan-summary-item">
+                                    <span class="task-plan-summary-label">耗时</span>
+                                    <strong>{{ taskOrchestrationSelectedRun.run.durationMs || 0 }}ms</strong>
+                                </div>
+                                <div class="task-plan-summary-item">
+                                    <span class="task-plan-summary-label">节点数</span>
+                                    <strong>{{ taskOrchestrationSelectedRunNodes.length }}</strong>
+                                </div>
+                                <div class="task-plan-summary-item">
+                                    <span class="task-plan-summary-label">摘要</span>
+                                    <strong>{{ taskOrchestrationSelectedRun.run.summary || '暂无' }}</strong>
+                                </div>
+                            </div>
+                            <div v-if="taskOrchestrationSelectedRun.run.error" class="task-issue-item">{{ taskOrchestrationSelectedRun.run.error }}</div>
+                            <div class="task-node-list">
+                                <div v-for="node in taskOrchestrationSelectedRunNodes" :key="node.id" class="task-node-card task-node-card-detail">
+                                    <div class="task-node-head">
+                                        <div>
+                                            <div class="task-node-title">{{ node.title || node.id }}</div>
+                                            <div class="task-node-meta">{{ node.id }} · attempts {{ node.attemptCount || 0 }} · auto-fix {{ node.autoFixRounds || 0 }}</div>
+                                        </div>
+                                        <span :class="['pill', taskRunStatusTone(node.status)]">{{ node.status }}</span>
+                                    </div>
+                                    <div v-if="node.summary" class="task-runtime-item-summary">{{ node.summary }}</div>
+                                    <div v-if="node.error && node.error !== node.summary" class="task-node-deps">错误：{{ node.error }}</div>
+                                    <div class="task-node-deps">依赖：{{ formatTaskNodeDependencies(node) }}</div>
+                                    <pre class="task-log-block">{{ Array.isArray(node.logs) && node.logs.length ? node.logs.map((item) => `${item.at || ''} ${item.level || ''} ${item.message || ''}`.trim()).join('\n') : '(no logs)' }}</pre>
+                                </div>
+                            </div>
+                        </template>
+                    </section>
+                </div>

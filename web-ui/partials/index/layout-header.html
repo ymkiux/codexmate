@@ -54,6 +54,16 @@
                 @pointerdown="onMainTabPointerDown('usage', $event)"
                 @click="onMainTabClick('usage', $event)">Usage</button>
             <button class="top-tab"
+                id="tab-orchestration"
+                role="tab"
+                data-main-tab="orchestration"
+                :tabindex="mainTab === 'orchestration' ? 0 : -1"
+                :aria-selected="mainTab === 'orchestration'"
+                aria-controls="panel-orchestration"
+                :class="{ active: isMainTabNavActive('orchestration') }"
+                @pointerdown="onMainTabPointerDown('orchestration', $event)"
+                @click="onMainTabClick('orchestration', $event)">任务编排</button>
+            <button class="top-tab"
                 id="tab-market"
                 role="tab"
                 data-main-tab="market"
@@ -175,6 +185,23 @@
                     </button>
                 </div>
 
+                <div class="side-section" role="navigation" aria-label="任务编排">
+                    <div class="side-section-title">任务</div>
+                    <button
+                        id="side-tab-orchestration"
+                        data-main-tab="orchestration"
+                        :aria-current="mainTab === 'orchestration' ? 'page' : null"
+                        :class="['side-item', { active: isMainTabNavActive('orchestration') }]"
+                        @pointerdown="onMainTabPointerDown('orchestration', $event)"
+                        @click="onMainTabClick('orchestration', $event)">
+                        <div class="side-item-title">任务编排</div>
+                        <div class="side-item-meta">
+                            <span>计划 / 队列 / 运行记录</span>
+                            <span>队列 {{ taskOrchestrationQueueStats.running }} 运行中 · {{ taskOrchestrationQueueStats.queued }} 等待中</span>
+                        </div>
+                    </button>
+                </div>
+
                 <div class="side-section" role="navigation" aria-label="技能市场">
                     <div class="side-section-title">扩展</div>
                     <button
@@ -231,9 +258,9 @@
                 <div class="main-panel-topbar">
                     <div class="panel-header panel-header-refined" v-if="!sessionStandalone">
                         <div class="panel-header-copy">
-                            <div class="panel-kicker">{{ mainTab === 'config' ? 'Configuration' : (mainTab === 'sessions' ? 'Sessions' : (mainTab === 'usage' ? 'Usage' : (mainTab === 'market' ? 'Skills' : (mainTab === 'docs' ? 'Docs' : 'Settings')))) }}</div>
-                            <h1 class="main-title">{{ mainTab === 'config' ? '本地配置控制台' : (mainTab === 'sessions' ? '会话与导出' : (mainTab === 'usage' ? '本地用量与趋势' : (mainTab === 'market' ? 'Skills 安装与同步' : (mainTab === 'docs' ? 'CLI 安装与文档' : '系统与数据设置')))) }}</h1>
-                            <p class="subtitle">{{ mainTab === 'config' ? '管理本地配置与模型。' : (mainTab === 'sessions' ? '浏览与导出会话。' : (mainTab === 'usage' ? '查看近 7 / 30 天用量。' : (mainTab === 'market' ? '管理本地 Skills。' : (mainTab === 'docs' ? '查看 CLI 安装命令与排障。' : '管理下载、目录与回收站。')))) }}</p>
+                            <div class="panel-kicker">{{ mainTabKicker }}</div>
+                            <h1 class="main-title">{{ mainTabTitle }}</h1>
+                            <p class="subtitle">{{ mainTabSubtitle }}</p>
                         </div>
                     </div>
 
@@ -299,6 +326,28 @@
                         <div class="status-chip">
                             <span class="label">总消息数</span>
                             <span class="value">{{ sessionUsageSummaryCards[1] ? sessionUsageSummaryCards[1].value : 0 }}</span>
+                        </div>
+                    </div>
+                    <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'orchestration'">
+                        <div class="status-chip">
+                            <span class="label">引擎</span>
+                            <span class="value">{{ taskOrchestration.selectedEngine === 'workflow' ? 'Workflow' : 'Codex' }}</span>
+                        </div>
+                        <div class="status-chip">
+                            <span class="label">并发度</span>
+                            <span class="value">{{ taskOrchestration.concurrency }}</span>
+                        </div>
+                        <div class="status-chip">
+                            <span class="label">运行中</span>
+                            <span class="value">{{ taskOrchestrationQueueStats.running }}</span>
+                        </div>
+                        <div class="status-chip">
+                            <span class="label">排队中</span>
+                            <span class="value">{{ taskOrchestrationQueueStats.queued }}</span>
+                        </div>
+                        <div class="status-chip">
+                            <span class="label">历史 Runs</span>
+                            <span class="value">{{ taskOrchestration.runs.length }}</span>
                         </div>
                     </div>
                     <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'market'">

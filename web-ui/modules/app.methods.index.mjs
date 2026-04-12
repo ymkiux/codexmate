@@ -20,6 +20,7 @@ import { createOpenclawEditingMethods } from './app.methods.openclaw-editing.mjs
 import { createOpenclawPersistMethods } from './app.methods.openclaw-persist.mjs';
 import { createProvidersMethods } from './app.methods.providers.mjs';
 import { createRuntimeMethods } from './app.methods.runtime.mjs';
+import { createTaskOrchestrationMethods } from './app.methods.task-orchestration.mjs';
 import { createSessionActionMethods } from './app.methods.session-actions.mjs';
 import { createSessionBrowserMethods } from './app.methods.session-browser.mjs';
 import { createSessionTimelineMethods } from './app.methods.session-timeline.mjs';
@@ -81,6 +82,7 @@ export function createAppMethods() {
             defaultOpenclawTemplate: DEFAULT_OPENCLAW_TEMPLATE
         }),
         ...createInstallMethods(),
-        ...createRuntimeMethods({ api })
+        ...createRuntimeMethods({ api }),
+        ...createTaskOrchestrationMethods({ api })
     };
 }

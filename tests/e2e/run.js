@@ -23,6 +23,7 @@ const testHealthSpeed = require('./test-health-speed');
 const testMessages = require('./test-messages');
 const testMcp = require('./test-mcp');
 const testWorkflow = require('./test-workflow');
+const testTaskOrchestration = require('./test-task-orchestration');
 const testInvalidConfig = require('./test-invalid-config');
 const testWebUiAssets = require('./test-web-ui-assets');
 const testWebUiSessionBrowser = require('./test-web-ui-session-browser');
@@ -134,6 +135,7 @@ async function main() {
         await testMessages(ctx);
         await testMcp(ctx);
         await testWorkflow(ctx);
+        await testTaskOrchestration(ctx);
         await testWebUiAssets(ctx);
         await testWebUiSessionBrowser(ctx);
 

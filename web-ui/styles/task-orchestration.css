@@ -1,0 +1,219 @@
+ .task-layout-grid,
+.task-runtime-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    gap: 14px;
+    margin-bottom: 14px;
+}
+
+.task-composer-card,
+.task-plan-card,
+.task-runtime-card,
+.task-detail-card {
+    min-width: 0;
+}
+
+.task-section-header {
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.task-composer-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.task-field-wide {
+    grid-column: 1 / -1;
+}
+
+.task-textarea,
+.task-log-block {
+    width: 100%;
+    min-height: 92px;
+    resize: vertical;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-alt);
+    color: var(--color-text-primary);
+    font: inherit;
+    box-sizing: border-box;
+}
+
+.task-toggle-row,
+.task-action-row,
+.task-plan-summary-strip,
+.task-detail-summary-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.task-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+}
+
+.task-action-row {
+    margin-top: 14px;
+}
+
+.task-plan-summary-item {
+    min-width: 120px;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-alt);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.task-plan-summary-label {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.task-wave-list,
+.task-node-list,
+.task-runtime-list,
+.task-warning-list,
+.task-issues-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.task-wave-card,
+.task-node-card,
+.task-runtime-item,
+.task-warning-item,
+.task-issue-item {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-alt);
+}
+
+.task-wave-card,
+.task-node-card {
+    padding: 12px;
+}
+
+.task-warning-item,
+.task-issue-item {
+    padding: 10px 12px;
+    font-size: 13px;
+}
+
+.task-warning-item {
+    color: var(--color-text-secondary);
+    background: rgba(255, 244, 220, 0.7);
+}
+
+.task-issue-item {
+    color: #8f2d21;
+    background: rgba(255, 232, 228, 0.75);
+}
+
+.task-wave-title,
+.task-node-title,
+.task-runtime-item-title {
+    font-weight: 700;
+    color: var(--color-text-primary);
+}
+
+.task-wave-nodes,
+.task-node-meta,
+.task-node-deps,
+.task-runtime-item-meta,
+.task-runtime-item-summary {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+}
+
+.task-node-head,
+.task-runtime-item,
+.task-runtime-item-actions {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.task-runtime-item {
+    width: 100%;
+    padding: 12px;
+    cursor: pointer;
+    text-align: left;
+}
+
+.task-runtime-item.active {
+    border-color: rgba(199, 116, 98, 0.3);
+    background: var(--color-brand-light);
+}
+
+.task-runtime-item-main {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.task-runtime-item-actions {
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.pill.success {
+    background: rgba(81, 154, 91, 0.14);
+    color: #285d31;
+}
+
+.pill.warn {
+    background: rgba(214, 153, 58, 0.16);
+    color: #7a5110;
+}
+
+.pill.error {
+    background: rgba(194, 73, 63, 0.16);
+    color: #8f2d21;
+}
+
+.pill.neutral {
+    background: rgba(116, 126, 138, 0.14);
+    color: #45515e;
+}
+
+.task-log-block {
+    margin: 10px 0 0;
+    min-height: 120px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+@media (max-width: 1100px) {
+    .task-layout-grid,
+    .task-runtime-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 720px) {
+    .task-composer-grid {
+        grid-template-columns: 1fr;
+    }
+}

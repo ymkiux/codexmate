@@ -346,7 +346,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 claudeImportLoading: false,
                 codexImportLoading: false,
                 codexAuthProfiles: [],
-                forceCompactLayout: false
+                forceCompactLayout: false,
+                taskOrchestration: {
+                    loading: false,
+                    planning: false,
+                    running: false,
+                    queueAdding: false,
+                    queueStarting: false,
+                    retrying: false,
+                    target: '',
+                    title: '',
+                    notes: '',
+                    followUpsText: '',
+                    workflowIdsText: '',
+                    selectedEngine: 'codex',
+                    allowWrite: false,
+                    dryRun: false,
+                    concurrency: 2,
+                    autoFixRounds: 1,
+                    plan: null,
+                    planIssues: [],
+                    planWarnings: [],
+                    workflows: [],
+                    queue: [],
+                    runs: [],
+                    selectedRunId: '',
+                    selectedRunDetail: null,
+                    selectedRunLoading: false,
+                    lastLoadedAt: '',
+                    lastError: ''
+                },
+                _taskOrchestrationPollTimer: 0
             };
         },
 
@@ -474,6 +504,7 @@ document.addEventListener('DOMContentLoaded', () => {
             window.removeEventListener('keydown', this.handleGlobalKeydown);
             window.removeEventListener('beforeunload', this.handleBeforeUnload);
             this.applyCompactLayoutClass(false);
+            this.stopTaskOrchestrationPolling();
             this.sessionPreviewScrollEl = null;
             this.sessionPreviewContainerEl = null;
             this.sessionPreviewHeaderEl = null;

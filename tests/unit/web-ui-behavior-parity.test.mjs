@@ -329,7 +329,9 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'openclawAuthProfilesByProvider',
         'openclawPendingAuthProfileUpdates',
         'sessionTrashEnabled',
-        'shareCommandPrefix'
+        'shareCommandPrefix',
+        'taskOrchestration',
+        '_taskOrchestrationPollTimer'
     ] : [
         '__mainTabSwitchState',
         'openclawAuthProfilesByProvider',
@@ -343,7 +345,9 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'sessionsUsageList',
         'sessionsUsageLoadedOnce',
         'sessionsUsageLoading',
-        'sessionsViewMode'
+        'sessionsViewMode',
+        'taskOrchestration',
+        '_taskOrchestrationPollTimer'
     ];
     const allowedMissingCurrentKeys = [
         'localProxyRunning',
@@ -404,7 +408,25 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'setShareCommandPrefix',
         'setSessionListRef',
         'hasRenderableSessionTimeline',
-        'syncDefaultOpenclawConfigEntry'
+        'syncDefaultOpenclawConfigEntry',
+        'ensureTaskOrchestrationState',
+        'buildTaskOrchestrationRequest',
+        'taskRunStatusTone',
+        'isTaskRunActive',
+        'formatTaskNodeDependencies',
+        'loadTaskOrchestrationOverview',
+        'previewTaskPlan',
+        'runTaskOrchestration',
+        'addTaskOrchestrationToQueue',
+        'startTaskQueueRunner',
+        'loadTaskRunDetail',
+        'selectTaskRun',
+        'retryTaskRunFromUi',
+        'cancelTaskRunFromUi',
+        'taskOrchestrationHasLiveActivity',
+        'stopTaskOrchestrationPolling',
+        'syncTaskOrchestrationPolling',
+        'resetTaskOrchestrationDraft'
     ];
     const allowedMissingCurrentMethodKeys = [
         'closeInstallModal',
@@ -446,7 +468,13 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     const extraCurrentComputedKeys = currentComputedKeys.filter((key) => !headComputedKeys.includes(key)).sort();
     const missingCurrentComputedKeys = headComputedKeys.filter((key) => !currentComputedKeys.includes(key)).sort();
     const allowedExtraCurrentComputedKeys = [
-        'visibleSessionsList'
+        'visibleSessionsList',
+        'mainTabKicker',
+        'mainTabTitle',
+        'mainTabSubtitle',
+        'taskOrchestrationSelectedRun',
+        'taskOrchestrationSelectedRunNodes',
+        'taskOrchestrationQueueStats'
     ];
     const allowedMissingCurrentComputedKeys = [
         'hasLocalAndProxy',
