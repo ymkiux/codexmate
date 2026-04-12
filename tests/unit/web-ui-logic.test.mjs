@@ -738,6 +738,54 @@ test('sessionUsageSummaryCards uses compact units for long token and context tot
     assert.strictEqual(totalDurationCard.value, '7天 5小时');
 });
 
+test('sessionUsageSummaryCards explains why usage cost is unavailable for the selected range', () => {
+    const computed = createSessionComputed();
+    const cards = computed.sessionUsageSummaryCards.call({
+        sessionUsageCharts: {
+            summary: {
+                totalSessions: 2,
+                totalMessages: 5,
+                totalTokens: 320000,
+                totalContextWindow: 128000,
+                activeDurationMs: 20 * 60 * 1000,
+                totalDurationMs: 20 * 60 * 1000,
+                activeDays: 1,
+                avgMessagesPerSession: 2.5,
+                busiestDay: null,
+                busiestHour: null
+            }
+        },
+        sessionsUsageList: [
+            {
+                provider: 'maxx',
+                model: 'gpt-5.1-codex-max',
+                totalTokens: 200000,
+                inputTokens: 120000,
+                cachedInputTokens: 0,
+                outputTokens: 80000,
+                reasoningOutputTokens: 0
+            },
+            {
+                provider: 'maxx',
+                model: 'gpt-5.3-codex',
+                totalTokens: 120000,
+                inputTokens: undefined,
+                cachedInputTokens: 0,
+                outputTokens: undefined,
+                reasoningOutputTokens: 0
+            }
+        ],
+        sessionsUsageTimeRange: '7d',
+        providersList: [],
+        currentProvider: 'maxx'
+    });
+
+    const costCard = cards.find((card) => card.key === 'estimated-cost');
+    assert(costCard, 'missing estimated cost summary card');
+    assert.strictEqual(costCard.value, '暂无');
+    assert.strictEqual(costCard.note, '覆盖 0/2 个会话，1 个缺少模型单价，1 个缺少 token 拆分');
+});
+
 test('sessionUsageSummaryCards estimates usage cost from configured provider pricing', () => {
     const computed = createSessionComputed();
     const cards = computed.sessionUsageSummaryCards.call({
@@ -802,7 +850,7 @@ test('sessionUsageSummaryCards estimates usage cost from configured provider pri
     assert(totalDurationCard, 'missing total duration summary card');
     assert.strictEqual(costCard.value, '$1.25');
     assert.strictEqual(costCard.label, '预估费用 · 近 7 天');
-    assert.strictEqual(costCard.note, '覆盖 1/2 个会话');
+    assert.strictEqual(costCard.note, '覆盖 1/2 个会话，1 个缺少模型单价');
     assert.match(costCard.title, /覆盖 1\/2 个会话/);
     assert.match(costCard.title, /约 67% token/);
     assert.strictEqual(activeDurationCard.value, '1小时 30分');
