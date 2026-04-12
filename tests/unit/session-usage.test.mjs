@@ -76,3 +76,18 @@ test('buildUsageChartGroups produces stable unique keys for sessions without ids
     assert.strictEqual(new Set(recentKeys).size, recentKeys.length);
     assert.strictEqual(new Set(topKeys).size, topKeys.length);
 });
+
+test('buildUsageChartGroups supports all range and keeps every valid session in filteredSessions', () => {
+    const now = Date.UTC(2026, 3, 6, 12, 0, 0);
+    const sessions = [
+        { source: 'codex', createdAt: '2026-04-06T07:30:00.000Z', updatedAt: '2026-04-06T08:00:00.000Z', messageCount: 5, totalTokens: 120, contextWindow: 32000, cwd: '/a' },
+        { source: 'claude', createdAt: '2026-03-01T08:15:00.000Z', updatedAt: '2026-03-01T09:00:00.000Z', messageCount: 7, totalTokens: 230, contextWindow: 64000, cwd: '/b' }
+    ];
+    const result = buildUsageChartGroups(sessions, { range: 'all', now });
+
+    assert.strictEqual(result.range, 'all');
+    assert.strictEqual(result.summary.totalSessions, 2);
+    assert.strictEqual(result.filteredSessions.length, 2);
+    assert.strictEqual(result.buckets[0].key, '2026-03-01');
+    assert.strictEqual(result.buckets[result.buckets.length - 1].key, '2026-04-06');
+});

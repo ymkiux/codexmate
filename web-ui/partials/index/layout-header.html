@@ -180,7 +180,7 @@
                         <div class="side-item-title">Usage 趋势</div>
                         <div class="side-item-meta">
                             <span>本地统计 / 趋势</span>
-                            <span>范围：{{ sessionsUsageTimeRange === '30d' ? '近 30 天' : '近 7 天' }}</span>
+                            <span>范围：{{ sessionsUsageTimeRange === 'all' ? '全部' : (sessionsUsageTimeRange === '30d' ? '近 30 天' : '近 7 天') }}</span>
                         </div>
                     </button>
                 </div>
@@ -317,7 +317,7 @@
                     <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'usage'">
                         <div class="status-chip">
                             <span class="label">统计范围</span>
-                            <span class="value">{{ sessionsUsageTimeRange === '30d' ? '近 30 天' : '近 7 天' }}</span>
+                            <span class="value">{{ sessionsUsageTimeRange === 'all' ? '全部' : (sessionsUsageTimeRange === '30d' ? '近 30 天' : '近 7 天') }}</span>
                         </div>
                         <div class="status-chip">
                             <span class="label">总会话数</span>

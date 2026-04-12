@@ -121,16 +121,54 @@ export function formatSessionTimelineTimestamp(timestamp) {
     return value;
 }
 
-export function buildUsageChartGroups(sessions = [], options = {}) {
-    const list = Array.isArray(sessions) ? sessions : [];
-    const range = typeof options.range === 'string' ? options.range.trim().toLowerCase() : '7d';
+function normalizeUsageRange(range) {
+    const normalized = typeof range === 'string' ? range.trim().toLowerCase() : '7d';
+    if (normalized === '30d' || normalized === 'all') {
+        return normalized;
+    }
+    return '7d';
+}
+
+function toUtcDayStartMs(value) {
+    const stamp = new Date(value);
+    return Date.UTC(stamp.getUTCFullYear(), stamp.getUTCMonth(), stamp.getUTCDate());
+}
+
+function formatUtcDayKey(value) {
+    const stamp = new Date(value);
+    return `${stamp.getUTCFullYear()}-${String(stamp.getUTCMonth() + 1).padStart(2, '0')}-${String(stamp.getUTCDate()).padStart(2, '0')}`;
+}
+
+function buildUsageBuckets(normalizedSessions, options = {}) {
+    const range = normalizeUsageRange(options.range);
     const now = Number.isFinite(Number(options.now)) ? Number(options.now) : Date.now();
     const dayMs = 24 * 60 * 60 * 1000;
-    const rangeDays = range === '30d' ? 30 : 7;
     const buckets = [];
+
+    if (range === 'all') {
+        const validDayStarts = normalizedSessions
+            .map((session) => toUtcDayStartMs(session.updatedAtMs))
+            .filter((value) => Number.isFinite(value));
+        const firstDayStart = validDayStarts.length ? Math.min(...validDayStarts) : toUtcDayStartMs(now);
+        const lastDayStart = validDayStarts.length ? Math.max(...validDayStarts) : toUtcDayStartMs(now);
+        for (let stamp = firstDayStart; stamp <= lastDayStart; stamp += dayMs) {
+            const key = formatUtcDayKey(stamp);
+            buckets.push({
+                key,
+                label: key.slice(5),
+                codex: 0,
+                claude: 0,
+                totalMessages: 0,
+                totalSessions: 0
+            });
+        }
+        return { range, buckets };
+    }
+
+    const rangeDays = range === '30d' ? 30 : 7;
     for (let i = rangeDays - 1; i >= 0; i -= 1) {
         const stamp = new Date(now - (i * dayMs));
-        const key = `${stamp.getUTCFullYear()}-${String(stamp.getUTCMonth() + 1).padStart(2, '0')}-${String(stamp.getUTCDate()).padStart(2, '0')}`;
+        const key = formatUtcDayKey(stamp);
         buckets.push({
             key,
             label: key.slice(5),
@@ -140,6 +178,33 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
             totalSessions: 0
         });
     }
+    return { range, buckets };
+}
+
+export function buildUsageChartGroups(sessions = [], options = {}) {
+    const list = Array.isArray(sessions) ? sessions : [];
+    const normalizedSessions = [];
+    for (const [sessionIndex, session] of list.entries()) {
+        if (!session || typeof session !== 'object') continue;
+        const source = normalizeSessionSource(session.source, '');
+        if (source !== 'codex' && source !== 'claude') continue;
+        const updatedAtMs = Date.parse(session.updatedAt || '');
+        if (!Number.isFinite(updatedAtMs)) continue;
+        const createdAtMs = Date.parse(session.createdAt || '');
+        const sessionStartedAtMs = Number.isFinite(createdAtMs) ? createdAtMs : updatedAtMs;
+        const sessionEndedAtMs = Math.max(updatedAtMs, sessionStartedAtMs);
+        normalizedSessions.push({
+            session,
+            sessionIndex,
+            source,
+            updatedAtMs,
+            createdAtMs,
+            sessionStartedAtMs,
+            sessionEndedAtMs,
+            bucketKey: formatUtcDayKey(updatedAtMs)
+        });
+    }
+    const { range, buckets } = buildUsageBuckets(normalizedSessions, options);
     const bucketMap = new Map(buckets.map((bucket) => [bucket.key, bucket]));
     let codexTotal = 0;
     let claudeTotal = 0;
@@ -164,20 +229,14 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
     }));
     const recentSessions = [];
     const topSessionsByMessages = [];
+    const filteredSessions = [];
 
-    for (const [sessionIndex, session] of list.entries()) {
-        if (!session || typeof session !== 'object') continue;
-        const source = normalizeSessionSource(session.source, '');
-        if (source !== 'codex' && source !== 'claude') continue;
-        const updatedAtMs = Date.parse(session.updatedAt || '');
-        if (!Number.isFinite(updatedAtMs)) continue;
-        const createdAtMs = Date.parse(session.createdAt || '');
-        const sessionStartedAtMs = Number.isFinite(createdAtMs) ? createdAtMs : updatedAtMs;
-        const sessionEndedAtMs = Math.max(updatedAtMs, sessionStartedAtMs);
+    for (const normalized of normalizedSessions) {
+        const { session, sessionIndex, source, updatedAtMs, sessionStartedAtMs, sessionEndedAtMs, bucketKey } = normalized;
         const stamp = new Date(updatedAtMs);
-        const key = `${stamp.getUTCFullYear()}-${String(stamp.getUTCMonth() + 1).padStart(2, '0')}-${String(stamp.getUTCDate()).padStart(2, '0')}`;
-        const bucket = bucketMap.get(key);
+        const bucket = bucketMap.get(bucketKey);
         if (!bucket) continue;
+        filteredSessions.push(session);
         const messageCount = Number.isFinite(Number(session.messageCount))
             ? Math.max(0, Math.floor(Number(session.messageCount)))
             : 0;
@@ -297,6 +356,7 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
     return {
         range,
         buckets,
+        filteredSessions,
         summary: {
             totalSessions,
             totalMessages: messageTotal,
