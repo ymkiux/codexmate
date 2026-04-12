@@ -1296,6 +1296,80 @@ test('ensureTaskOrchestrationState creates workbench defaults including workspac
     assert.strictEqual(state.workspaceTab, 'queue');
     assert.strictEqual(state.selectedRunError, '');
     assert.strictEqual(state.detailRequestToken, 0);
+    assert.deepStrictEqual(state.overviewWarnings, []);
+});
+
+test('ensureTaskOrchestrationState backfills missing workbench fields on existing state', () => {
+    const methods = createTaskOrchestrationMethods({ api: async () => ({}) });
+    const context = {
+        taskOrchestration: {
+            target: 'keep-me',
+            workspaceTab: 'runs'
+        }
+    };
+
+    const state = methods.ensureTaskOrchestrationState.call(context);
+
+    assert.strictEqual(state.target, 'keep-me');
+    assert.strictEqual(state.workspaceTab, 'runs');
+    assert.strictEqual(state.selectedRunError, '');
+    assert.strictEqual(state.detailRequestToken, 0);
+    assert.deepStrictEqual(state.overviewWarnings, []);
+});
+
+test('taskOrchestrationQueueStats counts queue statuses in one pass without changing totals', () => {
+    const computed = createMainTabsComputed();
+    const context = {
+        taskOrchestration: {
+            queue: [
+                { status: 'queued' },
+                { status: ' queued ' },
+                { status: 'running' },
+                { status: 'FAILED' },
+                { status: 'ignored' }
+            ]
+        }
+    };
+
+    const stats = computed.taskOrchestrationQueueStats.call(context);
+
+    assert.deepStrictEqual(stats, {
+        queued: 2,
+        running: 1,
+        failed: 1
+    });
+});
+
+test('startTaskQueueRunner surfaces already-running queue state distinctly', async () => {
+    const api = async (name) => {
+        if (name === 'task-queue-start') {
+            return { started: false, alreadyRunning: true };
+        }
+        if (name === 'task-overview') {
+            return { queue: [], runs: [], workflows: [], warnings: [] };
+        }
+        return {};
+    };
+    const methods = createTaskOrchestrationMethods({ api });
+    const messages = [];
+    const context = {
+        ensureTaskOrchestrationState: methods.ensureTaskOrchestrationState,
+        loadTaskOrchestrationOverview: methods.loadTaskOrchestrationOverview,
+        syncTaskOrchestrationPolling() {},
+        showMessage(message, tone) {
+            messages.push({ message, tone });
+        }
+    };
+    context.taskOrchestration = methods.ensureTaskOrchestrationState.call(context);
+
+    await methods.startTaskQueueRunner.call(context);
+
+    assert.deepStrictEqual(messages, [
+        {
+            message: '队列执行器已在运行',
+            tone: 'success'
+        }
+    ]);
 });
 
 test('selectTaskRun switches workbench to detail and keeps latest detail response only', async () => {

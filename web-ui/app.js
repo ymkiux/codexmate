@@ -367,6 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     plan: null,
                     planIssues: [],
                     planWarnings: [],
+                    overviewWarnings: [],
                     workflows: [],
                     queue: [],
                     runs: [],
@@ -374,6 +375,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     workspaceTab: 'queue',
                     selectedRunDetail: null,
                     selectedRunLoading: false,
+                    selectedRunError: '',
+                    detailRequestToken: 0,
                     lastLoadedAt: '',
                     lastError: ''
                 },

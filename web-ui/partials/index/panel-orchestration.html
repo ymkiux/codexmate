@@ -54,8 +54,8 @@
                                 <div class="task-template-block">
                                     <div class="task-template-label">快捷示例</div>
                                     <div class="task-template-chip-group">
-                                        <button type="button" class="task-template-chip" @click="taskOrchestration.target = '修复当前 PR review 评论，并补对应回归测试'; taskOrchestration.notes = '不要改动无关模块；需要给出验证结果'; taskOrchestration.followUpsText = '继续处理新增 review 评论\n最后更新 PR 摘要'">修 review + 回归</button>
-                                        <button type="button" class="task-template-chip" @click="taskOrchestration.target = '先排查问题根因并给出执行计划，不直接修改代码'; taskOrchestration.notes = '优先定位根因、影响范围和风险点'; taskOrchestration.followUpsText = ''">只做排查规划</button>
+                                        <button type="button" class="task-template-chip" @click="taskOrchestration.target = '修复当前 PR review 评论，并补对应回归测试'; taskOrchestration.selectedEngine = 'codex'; taskOrchestration.workflowIdsText = ''; taskOrchestration.notes = '不要改动无关模块；需要给出验证结果'; taskOrchestration.followUpsText = '继续处理新增 review 评论\n最后更新 PR 摘要'">修 review + 回归</button>
+                                        <button type="button" class="task-template-chip" @click="taskOrchestration.target = '先排查问题根因并给出执行计划，不直接修改代码'; taskOrchestration.selectedEngine = 'codex'; taskOrchestration.workflowIdsText = ''; taskOrchestration.notes = '优先定位根因、影响范围和风险点'; taskOrchestration.followUpsText = ''">只做排查规划</button>
                                         <button type="button" class="task-template-chip" @click="taskOrchestration.target = '用 Workflow 跑一组固定检查并整理结果'; taskOrchestration.selectedEngine = 'workflow'; taskOrchestration.workflowIdsText = 'diagnose-config\nsafe-provider-switch'; taskOrchestration.notes = '输出统一结论，避免重复描述'">Workflow 批处理</button>
                                     </div>
                                 </div>
@@ -314,8 +314,8 @@
                                         :tabindex="item.lastRunId ? 0 : -1"
                                         :aria-disabled="item.lastRunId ? null : 'true'"
                                         @click="item.lastRunId ? (taskOrchestration.workspaceTab = 'detail', selectTaskRun(item.lastRunId)) : null"
-                                        @keydown.enter.prevent="item.lastRunId ? (taskOrchestration.workspaceTab = 'detail', selectTaskRun(item.lastRunId)) : null"
-                                        @keydown.space.prevent="item.lastRunId ? (taskOrchestration.workspaceTab = 'detail', selectTaskRun(item.lastRunId)) : null">
+                                        @keydown.enter.self.prevent="item.lastRunId ? (taskOrchestration.workspaceTab = 'detail', selectTaskRun(item.lastRunId)) : null"
+                                        @keydown.space.self.prevent="item.lastRunId ? (taskOrchestration.workspaceTab = 'detail', selectTaskRun(item.lastRunId)) : null">
                                         <div class="task-runtime-item-main">
                                             <div class="task-runtime-item-title">{{ item.title || item.target || item.taskId }}</div>
                                             <div class="task-runtime-item-meta">{{ item.taskId }} · {{ item.updatedAt || item.createdAt }}</div>

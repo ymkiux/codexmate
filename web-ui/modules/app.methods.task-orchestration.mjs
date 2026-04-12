@@ -19,6 +19,7 @@ function createDefaultTaskOrchestrationState() {
         plan: null,
         planIssues: [],
         planWarnings: [],
+        overviewWarnings: [],
         workflows: [],
         queue: [],
         runs: [],
@@ -68,6 +69,12 @@ export function createTaskOrchestrationMethods(options = {}) {
         ensureTaskOrchestrationState() {
             const current = this.taskOrchestration;
             if (current && typeof current === 'object' && !Array.isArray(current)) {
+                const defaults = createDefaultTaskOrchestrationState();
+                for (const [key, value] of Object.entries(defaults)) {
+                    if (typeof current[key] === 'undefined') {
+                        current[key] = value;
+                    }
+                }
                 return current;
             }
             this.taskOrchestration = createDefaultTaskOrchestrationState();
@@ -140,7 +147,7 @@ export function createTaskOrchestrationMethods(options = {}) {
                 state.workflows = Array.isArray(res && res.workflows) ? res.workflows : [];
                 state.queue = Array.isArray(res && res.queue) ? res.queue : [];
                 state.runs = Array.isArray(res && res.runs) ? res.runs : [];
-                state.planWarnings = Array.isArray(res && res.warnings) ? res.warnings : [];
+                state.overviewWarnings = Array.isArray(res && res.warnings) ? res.warnings : [];
                 state.lastLoadedAt = new Date().toISOString();
                 if (state.selectedRunId && !state.runs.some((item) => item && item.runId === state.selectedRunId)) {
                     state.selectedRunId = '';
@@ -193,6 +200,9 @@ export function createTaskOrchestrationMethods(options = {}) {
                 return res;
             } catch (error) {
                 const message = error && error.message ? error.message : '任务计划生成失败';
+                state.plan = null;
+                state.planIssues = [];
+                state.planWarnings = [];
                 if (!options.silent) {
                     this.showMessage(message, 'error');
                 }
@@ -272,7 +282,7 @@ export function createTaskOrchestrationMethods(options = {}) {
                 }
                 await this.loadTaskOrchestrationOverview({ silent: true, includeDetail: false });
                 this.syncTaskOrchestrationPolling();
-                this.showMessage('队列执行器已启动', 'success');
+                this.showMessage(res && res.alreadyRunning ? '队列执行器已在运行' : '队列执行器已启动', 'success');
                 return res;
             } catch (error) {
                 const message = error && error.message ? error.message : '启动队列失败';
