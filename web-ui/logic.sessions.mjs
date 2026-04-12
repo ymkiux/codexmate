@@ -146,6 +146,9 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
     let messageTotal = 0;
     let totalTokens = 0;
     let totalContextWindow = 0;
+    let activeDurationMs = 0;
+    let earliestSessionMs = Number.POSITIVE_INFINITY;
+    let latestSessionMs = 0;
     const pathMap = new Map();
     const sourceMessageTotals = { codex: 0, claude: 0 };
     const hourCounts = Array.from({ length: 24 }, (_, hour) => ({
@@ -168,6 +171,9 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
         if (source !== 'codex' && source !== 'claude') continue;
         const updatedAtMs = Date.parse(session.updatedAt || '');
         if (!Number.isFinite(updatedAtMs)) continue;
+        const createdAtMs = Date.parse(session.createdAt || '');
+        const sessionStartedAtMs = Number.isFinite(createdAtMs) ? createdAtMs : updatedAtMs;
+        const sessionEndedAtMs = Math.max(updatedAtMs, sessionStartedAtMs);
         const stamp = new Date(updatedAtMs);
         const key = `${stamp.getUTCFullYear()}-${String(stamp.getUTCMonth() + 1).padStart(2, '0')}-${String(stamp.getUTCDate()).padStart(2, '0')}`;
         const bucket = bucketMap.get(key);
@@ -194,6 +200,9 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
         totalTokens += sessionTotalTokens;
         totalContextWindow += sessionContextWindow;
         sourceMessageTotals[source] += messageCount;
+        activeDurationMs += Math.max(0, sessionEndedAtMs - sessionStartedAtMs);
+        earliestSessionMs = Math.min(earliestSessionMs, sessionStartedAtMs);
+        latestSessionMs = Math.max(latestSessionMs, sessionEndedAtMs);
 
         const utcHour = stamp.getUTCHours();
         if (hourCounts[utcHour]) {
@@ -281,6 +290,9 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
     const activeDays = buckets.filter((item) => item.totalSessions > 0).length;
     const avgMessagesPerSession = totalSessions > 0 ? Math.round((messageTotal / totalSessions) * 10) / 10 : 0;
     const avgSessionsPerActiveDay = activeDays > 0 ? Math.round((totalSessions / activeDays) * 10) / 10 : 0;
+    const totalDurationMs = Number.isFinite(earliestSessionMs) && latestSessionMs > 0
+        ? Math.max(0, latestSessionMs - earliestSessionMs)
+        : 0;
 
     return {
         range,
@@ -290,6 +302,8 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
             totalMessages: messageTotal,
             totalTokens,
             totalContextWindow,
+            activeDurationMs,
+            totalDurationMs,
             codexTotal,
             claudeTotal,
             activeDays,

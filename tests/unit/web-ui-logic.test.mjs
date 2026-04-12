@@ -703,6 +703,8 @@ test('sessionUsageSummaryCards uses compact units for long token and context tot
                 totalMessages: 3456,
                 totalTokens: 1234567,
                 totalContextWindow: 256000,
+                activeDurationMs: (2 * 24 * 60 * 60 * 1000) + (3 * 60 * 60 * 1000),
+                totalDurationMs: (7 * 24 * 60 * 60 * 1000) + (5 * 60 * 60 * 1000),
                 activeDays: 7,
                 avgMessagesPerSession: 288,
                 busiestDay: null,
@@ -717,14 +719,21 @@ test('sessionUsageSummaryCards uses compact units for long token and context tot
     const tokensCard = cards.find((card) => card.key === 'tokens');
     const contextCard = cards.find((card) => card.key === 'context-window');
     const costCard = cards.find((card) => card.key === 'estimated-cost');
+    const activeDurationCard = cards.find((card) => card.key === 'active-duration');
+    const totalDurationCard = cards.find((card) => card.key === 'total-duration');
     assert(tokensCard, 'missing tokens summary card');
     assert(contextCard, 'missing context summary card');
     assert(costCard, 'missing estimated cost summary card');
+    assert(activeDurationCard, 'missing active duration summary card');
+    assert(totalDurationCard, 'missing total duration summary card');
     assert.strictEqual(tokensCard.value, '1.2M');
     assert.strictEqual(tokensCard.title, '1,234,567');
     assert.strictEqual(contextCard.value, '256K');
     assert.strictEqual(contextCard.title, '256,000');
     assert.strictEqual(costCard.value, '暂无');
+    assert.strictEqual(costCard.label, '预估费用');
+    assert.strictEqual(activeDurationCard.value, '2天 3小时');
+    assert.strictEqual(totalDurationCard.value, '7天 5小时');
 });
 
 test('sessionUsageSummaryCards estimates usage cost from configured provider pricing', () => {
@@ -736,6 +745,8 @@ test('sessionUsageSummaryCards estimates usage cost from configured provider pri
                 totalMessages: 10,
                 totalTokens: 600000,
                 totalContextWindow: 256000,
+                activeDurationMs: 90 * 60 * 1000,
+                totalDurationMs: 3 * 24 * 60 * 60 * 1000,
                 activeDays: 2,
                 avgMessagesPerSession: 5,
                 busiestDay: null,
@@ -782,10 +793,16 @@ test('sessionUsageSummaryCards estimates usage cost from configured provider pri
     });
 
     const costCard = cards.find((card) => card.key === 'estimated-cost');
+    const activeDurationCard = cards.find((card) => card.key === 'active-duration');
+    const totalDurationCard = cards.find((card) => card.key === 'total-duration');
     assert(costCard, 'missing estimated cost summary card');
+    assert(activeDurationCard, 'missing active duration summary card');
+    assert(totalDurationCard, 'missing total duration summary card');
     assert.strictEqual(costCard.value, '$1.25');
     assert.match(costCard.title, /覆盖 1\/2 个会话/);
     assert.match(costCard.title, /约 67% token/);
+    assert.strictEqual(activeDurationCard.value, '1小时 30分');
+    assert.strictEqual(totalDurationCard.value, '3天');
 });
 
 test('activeSessionVisibleMessages falls back to the initial preview batch before priming completes', () => {
