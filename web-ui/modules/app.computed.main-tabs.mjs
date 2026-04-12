@@ -172,11 +172,14 @@ export function createMainTabsComputed() {
             const queue = this.taskOrchestration && Array.isArray(this.taskOrchestration.queue)
                 ? this.taskOrchestration.queue
                 : [];
-            return {
-                queued: queue.filter((item) => String(item && item.status || '').trim().toLowerCase() === 'queued').length,
-                running: queue.filter((item) => String(item && item.status || '').trim().toLowerCase() === 'running').length,
-                failed: queue.filter((item) => String(item && item.status || '').trim().toLowerCase() === 'failed').length
-            };
+            const stats = { queued: 0, running: 0, failed: 0 };
+            for (const item of queue) {
+                const status = String(item && item.status || '').trim().toLowerCase();
+                if (status === 'queued') stats.queued += 1;
+                else if (status === 'running') stats.running += 1;
+                else if (status === 'failed') stats.failed += 1;
+            }
+            return stats;
         },
         taskOrchestrationDraftMetrics() {
             return readTaskOrchestrationDraftMetrics(this.taskOrchestration);
