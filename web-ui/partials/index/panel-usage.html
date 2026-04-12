@@ -84,6 +84,17 @@
                             </section>
 
                             <section class="usage-card">
+                                <div class="usage-card-title">使用模型</div>
+                                <div v-if="!sessionUsageCharts.usedModels.length" class="usage-list-value">暂无模型数据</div>
+                                <div v-else class="usage-model-list">
+                                    <div v-for="item in sessionUsageCharts.usedModels" :key="item.key" class="usage-model-chip" :title="`${item.model} · ${item.count} 会话 · ${item.messageTotal} 消息${item.tokenTotal ? ` · ${item.tokenTotal} token` : ''}`">
+                                        <div class="usage-model-name">{{ item.model }}</div>
+                                        <div class="usage-model-meta">{{ item.count }} 会话<span v-if="item.sourceLabels.length"> · {{ item.sourceLabels.join(' / ') }}</span></div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="usage-card">
                                 <div class="usage-card-title">工作日分布</div>
                                 <div class="usage-list">
                                     <div v-for="item in sessionUsageCharts.weekdayActivity" :key="item.key" class="usage-list-row usage-list-row-compact">

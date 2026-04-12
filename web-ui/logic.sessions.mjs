@@ -215,6 +215,7 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
     let earliestSessionMs = Number.POSITIVE_INFINITY;
     let latestSessionMs = 0;
     const pathMap = new Map();
+    const modelMap = new Map();
     const sourceMessageTotals = { codex: 0, claude: 0 };
     const hourCounts = Array.from({ length: 24 }, (_, hour) => ({
         key: String(hour).padStart(2, '0'),
@@ -282,6 +283,21 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
             });
         }
 
+        const modelId = typeof session.model === 'string' ? session.model.trim() : '';
+        if (modelId) {
+            const prev = modelMap.get(modelId) || {
+                count: 0,
+                messageTotal: 0,
+                tokenTotal: 0,
+                sources: new Set()
+            };
+            prev.count += 1;
+            prev.messageTotal += messageCount;
+            prev.tokenTotal += sessionTotalTokens;
+            prev.sources.add(source);
+            modelMap.set(modelId, prev);
+        }
+
         const normalizedTitle = typeof session.title === 'string' && session.title.trim()
             ? session.title.trim()
             : (typeof session.sessionId === 'string' && session.sessionId.trim() ? session.sessionId.trim() : '未命名会话');
@@ -329,6 +345,22 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
             messageTotal: meta.messageTotal,
             updatedAtLabel: meta.updatedAtMs ? formatSessionTimelineTimestamp(new Date(meta.updatedAtMs).toISOString()) : ''
         }));
+
+    const usedModels = [...modelMap.entries()]
+        .sort((a, b) => b[1].count - a[1].count || b[1].tokenTotal - a[1].tokenTotal || a[0].localeCompare(b[0], 'zh-Hans-CN'))
+        .map(([modelId, meta]) => {
+            const sourceLabels = [...meta.sources]
+                .sort((a, b) => a.localeCompare(b, 'en-US'))
+                .map((source) => (source === 'codex' ? 'Codex' : 'Claude Code'));
+            return {
+                key: modelId,
+                model: modelId,
+                count: meta.count,
+                messageTotal: meta.messageTotal,
+                tokenTotal: meta.tokenTotal,
+                sourceLabels
+            };
+        });
 
     const sortedRecentSessions = recentSessions
         .sort((a, b) => b.updatedAtMs - a.updatedAtMs || b.messageCount - a.messageCount || a.title.localeCompare(b.title, 'zh-Hans-CN'))
@@ -386,6 +418,7 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
                 : null
         },
         sourceShare,
+        usedModels,
         topPaths,
         recentSessions: sortedRecentSessions,
         topSessionsByMessages: sortedTopSessionsByMessages,

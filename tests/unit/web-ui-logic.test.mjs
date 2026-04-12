@@ -738,6 +738,57 @@ test('sessionUsageSummaryCards uses compact units for long token and context tot
     assert.strictEqual(totalDurationCard.value, '7天 5小时');
 });
 
+test('buildUsageChartGroups keeps all used model names for the selected range', () => {
+    const result = buildUsageChartGroups([
+        {
+            source: 'codex',
+            model: 'gpt-5.3-codex',
+            createdAt: '2026-04-10T07:30:00.000Z',
+            updatedAt: '2026-04-10T08:00:00.000Z',
+            messageCount: 4,
+            totalTokens: 400000,
+            contextWindow: 258400
+        },
+        {
+            source: 'claude',
+            model: 'claude-sonnet-4',
+            createdAt: '2026-04-09T07:30:00.000Z',
+            updatedAt: '2026-04-09T08:00:00.000Z',
+            messageCount: 6,
+            totalTokens: 500000,
+            contextWindow: 300000
+        },
+        {
+            source: 'codex',
+            model: 'gpt-5.1-codex-max',
+            createdAt: '2026-04-08T07:30:00.000Z',
+            updatedAt: '2026-04-08T08:00:00.000Z',
+            messageCount: 3,
+            totalTokens: 200000,
+            contextWindow: 128000
+        },
+        {
+            source: 'codex',
+            model: 'legacy-old-model',
+            createdAt: '2026-03-01T07:30:00.000Z',
+            updatedAt: '2026-03-01T08:00:00.000Z',
+            messageCount: 1,
+            totalTokens: 100000,
+            contextWindow: 64000
+        }
+    ], {
+        range: '7d',
+        now: Date.UTC(2026, 3, 12, 12, 0, 0)
+    });
+
+    assert.deepStrictEqual(
+        result.usedModels.map((item) => item.model),
+        ['claude-sonnet-4', 'gpt-5.3-codex', 'gpt-5.1-codex-max']
+    );
+    assert.deepStrictEqual(result.usedModels[0].sourceLabels, ['Claude Code']);
+    assert.deepStrictEqual(result.usedModels[1].sourceLabels, ['Codex']);
+});
+
 test('sessionUsageSummaryCards explains why usage cost is unavailable for the selected range', () => {
     const computed = createSessionComputed();
     const cards = computed.sessionUsageSummaryCards.call({

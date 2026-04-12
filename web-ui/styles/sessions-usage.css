@@ -362,6 +362,36 @@
     overflow-wrap: anywhere;
 }
 
+.usage-model-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.usage-model-chip {
+    min-width: 0;
+    max-width: 100%;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: var(--color-surface-alt);
+    border: 1px solid var(--color-border-soft);
+}
+
+.usage-model-name {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.usage-model-meta {
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    line-height: 1.4;
+}
+
 .usage-empty {
     padding: 24px 16px;
     border-radius: 16px;
