@@ -142,6 +142,7 @@ test('listSessionUsage uses lightweight session listing without exact hydration'
         throw new Error('should not call listAllSessionsData');
     };
     const listSessionUsage = instantiateListSessionUsage({
+        fs,
         MAX_SESSION_USAGE_LIST_SIZE: 2000,
         listSessionBrowse,
         listAllSessionsData,
@@ -191,6 +192,7 @@ test('listSessionUsage normalizes source and default limit for lightweight usage
         return [];
     };
     const listSessionUsage = instantiateListSessionUsage({
+        fs,
         MAX_SESSION_USAGE_LIST_SIZE: 2000,
         listSessionBrowse,
         SESSION_BROWSE_SUMMARY_READ_BYTES: 65536,
@@ -230,6 +232,7 @@ test('listSessionUsage backfills missing model metadata from parsed session summ
     const codexParses = [];
     const claudeParses = [];
     const listSessionUsage = instantiateListSessionUsage({
+        fs,
         MAX_SESSION_USAGE_LIST_SIZE: 2000,
         SESSION_BROWSE_SUMMARY_READ_BYTES: 65536,
         async listSessionBrowse() {
@@ -291,6 +294,64 @@ test('listSessionUsage backfills missing model metadata from parsed session summ
             options: { summaryReadBytes: 65536, titleReadBytes: 65536 }
         }
     ]);
+});
+
+test('listSessionUsage scans the full session file so middle model names are not dropped', async () => {
+    const tempDir = fs.mkdtempSync(path.join(__dirname, 'tmp-session-model-scan-'));
+    const filePath = path.join(tempDir, 'codex-middle.jsonl');
+    fs.writeFileSync(filePath, [
+        JSON.stringify({
+            timestamp: '2026-04-12T09:07:24.127Z',
+            type: 'session_meta',
+            payload: { id: 'codex-middle', cwd: '/repo' }
+        }),
+        JSON.stringify({
+            timestamp: '2026-04-12T09:08:00.000Z',
+            type: 'turn_context',
+            payload: { model: 'gpt-5.3-codex' }
+        }),
+        JSON.stringify({
+            timestamp: '2026-04-12T09:09:00.000Z',
+            type: 'event_msg',
+            payload: { info: { model_name: 'gpt-5.2-codex' } }
+        })
+    ].join('\n'));
+
+    const codexParses = [];
+    const listSessionUsage = instantiateListSessionUsage({
+        fs,
+        MAX_SESSION_USAGE_LIST_SIZE: 2000,
+        SESSION_BROWSE_SUMMARY_READ_BYTES: 65536,
+        async listSessionBrowse() {
+            return [
+                {
+                    source: 'codex',
+                    sessionId: 'codex-middle',
+                    filePath,
+                    model: 'gpt-5.3-codex'
+                }
+            ];
+        },
+        parseCodexSessionSummary(...args) {
+            codexParses.push(args);
+            return null;
+        },
+        parseClaudeSessionSummary() {
+            return null;
+        },
+        listAllSessionsData: async () => {
+            throw new Error('should not call listAllSessionsData');
+        }
+    });
+
+    try {
+        const result = await listSessionUsage({ source: 'codex', limit: 50, forceRefresh: true });
+        assert.deepStrictEqual(result[0].models, ['gpt-5.3-codex', 'gpt-5.2-codex']);
+        assert.strictEqual(result[0].model, 'gpt-5.3-codex');
+        assert.deepStrictEqual(codexParses, []);
+    } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+    }
 });
 
 test('parseCodexSessionSummary reads token totals and model data from tail records', () => {
