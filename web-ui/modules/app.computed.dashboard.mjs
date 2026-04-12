@@ -20,9 +20,6 @@ export function createDashboardComputed() {
             }
             return list;
         },
-        hasLocalAndProxy() {
-            return false;
-        },
         displayCurrentProvider() {
             const switching = String(this.providerSwitchDisplayTarget || '').trim();
             if (switching) return switching;

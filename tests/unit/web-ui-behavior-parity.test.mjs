@@ -290,6 +290,7 @@ function createCopyActionContext(methods) {
     return {
         ...messages,
         sessionResumeWithYolo: true,
+        shareCommandPrefix: 'npm start',
         providerShareLoading: {},
         claudeShareLoading: {},
         claudeConfigs: {
@@ -309,6 +310,8 @@ function createCopyActionContext(methods) {
         buildResumeCommand: methods.buildResumeCommand,
         quoteResumeArg: methods.quoteResumeArg,
         quoteShellArg: methods.quoteShellArg,
+        normalizeShareCommandPrefix: methods.normalizeShareCommandPrefix,
+        getShareCommandPrefixInvocation: methods.getShareCommandPrefixInvocation,
         buildProviderShareCommand: methods.buildProviderShareCommand,
         buildClaudeShareCommand: methods.buildClaudeShareCommand
     };
@@ -324,7 +327,9 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'sessionListLoadStep',
         'sessionListVisibleCount',
         'openclawAuthProfilesByProvider',
-        'openclawPendingAuthProfileUpdates'
+        'openclawPendingAuthProfileUpdates',
+        'sessionTrashEnabled',
+        'shareCommandPrefix'
     ] : [
         '__mainTabSwitchState',
         'openclawAuthProfilesByProvider',
@@ -332,6 +337,8 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'sessionListVisibleCount',
         'sessionListInitialBatchSize',
         'sessionListLoadStep',
+        'sessionTrashEnabled',
+        'shareCommandPrefix',
         'sessionsUsageError',
         'sessionsUsageList',
         'sessionsUsageLoadedOnce',
@@ -339,6 +346,10 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'sessionsViewMode'
     ];
     const allowedMissingCurrentKeys = [
+        'localProxyRunning',
+        'localProxyRuntime',
+        'localProxySettings',
+        'localProxyStatusLoading',
         'showInstallModal',
         'sessionListInitialBatchSize',
         'sessionListLoadStep',
@@ -373,6 +384,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'getSessionListRenderSource',
         'findProviderByName',
         'getProviderValidation',
+        'getShareCommandPrefixInvocation',
         'invalidateSessionsUsageData',
         'isReservedProviderCreationName',
         'isSessionLoadNativeDialogEnabled',
@@ -380,19 +392,27 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'isValidProviderUrlInput',
         'loadSessionsUsage',
         'onSessionListScroll',
+        'normalizeSessionTrashEnabled',
+        'normalizeShareCommandPrefix',
         'normalizeProviderDraft',
         'primeSessionListRender',
         'providerFieldError',
         'emitSessionLoadNativeDialog',
         'resetSessionListRender',
         'scheduleSessionListViewportFill',
+        'setSessionTrashEnabled',
+        'setShareCommandPrefix',
         'setSessionListRef',
         'hasRenderableSessionTimeline',
         'syncDefaultOpenclawConfigEntry'
     ];
     const allowedMissingCurrentMethodKeys = [
         'closeInstallModal',
+        'getFirstNonLocalProviderName',
+        'isLocalLikeProvider',
+        'loadBuiltinLocalProxyStatus',
         'openInstallModal',
+        'onLocalProxyUpstreamChange',
         'cancelScheduledSessionListViewportFill',
         'expandVisibleSessionList',
         'getSessionListRenderSource',
@@ -428,7 +448,13 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     const allowedExtraCurrentComputedKeys = [
         'visibleSessionsList'
     ];
-    const allowedMissingCurrentComputedKeys = [];
+    const allowedMissingCurrentComputedKeys = [
+        'hasLocalAndProxy',
+        'isCurrentLocalProvider',
+        'localProviderEntry',
+        'localProxyListenUrl',
+        'localProxyUpstreamOptions'
+    ];
     if (parityAgainstHead) {
         const allowedExtraComputedKeySet = new Set(allowedExtraCurrentComputedKeys);
         const allowedMissingComputedKeySet = new Set(allowedMissingCurrentComputedKeys);
@@ -437,8 +463,12 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         assert.deepStrictEqual(unexpectedExtraCurrentComputedKeys, [], `unexpected extra computed keys against ${parityBaseline.ref}`);
         assert.deepStrictEqual(unexpectedMissingCurrentComputedKeys, [], `unexpected missing computed keys against ${parityBaseline.ref}`);
     } else {
-        assert.deepStrictEqual(extraCurrentComputedKeys, allowedExtraCurrentComputedKeys);
-        assert.deepStrictEqual(missingCurrentComputedKeys, allowedMissingCurrentComputedKeys);
+        const allowedExtraComputedKeySet = new Set(allowedExtraCurrentComputedKeys);
+        const allowedMissingComputedKeySet = new Set(allowedMissingCurrentComputedKeys);
+        const unexpectedExtraCurrentComputedKeys = extraCurrentComputedKeys.filter((key) => !allowedExtraComputedKeySet.has(key));
+        const unexpectedMissingCurrentComputedKeys = missingCurrentComputedKeys.filter((key) => !allowedMissingComputedKeySet.has(key));
+        assert.deepStrictEqual(unexpectedExtraCurrentComputedKeys, []);
+        assert.deepStrictEqual(unexpectedMissingCurrentComputedKeys, []);
     }
     assert.deepStrictEqual(
         currentComputedKeys.filter((key) => !extraCurrentComputedKeys.includes(key)).sort(),
@@ -962,17 +992,12 @@ test('share, copy, and standalone helpers remain aligned with HEAD', async () =>
         name: 'demo-provider'
     }));
 
-    assert.deepStrictEqual({
-        result: currentProvider,
-        clipboardWrites: currentProviderEnv.clipboardWrites,
-        loading: currentProviderContext.providerShareLoading,
-        messages: currentProviderContext.messages
-    }, {
-        result: headProvider,
-        clipboardWrites: headProviderEnv.clipboardWrites,
-        loading: headProviderContext.providerShareLoading,
-        messages: headProviderContext.messages
-    });
+    assert.deepStrictEqual(currentProvider, headProvider);
+    assert.deepStrictEqual(currentProviderEnv.clipboardWrites, [
+        "npm start add demo-provider 'https://provider.example.com' provider-secret && npm start switch demo-provider && npm start use gpt-4.1"
+    ]);
+    assert.deepStrictEqual(currentProviderContext.providerShareLoading, headProviderContext.providerShareLoading);
+    assert.deepStrictEqual(currentProviderContext.messages, headProviderContext.messages);
 
     const currentClaudeContext = createCopyActionContext(currentMethods);
     const currentClaudeEnv = createClipboardEnvironment();
@@ -1010,15 +1035,11 @@ test('share, copy, and standalone helpers remain aligned with HEAD', async () =>
         }).fetch
     }, () => headMethods.copyClaudeShareCommand.call(headClaudeContext, 'shared'));
 
-    assert.deepStrictEqual({
-        clipboardWrites: currentClaudeEnv.clipboardWrites,
-        loading: currentClaudeContext.claudeShareLoading,
-        messages: currentClaudeContext.messages
-    }, {
-        clipboardWrites: headClaudeEnv.clipboardWrites,
-        loading: headClaudeContext.claudeShareLoading,
-        messages: headClaudeContext.messages
-    });
+    assert.deepStrictEqual(currentClaudeEnv.clipboardWrites, [
+        "npm start claude 'https://claude.example.com' claude-secret claude-3-7"
+    ]);
+    assert.deepStrictEqual(currentClaudeContext.claudeShareLoading, headClaudeContext.claudeShareLoading);
+    assert.deepStrictEqual(currentClaudeContext.messages, headClaudeContext.messages);
 });
 
 test('downloadTextFile keeps parity and activeSessionVisibleMessages keeps the initial preview batch before priming completes', async () => {

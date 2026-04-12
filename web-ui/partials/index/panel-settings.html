@@ -46,6 +46,18 @@
                         aria-labelledby="settings-tab-backup">
                         <div class="selector-section">
                             <div class="selector-header">
+                                <span class="selector-title">分享命令前缀</span>
+                            </div>
+                            <select class="model-select" :value="shareCommandPrefix" @change="setShareCommandPrefix($event.target.value)">
+                                <option value="npm start">npm start</option>
+                                <option value="codexmate">codexmate</option>
+                            </select>
+                            <div class="config-template-hint">
+                                默认走项目内 <code>npm start</code>，也可切到全局 <code>codexmate</code>。该设置会缓存到浏览器本地。
+                            </div>
+                        </div>
+                        <div class="selector-section">
+                            <div class="selector-header">
                                 <span class="selector-title">Claude 配置</span>
                             </div>
                             <button class="btn-tool" @click="downloadClaudeDirectory" :disabled="claudeDownloadLoading">
@@ -85,6 +97,18 @@
                         id="settings-panel-trash"
                         role="tabpanel"
                         aria-labelledby="settings-tab-trash">
+                        <div class="selector-section">
+                            <div class="selector-header">
+                                <span class="selector-title">会话删除行为</span>
+                            </div>
+                            <label class="health-remote-toggle">
+                                <input type="checkbox" :checked="sessionTrashEnabled" @change="setSessionTrashEnabled($event.target.checked)">
+                                <span>删除会话时先移入回收站</span>
+                            </label>
+                            <div class="config-template-hint">
+                                默认开启。关闭后，会话浏览里的删除会直接永久删除，不再进入回收站。
+                            </div>
+                        </div>
                         <div class="selector-section">
                             <div class="selector-header settings-tab-header">
                                 <div class="settings-tab-actions trash-header-actions">

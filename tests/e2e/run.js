@@ -15,6 +15,7 @@ const {
 const testSetup = require('./test-setup');
 const testConfig = require('./test-config');
 const testClaude = require('./test-claude');
+const testClaudeProxy = require('./test-claude-proxy');
 const testSessionSearch = require('./test-session-search');
 const testSessions = require('./test-sessions');
 const testOpenclaw = require('./test-openclaw');
@@ -125,6 +126,7 @@ async function main() {
 
         await testConfig(ctx);
         await testClaude(ctx);
+        await testClaudeProxy(ctx);
         await testSessionSearch(ctx);
         await testSessions(ctx);
         await testOpenclaw(ctx);
