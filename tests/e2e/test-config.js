@@ -311,8 +311,13 @@ preferred_auth_method = "shadow-key"
     const addProviderDup = await api('add-provider', { name: 'e2e-api', url: mockProviderUrl });
     assert(addProviderDup.error, 'add-provider should reject duplicate provider');
 
-    const addProviderLocal = await api('add-provider', { name: 'LOCAL', url: mockProviderUrl });
-    assert(addProviderLocal.error, 'add-provider should reject reserved local name');
+    const addProviderLocal = await api('add-provider', { name: 'local', url: mockProviderUrl, key: 'sk-local-e2e' });
+    assert(addProviderLocal.success === true, 'add-provider should allow local as a normal provider name');
+    const apiListAfterLocalAdd = await api('list');
+    assert(
+        apiListAfterLocalAdd.providers.some((item) => item && item.name === 'local' && item.url === mockProviderUrl),
+        'add-provider should persist local as a normal provider'
+    );
 
     const addProviderInvalidName = await api('add-provider', { name: 'bad name', url: mockProviderUrl });
     assert(addProviderInvalidName.error, 'add-provider should reject invalid provider name');
@@ -1455,8 +1460,12 @@ preferred_auth_method = "shadow-key"
     const deleteProviderResult = await api('delete-provider', { name: 'e2e-api' });
     assert(deleteProviderResult.success === true, 'delete-provider failed');
 
+    const deleteLocalProviderResult = await api('delete-provider', { name: 'local' });
+    assert(deleteLocalProviderResult.success === true, 'delete-provider should remove normal local provider');
+
     const apiListAfterDelete = await api('list');
     assert(!apiListAfterDelete.providers.some(p => p.name === 'e2e-api'), 'delete-provider not reflected in list');
+    assert(!apiListAfterDelete.providers.some(p => p.name === 'local'), 'delete-provider should remove local provider');
 
     // ========== Recent Configs Tests ==========
     const recentConfigs = await api('get-recent-configs');

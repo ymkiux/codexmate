@@ -204,6 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 claudeSpeedLoading: {},
                 claudeShareLoading: {},
                 providerShareLoading: {},
+                shareCommandPrefix: 'npm start',
                 providerSwitchInProgress: false,
                 pendingProviderSwitch: '',
                 providerSwitchDisplayTarget: '',
@@ -359,6 +360,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             this.restoreSessionFilterCache();
             this.restoreSessionPinnedMap();
+            this.shareCommandPrefix = this.normalizeShareCommandPrefix(localStorage.getItem('codexmateShareCommandPrefix'));
             window.addEventListener('resize', this.onWindowResize);
             window.addEventListener('keydown', this.handleGlobalKeydown);
             window.addEventListener('beforeunload', this.handleBeforeUnload);

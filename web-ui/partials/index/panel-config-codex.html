@@ -193,10 +193,10 @@
                                 <button
                                     v-if="!provider.readOnly"
                                     class="card-action-btn"
-                                    :class="{ loading: providerShareLoading[provider.name] }"
-                                    disabled
+                                    :class="{ loading: providerShareLoading[provider.name], disabled: !shouldAllowProviderShare(provider) }"
+                                    :disabled="providerShareLoading[provider.name] || !shouldAllowProviderShare(provider)"
                                     @click="copyProviderShareCommand(provider)"
-                                    title="分享命令（暂不可用）"
+                                    :title="shouldAllowProviderShare(provider) ? '分享命令' : '不可分享'"
                                     aria-label="Share import command">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/>
