@@ -1806,6 +1806,92 @@ test('deleteSession keeps success message when list cleanup fails after trash su
     assert.deepStrictEqual(messages, [{ message: '已移入回收站', tone: 'success' }]);
 });
 
+test('deleteSession permanently deletes when session trash is disabled', async () => {
+    let requestedAction = '';
+    let confirmCalls = 0;
+    const deleteSessionSource = extractMethodAsFunction(appSource, 'deleteSession');
+    const deleteSession = instantiateFunction(deleteSessionSource, 'deleteSession', {
+        api: async (action) => {
+            requestedAction = action;
+            return {
+                success: true,
+                deleted: true,
+                sessionId: 'session-1'
+            };
+        }
+    });
+
+    const messages = [];
+    const context = {
+        sessionDeleting: {},
+        sessionTrashEnabled: false,
+        sessionTrashLoadedOnce: false,
+        sessionTrashCountLoadedOnce: true,
+        sessionTrashTotalCount: 5,
+        sessionTrashItems: [],
+        sessionTrashCountRequestToken: 0,
+        sessionTrashListRequestToken: 0,
+        removeSessionPinCalls: [],
+        invalidateUsageCalls: [],
+        isDeleteAvailable: () => true,
+        requestConfirmDialog: async () => {
+            confirmCalls += 1;
+            return true;
+        },
+        getSessionExportKey(session) {
+            return `${session.source}:${session.sessionId}:${session.filePath}`;
+        },
+        invalidateSessionTrashRequests() {
+            throw new Error('hard delete should not invalidate trash requests');
+        },
+        normalizeSessionTrashTotalCount(totalCount, fallbackItems = this.sessionTrashItems) {
+            const fallbackCount = Array.isArray(fallbackItems) ? fallbackItems.length : 0;
+            const numericTotal = Number(totalCount);
+            if (!Number.isFinite(numericTotal) || numericTotal < 0) {
+                return fallbackCount;
+            }
+            return Math.max(fallbackCount, Math.floor(numericTotal));
+        },
+        prependSessionTrashItem() {
+            throw new Error('hard delete should not prepend trash items');
+        },
+        buildSessionTrashItemFromSession() {
+            throw new Error('hard delete should not build trash items');
+        },
+        removeSessionPin(session) {
+            this.removeSessionPinCalls.push(session);
+        },
+        invalidateSessionsUsageData(payload) {
+            this.invalidateUsageCalls.push(payload);
+        },
+        async removeSessionFromCurrentList() {
+            this.removed = true;
+        },
+        showMessage(message, tone) {
+            messages.push({ message, tone });
+        }
+    };
+
+    await deleteSession.call(context, {
+        source: 'codex',
+        sessionId: 'session-1',
+        filePath: '/tmp/session-1.jsonl'
+    });
+
+    assert.strictEqual(confirmCalls, 1);
+    assert.strictEqual(requestedAction, 'delete-session');
+    assert.strictEqual(context.sessionTrashTotalCount, 5);
+    assert.strictEqual(context.sessionDeleting['codex:session-1:/tmp/session-1.jsonl'], false);
+    assert.strictEqual(context.removed, true);
+    assert.deepStrictEqual(context.removeSessionPinCalls, [{
+        source: 'codex',
+        sessionId: 'session-1',
+        filePath: '/tmp/session-1.jsonl'
+    }]);
+    assert.deepStrictEqual(context.invalidateUsageCalls, [{ preserveList: true }]);
+    assert.deepStrictEqual(messages, [{ message: '已删除', tone: 'success' }]);
+});
+
 test('cloneSession keeps success message when refresh fails after clone succeeds', async () => {
     const cloneSessionSource = extractMethodAsFunction(appSource, 'cloneSession');
     const cloneSession = instantiateFunction(cloneSessionSource, 'cloneSession', {

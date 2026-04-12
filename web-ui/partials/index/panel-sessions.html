@@ -186,7 +186,7 @@
                                             class="btn-session-delete"
                                             @click="deleteSession(activeSession)"
                                             :disabled="!activeSession || sessionsLoading || sessionDeleting[getSessionExportKey(activeSession)]">
-                                            {{ (activeSession && sessionDeleting[getSessionExportKey(activeSession)]) ? '移入中...' : '移入回收站' }}
+                                            {{ (activeSession && sessionDeleting[getSessionExportKey(activeSession)]) ? (sessionTrashEnabled === false ? '删除中...' : '移入中...') : (sessionTrashEnabled === false ? '直接删除' : '移入回收站') }}
                                         </button>
                                         <button
                                             class="btn-session-export"
