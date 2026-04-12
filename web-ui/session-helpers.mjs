@@ -141,10 +141,16 @@ export function switchMainTab(tab) {
         this.loadSessionsUsage();
     }
     if (enteringOrchestrationTab && typeof this.loadTaskOrchestrationOverview === 'function') {
-        void this.loadTaskOrchestrationOverview({
-            silent: true,
-            includeDetail: true
-        });
+        let orchestrationOverviewLoad = null;
+        try {
+            orchestrationOverviewLoad = this.loadTaskOrchestrationOverview({
+                silent: true,
+                includeDetail: true
+            });
+        } catch (_) {
+            orchestrationOverviewLoad = null;
+        }
+        void Promise.resolve(orchestrationOverviewLoad).catch(() => {});
     }
     if (nextTab !== 'orchestration' && typeof this.stopTaskOrchestrationPolling === 'function') {
         this.stopTaskOrchestrationPolling();

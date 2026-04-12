@@ -141,6 +141,7 @@ const WORKFLOW_RUNS_FILE = path.join(CONFIG_DIR, 'codexmate-workflow-runs.jsonl'
 const TASK_QUEUE_FILE = path.join(CONFIG_DIR, 'codexmate-task-queue.json');
 const TASK_RUNS_FILE = path.join(CONFIG_DIR, 'codexmate-task-runs.jsonl');
 const TASK_RUN_DETAILS_DIR = path.join(CONFIG_DIR, 'codexmate-task-runs');
+const TASK_QUEUE_WORKER_FILE = path.join(CONFIG_DIR, 'codexmate-task-queue-worker.json');
 const DEFAULT_CLAUDE_MODEL = 'glm-4.7';
 const DEFAULT_MODEL_CONTEXT_WINDOW = 190000;
 const DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT = 185000;
@@ -10833,7 +10834,8 @@ function parseTaskCliOptions(args = []) {
         runId: '',
         status: '',
         detach: false,
-        json: false
+        json: false,
+        explicit: {}
     };
     const rest = [];
     const pushValue = (key, value, optionName) => {
@@ -10848,10 +10850,12 @@ function parseTaskCliOptions(args = []) {
         if (!arg) continue;
         if (arg === '--allow-write') {
             options.allowWrite = true;
+            options.explicit.allowWrite = true;
             continue;
         }
         if (arg === '--dry-run') {
             options.dryRun = true;
+            options.explicit.dryRun = true;
             continue;
         }
         if (arg === '--plan-only') {
@@ -10868,87 +10872,105 @@ function parseTaskCliOptions(args = []) {
         }
         if (arg === '--title') {
             options.title = String(args[i + 1] || '').trim();
+            options.explicit.title = true;
             i += 1;
             continue;
         }
         if (arg.startsWith('--title=')) {
             options.title = arg.slice('--title='.length).trim();
+            options.explicit.title = true;
             continue;
         }
         if (arg === '--target') {
             options.target = String(args[i + 1] || '').trim();
+            options.explicit.target = true;
             i += 1;
             continue;
         }
         if (arg.startsWith('--target=')) {
             options.target = arg.slice('--target='.length).trim();
+            options.explicit.target = true;
             continue;
         }
         if (arg === '--notes') {
             options.notes = String(args[i + 1] || '').trim();
+            options.explicit.notes = true;
             i += 1;
             continue;
         }
         if (arg.startsWith('--notes=')) {
             options.notes = arg.slice('--notes='.length).trim();
+            options.explicit.notes = true;
             continue;
         }
         if (arg === '--plan') {
             options.planRaw = String(args[i + 1] || '').trim();
+            options.explicit.planRaw = true;
             i += 1;
             continue;
         }
         if (arg.startsWith('--plan=')) {
             options.planRaw = arg.slice('--plan='.length).trim();
+            options.explicit.planRaw = true;
             continue;
         }
         if (arg === '--workflow-id') {
             pushValue('workflowIds', args[i + 1], '--workflow-id');
+            options.explicit.workflowIds = true;
             i += 1;
             continue;
         }
         if (arg.startsWith('--workflow-id=')) {
             pushValue('workflowIds', arg.slice('--workflow-id='.length), '--workflow-id');
+            options.explicit.workflowIds = true;
             continue;
         }
         if (arg === '--follow-up') {
             pushValue('followUps', args[i + 1], '--follow-up');
+            options.explicit.followUps = true;
             i += 1;
             continue;
         }
         if (arg.startsWith('--follow-up=')) {
             pushValue('followUps', arg.slice('--follow-up='.length), '--follow-up');
+            options.explicit.followUps = true;
             continue;
         }
         if (arg === '--engine') {
             options.engine = normalizeTaskEngine(args[i + 1]);
+            options.explicit.engine = true;
             i += 1;
             continue;
         }
         if (arg.startsWith('--engine=')) {
             options.engine = normalizeTaskEngine(arg.slice('--engine='.length));
+            options.explicit.engine = true;
             continue;
         }
         if (arg === '--concurrency') {
             const value = parseInt(args[i + 1], 10);
             if (Number.isFinite(value)) options.concurrency = value;
+            options.explicit.concurrency = true;
             i += 1;
             continue;
         }
         if (arg.startsWith('--concurrency=')) {
             const value = parseInt(arg.slice('--concurrency='.length), 10);
             if (Number.isFinite(value)) options.concurrency = value;
+            options.explicit.concurrency = true;
             continue;
         }
         if (arg === '--auto-fix-rounds') {
             const value = parseInt(args[i + 1], 10);
             if (Number.isFinite(value)) options.autoFixRounds = value;
+            options.explicit.autoFixRounds = true;
             i += 1;
             continue;
         }
         if (arg.startsWith('--auto-fix-rounds=')) {
             const value = parseInt(arg.slice('--auto-fix-rounds='.length), 10);
             if (Number.isFinite(value)) options.autoFixRounds = value;
+            options.explicit.autoFixRounds = true;
             continue;
         }
         if (arg === '--limit') {
@@ -10964,20 +10986,24 @@ function parseTaskCliOptions(args = []) {
         }
         if (arg === '--task-id') {
             options.taskId = String(args[i + 1] || '').trim();
+            options.explicit.taskId = true;
             i += 1;
             continue;
         }
         if (arg.startsWith('--task-id=')) {
             options.taskId = arg.slice('--task-id='.length).trim();
+            options.explicit.taskId = true;
             continue;
         }
         if (arg === '--run-id') {
             options.runId = String(args[i + 1] || '').trim();
+            options.explicit.runId = true;
             i += 1;
             continue;
         }
         if (arg.startsWith('--run-id=')) {
             options.runId = arg.slice('--run-id='.length).trim();
+            options.explicit.runId = true;
             continue;
         }
         if (arg === '--status') {
@@ -10995,20 +11021,20 @@ function parseTaskCliOptions(args = []) {
 }
 
 function buildTaskCliPayload(options = {}, rest = []) {
-    const payload = {
-        title: options.title || '',
-        target: options.target || '',
-        notes: options.notes || '',
-        workflowIds: Array.isArray(options.workflowIds) ? options.workflowIds.slice() : [],
-        followUps: Array.isArray(options.followUps) ? options.followUps.slice() : [],
-        allowWrite: options.allowWrite === true,
-        dryRun: options.dryRun === true,
-        engine: options.engine || 'codex',
-        concurrency: options.concurrency,
-        autoFixRounds: options.autoFixRounds,
-        taskId: options.taskId || '',
-        runId: options.runId || ''
-    };
+    const explicit = options && options.explicit && typeof options.explicit === 'object' ? options.explicit : {};
+    const payload = {};
+    if (explicit.title && options.title) payload.title = options.title;
+    if (explicit.target && options.target) payload.target = options.target;
+    if (explicit.notes && options.notes) payload.notes = options.notes;
+    if (explicit.workflowIds && Array.isArray(options.workflowIds)) payload.workflowIds = options.workflowIds.slice();
+    if (explicit.followUps && Array.isArray(options.followUps)) payload.followUps = options.followUps.slice();
+    if (explicit.allowWrite) payload.allowWrite = options.allowWrite === true;
+    if (explicit.dryRun) payload.dryRun = options.dryRun === true;
+    if (explicit.engine) payload.engine = options.engine || 'codex';
+    if (explicit.concurrency) payload.concurrency = options.concurrency;
+    if (explicit.autoFixRounds) payload.autoFixRounds = options.autoFixRounds;
+    if (explicit.taskId && options.taskId) payload.taskId = options.taskId;
+    if (explicit.runId && options.runId) payload.runId = options.runId;
     if (!payload.target && Array.isArray(rest) && rest.length > 0) {
         payload.target = rest.join(' ').trim();
     }
@@ -11241,7 +11267,12 @@ async function cmdTask(args = []) {
             }
             const taskId = options.taskId || createTaskId();
             const runId = createTaskRunId();
-            runTaskPlanInternal(plan, { taskId, runId }).catch(() => {});
+            spawnDetachedTaskWorker({
+                type: 'run-plan',
+                plan,
+                taskId,
+                runId
+            });
             const result = { ok: true, detached: true, taskId, runId, warnings: validation.warnings || [] };
             if (options.json) {
                 console.log(JSON.stringify(result, null, 2));
@@ -11265,6 +11296,33 @@ async function cmdTask(args = []) {
 
     if (subcommand === 'retry') {
         const runId = options.runId || String(rest[0] || '').trim();
+        if (options.detach) {
+            const detail = readTaskRunDetail(runId);
+            if (!detail || !detail.plan) {
+                throw new Error(`task run not found: ${runId}`);
+            }
+            const nextRunId = createTaskRunId();
+            spawnDetachedTaskWorker({
+                type: 'run-plan',
+                plan: cloneJson(detail.plan, {}),
+                taskId: detail.taskId || createTaskId(),
+                runId: nextRunId
+            });
+            const result = {
+                ok: true,
+                started: true,
+                detached: true,
+                runId: nextRunId,
+                taskId: detail.taskId || ''
+            };
+            if (options.json) {
+                console.log(JSON.stringify(result, null, 2));
+            } else {
+                console.log(`✓ 已后台重试: runId=${result.runId}`);
+                console.log();
+            }
+            return;
+        }
         const result = await retryTaskRun({ runId, detach: options.detach });
         if (options.json) {
             console.log(JSON.stringify(result, null, 2));
@@ -11276,6 +11334,9 @@ async function cmdTask(args = []) {
         }
         if (result.error) {
             throw new Error(result.error);
+        }
+        if (!result.detached && result.run && result.run.status === 'failed') {
+            throw new Error(result.run.error || 'task retry failed');
         }
         return;
     }
@@ -12496,7 +12557,18 @@ function normalizeTaskPlanRequest(params = {}) {
 
 function coerceTaskPlanPayload(params = {}) {
     if (params && params.plan && typeof params.plan === 'object' && !Array.isArray(params.plan)) {
-        return cloneJson(params.plan, {});
+        const plan = cloneJson(params.plan, {});
+        const overrideKeys = ['id', 'title', 'target', 'notes', 'cwd', 'engine', 'allowWrite', 'dryRun', 'concurrency', 'autoFixRounds', 'workflowIds', 'followUps'];
+        for (const key of overrideKeys) {
+            if (Object.prototype.hasOwnProperty.call(params, key) && params[key] !== undefined) {
+                plan[key] = cloneJson(params[key], params[key]);
+            }
+        }
+        plan.engine = normalizeTaskEngine(plan.engine);
+        plan.workflowIds = normalizeTaskFollowUps(plan.workflowIds || []).map((id) => normalizeWorkflowId(id)).filter(Boolean);
+        plan.followUps = normalizeTaskFollowUps(plan.followUps || []);
+        plan.waves = computePlanWaves(Array.isArray(plan.nodes) ? plan.nodes : []);
+        return plan;
     }
     const request = normalizeTaskPlanRequest(params || {});
     const catalog = buildTaskWorkflowCatalog();
@@ -12812,22 +12884,48 @@ async function runCodexExecTaskNode(node, context = {}) {
     const stderrLines = [];
     const parsedEvents = [];
     let sessionId = '';
-    const captureLines = (bucket, text) => {
-        const lines = String(text || '').split(/\r?\n/g).map((line) => line.trim()).filter(Boolean);
-        for (const line of lines) {
-            if (bucket.length < 120) {
-                bucket.push(truncateTaskText(line, 1200));
-            }
-            try {
-                const payload = JSON.parse(line);
-                if (parsedEvents.length < 120) {
-                    parsedEvents.push(payload);
-                }
-                if (!sessionId) {
-                    sessionId = findCodexSessionId(payload);
-                }
-            } catch (_) {}
+    let stdoutPartial = '';
+    let stderrPartial = '';
+    const processCapturedLine = (bucket, line) => {
+        const normalizedLine = String(line || '').trim();
+        if (!normalizedLine) {
+            return;
         }
+        if (bucket.length < 120) {
+            bucket.push(truncateTaskText(normalizedLine, 1200));
+        }
+        try {
+            const payload = JSON.parse(normalizedLine);
+            if (parsedEvents.length < 120) {
+                parsedEvents.push(payload);
+            }
+            if (!sessionId) {
+                sessionId = findCodexSessionId(payload);
+            }
+        } catch (_) {}
+    };
+    const captureLines = (bucket, text, stream) => {
+        const currentPartial = stream === 'stderr' ? stderrPartial : stdoutPartial;
+        const merged = `${currentPartial}${String(text || '')}`;
+        const pieces = merged.split(/\r?\n/g);
+        const nextPartial = pieces.pop() || '';
+        if (stream === 'stderr') {
+            stderrPartial = nextPartial;
+        } else {
+            stdoutPartial = nextPartial;
+        }
+        for (const line of pieces) {
+            processCapturedLine(bucket, line);
+        }
+    };
+    const flushCapturedPartial = (bucket, stream) => {
+        const partial = stream === 'stderr' ? stderrPartial : stdoutPartial;
+        if (stream === 'stderr') {
+            stderrPartial = '';
+        } else {
+            stdoutPartial = '';
+        }
+        processCapturedLine(bucket, partial);
     };
     const exit = await new Promise((resolve) => {
         const child = spawn(codexPath, args, {
@@ -12842,15 +12940,17 @@ async function runCodexExecTaskNode(node, context = {}) {
             });
         }
         child.stdout.on('data', (chunk) => {
-            captureLines(stdoutLines, chunk);
+            captureLines(stdoutLines, chunk, 'stdout');
         });
         child.stderr.on('data', (chunk) => {
-            captureLines(stderrLines, chunk);
+            captureLines(stderrLines, chunk, 'stderr');
         });
         child.on('error', (error) => {
             resolve({ code: 1, signal: '', error: error && error.message ? error.message : String(error || 'spawn failed') });
         });
         child.on('close', (code, signal) => {
+            flushCapturedPartial(stdoutLines, 'stdout');
+            flushCapturedPartial(stderrLines, 'stderr');
             resolve({ code: typeof code === 'number' ? code : 1, signal: signal || '', error: '' });
         });
     });
@@ -12938,6 +13038,7 @@ async function runTaskPlanInternal(plan, options = {}) {
     const baseDetail = {
         runId,
         taskId,
+        workerPid: process.pid,
         title: plan.title || '',
         target: plan.target || '',
         engine: normalizeTaskEngine(plan.engine),
@@ -13099,6 +13200,29 @@ async function runTaskNow(params = {}) {
     return detail;
 }
 
+async function runTaskQueueProcessingInternal(options = {}) {
+    const taskId = typeof options.taskId === 'string' ? options.taskId.trim() : '';
+    let latestDetail = null;
+    while (true) {
+        const queue = listTaskQueueItems({ limit: 200, status: 'queued' });
+        const nextItem = taskId
+            ? queue.find((item) => item.taskId === taskId)
+            : queue[queue.length - 1];
+        if (!nextItem) {
+            break;
+        }
+        latestDetail = await runTaskPlanInternal(nextItem.plan, {
+            taskId: nextItem.taskId,
+            runId: createTaskRunId(),
+            queueItem: nextItem
+        });
+        if (taskId) {
+            break;
+        }
+    }
+    return latestDetail;
+}
+
 async function startTaskQueueProcessing(options = {}) {
     const taskId = typeof options.taskId === 'string' ? options.taskId.trim() : '';
     const detach = options.detach === true;
@@ -13109,47 +13233,49 @@ async function startTaskQueueProcessing(options = {}) {
     if (queueItemById && queueItemById.status !== 'queued') {
         return { error: `task is not queued: ${taskId}` };
     }
-    const runner = async () => {
-        let latestDetail = null;
-        while (true) {
-            const queue = listTaskQueueItems({ limit: 200, status: 'queued' });
-            const nextItem = taskId
-                ? queue.find((item) => item.taskId === taskId)
-                : queue[0];
-            if (!nextItem) {
-                break;
-            }
-            latestDetail = await runTaskPlanInternal(nextItem.plan, {
-                taskId: nextItem.taskId,
-                runId: createTaskRunId(),
-                queueItem: nextItem
-            });
-            if (taskId) {
-                break;
-            }
-        }
-        return latestDetail;
-    };
+    const detachedWorker = readTaskQueueWorkerState();
+    const runner = async () => runTaskQueueProcessingInternal({ taskId });
     if (detach) {
-        if (g_taskQueueProcessor) {
+        if (g_taskQueueProcessor || detachedWorker) {
             return {
                 ok: true,
                 started: false,
                 alreadyRunning: true
             };
         }
-        g_taskQueueProcessor = runner()
-            .catch(() => null)
-            .finally(() => {
-                g_taskQueueProcessor = null;
-            });
+        spawnDetachedTaskWorker({
+            type: 'queue-runner',
+            taskId
+        });
         return {
             ok: true,
             started: true,
             detached: true
         };
     }
-    const detail = await runner();
+    if (detachedWorker) {
+        return {
+            ok: true,
+            started: false,
+            alreadyRunning: true
+        };
+    }
+    if (g_taskQueueProcessor) {
+        const detail = await g_taskQueueProcessor;
+        return {
+            ok: true,
+            started: false,
+            detached: false,
+            detail,
+            alreadyRunning: true
+        };
+    }
+    g_taskQueueProcessor = runner()
+        .catch(() => null)
+        .finally(() => {
+            g_taskQueueProcessor = null;
+        });
+    const detail = await g_taskQueueProcessor;
     return {
         ok: true,
         started: true,
@@ -13171,10 +13297,12 @@ async function retryTaskRun(params = {}) {
     const detach = params.detach === true;
     const nextRunId = createTaskRunId();
     if (detach) {
-        runTaskPlanInternal(plan, {
+        spawnDetachedTaskWorker({
+            type: 'run-plan',
+            plan,
             taskId: detail.taskId || createTaskId(),
             runId: nextRunId
-        }).catch(() => {});
+        });
         return {
             ok: true,
             started: true,
@@ -13197,7 +13325,8 @@ function cancelTaskRunOrQueue(params = {}) {
     if (!target) {
         return { error: 'taskId or runId is required' };
     }
-    const controllerByRun = g_taskRunControllers.get(target);
+    const controllerByRun = g_taskRunControllers.get(target)
+        || Array.from(g_taskRunControllers.values()).find((entry) => entry && entry.taskId === target);
     if (controllerByRun) {
         controllerByRun.abort();
         return {
@@ -13236,6 +13365,12 @@ function cancelTaskRunOrQueue(params = {}) {
                 mode: 'running'
             };
         }
+        if (queueItem.lastRunId) {
+            const detachedResult = signalDetachedTaskWorker(readTaskRunDetail(queueItem.lastRunId) || {});
+            if (!detachedResult.error) {
+                return detachedResult;
+            }
+        }
         return {
             error: `task cannot be cancelled in current status: ${queueItem.status}`
         };
@@ -13251,6 +13386,19 @@ function cancelTaskRunOrQueue(params = {}) {
             taskId: active.taskId,
             mode: 'running'
         };
+    }
+    if (detail) {
+        const detachedResult = signalDetachedTaskWorker(detail);
+        if (!detachedResult.error) {
+            return detachedResult;
+        }
+    }
+    const detailByTaskId = findRunningTaskRunDetailByTaskId(target);
+    if (detailByTaskId) {
+        const detachedResult = signalDetachedTaskWorker(detailByTaskId);
+        if (!detachedResult.error) {
+            return detachedResult;
+        }
     }
     return { error: `task/run not found: ${target}` };
 }
@@ -13281,6 +13429,187 @@ function getTaskLogs(params = {}) {
         logs: lines.join('\n').trim(),
         detail
     };
+}
+
+function writeDetachedTaskWorkerPayload(payload = {}) {
+    const tempRoot = path.join(TASK_RUN_DETAILS_DIR, 'tmp');
+    ensureDir(tempRoot);
+    const payloadPath = path.join(tempRoot, `task-worker-${Date.now()}-${crypto.randomBytes(3).toString('hex')}.json`);
+    writeJsonAtomic(payloadPath, payload);
+    return payloadPath;
+}
+
+function readDetachedTaskWorkerPayload(payloadPath = '') {
+    const filePath = typeof payloadPath === 'string' ? payloadPath.trim() : '';
+    if (!filePath) {
+        return { error: 'task worker payload path is required' };
+    }
+    const parsed = readJsonObjectFromFile(filePath, {});
+    try {
+        fs.unlinkSync(filePath);
+    } catch (_) {}
+    if (!parsed.ok || !parsed.exists) {
+        return { error: parsed.error || 'task worker payload not found' };
+    }
+    return { payload: parsed.data && typeof parsed.data === 'object' ? parsed.data : {} };
+}
+
+function spawnDetachedTaskWorker(payload = {}) {
+    const payloadPath = writeDetachedTaskWorkerPayload(payload);
+    const child = spawn(process.execPath, [__filename, '__task-worker', payloadPath], {
+        stdio: 'ignore',
+        detached: true,
+        windowsHide: true
+    });
+    child.on('error', () => {});
+    if (typeof child.unref === 'function') {
+        child.unref();
+    }
+    return {
+        ok: true,
+        detached: true,
+        pid: child.pid || 0
+    };
+}
+
+function isLiveProcessId(value) {
+    const pid = Number.isFinite(Number(value)) ? Math.floor(Number(value)) : 0;
+    if (!pid) {
+        return false;
+    }
+    try {
+        process.kill(pid, 0);
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+function readTaskQueueWorkerState() {
+    const parsed = readJsonObjectFromFile(TASK_QUEUE_WORKER_FILE, {});
+    if (!parsed.ok || !parsed.exists || !parsed.data || typeof parsed.data !== 'object') {
+        return null;
+    }
+    const state = parsed.data;
+    if (!isLiveProcessId(state.pid)) {
+        try {
+            fs.unlinkSync(TASK_QUEUE_WORKER_FILE);
+        } catch (_) {}
+        return null;
+    }
+    return state;
+}
+
+function writeTaskQueueWorkerState(state = {}) {
+    ensureDir(path.dirname(TASK_QUEUE_WORKER_FILE));
+    writeJsonAtomic(TASK_QUEUE_WORKER_FILE, {
+        pid: process.pid,
+        taskId: typeof state.taskId === 'string' ? state.taskId.trim() : '',
+        startedAt: state.startedAt || toIsoTime(Date.now())
+    });
+}
+
+function clearTaskQueueWorkerState() {
+    try {
+        fs.unlinkSync(TASK_QUEUE_WORKER_FILE);
+    } catch (_) {}
+}
+
+function findRunningTaskRunDetailByTaskId(taskId = '') {
+    const normalizedTaskId = typeof taskId === 'string' ? taskId.trim() : '';
+    if (!normalizedTaskId || !fs.existsSync(TASK_RUN_DETAILS_DIR)) {
+        return null;
+    }
+    let entries = [];
+    try {
+        entries = fs.readdirSync(TASK_RUN_DETAILS_DIR, { withFileTypes: true });
+    } catch (_) {
+        return null;
+    }
+    const candidates = [];
+    for (const entry of entries) {
+        if (!entry || !entry.isFile() || !entry.name.endsWith('.json')) {
+            continue;
+        }
+        const detail = readTaskRunDetail(entry.name.slice(0, -5));
+        if (!detail || detail.taskId !== normalizedTaskId) {
+            continue;
+        }
+        const status = detail.run && detail.run.status ? detail.run.status : detail.status;
+        if (status !== 'running') {
+            continue;
+        }
+        candidates.push(detail);
+    }
+    candidates.sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')));
+    return candidates[0] || null;
+}
+
+function signalDetachedTaskWorker(detail = {}) {
+    const workerPid = Number.isFinite(Number(detail && detail.workerPid)) ? Math.floor(Number(detail.workerPid)) : 0;
+    if (!workerPid) {
+        return { error: 'task worker pid is missing' };
+    }
+    try {
+        process.kill(workerPid, 'SIGTERM');
+        return {
+            ok: true,
+            cancelled: true,
+            runId: detail.runId || '',
+            taskId: detail.taskId || '',
+            workerPid,
+            mode: 'running'
+        };
+    } catch (error) {
+        return {
+            error: error && error.code === 'ESRCH'
+                ? `task worker is not running: ${workerPid}`
+                : (error && error.message ? error.message : 'failed to signal task worker')
+        };
+    }
+}
+
+async function cmdTaskWorker(args = []) {
+    const payloadResult = readDetachedTaskWorkerPayload(args[0] || '');
+    if (payloadResult.error) {
+        throw new Error(payloadResult.error);
+    }
+    const payload = payloadResult.payload || {};
+    if (payload.type === 'run-plan') {
+        const runId = typeof payload.runId === 'string' ? payload.runId.trim() : '';
+        const taskId = typeof payload.taskId === 'string' ? payload.taskId.trim() : '';
+        let cancelRequested = false;
+        const cancelHandler = () => {
+            if (cancelRequested) return;
+            cancelRequested = true;
+            cancelTaskRunOrQueue({ runId, taskId });
+        };
+        process.once('SIGTERM', cancelHandler);
+        process.once('SIGINT', cancelHandler);
+        try {
+            const detail = await runTaskPlanInternal(payload.plan || {}, { taskId, runId });
+            if (detail && detail.error) {
+                throw new Error(detail.error);
+            }
+            if (detail && detail.run && detail.run.status === 'failed') {
+                throw new Error(detail.run.error || 'task run failed');
+            }
+            return;
+        } finally {
+            process.removeListener('SIGTERM', cancelHandler);
+            process.removeListener('SIGINT', cancelHandler);
+        }
+    }
+    if (payload.type === 'queue-runner') {
+        writeTaskQueueWorkerState({ taskId: payload.taskId || '', startedAt: toIsoTime(Date.now()) });
+        try {
+            await runTaskQueueProcessingInternal({ taskId: payload.taskId || '' });
+            return;
+        } finally {
+            clearTaskQueueWorkerState();
+        }
+    }
+    throw new Error(`unknown task worker payload type: ${payload.type || ''}`);
 }
 
 function createMcpTools(options = {}) {
@@ -14133,6 +14462,7 @@ async function main() {
     }
 
     switch (command) {
+        case '__task-worker': await cmdTaskWorker(args.slice(1)); break;
         case 'status': cmdStatus(); break;
         case 'setup': await cmdSetup(); break;
         case 'list': cmdList(); break;
