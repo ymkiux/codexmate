@@ -9,7 +9,7 @@
                             <div class="selector-header task-section-header">
                                 <div>
                                     <span class="selector-title">任务编排</span>
-                                    <div class="skills-panel-note">生成计划，执行或入队，并查看运行记录。</div>
+                                    <div class="skills-panel-note">把需求拆成可执行节点，先预览，再执行或入队。</div>
                                 </div>
                                 <div class="settings-tab-actions task-header-actions">
                                     <button type="button" class="btn-tool btn-tool-compact" @click="loadTaskOrchestrationOverview({ forceRefresh: true, includeDetail: true })" :disabled="taskOrchestration.loading">
@@ -21,14 +21,34 @@
                                 </div>
                             </div>
 
+                            <div class="task-onboarding-card">
+                                <div class="task-onboarding-title">三步完成一次编排</div>
+                                <div class="task-onboarding-steps">
+                                    <div class="task-onboarding-step"><strong>1.</strong> 写清目标和边界</div>
+                                    <div class="task-onboarding-step"><strong>2.</strong> 先看预览，确认节点和依赖</div>
+                                    <div class="task-onboarding-step"><strong>3.</strong> 决定立即执行，还是先入队</div>
+                                </div>
+                            </div>
+
+                            <div class="task-template-block">
+                                <div class="task-template-label">快捷示例</div>
+                                <div class="task-template-chip-group">
+                                    <button type="button" class="task-template-chip" @click="taskOrchestration.target = '修复当前 PR review 评论，并补对应回归测试'; taskOrchestration.notes = '不要改动无关模块；需要给出验证结果'; taskOrchestration.followUpsText = '继续处理新增 review 评论\n最后更新 PR 摘要'">修 review + 回归</button>
+                                    <button type="button" class="task-template-chip" @click="taskOrchestration.target = '先排查问题根因并给出执行计划，不直接修改代码'; taskOrchestration.notes = '优先定位根因、影响范围和风险点'; taskOrchestration.followUpsText = ''">只做排查规划</button>
+                                    <button type="button" class="task-template-chip" @click="taskOrchestration.target = '用 Workflow 跑一组固定检查并整理结果'; taskOrchestration.selectedEngine = 'workflow'; taskOrchestration.workflowIdsText = 'diagnose-config\nsafe-provider-switch'; taskOrchestration.notes = '输出统一结论，避免重复描述'">Workflow 批处理</button>
+                                </div>
+                            </div>
+
                             <div class="selector-grid task-composer-grid">
                                 <label class="selector-field task-field task-field-wide">
                                     <span class="selector-label">目标</span>
                                     <textarea v-model="taskOrchestration.target" class="task-textarea" rows="4" placeholder="例如：新增任务编排 Tab，并补上 CLI / API / 最小测试"></textarea>
+                                    <span class="task-field-hint">写结果导向的目标，最好带上范围、约束和验收标准。</span>
                                 </label>
                                 <label class="selector-field">
                                     <span class="selector-label">标题</span>
                                     <input v-model="taskOrchestration.title" type="text" placeholder="可选，默认从目标自动提取">
+                                    <span class="task-field-hint">给队列和运行记录一个更容易识别的短标题。</span>
                                 </label>
                                 <label class="selector-field">
                                     <span class="selector-label">引擎</span>
@@ -36,26 +56,32 @@
                                         <option value="codex">Codex</option>
                                         <option value="workflow">Workflow</option>
                                     </select>
+                                    <span class="task-field-hint">Codex 适合开放式任务，Workflow 适合固定流程。</span>
                                 </label>
                                 <label class="selector-field">
                                     <span class="selector-label">并发</span>
                                     <input v-model="taskOrchestration.concurrency" type="number" min="1" max="8">
+                                    <span class="task-field-hint">允许同时运行的节点数，复杂任务先从 1~2 更稳。</span>
                                 </label>
                                 <label class="selector-field">
                                     <span class="selector-label">自动修复</span>
                                     <input v-model="taskOrchestration.autoFixRounds" type="number" min="0" max="5">
+                                    <span class="task-field-hint">节点失败后允许自动再试几轮修复。</span>
                                 </label>
                                 <label class="selector-field task-field-wide">
                                     <span class="selector-label">说明</span>
                                     <textarea v-model="taskOrchestration.notes" class="task-textarea" rows="3" placeholder="例如：不要重写现有架构，只做增量实现"></textarea>
+                                    <span class="task-field-hint">补充边界、禁区、风格要求或验证要求。</span>
                                 </label>
                                 <label class="selector-field task-field-wide">
                                     <span class="selector-label">后续动作（每行一条）</span>
                                     <textarea v-model="taskOrchestration.followUpsText" class="task-textarea" rows="3" placeholder="例如：\n继续处理 review 评论\n最后补回归测试"></textarea>
+                                    <span class="task-field-hint">把完成主目标后的固定收尾动作写在这里。</span>
                                 </label>
                                 <label class="selector-field task-field-wide">
                                     <span class="selector-label">Workflow ID（每行一条）</span>
                                     <textarea v-model="taskOrchestration.workflowIdsText" class="task-textarea" rows="3" placeholder="例如：\ndiagnose-config\nsafe-provider-switch"></textarea>
+                                    <span class="task-field-hint">只在 Workflow 引擎下需要，用来指定复用的固定流程。</span>
                                 </label>
                             </div>
 
@@ -68,6 +94,14 @@
                                     <input v-model="taskOrchestration.dryRun" type="checkbox">
                                     <span>仅预演</span>
                                 </label>
+                            </div>
+
+                            <div class="task-config-strip">
+                                <div class="task-config-pill">引擎 · {{ taskOrchestration.selectedEngine === 'workflow' ? 'Workflow' : 'Codex' }}</div>
+                                <div class="task-config-pill">并发 · {{ taskOrchestration.concurrency }}</div>
+                                <div class="task-config-pill">自动修复 · {{ taskOrchestration.autoFixRounds }}</div>
+                                <div class="task-config-pill">写入 · {{ taskOrchestration.allowWrite ? '允许' : '只读' }}</div>
+                                <div class="task-config-pill">模式 · {{ taskOrchestration.dryRun ? '仅预演' : '真实执行' }}</div>
                             </div>
 
                             <div class="task-action-row">
@@ -85,6 +119,12 @@
                                         {{ taskOrchestration.queueStarting ? '启动中...' : '开始队列' }}
                                     </button>
                                 </div>
+                            </div>
+
+                            <div class="task-action-help">
+                                <div class="task-action-help-item"><strong>预览</strong> 只生成 DAG，不启动执行。</div>
+                                <div class="task-action-help-item"><strong>执行</strong> 立即创建并启动这次编排。</div>
+                                <div class="task-action-help-item"><strong>入队</strong> 先排进队列，稍后统一开始。</div>
                             </div>
                         </section>
 
@@ -106,7 +146,10 @@
                                     {{ warning }}
                                 </div>
                             </div>
-                            <div v-if="!taskOrchestration.plan" class="session-empty">先输入目标，再点“预览”。</div>
+                            <div v-if="!taskOrchestration.plan" class="task-empty-state">
+                                <div class="task-empty-title">先生成一份计划预览</div>
+                                <div class="task-empty-copy">建议先写清目标和约束，再点“预览”，确认节点数、波次和依赖是否符合预期。</div>
+                            </div>
                             <template v-else>
                                 <div class="task-plan-summary-strip">
                                     <div class="task-plan-summary-item">
@@ -152,7 +195,10 @@
                                     <div class="skills-panel-note">本地队列，可后台执行和取消。</div>
                                 </div>
                             </div>
-                            <div v-if="!taskOrchestration.queue.length" class="session-empty">当前没有排队任务。</div>
+                            <div v-if="!taskOrchestration.queue.length" class="task-empty-state">
+                                <div class="task-empty-title">当前没有排队任务</div>
+                                <div class="task-empty-copy">想批量处理时，先把任务加入队列，再点“开始队列”。</div>
+                            </div>
                             <div v-else class="task-runtime-list">
                                 <div
                                     v-for="item in taskOrchestration.queue"
@@ -184,7 +230,10 @@
                                     <div class="skills-panel-note">查看最近运行记录和摘要。</div>
                                 </div>
                             </div>
-                            <div v-if="!taskOrchestration.runs.length" class="session-empty">还没有运行记录。</div>
+                            <div v-if="!taskOrchestration.runs.length" class="task-empty-state">
+                                <div class="task-empty-title">还没有运行记录</div>
+                                <div class="task-empty-copy">执行一次编排后，这里会显示最近运行历史和摘要。</div>
+                            </div>
                             <div v-else class="task-runtime-list">
                                 <button
                                     v-for="item in taskOrchestration.runs"
@@ -225,7 +274,10 @@
                         </div>
 
                         <div v-if="taskOrchestration.selectedRunError" class="task-issue-item">{{ taskOrchestration.selectedRunError }}</div>
-                        <div v-if="!taskOrchestrationSelectedRun" class="session-empty">选择一个运行记录查看详情。</div>
+                        <div v-if="!taskOrchestrationSelectedRun" class="task-empty-state">
+                            <div class="task-empty-title">选择一条运行记录查看详情</div>
+                            <div class="task-empty-copy">你可以在这里检查节点状态、错误、摘要和日志，决定是否重试或取消。</div>
+                        </div>
                         <template v-else>
                             <div class="task-detail-summary-strip">
                                 <div class="task-plan-summary-item">
