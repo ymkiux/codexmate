@@ -10,7 +10,6 @@ const yauzl = require('yauzl');
 const { exec, execSync, spawn, spawnSync } = require('child_process');
 const http = require('http');
 const https = require('https');
-const net = require('net');
 const readline = require('readline');
 const {
     expandHomePath,
@@ -45,7 +44,8 @@ const {
     buildModelsCacheKey,
     buildModelProbeSpec,
     buildModelConversationSpecs,
-    extractModelResponseText
+    extractModelResponseText,
+    normalizeWireApi
 } = require('./lib/cli-models-utils');
 const {
     probeUrl,
@@ -66,6 +66,30 @@ const {
     executeWorkflowDefinition
 } = require('./lib/workflow-engine');
 const { buildConfigHealthReport: buildConfigHealthReportCore } = require('./cli/config-health');
+const {
+    createAuthProfileController
+} = require('./cli/auth-profiles');
+const {
+    createBuiltinProxyRuntimeController
+} = require('./cli/builtin-proxy');
+const {
+    createBuiltinClaudeProxyRuntimeController
+} = require('./cli/claude-proxy');
+const {
+    createOpenclawConfigController
+} = require('./cli/openclaw-config');
+const {
+    createConfigBootstrapController
+} = require('./cli/config-bootstrap');
+const {
+    createAgentsFileController
+} = require('./cli/agents-files');
+const {
+    createArchiveHelperController
+} = require('./cli/archive-helpers');
+const {
+    createZipCommandController
+} = require('./cli/zip-commands');
 const {
     readBundledWebUiCss,
     readBundledWebUiHtml,
@@ -89,6 +113,7 @@ const MODELS_FILE = path.join(CONFIG_DIR, 'models.json');
 const CURRENT_MODELS_FILE = path.join(CONFIG_DIR, 'provider-current-models.json');
 const INIT_MARK_FILE = path.join(CONFIG_DIR, 'codexmate-init.json');
 const BUILTIN_PROXY_SETTINGS_FILE = path.join(CONFIG_DIR, 'codexmate-proxy.json');
+const BUILTIN_CLAUDE_PROXY_SETTINGS_FILE = path.join(CONFIG_DIR, 'codexmate-claude-proxy.json');
 const CODEX_SESSIONS_DIR = path.join(CONFIG_DIR, 'sessions');
 const SESSION_TRASH_DIR = path.join(CONFIG_DIR, 'codexmate-session-trash');
 const SESSION_TRASH_FILES_DIR = path.join(SESSION_TRASH_DIR, 'files');
@@ -165,6 +190,14 @@ const DEFAULT_BUILTIN_PROXY_SETTINGS = Object.freeze({
     enabled: false,
     host: '127.0.0.1',
     port: 8318,
+    provider: '',
+    authSource: 'provider',
+    timeoutMs: 30000
+});
+const DEFAULT_BUILTIN_CLAUDE_PROXY_SETTINGS = Object.freeze({
+    enabled: false,
+    host: '127.0.0.1',
+    port: 8328,
     provider: '',
     authSource: 'provider',
     timeoutMs: 30000
@@ -510,7 +543,6 @@ stream_max_retries = 10
 stream_idle_timeout_ms = 300000
 `;
 
-let g_initNotice = '';
 let g_sessionListCache = new Map();
 let g_sessionInventoryCache = new Map();
 let g_sessionFileLookupCache = {
@@ -520,28 +552,25 @@ let g_sessionFileLookupCache = {
 let g_exactMessageCountCache = new Map();
 let g_modelsCache = new Map();
 let g_modelsInFlight = new Map();
-let g_builtinProxyRuntime = null;
-const DEFAULT_LOCAL_PROVIDER_NAME = 'local';
 
 function isBuiltinProxyProvider(providerName) {
     return typeof providerName === 'string' && providerName.trim().toLowerCase() === BUILTIN_PROXY_PROVIDER_NAME.toLowerCase();
 }
 
 function isReservedProviderNameForCreation(providerName) {
-    return typeof providerName === 'string'
-        && providerName.trim().toLowerCase() === DEFAULT_LOCAL_PROVIDER_NAME;
+    return false;
 }
 
-function isDefaultLocalProvider(providerName) {
-    return typeof providerName === 'string' && providerName.trim() === DEFAULT_LOCAL_PROVIDER_NAME;
+function isBuiltinManagedProvider(providerName) {
+    return isBuiltinProxyProvider(providerName);
 }
 
 function isNonDeletableProvider(providerName) {
-    return isBuiltinProxyProvider(providerName) || isDefaultLocalProvider(providerName);
+    return isBuiltinManagedProvider(providerName);
 }
 
 function isNonEditableProvider(providerName) {
-    return isBuiltinProxyProvider(providerName) || isDefaultLocalProvider(providerName);
+    return isBuiltinManagedProvider(providerName);
 }
 
 // ============================================================================
@@ -1162,315 +1191,26 @@ function collectModelProviderHeaderSegmentKeySet(content) {
     return keys;
 }
 
-function normalizeAuthProfileName(value) {
-    const raw = typeof value === 'string' ? value.trim() : '';
-    if (!raw) return '';
-    const sanitized = raw
-        .replace(/[\\\/:*?"<>|]/g, '-')
-        .replace(/\s+/g, '-')
-        .replace(/^-+|-+$/g, '')
-        .slice(0, 120);
-    return sanitized;
-}
-
-function normalizeAuthRegistry(raw) {
-    const fallback = { version: 1, current: '', items: [] };
-    if (!isPlainObject(raw)) return fallback;
-    const items = Array.isArray(raw.items)
-        ? raw.items.filter(item => isPlainObject(item) && typeof item.name === 'string' && item.name.trim())
-        : [];
-    return {
-        version: 1,
-        current: typeof raw.current === 'string' ? raw.current.trim() : '',
-        items: items.map((item) => ({
-            name: normalizeAuthProfileName(item.name) || item.name.trim(),
-            fileName: typeof item.fileName === 'string' ? path.basename(item.fileName) : '',
-            type: typeof item.type === 'string' ? item.type : '',
-            email: typeof item.email === 'string' ? item.email : '',
-            accountId: typeof item.accountId === 'string' ? item.accountId : '',
-            expired: typeof item.expired === 'string' ? item.expired : '',
-            lastRefresh: typeof item.lastRefresh === 'string' ? item.lastRefresh : '',
-            updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : '',
-            importedAt: typeof item.importedAt === 'string' ? item.importedAt : '',
-            sourceFile: typeof item.sourceFile === 'string' ? item.sourceFile : ''
-        }))
-    };
-}
-
-function ensureAuthProfileStoragePrepared() {
-    ensureDir(AUTH_PROFILES_DIR);
-}
-
-function readAuthRegistry() {
-    ensureAuthProfileStoragePrepared();
-    const parsed = readJsonFile(AUTH_REGISTRY_FILE, null);
-    return normalizeAuthRegistry(parsed);
-}
-
-function writeAuthRegistry(registry) {
-    ensureAuthProfileStoragePrepared();
-    writeJsonAtomic(AUTH_REGISTRY_FILE, normalizeAuthRegistry(registry));
-}
-
-function parseAuthProfileJson(rawContent, label = '') {
-    let parsed;
-    try {
-        parsed = JSON.parse(stripUtf8Bom(String(rawContent || '')));
-    } catch (e) {
-        throw new Error(`认证文件不是有效 JSON${label ? `: ${label}` : ''}`);
-    }
-    if (!isPlainObject(parsed)) {
-        throw new Error('认证文件根节点必须是对象');
-    }
-    const hasCredential = ['access_token', 'refresh_token', 'id_token', 'OPENAI_API_KEY']
-        .some((key) => typeof parsed[key] === 'string' && parsed[key].trim());
-    if (!hasCredential) {
-        throw new Error('认证文件缺少可用凭据（access_token / refresh_token / id_token / OPENAI_API_KEY）');
-    }
-    return parsed;
-}
-
-function buildAuthProfileSummary(name, payload, fileName = '') {
-    const safePayload = isPlainObject(payload) ? payload : {};
-    return {
-        name,
-        fileName: fileName || `${name}.json`,
-        type: typeof safePayload.type === 'string' ? safePayload.type : '',
-        email: typeof safePayload.email === 'string' ? safePayload.email : '',
-        accountId: typeof safePayload.account_id === 'string'
-            ? safePayload.account_id
-            : (typeof safePayload.accountId === 'string' ? safePayload.accountId : ''),
-        expired: typeof safePayload.expired === 'string' ? safePayload.expired : '',
-        lastRefresh: typeof safePayload.last_refresh === 'string'
-            ? safePayload.last_refresh
-            : (typeof safePayload.lastRefresh === 'string' ? safePayload.lastRefresh : ''),
-        updatedAt: toIsoTime(Date.now())
-    };
-}
-
-function getAuthProfileNameFallback(payload, fallbackName = '') {
-    const fromPayload = isPlainObject(payload)
-        ? (payload.email || payload.account_id || payload.accountId || '')
-        : '';
-    const fromFallback = typeof fallbackName === 'string' ? fallbackName : '';
-    const resolved = normalizeAuthProfileName(fromPayload) || normalizeAuthProfileName(fromFallback);
-    if (resolved) return resolved;
-    return `auth-${Date.now()}`;
-}
-
-function listAuthProfilesInfo() {
-    const registry = readAuthRegistry();
-    return registry.items.map((item) => ({
-        ...item,
-        current: item.name === registry.current
-    }));
-}
-
-function upsertAuthProfile(payload, options = {}) {
-    ensureAuthProfileStoragePrepared();
-    const safePayload = parseAuthProfileJson(JSON.stringify(payload || {}));
-    const sourceFile = typeof options.sourceFile === 'string' ? options.sourceFile : '';
-    const preferredName = normalizeAuthProfileName(options.name || '');
-    const profileName = preferredName || getAuthProfileNameFallback(safePayload, sourceFile);
-    const fileName = `${profileName}.json`;
-    const profilePath = path.join(AUTH_PROFILES_DIR, fileName);
-
-    ensureDir(AUTH_PROFILES_DIR);
-    writeJsonAtomic(profilePath, safePayload);
-
-    const registry = readAuthRegistry();
-    const meta = buildAuthProfileSummary(profileName, safePayload, fileName);
-    meta.importedAt = toIsoTime(Date.now());
-    meta.sourceFile = sourceFile || '';
-
-    const idx = registry.items.findIndex((item) => item.name === profileName);
-    if (idx >= 0) {
-        registry.items[idx] = {
-            ...registry.items[idx],
-            ...meta
-        };
-    } else {
-        registry.items.push(meta);
-    }
-    registry.items.sort((a, b) => a.name.localeCompare(b.name));
-
-    const shouldActivate = options.activate !== false;
-    if (shouldActivate) {
-        writeJsonAtomic(AUTH_FILE, safePayload);
-        registry.current = profileName;
-    }
-    writeAuthRegistry(registry);
-
-    return {
-        success: true,
-        profile: {
-            ...meta,
-            current: shouldActivate ? true : registry.current === profileName
-        }
-    };
-}
-
-function importAuthProfileFromFile(filePath, options = {}) {
-    const absPath = path.resolve(String(filePath || ''));
-    if (!absPath || !fs.existsSync(absPath) || !fs.statSync(absPath).isFile()) {
-        throw new Error('认证文件不存在');
-    }
-    const raw = fs.readFileSync(absPath, 'utf-8');
-    const payload = parseAuthProfileJson(raw, path.basename(absPath));
-    const fallbackName = path.basename(absPath, path.extname(absPath));
-    return upsertAuthProfile(payload, {
-        ...options,
-        sourceFile: absPath,
-        name: options.name || fallbackName
-    });
-}
-
-function importAuthProfileFromUpload(payload = {}) {
-    const fileBase64 = typeof payload.fileBase64 === 'string' ? payload.fileBase64.trim() : '';
-    if (!fileBase64) {
-        return { error: '缺少认证文件内容' };
-    }
-    let buffer;
-    try {
-        buffer = Buffer.from(fileBase64, 'base64');
-    } catch (e) {
-        return { error: '认证文件不是有效的 base64 编码' };
-    }
-    if (!buffer || buffer.length === 0) {
-        return { error: '认证文件为空' };
-    }
-    if (buffer.length > 10 * 1024 * 1024) {
-        return { error: '认证文件过大（>10MB）' };
-    }
-
-    try {
-        const raw = buffer.toString('utf-8');
-        const profileData = parseAuthProfileJson(raw, payload.fileName || 'upload.json');
-        return upsertAuthProfile(profileData, {
-            name: payload.name || path.basename(payload.fileName || '', path.extname(payload.fileName || '')),
-            sourceFile: payload.fileName || '',
-            activate: payload.activate !== false
-        });
-    } catch (e) {
-        return { error: e.message || '导入认证文件失败' };
-    }
-}
-
-function switchAuthProfile(name, options = {}) {
-    ensureAuthProfileStoragePrepared();
-    const profileName = normalizeAuthProfileName(name);
-    if (!profileName) {
-        throw new Error('认证名称不能为空');
-    }
-    const registry = readAuthRegistry();
-    const profile = registry.items.find((item) => item.name === profileName);
-    if (!profile) {
-        throw new Error(`认证不存在: ${profileName}`);
-    }
-    const fileName = profile.fileName || `${profileName}.json`;
-    const profilePath = path.join(AUTH_PROFILES_DIR, fileName);
-    if (!fs.existsSync(profilePath)) {
-        throw new Error(`认证文件不存在: ${fileName}`);
-    }
-    const raw = fs.readFileSync(profilePath, 'utf-8');
-    const profileData = parseAuthProfileJson(raw, fileName);
-    writeJsonAtomic(AUTH_FILE, profileData);
-
-    registry.current = profileName;
-    const idx = registry.items.findIndex((item) => item.name === profileName);
-    if (idx >= 0) {
-        registry.items[idx] = {
-            ...registry.items[idx],
-            updatedAt: toIsoTime(Date.now())
-        };
-    }
-    writeAuthRegistry(registry);
-
-    if (!options.silent) {
-        console.log(`✓ 已切换认证: ${profileName}`);
-        if (profile.email) {
-            console.log(`  账号: ${profile.email}`);
-        }
-        console.log();
-    }
-    return {
-        success: true,
-        profile: {
-            ...profile,
-            current: true
-        }
-    };
-}
-
-function deleteAuthProfile(name) {
-    ensureAuthProfileStoragePrepared();
-    const profileName = normalizeAuthProfileName(name);
-    if (!profileName) {
-        return { error: '认证名称不能为空' };
-    }
-    const registry = readAuthRegistry();
-    const idx = registry.items.findIndex((item) => item.name === profileName);
-    if (idx < 0) {
-        return { error: '认证不存在' };
-    }
-    const profile = registry.items[idx];
-    const fileName = profile.fileName || `${profileName}.json`;
-    const profilePath = path.join(AUTH_PROFILES_DIR, fileName);
-
-    if (fs.existsSync(profilePath)) {
-        try {
-            fs.unlinkSync(profilePath);
-        } catch (e) {
-            return { error: `删除认证文件失败: ${e.message}` };
-        }
-    }
-
-    registry.items.splice(idx, 1);
-    let switchedTo = '';
-    if (registry.current === profileName) {
-        if (registry.items.length > 0) {
-            const next = registry.items[0];
-            try {
-                const nextPath = path.join(AUTH_PROFILES_DIR, next.fileName || `${next.name}.json`);
-                const raw = fs.readFileSync(nextPath, 'utf-8');
-                const nextData = parseAuthProfileJson(raw, next.fileName || `${next.name}.json`);
-                writeJsonAtomic(AUTH_FILE, nextData);
-                registry.current = next.name;
-                switchedTo = next.name;
-            } catch (e) {
-                registry.current = '';
-            }
-        } else {
-            registry.current = '';
-        }
-    }
-    writeAuthRegistry(registry);
-    return {
-        success: true,
-        switchedTo
-    };
-}
-
-function resolveAuthTokenFromCurrentProfile() {
-    ensureAuthProfileStoragePrepared();
-    const registry = readAuthRegistry();
-    if (!registry.current) return '';
-    const profile = registry.items.find((item) => item.name === registry.current);
-    if (!profile) return '';
-    const filePath = path.join(AUTH_PROFILES_DIR, profile.fileName || `${profile.name}.json`);
-    if (!fs.existsSync(filePath)) return '';
-    try {
-        const raw = fs.readFileSync(filePath, 'utf-8');
-        const payload = parseAuthProfileJson(raw, profile.fileName || `${profile.name}.json`);
-        if (typeof payload.access_token === 'string' && payload.access_token.trim()) {
-            return payload.access_token.trim();
-        }
-        if (typeof payload.OPENAI_API_KEY === 'string' && payload.OPENAI_API_KEY.trim()) {
-            return payload.OPENAI_API_KEY.trim();
-        }
-    } catch (e) {}
-    return '';
-}
+const {
+    listAuthProfilesInfo,
+    importAuthProfileFromFile,
+    importAuthProfileFromUpload,
+    switchAuthProfile,
+    deleteAuthProfile,
+    resolveAuthTokenFromCurrentProfile
+} = createAuthProfileController({
+    fs,
+    path,
+    ensureDir,
+    readJsonFile,
+    writeJsonAtomic,
+    stripUtf8Bom,
+    toIsoTime,
+    isPlainObject,
+    AUTH_PROFILES_DIR,
+    AUTH_REGISTRY_FILE,
+    AUTH_FILE
+});
 
 function getCodexSessionsDir() {
     const candidates = [];
@@ -1663,26 +1403,6 @@ async function fetchProviderModels(providerName, overrides = {}) {
     if (res.unlimited) return { models: [], provider: targetProvider, unlimited: true };
     if (res.error) return { error: res.error };
     return { models: res.models || [], provider: targetProvider, unlimited: false };
-}
-
-function resolveAgentsFilePath(params = {}) {
-    const baseDir = typeof params.baseDir === 'string' && params.baseDir.trim()
-        ? params.baseDir.trim()
-        : CONFIG_DIR;
-    return path.join(baseDir, AGENTS_FILE_NAME);
-}
-
-function validateAgentsBaseDir(filePath) {
-    const dirPath = path.dirname(filePath);
-    try {
-        const stat = fs.statSync(dirPath);
-        if (!stat.isDirectory()) {
-            return { error: `目标不是目录: ${dirPath}` };
-        }
-    } catch (e) {
-        return { error: `目标目录不存在: ${dirPath}` };
-    }
-    return { ok: true, dirPath };
 }
 
 function normalizeCodexSkillName(name) {
@@ -2693,729 +2413,164 @@ function deleteCodexSkills(params = {}) {
     return deleteSkills({ ...(params || {}), targetApp: 'codex' });
 }
 
-function readAgentsFile(params = {}) {
-    const filePath = resolveAgentsFilePath(params);
-    const dirCheck = validateAgentsBaseDir(filePath);
-    if (dirCheck.error) {
-        return { error: dirCheck.error };
+// buildAgentsDiff keeps the metaOnly optimization inside cli/agents-files.js.
+const {
+    resolveAgentsFilePath,
+    validateAgentsBaseDir,
+    readAgentsFile,
+    applyAgentsFile,
+    normalizeDiffText,
+    buildAgentsDiff
+} = createAgentsFileController({
+    fs,
+    path,
+    os,
+    stripUtf8Bom,
+    detectLineEnding,
+    normalizeLineEnding,
+    ensureUtf8Bom,
+    buildLineDiff,
+    CONFIG_DIR,
+    AGENTS_FILE_NAME,
+    readOpenclawAgentsFile() {
+        return readOpenclawAgentsFile(...arguments);
+    },
+    readOpenclawWorkspaceFile() {
+        return readOpenclawWorkspaceFile(...arguments);
     }
+});
 
-    if (!fs.existsSync(filePath)) {
-        return {
-            exists: false,
-            path: filePath,
-            content: '',
-            lineEnding: os.EOL === '\r\n' ? '\r\n' : '\n'
-        };
-    }
+const {
+    readOpenclawConfigFile,
+    applyOpenclawConfig,
+    readOpenclawAgentsFile,
+    applyOpenclawAgentsFile,
+    readOpenclawWorkspaceFile,
+    applyOpenclawWorkspaceFile
+} = createOpenclawConfigController({
+    fs,
+    path,
+    os,
+    ensureDir,
+    readJsonObjectFromFile,
+    writeJsonAtomic,
+    backupFileIfNeededOnce,
+    stripUtf8Bom,
+    detectLineEnding,
+    normalizeLineEnding,
+    ensureUtf8Bom,
+    isPlainObject,
+    resolveHomePath,
+    readAgentsFile,
+    applyAgentsFile,
+    OPENCLAW_CONFIG_FILE,
+    OPENCLAW_WORKSPACE_DIR,
+    OPENCLAW_DIR,
+    OPENCLAW_DEFAULT_AGENT_ID,
+    OPENCLAW_AUTH_PROFILES_FILE_NAME,
+    OPENCLAW_AUTH_STATE_FILE_NAME,
+    AGENTS_FILE_NAME
+});
 
-    if (params.metaOnly) {
-        return {
-            exists: true,
-            path: filePath,
-            content: '',
-            lineEnding: os.EOL === '\r\n' ? '\r\n' : '\n'
-        };
-    }
+const {
+    normalizeRecentConfigs,
+    readRecentConfigs,
+    writeRecentConfigs,
+    recordRecentConfig,
+    sanitizeRemovedBuiltinProxyProvider,
+    readConfigOrVirtualDefault,
+    printConfigLoadErrorAndMarkExit,
+    ensureManagedConfigBootstrap,
+    resetConfigToDefault,
+    consumeInitNotice
+} = createConfigBootstrapController({
+    fs,
+    path,
+    readJsonFile,
+    readJsonArrayFile,
+    writeJsonAtomic,
+    formatTimestampForFileName,
+    isPlainObject,
+    ensureConfigDir,
+    readConfig,
+    removePersistedBuiltinProxyProviderFromConfig() {
+        return removePersistedBuiltinProxyProviderFromConfig();
+    },
+    writeConfig,
+    readModels,
+    writeModels,
+    readCurrentModels,
+    writeCurrentModels,
+    updateAuthJson,
+    CONFIG_DIR,
+    CONFIG_FILE,
+    AUTH_FILE,
+    MODELS_FILE,
+    RECENT_CONFIGS_FILE,
+    INIT_MARK_FILE,
+    MAX_RECENT_CONFIGS,
+    DEFAULT_MODELS,
+    DEFAULT_MODEL_CONTEXT_WINDOW,
+    DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT,
+    CODEXMATE_MANAGED_MARKER,
+    BUILTIN_PROXY_PROVIDER_NAME,
+    EMPTY_CONFIG_FALLBACK_TEMPLATE
+});
 
-    try {
-        const raw = fs.readFileSync(filePath, 'utf-8');
-        return {
-            exists: true,
-            path: filePath,
-            content: stripUtf8Bom(raw),
-            lineEnding: detectLineEnding(raw)
-        };
-    } catch (e) {
-        return { error: `读取 AGENTS.md 失败: ${e.message}` };
-    }
-}
+const {
+    resolveZipTool,
+    resolveUnzipTool,
+    zipWithLibrary,
+    unzipWithLibrary,
+    copyDirRecursive,
+    inspectZipArchiveLimits,
+    writeUploadZipStream,
+    writeUploadZip,
+    extractUploadZip,
+    findConfigSourceDir,
+    prepareDirectoryDownload,
+    backupDirectoryIfExists,
+    restoreConfigDirectoryFromUpload
+} = createArchiveHelperController({
+    fs,
+    path,
+    os,
+    execSync,
+    zipLib,
+    yauzl,
+    ensureDir,
+    isPathInside,
+    commandExists,
+    MAX_UPLOAD_SIZE,
+    MAX_SKILLS_ZIP_UPLOAD_SIZE,
+    MAX_SKILLS_ZIP_ENTRY_COUNT,
+    MAX_SKILLS_ZIP_UNCOMPRESSED_BYTES
+});
 
-function applyAgentsFile(params = {}) {
-    const filePath = resolveAgentsFilePath(params);
-    const dirCheck = validateAgentsBaseDir(filePath);
-    if (dirCheck.error) {
-        return { error: dirCheck.error };
-    }
-
-    const content = typeof params.content === 'string' ? params.content : '';
-    const lineEnding = params.lineEnding === '\r\n' ? '\r\n' : '\n';
-    const normalized = normalizeLineEnding(content, lineEnding);
-    const finalContent = ensureUtf8Bom(normalized);
-
-    try {
-        fs.writeFileSync(filePath, finalContent, 'utf-8');
-        return { success: true, path: filePath };
-    } catch (e) {
-        return { error: `写入 AGENTS.md 失败: ${e.message}` };
-    }
-}
-
-function normalizeDiffText(input) {
-    const safe = typeof input === 'string' ? input : '';
-    return normalizeLineEnding(stripUtf8Bom(safe), '\n');
-}
-
-function buildAgentsDiff(params = {}) {
-    const hasBaseContent = typeof params.baseContent === 'string';
-    const contextRaw = typeof params.context === 'string' ? params.context.trim() : '';
-    const context = contextRaw || 'codex';
-    const metaOnly = hasBaseContent;
-    let readResult;
-    if (context === 'openclaw') {
-        readResult = readOpenclawAgentsFile({ metaOnly });
-    } else if (context === 'openclaw-workspace') {
-        readResult = readOpenclawWorkspaceFile({ ...params, metaOnly });
-    } else if (context === 'codex') {
-        readResult = readAgentsFile({ ...params, metaOnly });
-    } else {
-        return { error: `Unsupported agents diff context: ${context}` };
-    }
-    if (readResult && readResult.error) {
-        return { error: readResult.error };
-    }
-
-    const beforeText = normalizeDiffText(
-        hasBaseContent ? params.baseContent : (readResult && readResult.content ? readResult.content : '')
-    );
-    const afterText = normalizeDiffText(params.content);
-    const diff = buildLineDiff(beforeText, afterText);
-    const hasChanges = diff.truncated ? beforeText !== afterText : (diff.stats.added > 0 || diff.stats.removed > 0);
-    return {
-        diff: {
-            ...diff,
-            hasChanges
-        },
-        path: readResult && readResult.path ? readResult.path : '',
-        exists: !!(readResult && readResult.exists),
-        context,
-        configError: readResult && readResult.configError ? readResult.configError : ''
-    };
-}
-
-function resolveOpenclawWorkspaceDir(config) {
-    const workspace = config
-        && config.agents
-        && config.agents.defaults
-        && typeof config.agents.defaults.workspace === 'string'
-        ? config.agents.defaults.workspace
-        : '';
-    const resolved = resolveHomePath(workspace);
-    if (!resolved) {
-        return OPENCLAW_WORKSPACE_DIR;
-    }
-    if (path.isAbsolute(resolved)) {
-        return resolved;
-    }
-    return path.join(OPENCLAW_DIR, resolved);
-}
-
-function normalizeOpenclawWorkspaceFileName(input) {
-    const raw = typeof input === 'string' ? input.trim() : '';
-    if (!raw) {
-        return { error: '文件名不能为空' };
-    }
-    if (raw.includes('\0')) {
-        return { error: '文件名非法' };
-    }
-    if (raw.includes('/') || raw.includes('\\') || raw.includes('..')) {
-        return { error: '文件名非法' };
-    }
-    const baseName = path.basename(raw);
-    if (baseName !== raw) {
-        return { error: '文件名非法' };
-    }
-    if (!raw.toLowerCase().endsWith('.md')) {
-        return { error: '仅支持 .md 文件' };
-    }
-    return { ok: true, name: raw };
-}
-
-function readOpenclawConfigFile() {
-    const filePath = OPENCLAW_CONFIG_FILE;
-    const authProfilesByProvider = sanitizeOpenclawAuthProfilesForClient(
-        readOpenclawAuthProfilesSummary().providers
-    );
-    if (!fs.existsSync(filePath)) {
-        return {
-            exists: false,
-            path: filePath,
-            content: '',
-            lineEnding: os.EOL === '\r\n' ? '\r\n' : '\n',
-            authProfilesByProvider
-        };
-    }
-
-    try {
-        const raw = fs.readFileSync(filePath, 'utf-8');
-        return {
-            exists: true,
-            path: filePath,
-            content: stripUtf8Bom(raw),
-            lineEnding: detectLineEnding(raw),
-            authProfilesByProvider
-        };
-    } catch (e) {
-        return { error: `读取 OpenClaw 配置失败: ${e.message}` };
-    }
-}
-
-function normalizeOpenclawProviderId(provider) {
-    const normalized = typeof provider === 'string' ? provider.trim().toLowerCase() : '';
-    if (!normalized) return '';
-    if (normalized === 'modelstudio' || normalized === 'qwencloud') {
-        return 'qwen';
-    }
-    if (normalized === 'z.ai' || normalized === 'z-ai') {
-        return 'zai';
-    }
-    if (normalized === 'opencode-zen') {
-        return 'opencode';
-    }
-    if (normalized === 'opencode-go-auth') {
-        return 'opencode-go';
-    }
-    if (normalized === 'kimi' || normalized === 'kimi-code' || normalized === 'kimi-coding') {
-        return 'kimi';
-    }
-    if (normalized === 'bedrock' || normalized === 'aws-bedrock') {
-        return 'amazon-bedrock';
-    }
-    if (normalized === 'bytedance' || normalized === 'doubao') {
-        return 'volcengine';
-    }
-    if (normalized === 'volcengine-plan') {
-        return 'volcengine';
-    }
-    if (normalized === 'byteplus-plan') {
-        return 'byteplus';
-    }
-    return normalized;
-}
-
-function findNormalizedOpenclawProviderValue(entries, provider) {
-    if (!isPlainObject(entries)) {
-        return undefined;
-    }
-    const providerKey = normalizeOpenclawProviderId(provider);
-    if (!providerKey) {
-        return undefined;
-    }
-    for (const [key, value] of Object.entries(entries)) {
-        if (normalizeOpenclawProviderId(key) === providerKey) {
-            return value;
-        }
-    }
-    return undefined;
-}
-
-function resolveOpenclawStateDir() {
-    const override = typeof process.env.OPENCLAW_STATE_DIR === 'string'
-        ? process.env.OPENCLAW_STATE_DIR.trim()
-        : '';
-    return override ? resolveHomePath(override) : OPENCLAW_DIR;
-}
-
-function resolveOpenclawAgentDir() {
-    const override = [process.env.OPENCLAW_AGENT_DIR, process.env.PI_CODING_AGENT_DIR]
-        .find(value => typeof value === 'string' && value.trim());
-    if (override) {
-        return resolveHomePath(override.trim());
-    }
-    return path.join(resolveOpenclawStateDir(), 'agents', OPENCLAW_DEFAULT_AGENT_ID, 'agent');
-}
-
-function buildOpenclawAuthProfileDisplay(profileId, credential) {
-    const type = typeof credential.type === 'string' && credential.type.trim()
-        ? credential.type.trim()
-        : 'unknown';
-    const parts = [`AuthProfile(${type}:${profileId})`];
-    const label = typeof credential.displayName === 'string' && credential.displayName.trim()
-        ? credential.displayName.trim()
-        : (typeof credential.email === 'string' && credential.email.trim() ? credential.email.trim() : '');
-    if (label) {
-        parts.push(label);
-    }
-    return parts.join(' · ');
-}
-
-function resolveOpenclawAuthProfileEditableValue(credential) {
-    if (!isPlainObject(credential)) {
-        return {
-            resolvedValue: '',
-            resolvedField: '',
-            editable: false,
-            valueKind: 'missing'
-        };
-    }
-    if (credential.type === 'api_key' && typeof credential.key === 'string' && credential.key.trim()) {
-        return {
-            resolvedValue: credential.key.trim(),
-            resolvedField: 'key',
-            editable: true,
-            valueKind: 'api_key'
-        };
-    }
-    if (credential.type === 'token' && typeof credential.token === 'string' && credential.token.trim()) {
-        return {
-            resolvedValue: credential.token.trim(),
-            resolvedField: 'token',
-            editable: true,
-            valueKind: 'token'
-        };
-    }
-    if (credential.type === 'oauth' && typeof credential.access === 'string' && credential.access.trim()) {
-        return {
-            resolvedValue: credential.access.trim(),
-            resolvedField: 'access',
-            editable: true,
-            valueKind: 'oauth-access'
-        };
-    }
-    return {
-        resolvedValue: '',
-        resolvedField: '',
-        editable: false,
-        valueKind: typeof credential.type === 'string' && credential.type.trim()
-            ? credential.type.trim()
-            : 'missing'
-    };
-}
-
-function getOpenclawAuthProfileTypeRank(credential) {
-    const type = typeof credential.type === 'string' ? credential.type.trim().toLowerCase() : '';
-    if (type === 'oauth') return 0;
-    if (type === 'token') return 1;
-    if (type === 'api_key') return 2;
-    return 3;
-}
-
-function readOpenclawAuthProfilesSummary() {
-    const agentDir = resolveOpenclawAgentDir();
-    const authStorePath = path.join(agentDir, OPENCLAW_AUTH_PROFILES_FILE_NAME);
-    const authStatePath = path.join(agentDir, OPENCLAW_AUTH_STATE_FILE_NAME);
-    const storeResult = readJsonObjectFromFile(authStorePath, { profiles: {} });
-    const stateResult = readJsonObjectFromFile(authStatePath, {});
-    const profiles = storeResult.ok && isPlainObject(storeResult.data) && isPlainObject(storeResult.data.profiles)
-        ? storeResult.data.profiles
-        : {};
-    const state = stateResult.ok && isPlainObject(stateResult.data)
-        ? stateResult.data
-        : {};
-    const grouped = new Map();
-
-    for (const [profileId, credential] of Object.entries(profiles)) {
-        if (!isPlainObject(credential)) continue;
-        const provider = typeof credential.provider === 'string' ? credential.provider.trim() : '';
-        const normalizedProvider = normalizeOpenclawProviderId(provider);
-        if (!normalizedProvider) continue;
-        if (!grouped.has(normalizedProvider)) {
-            grouped.set(normalizedProvider, []);
-        }
-        grouped.get(normalizedProvider).push([profileId, credential]);
-    }
-
-    const providerSummaries = {};
-    for (const [providerKey, entries] of grouped.entries()) {
-        const explicitOrder = findNormalizedOpenclawProviderValue(state.order, providerKey);
-        const lastGood = findNormalizedOpenclawProviderValue(state.lastGood, providerKey);
-        let selected = null;
-
-        if (typeof lastGood === 'string' && lastGood.trim()) {
-            selected = entries.find(([profileId]) => profileId === lastGood.trim()) || null;
-        }
-        if (!selected && Array.isArray(explicitOrder)) {
-            for (const candidateId of explicitOrder) {
-                if (typeof candidateId !== 'string' || !candidateId.trim()) continue;
-                selected = entries.find(([profileId]) => profileId === candidateId.trim()) || null;
-                if (selected) break;
-            }
-        }
-        if (!selected) {
-            selected = [...entries].sort((a, b) => {
-                const rankDelta = getOpenclawAuthProfileTypeRank(a[1]) - getOpenclawAuthProfileTypeRank(b[1]);
-                if (rankDelta !== 0) return rankDelta;
-                return String(a[0]).localeCompare(String(b[0]));
-            })[0] || null;
-        }
-        if (!selected) continue;
-
-        const [profileId, credential] = selected;
-        const resolvedValueMeta = resolveOpenclawAuthProfileEditableValue(credential);
-        providerSummaries[providerKey] = {
-            provider: typeof credential.provider === 'string' ? credential.provider.trim() : providerKey,
-            normalizedProvider: providerKey,
-            profileId,
-            type: typeof credential.type === 'string' ? credential.type.trim() : '',
-            display: buildOpenclawAuthProfileDisplay(profileId, credential),
-            displayName: typeof credential.displayName === 'string' ? credential.displayName.trim() : '',
-            email: typeof credential.email === 'string' ? credential.email.trim() : '',
-            resolvedValue: resolvedValueMeta.resolvedValue,
-            resolvedField: resolvedValueMeta.resolvedField,
-            editable: resolvedValueMeta.editable,
-            valueKind: resolvedValueMeta.valueKind
-        };
-    }
-
-    return {
-        agentDir,
-        authStorePath,
-        authStatePath,
-        providers: providerSummaries
-    };
-}
-
-function sanitizeOpenclawAuthProfilesForClient(providers) {
-    if (!isPlainObject(providers)) {
-        return {};
-    }
-    const sanitized = {};
-    for (const [providerKey, summary] of Object.entries(providers)) {
-        if (!isPlainObject(summary)) {
-            continue;
-        }
-        const normalized = { ...summary };
-        delete normalized.resolvedValue;
-        sanitized[providerKey] = normalized;
-    }
-    return sanitized;
-}
-
-function normalizeOpenclawAuthProfileUpdate(entry) {
-    if (!isPlainObject(entry)) return null;
-    const profileId = typeof entry.profileId === 'string' ? entry.profileId.trim() : '';
-    const provider = typeof entry.provider === 'string' ? entry.provider.trim() : '';
-    const field = typeof entry.field === 'string' ? entry.field.trim() : '';
-    const value = typeof entry.value === 'string' ? entry.value.trim() : '';
-    const allowedFields = new Set(['key', 'token', 'access']);
-    if (!profileId || !provider || !allowedFields.has(field) || !value) {
-        return null;
-    }
-    return { profileId, provider, field, value };
-}
-
-function applyOpenclawAuthProfileUpdates(params = {}) {
-    const updates = Array.isArray(params.updates)
-        ? params.updates.map(normalizeOpenclawAuthProfileUpdate).filter(Boolean)
-        : [];
-    if (!updates.length) {
-        return { ok: true, applied: [] };
-    }
-
-    const authSummary = readOpenclawAuthProfilesSummary();
-    const authStorePath = authSummary.authStorePath;
-    const storeResult = readJsonObjectFromFile(authStorePath, { version: 1, profiles: {} });
-    if (!storeResult.ok) {
-        return { ok: false, error: storeResult.error || '读取 OpenClaw auth profile 失败' };
-    }
-    const store = isPlainObject(storeResult.data) ? storeResult.data : { version: 1, profiles: {} };
-    const profiles = isPlainObject(store.profiles) ? { ...store.profiles } : {};
-    const applied = [];
-
-    for (const update of updates) {
-        const existing = profiles[update.profileId];
-        if (!isPlainObject(existing)) {
-            return { ok: false, error: `未找到 OpenClaw 认证配置: ${update.profileId}` };
-        }
-        const existingProvider = typeof existing.provider === 'string' ? existing.provider.trim() : '';
-        if (normalizeOpenclawProviderId(existingProvider) !== normalizeOpenclawProviderId(update.provider)) {
-            return { ok: false, error: `认证配置与 provider 不匹配: ${update.profileId}` };
-        }
-
-        const next = { ...existing };
-        next[update.field] = update.value;
-        if (update.field === 'key') {
-            next.type = 'api_key';
-            delete next.keyRef;
-        } else if (update.field === 'token') {
-            next.type = 'token';
-            delete next.tokenRef;
-        } else if (update.field === 'access') {
-            next.type = 'oauth';
-        }
-        profiles[update.profileId] = next;
-        applied.push({
-            profileId: update.profileId,
-            provider: existingProvider || update.provider,
-            field: update.field
-        });
-    }
-
-    try {
-        ensureDir(path.dirname(authStorePath));
-        const backupPath = fs.existsSync(authStorePath) ? backupFileIfNeededOnce(authStorePath) : '';
-        writeJsonAtomic(authStorePath, {
-            ...store,
-            version: Number(store.version) > 0 ? Number(store.version) : 1,
-            profiles
-        });
-        return {
-            ok: true,
-            applied,
-            authStorePath,
-            backupPath
-        };
-    } catch (e) {
-        return {
-            ok: false,
-            error: e && e.message ? e.message : '写入 OpenClaw auth profile 失败'
-        };
-    }
-}
-
-function parseOpenclawConfigText(content) {
-    const raw = stripUtf8Bom(typeof content === 'string' ? content : '');
-    if (!raw.trim()) {
-        return { ok: false, error: 'OpenClaw 配置内容不能为空' };
-    }
-    try {
-        const parsed = JSON5.parse(raw);
-        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-            return { ok: false, error: '配置格式错误（根节点必须是对象）' };
-        }
-        return { ok: true, data: parsed };
-    } catch (e) {
-        return { ok: false, error: `配置解析失败: ${e.message}` };
-    }
-}
-
-function getOpenclawWorkspaceInfo() {
-    const readResult = readOpenclawConfigFile();
-    let workspaceDir = OPENCLAW_WORKSPACE_DIR;
-    let configError = readResult.error || '';
-    if (!configError && readResult.exists && readResult.content.trim()) {
-        const parsed = parseOpenclawConfigText(readResult.content);
-        if (parsed.ok) {
-            workspaceDir = resolveOpenclawWorkspaceDir(parsed.data);
-        } else {
-            configError = parsed.error || '';
-        }
-    }
-    return {
-        workspaceDir,
-        configError,
-        configPath: readResult.path || OPENCLAW_CONFIG_FILE
-    };
-}
-
-function readOpenclawAgentsFile(params = {}) {
-    const workspaceInfo = getOpenclawWorkspaceInfo();
-    const baseDir = workspaceInfo.workspaceDir;
-    const filePath = path.join(baseDir, AGENTS_FILE_NAME);
-
-    if (!fs.existsSync(baseDir)) {
-        return {
-            exists: false,
-            path: filePath,
-            content: '',
-            lineEnding: os.EOL === '\r\n' ? '\r\n' : '\n',
-            workspaceDir: baseDir,
-            configError: workspaceInfo.configError,
-            baseDirMissing: true
-        };
-    }
-
-    const readResult = readAgentsFile({ baseDir, metaOnly: !!params.metaOnly });
-    return {
-        ...readResult,
-        workspaceDir: baseDir,
-        configError: workspaceInfo.configError
-    };
-}
-
-function applyOpenclawAgentsFile(params = {}) {
-    const workspaceInfo = getOpenclawWorkspaceInfo();
-    const baseDir = workspaceInfo.workspaceDir;
-    ensureDir(baseDir);
-    const result = applyAgentsFile({
-        ...params,
-        baseDir
-    });
-    return {
-        ...result,
-        workspaceDir: baseDir,
-        configError: workspaceInfo.configError
-    };
-}
-
-function readOpenclawWorkspaceFile(params = {}) {
-    const nameResult = normalizeOpenclawWorkspaceFileName(params.fileName);
-    if (nameResult.error) {
-        return { error: nameResult.error };
-    }
-    const workspaceInfo = getOpenclawWorkspaceInfo();
-    const baseDir = workspaceInfo.workspaceDir;
-    const filePath = path.join(baseDir, nameResult.name);
-
-    if (!fs.existsSync(baseDir)) {
-        return {
-            exists: false,
-            path: filePath,
-            content: '',
-            lineEnding: os.EOL === '\r\n' ? '\r\n' : '\n',
-            workspaceDir: baseDir,
-            configError: workspaceInfo.configError,
-            baseDirMissing: true
-        };
-    }
-
-    if (!fs.existsSync(filePath)) {
-        return {
-            exists: false,
-            path: filePath,
-            content: '',
-            lineEnding: os.EOL === '\r\n' ? '\r\n' : '\n',
-            workspaceDir: baseDir,
-            configError: workspaceInfo.configError
-        };
-    }
-
-    if (params.metaOnly) {
-        return {
-            exists: true,
-            path: filePath,
-            content: '',
-            lineEnding: os.EOL === '\r\n' ? '\r\n' : '\n',
-            workspaceDir: baseDir,
-            configError: workspaceInfo.configError
-        };
-    }
-
-    try {
-        const raw = fs.readFileSync(filePath, 'utf-8');
-        return {
-            exists: true,
-            path: filePath,
-            content: stripUtf8Bom(raw),
-            lineEnding: detectLineEnding(raw),
-            workspaceDir: baseDir,
-            configError: workspaceInfo.configError
-        };
-    } catch (e) {
-        return { error: `读取 OpenClaw 工作区文件失败: ${e.message}` };
-    }
-}
-
-function applyOpenclawWorkspaceFile(params = {}) {
-    const nameResult = normalizeOpenclawWorkspaceFileName(params.fileName);
-    if (nameResult.error) {
-        return { error: nameResult.error };
-    }
-    const workspaceInfo = getOpenclawWorkspaceInfo();
-    const baseDir = workspaceInfo.workspaceDir;
-    ensureDir(baseDir);
-
-    const content = typeof params.content === 'string' ? params.content : '';
-    const lineEnding = params.lineEnding === '\r\n' ? '\r\n' : '\n';
-    const normalized = normalizeLineEnding(content, lineEnding);
-    const finalContent = ensureUtf8Bom(normalized);
-    const filePath = path.join(baseDir, nameResult.name);
-
-    try {
-        fs.writeFileSync(filePath, finalContent, 'utf-8');
-        return {
-            success: true,
-            path: filePath,
-            workspaceDir: baseDir,
-            configError: workspaceInfo.configError
-        };
-    } catch (e) {
-        return { error: `写入 OpenClaw 工作区文件失败: ${e.message}` };
-    }
-}
-
-function applyOpenclawConfig(params = {}) {
-    const content = typeof params.content === 'string' ? params.content : '';
-    const lineEnding = params.lineEnding === '\r\n' ? '\r\n' : '\n';
-    const normalized = normalizeLineEnding(content, lineEnding);
-    const parsed = parseOpenclawConfigText(normalized);
-    if (!parsed.ok) {
-        return { success: false, error: parsed.error };
-    }
-
-    try {
-        const authUpdateResult = applyOpenclawAuthProfileUpdates({ updates: params.authProfileUpdates });
-        if (!authUpdateResult.ok) {
-            return {
-                success: false,
-                error: authUpdateResult.error || '写入 OpenClaw 认证配置失败'
-            };
-        }
-        ensureDir(OPENCLAW_DIR);
-        const backupPath = backupFileIfNeededOnce(OPENCLAW_CONFIG_FILE);
-        fs.writeFileSync(OPENCLAW_CONFIG_FILE, normalized, 'utf-8');
-        const result = {
-            success: true,
-            targetPath: OPENCLAW_CONFIG_FILE
-        };
-        if (backupPath) {
-            result.backupPath = backupPath;
-        }
-        if (authUpdateResult.authStorePath) {
-            result.authStorePath = authUpdateResult.authStorePath;
-        }
-        if (Array.isArray(authUpdateResult.applied) && authUpdateResult.applied.length) {
-            result.authProfilesUpdated = authUpdateResult.applied;
-        }
-        return result;
-    } catch (e) {
-        return {
-            success: false,
-            error: e.message || '写入 OpenClaw 配置失败'
-        };
-    }
-}
-
-function normalizeRecentConfigs(items) {
-    if (!Array.isArray(items)) return [];
-    const output = [];
-    const seen = new Set();
-    for (const item of items) {
-        if (!item || typeof item !== 'object') continue;
-        const provider = typeof item.provider === 'string' ? item.provider.trim() : '';
-        const model = typeof item.model === 'string' ? item.model.trim() : '';
-        if (!provider || !model) continue;
-        const key = `${provider}::${model}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        output.push({
-            provider,
-            model,
-            usedAt: typeof item.usedAt === 'string' ? item.usedAt : ''
-        });
-    }
-    return output;
-}
-
-function readRecentConfigs() {
-    return normalizeRecentConfigs(readJsonArrayFile(RECENT_CONFIGS_FILE, []));
-}
-
-function writeRecentConfigs(items) {
-    writeJsonAtomic(RECENT_CONFIGS_FILE, items);
-}
-
-function recordRecentConfig(provider, model) {
-    const providerName = typeof provider === 'string' ? provider.trim() : '';
-    const modelName = typeof model === 'string' ? model.trim() : '';
-    if (!providerName || !modelName) return;
-
-    const now = new Date().toISOString();
-    const current = readRecentConfigs();
-    const next = [{
-        provider: providerName,
-        model: modelName,
-        usedAt: now
-    }];
-
-    for (const item of current) {
-        if (item.provider === providerName && item.model === modelName) continue;
-        next.push(item);
-    }
-
-    const trimmed = next.slice(0, MAX_RECENT_CONFIGS);
-    writeRecentConfigs(trimmed);
-}
+const {
+    cmdZip,
+    cmdUnzip,
+    cmdUnzipExt,
+    splitExtractSuffixInput,
+    parseZipCommandArgs,
+    parseUnzipExtCommandArgs
+} = createZipCommandController({
+    fs,
+    path,
+    execSync,
+    process,
+    yauzl,
+    formatTimestampForFileName,
+    inspectZipArchiveLimits,
+    resolveZipTool,
+    resolveUnzipTool,
+    zipWithLibrary,
+    unzipWithLibrary,
+    DEFAULT_EXTRACT_SUFFIXES,
+    MAX_SKILLS_ZIP_ENTRY_COUNT,
+    MAX_SKILLS_ZIP_UNCOMPRESSED_BYTES,
+    ensureDir
+});
 
 async function buildConfigHealthReport(params = {}) {
     return buildConfigHealthReportCore(params, {
@@ -3424,119 +2579,10 @@ async function buildConfigHealthReport(params = {}) {
     });
 }
 
-function buildDefaultConfigContent(initializedAt) {
-    const defaultModel = DEFAULT_MODELS[0] || 'gpt-4';
-    return `${CODEXMATE_MANAGED_MARKER}
-# codexmate-initialized-at: ${initializedAt}
-
-model_provider = "openai"
-model = "${defaultModel}"
-model_context_window = ${DEFAULT_MODEL_CONTEXT_WINDOW}
-model_auto_compact_token_limit = ${DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT}
-
-[model_providers.openai]
-name = "openai"
-base_url = "https://api.openai.com/v1"
-wire_api = "responses"
-requires_openai_auth = false
-preferred_auth_method = ""
-request_max_retries = 4
-stream_max_retries = 10
-stream_idle_timeout_ms = 300000
-`;
-}
-
-function buildVirtualDefaultConfig() {
-    return toml.parse(EMPTY_CONFIG_FALLBACK_TEMPLATE);
-}
-
-function sanitizeRemovedBuiltinProxyProvider(config) {
-    const safeConfig = isPlainObject(config) ? config : {};
-    const providers = isPlainObject(safeConfig.model_providers) ? safeConfig.model_providers : null;
-    const currentProvider = typeof safeConfig.model_provider === 'string' ? safeConfig.model_provider.trim() : '';
-    const hasRemovedBuiltin = !!(providers && providers[BUILTIN_PROXY_PROVIDER_NAME]);
-    const currentIsRemovedBuiltin = currentProvider === BUILTIN_PROXY_PROVIDER_NAME;
-
-    if (!hasRemovedBuiltin && !currentIsRemovedBuiltin) {
-        return safeConfig;
-    }
-
-    const nextProviders = providers ? { ...providers } : {};
-    delete nextProviders[BUILTIN_PROXY_PROVIDER_NAME];
-    const providerNames = Object.keys(nextProviders);
-    const fallbackProvider = providerNames[0] || '';
-    const currentModels = readCurrentModels();
-    const fallbackModel = fallbackProvider
-        ? (currentModels[fallbackProvider] || (typeof safeConfig.model === 'string' ? safeConfig.model : ''))
-        : '';
-
-    return {
-        ...safeConfig,
-        model_providers: nextProviders,
-        model_provider: currentIsRemovedBuiltin ? fallbackProvider : safeConfig.model_provider,
-        model: currentIsRemovedBuiltin ? fallbackModel : safeConfig.model
-    };
-}
-
-function readConfigOrVirtualDefault() {
-    if (fs.existsSync(CONFIG_FILE)) {
-        try {
-            removePersistedBuiltinProxyProviderFromConfig();
-            return {
-                config: sanitizeRemovedBuiltinProxyProvider(readConfig()),
-                isVirtual: false,
-                reason: '',
-                detail: '',
-                errorType: ''
-            };
-        } catch (e) {
-            const errorType = typeof e.configErrorType === 'string' && e.configErrorType.trim()
-                ? e.configErrorType.trim()
-                : 'read';
-            const publicReason = typeof e.configPublicReason === 'string' && e.configPublicReason.trim()
-                ? e.configPublicReason.trim()
-                : (errorType === 'parse' ? 'config.toml 解析失败' : '读取 config.toml 失败');
-            const detail = typeof e.configDetail === 'string' && e.configDetail.trim()
-                ? e.configDetail.trim()
-                : (e && e.message ? e.message : publicReason);
-            return {
-                config: errorType === 'missing'
-                    ? sanitizeRemovedBuiltinProxyProvider(buildVirtualDefaultConfig())
-                    : {},
-                isVirtual: true,
-                reason: publicReason,
-                detail,
-                errorType
-            };
-        }
-    }
-
-    return {
-        config: sanitizeRemovedBuiltinProxyProvider(buildVirtualDefaultConfig()),
-        isVirtual: true,
-        reason: '未检测到 config.toml',
-        detail: `配置文件不存在: ${CONFIG_FILE}`,
-        errorType: 'missing'
-    };
-}
-
 function hasConfigLoadError(result) {
     return !!(result
         && result.isVirtual
         && (result.errorType === 'parse' || result.errorType === 'read'));
-}
-
-function printConfigLoadErrorAndMarkExit(result) {
-    const isReadError = result && result.errorType === 'read';
-    const detail = result && typeof result.detail === 'string' && result.detail.trim()
-        ? result.detail.trim()
-        : (isReadError ? '读取配置文件失败' : '配置文件解析失败');
-    console.error(`\n错误: ${isReadError ? '读取 config.toml 失败' : '配置文件解析失败'}`);
-    console.error(`  详情: ${detail}`);
-    console.error(`  路径: ${CONFIG_FILE}`);
-    console.error(`  建议: ${isReadError ? '检查文件权限后重试' : '修复 config.toml 语法后重试'}`);
-    console.error();
-    process.exitCode = 1;
 }
 
 function normalizeTopLevelConfigWithTemplate(template, selectedProvider, selectedModel) {
@@ -3797,7 +2843,7 @@ function addProviderToConfig(params = {}) {
         return { error: 'URL 仅支持 http/https' };
     }
     if (isReservedProviderNameForCreation(name)) {
-        return { error: 'local provider 为系统保留名称，不可新增' };
+        return { error: '提供商名称不可用' };
     }
     if (isBuiltinProxyProvider(name) && !allowManaged) {
         return { error: 'codexmate-proxy 为保留名称，不可手动添加' };
@@ -3878,9 +2924,6 @@ function updateProviderInConfig(params = {}) {
         return { error: 'URL 仅支持 http/https' };
     }
     if (isNonEditableProvider(name) && !allowManaged) {
-        if (isDefaultLocalProvider(name)) {
-            return { error: 'local provider 为系统保留项，不可编辑' };
-        }
         return { error: 'codexmate-proxy 为保留名称，不可编辑' };
     }
 
@@ -3896,9 +2939,6 @@ function deleteProviderFromConfig(params = {}) {
     const name = typeof params.name === 'string' ? params.name.trim() : '';
     if (!name) return { error: '名称不能为空' };
     if (isNonDeletableProvider(name)) {
-        if (isDefaultLocalProvider(name)) {
-            return { error: 'local provider 为系统保留项，不可删除' };
-        }
         return { error: 'codexmate-proxy 为保留名称，不可删除' };
     }
     if (!fs.existsSync(CONFIG_FILE)) {
@@ -3927,9 +2967,7 @@ function deleteProviderFromConfig(params = {}) {
 function performProviderDeletion(name, options = {}) {
     const silent = !!options.silent;
     if (isNonDeletableProvider(name)) {
-        const msg = isDefaultLocalProvider(name)
-            ? 'local provider 为系统保留项，不可删除'
-            : 'codexmate-proxy 为保留名称，不可删除';
+        const msg = 'codexmate-proxy 为保留名称，不可删除';
         if (!silent) console.error('错误:', msg);
         return { error: msg };
     }
@@ -4065,147 +3103,6 @@ function performProviderDeletion(name, options = {}) {
     return result;
 }
 
-function ensureSupportFiles(defaultProvider, defaultModel) {
-    if (!fs.existsSync(MODELS_FILE)) {
-        writeModels([...DEFAULT_MODELS]);
-    } else {
-        const existingModels = readModels();
-        const mergedModels = Array.isArray(existingModels) ? [...existingModels] : [];
-        let hasNewDefaultModel = false;
-        for (const model of DEFAULT_MODELS) {
-            if (!mergedModels.includes(model)) {
-                mergedModels.push(model);
-                hasNewDefaultModel = true;
-            }
-        }
-        if (hasNewDefaultModel) {
-            writeModels(mergedModels);
-        }
-    }
-
-    const currentModels = readCurrentModels();
-    if (!currentModels[defaultProvider]) {
-        currentModels[defaultProvider] = defaultModel;
-        writeCurrentModels(currentModels);
-    }
-
-    if (!fs.existsSync(AUTH_FILE)) {
-        updateAuthJson('');
-    }
-}
-
-function writeInitMark(payload) {
-    fs.writeFileSync(INIT_MARK_FILE, JSON.stringify(payload, null, 2), 'utf-8');
-}
-
-function ensureManagedConfigBootstrap() {
-    ensureConfigDir();
-
-    const initializedAt = new Date().toISOString();
-    const defaultProvider = 'openai';
-    const defaultModel = DEFAULT_MODELS[0] || 'gpt-4';
-    const forceResetExistingConfig = process.env.CODEXMATE_FORCE_RESET_EXISTING_CONFIG === '1';
-    const mark = readJsonFile(INIT_MARK_FILE, null);
-    const hasConfig = fs.existsSync(CONFIG_FILE);
-
-    if (mark) {
-        if (!hasConfig) {
-            writeConfig(buildDefaultConfigContent(initializedAt));
-            ensureSupportFiles(defaultProvider, defaultModel);
-            g_initNotice = '检测到配置缺失，已自动重建默认配置。';
-            return { notice: g_initNotice };
-        }
-        ensureSupportFiles(defaultProvider, defaultModel);
-        return { notice: '' };
-    }
-
-    if (hasConfig) {
-        let existingContent = '';
-        try {
-            existingContent = fs.readFileSync(CONFIG_FILE, 'utf-8');
-        } catch (e) {}
-
-        if (existingContent.includes(CODEXMATE_MANAGED_MARKER)) {
-            writeInitMark({
-                version: 1,
-                initializedAt,
-                mode: 'managed-config-detected',
-                backupFile: ''
-            });
-            ensureSupportFiles(defaultProvider, defaultModel);
-            return { notice: '' };
-        }
-
-        const backupFile = `config.toml.codexmate-backup-${formatTimestampForFileName(initializedAt)}.bak`;
-        const backupPath = path.join(CONFIG_DIR, backupFile);
-        fs.copyFileSync(CONFIG_FILE, backupPath);
-
-        if (forceResetExistingConfig) {
-            writeConfig(buildDefaultConfigContent(initializedAt));
-            ensureSupportFiles(defaultProvider, defaultModel);
-            writeInitMark({
-                version: 1,
-                initializedAt,
-                mode: 'first-run-reset',
-                backupFile
-            });
-
-            g_initNotice = `首次使用已备份原配置到 ${backupFile}，并重建默认配置。`;
-            return { notice: g_initNotice, backupFile };
-        }
-
-        ensureSupportFiles(defaultProvider, defaultModel);
-        writeInitMark({
-            version: 1,
-            initializedAt,
-            mode: 'legacy-config-preserved',
-            backupFile
-        });
-        g_initNotice = `检测到已有配置，已备份到 ${backupFile}，并保留原配置不覆盖。`;
-        return { notice: g_initNotice, backupFile };
-    }
-
-    writeConfig(buildDefaultConfigContent(initializedAt));
-    ensureSupportFiles(defaultProvider, defaultModel);
-    writeInitMark({
-        version: 1,
-        initializedAt,
-        mode: 'fresh-install',
-        backupFile: ''
-    });
-    g_initNotice = '首次使用已创建默认配置。';
-    return { notice: g_initNotice };
-}
-
-function resetConfigToDefault() {
-    ensureConfigDir();
-    const initializedAt = new Date().toISOString();
-    const defaultProvider = 'openai';
-    const defaultModel = DEFAULT_MODELS[0] || 'gpt-4';
-
-    let backupFile = '';
-    if (fs.existsSync(CONFIG_FILE)) {
-        backupFile = `config.toml.reset-${formatTimestampForFileName(initializedAt)}.bak`;
-        fs.copyFileSync(CONFIG_FILE, path.join(CONFIG_DIR, backupFile));
-    }
-
-    writeConfig(buildDefaultConfigContent(initializedAt));
-    ensureSupportFiles(defaultProvider, defaultModel);
-    writeInitMark({
-        version: 1,
-        initializedAt,
-        mode: 'manual-reset',
-        backupFile
-    });
-
-    return { success: true, backupFile };
-}
-
-function consumeInitNotice() {
-    const notice = g_initNotice;
-    g_initNotice = '';
-    return notice;
-}
 
 function normalizePathForCompare(targetPath, options = {}) {
     const ignoreCase = !!options.ignoreCase;
@@ -6398,513 +5295,53 @@ function findClaudeSessionIndexPath(sessionFilePath) {
     return '';
 }
 
-function canListenPort(host, port) {
-    return new Promise((resolve) => {
-        const tester = net.createServer();
-        tester.unref();
-        tester.once('error', () => {
-            resolve(false);
-        });
-        tester.once('listening', () => {
-            tester.close(() => resolve(true));
-        });
-        tester.listen(port, host);
-    });
-}
+const {
+    findAvailablePort,
+    saveBuiltinProxySettings,
+    removePersistedBuiltinProxyProviderFromConfig,
+    hasCodexConfigReadyForProxy,
+    resolveBuiltinProxyProviderName,
+    startBuiltinProxyRuntime,
+    stopBuiltinProxyRuntime,
+    getBuiltinProxyStatus
+} = createBuiltinProxyRuntimeController({
+    fs,
+    https,
+    CONFIG_FILE,
+    BUILTIN_PROXY_SETTINGS_FILE,
+    DEFAULT_BUILTIN_PROXY_SETTINGS,
+    BUILTIN_PROXY_PROVIDER_NAME,
+    CODEXMATE_MANAGED_MARKER,
+    HTTP_KEEP_ALIVE_AGENT,
+    HTTPS_KEEP_ALIVE_AGENT,
+    readConfig,
+    writeConfig,
+    readConfigOrVirtualDefault,
+    resolveAuthTokenFromCurrentProfile,
+    isPlainObject,
+    isBuiltinManagedProvider,
+    findProviderSectionRanges,
+    findProviderDescendantSectionRanges,
+    normalizeLegacySegments,
+    buildLegacySegmentsKey,
+    formatHostForUrl
+});
 
-async function findAvailablePort(host, startPort, maxAttempts = 20) {
-    const start = parseInt(String(startPort), 10);
-    if (!Number.isFinite(start) || start <= 0) {
-        return 0;
-    }
-    const attempts = Number.isFinite(maxAttempts) && maxAttempts > 0 ? maxAttempts : 20;
-    for (let offset = 0; offset < attempts; offset += 1) {
-        const candidate = start + offset;
-        if (candidate > 65535) {
-            break;
-        }
-        // eslint-disable-next-line no-await-in-loop
-        const ok = await canListenPort(host, candidate);
-        if (ok) {
-            return candidate;
-        }
-    }
-    return 0;
-}
-
-function normalizeBuiltinProxySettings(raw) {
-    const merged = {
-        ...DEFAULT_BUILTIN_PROXY_SETTINGS,
-        ...(isPlainObject(raw) ? raw : {})
-    };
-    const host = typeof merged.host === 'string' ? merged.host.trim() : '';
-    const port = parseInt(String(merged.port), 10);
-    const provider = typeof merged.provider === 'string' ? merged.provider.trim() : '';
-    const authSourceRaw = typeof merged.authSource === 'string' ? merged.authSource.trim().toLowerCase() : '';
-    const timeoutMs = parseInt(String(merged.timeoutMs), 10);
-    const authSource = authSourceRaw === 'profile' || authSourceRaw === 'none' ? authSourceRaw : 'provider';
-
-    return {
-        enabled: merged.enabled !== false,
-        host: host || DEFAULT_BUILTIN_PROXY_SETTINGS.host,
-        port: Number.isFinite(port) && port > 0 && port <= 65535 ? port : DEFAULT_BUILTIN_PROXY_SETTINGS.port,
-        provider,
-        authSource,
-        timeoutMs: Number.isFinite(timeoutMs) && timeoutMs >= 1000 ? timeoutMs : DEFAULT_BUILTIN_PROXY_SETTINGS.timeoutMs
-    };
-}
-
-function readBuiltinProxySettings() {
-    const parsed = readJsonFile(BUILTIN_PROXY_SETTINGS_FILE, null);
-    return normalizeBuiltinProxySettings(parsed);
-}
-
-function resolveBuiltinProxyProviderName(rawProviderName, providers = {}, preferredProvider = '') {
-    const providerMap = providers && isPlainObject(providers) ? providers : {};
-    const providerNames = Object.keys(providerMap)
-        .filter((name) => name && name !== BUILTIN_PROXY_PROVIDER_NAME);
-    const requested = typeof rawProviderName === 'string' ? rawProviderName.trim() : '';
-    if (requested && requested !== BUILTIN_PROXY_PROVIDER_NAME && providerMap[requested]) {
-        return requested;
-    }
-    const preferred = typeof preferredProvider === 'string' ? preferredProvider.trim() : '';
-    if (preferred && preferred !== BUILTIN_PROXY_PROVIDER_NAME && providerMap[preferred]) {
-        return preferred;
-    }
-    return providerNames[0] || '';
-}
-
-function saveBuiltinProxySettings(payload = {}, options = {}) {
-    const current = readBuiltinProxySettings();
-    const merged = normalizeBuiltinProxySettings({
-        ...current,
-        ...(isPlainObject(payload) ? payload : {})
-    });
-
-    if (!merged.host) {
-        return { error: '代理 host 不能为空' };
-    }
-    if (!Number.isFinite(merged.port) || merged.port <= 0 || merged.port > 65535) {
-        return { error: '代理端口无效（1-65535）' };
-    }
-
-    const { config } = readConfigOrVirtualDefault();
-    const providers = config && isPlainObject(config.model_providers) ? config.model_providers : {};
-    const preferredProvider = typeof config.model_provider === 'string' ? config.model_provider.trim() : '';
-    const finalProvider = resolveBuiltinProxyProviderName(merged.provider, providers, preferredProvider);
-
-    const normalized = {
-        ...merged,
-        provider: finalProvider
-    };
-
-    if (!options.skipWrite) {
-        writeJsonAtomic(BUILTIN_PROXY_SETTINGS_FILE, normalized);
-    }
-
-    return {
-        success: true,
-        settings: normalized
-    };
-}
-
-function buildProxyListenUrl(settings) {
-    const host = formatHostForUrl(settings.host || DEFAULT_BUILTIN_PROXY_SETTINGS.host);
-    return `http://${host}:${settings.port}`;
-}
-
-function buildBuiltinProxyProviderBaseUrl(settings) {
-    return `${buildProxyListenUrl(settings).replace(/\/+$/, '')}/v1`;
-}
-
-function buildBuiltinProxyProviderConfig(settings) {
-    return {
-        name: BUILTIN_PROXY_PROVIDER_NAME,
-        base_url: buildBuiltinProxyProviderBaseUrl(settings),
-        wire_api: 'responses',
-        requires_openai_auth: false,
-        preferred_auth_method: '',
-        request_max_retries: 4,
-        stream_max_retries: 10,
-        stream_idle_timeout_ms: 300000
-    };
-}
-
-function injectBuiltinProxyProvider(config) {
-    return isPlainObject(config) ? config : {};
-}
-
-function removePersistedBuiltinProxyProviderFromConfig() {
-    if (!fs.existsSync(CONFIG_FILE)) {
-        return { success: true, removed: false };
-    }
-
-    let config;
-    try {
-        config = readConfig();
-    } catch (e) {
-        return { error: e.message || '读取 config.toml 失败' };
-    }
-
-    if (!config.model_providers || !config.model_providers[BUILTIN_PROXY_PROVIDER_NAME]) {
-        return { success: true, removed: false };
-    }
-
-    const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
-    const lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
-    const hasBom = content.charCodeAt(0) === 0xFEFF;
-    const providerConfig = config.model_providers[BUILTIN_PROXY_PROVIDER_NAME];
-    const providerSegments = providerConfig && Array.isArray(providerConfig.__codexmate_legacy_segments)
-        ? providerConfig.__codexmate_legacy_segments
-        : null;
-    const providerSegmentVariants = (() => {
-        const variants = [];
-        const seen = new Set();
-        const pushVariant = (segments) => {
-            const normalized = normalizeLegacySegments(segments);
-            const key = buildLegacySegmentsKey(normalized);
-            if (!key || seen.has(key)) return;
-            seen.add(key);
-            variants.push(normalized);
-        };
-        if (providerConfig && Array.isArray(providerConfig.__codexmate_legacy_segments)) {
-            pushVariant(providerConfig.__codexmate_legacy_segments);
-        }
-        if (providerConfig && Array.isArray(providerConfig.__codexmate_legacy_segment_variants)) {
-            for (const segments of providerConfig.__codexmate_legacy_segment_variants) {
-                pushVariant(segments);
-            }
-        }
-        if (providerSegments) {
-            pushVariant(providerSegments);
-        }
-        if (variants.length === 0) {
-            pushVariant(String(BUILTIN_PROXY_PROVIDER_NAME || '').split('.').filter((item) => item));
-        }
-        return variants;
-    })();
-
-    let updatedContent = null;
-    const combinedRanges = [];
-    for (const segments of providerSegmentVariants) {
-        combinedRanges.push(...findProviderSectionRanges(content, BUILTIN_PROXY_PROVIDER_NAME, segments));
-        combinedRanges.push(...findProviderDescendantSectionRanges(content, segments));
-    }
-    if (combinedRanges.length === 0) {
-        combinedRanges.push(...findProviderSectionRanges(content, BUILTIN_PROXY_PROVIDER_NAME, providerSegments));
-    }
-
-    if (combinedRanges.length > 0) {
-        const sorted = combinedRanges.sort((a, b) => b.start - a.start || b.end - a.end);
-        const seen = new Set();
-        let removedContent = content;
-        for (const range of sorted) {
-            const rangeKey = `${range.start}:${range.end}`;
-            if (seen.has(rangeKey)) continue;
-            seen.add(rangeKey);
-            removedContent = removedContent.slice(0, range.start) + removedContent.slice(range.end);
-        }
-        updatedContent = removedContent.replace(/\n{3,}/g, lineEnding + lineEnding);
-    }
-
-    if (!updatedContent) {
-        const rebuilt = JSON.parse(JSON.stringify(config));
-        delete rebuilt.model_providers[BUILTIN_PROXY_PROVIDER_NAME];
-        const hasMarker = content.includes(CODEXMATE_MANAGED_MARKER);
-        let rebuiltToml = toml.stringify(rebuilt).trimEnd();
-        rebuiltToml = rebuiltToml.replace(/\n/g, lineEnding);
-        if (hasMarker && !rebuiltToml.includes(CODEXMATE_MANAGED_MARKER)) {
-            rebuiltToml = `${CODEXMATE_MANAGED_MARKER}${lineEnding}${rebuiltToml}`;
-        }
-        updatedContent = rebuiltToml + lineEnding;
-        if (hasBom && updatedContent.charCodeAt(0) !== 0xFEFF) {
-            updatedContent = '\uFEFF' + updatedContent;
-        }
-    }
-
-    try {
-        writeConfig(updatedContent.trimEnd() + lineEnding);
-    } catch (e) {
-        return { error: e.message || '写入 config.toml 失败' };
-    }
-
-    return { success: true, removed: true };
-}
-
-function hasCodexConfigReadyForProxy() {
-    const result = readConfigOrVirtualDefault();
-    if (!result || result.isVirtual) {
-        return false;
-    }
-    const config = result.config || {};
-    if (!isPlainObject(config.model_providers)) {
-        return false;
-    }
-    const providerNames = Object.keys(config.model_providers)
-        .filter((name) => name && name !== BUILTIN_PROXY_PROVIDER_NAME);
-    return providerNames.length > 0;
-}
-
-function resolveBuiltinProxyUpstream(settings) {
-    const { config } = readConfigOrVirtualDefault();
-    const providers = config && isPlainObject(config.model_providers) ? config.model_providers : {};
-    const currentProvider = typeof config.model_provider === 'string' ? config.model_provider.trim() : '';
-    const providerName = resolveBuiltinProxyProviderName(settings.provider, providers, currentProvider);
-    if (!providerName) {
-        return { error: '未找到可用的上游 provider，请先添加 provider' };
-    }
-    if (providerName === BUILTIN_PROXY_PROVIDER_NAME) {
-        return { error: `上游 provider 不能是 ${BUILTIN_PROXY_PROVIDER_NAME}` };
-    }
-    const provider = providers[providerName];
-    if (!provider || !isPlainObject(provider)) {
-        return { error: `上游 provider 不存在: ${providerName}` };
-    }
-
-    const baseUrl = typeof provider.base_url === 'string' ? provider.base_url.trim() : '';
-    if (!baseUrl || !isValidHttpUrl(baseUrl)) {
-        return { error: `上游 provider base_url 无效: ${providerName}` };
-    }
-
-    let token = '';
-    if (settings.authSource === 'profile') {
-        token = resolveAuthTokenFromCurrentProfile();
-    } else if (settings.authSource === 'provider') {
-        token = typeof provider.preferred_auth_method === 'string' ? provider.preferred_auth_method.trim() : '';
-        if (!token) {
-            token = resolveAuthTokenFromCurrentProfile();
-        }
-    }
-
-    let authHeader = '';
-    if (token) {
-        authHeader = /^bearer\s+/i.test(token) ? token : `Bearer ${token}`;
-    }
-
-    return {
-        providerName,
-        baseUrl: normalizeBaseUrl(baseUrl),
-        authHeader
-    };
-}
-
-function createBuiltinProxyServer(settings, upstream) {
-    const connections = new Set();
-    const timeoutMs = settings.timeoutMs;
-
-    const server = http.createServer((req, res) => {
-        let parsedIncoming;
-        try {
-            parsedIncoming = new URL(req.url || '/', 'http://localhost');
-        } catch (e) {
-            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
-            res.end(JSON.stringify({ error: 'invalid request path' }));
-            return;
-        }
-
-        const incomingPath = parsedIncoming.pathname || '/';
-        if (incomingPath === '/health' || incomingPath === '/status') {
-            const body = JSON.stringify({
-                ok: true,
-                upstreamProvider: upstream.providerName,
-                upstreamBaseUrl: upstream.baseUrl
-            });
-            res.writeHead(200, {
-                'Content-Type': 'application/json; charset=utf-8',
-                'Content-Length': Buffer.byteLength(body, 'utf-8')
-            });
-            res.end(body, 'utf-8');
-            return;
-        }
-
-        if (!(incomingPath === '/v1' || incomingPath.startsWith('/v1/'))) {
-            const body = JSON.stringify({ error: 'proxy only supports /v1/* paths' });
-            res.writeHead(404, {
-                'Content-Type': 'application/json; charset=utf-8',
-                'Content-Length': Buffer.byteLength(body, 'utf-8')
-            });
-            res.end(body, 'utf-8');
-            return;
-        }
-
-        const suffix = incomingPath === '/v1'
-            ? ''
-            : incomingPath.replace(/^\/v1\/?/, '');
-        const targetBase = joinApiUrl(upstream.baseUrl, suffix);
-        if (!targetBase) {
-            const body = JSON.stringify({ error: 'failed to build upstream URL' });
-            res.writeHead(500, {
-                'Content-Type': 'application/json; charset=utf-8',
-                'Content-Length': Buffer.byteLength(body, 'utf-8')
-            });
-            res.end(body, 'utf-8');
-            return;
-        }
-
-        let targetUrl;
-        try {
-            targetUrl = new URL(targetBase);
-            targetUrl.search = parsedIncoming.search || '';
-        } catch (e) {
-            const body = JSON.stringify({ error: `invalid upstream URL: ${e.message}` });
-            res.writeHead(500, {
-                'Content-Type': 'application/json; charset=utf-8',
-                'Content-Length': Buffer.byteLength(body, 'utf-8')
-            });
-            res.end(body, 'utf-8');
-            return;
-        }
-
-        const requestHeaders = { ...req.headers };
-        delete requestHeaders.host;
-        delete requestHeaders.connection;
-        delete requestHeaders['content-length'];
-        if (upstream.authHeader) {
-            requestHeaders.authorization = upstream.authHeader;
-        }
-        requestHeaders['x-codexmate-proxy'] = '1';
-        if (!requestHeaders['x-forwarded-for'] && req.socket && req.socket.remoteAddress) {
-            requestHeaders['x-forwarded-for'] = req.socket.remoteAddress;
-        }
-
-        const transport = targetUrl.protocol === 'https:' ? https : http;
-        const upstreamReq = transport.request({
-            protocol: targetUrl.protocol,
-            hostname: targetUrl.hostname,
-            port: targetUrl.port || (targetUrl.protocol === 'https:' ? 443 : 80),
-            method: req.method || 'GET',
-            path: `${targetUrl.pathname}${targetUrl.search}`,
-            headers: requestHeaders,
-            agent: targetUrl.protocol === 'https:' ? HTTPS_KEEP_ALIVE_AGENT : HTTP_KEEP_ALIVE_AGENT
-        }, (upstreamRes) => {
-            const responseHeaders = { ...upstreamRes.headers };
-            delete responseHeaders.connection;
-            res.writeHead(upstreamRes.statusCode || 502, responseHeaders);
-            upstreamRes.pipe(res);
-        });
-
-        upstreamReq.setTimeout(timeoutMs, () => {
-            upstreamReq.destroy(new Error(`upstream timeout (${timeoutMs}ms)`));
-        });
-
-        upstreamReq.on('error', (err) => {
-            if (res.headersSent) {
-                try { res.destroy(err); } catch (_) {}
-                return;
-            }
-            const body = JSON.stringify({ error: `proxy request failed: ${err.message}` });
-            res.writeHead(502, {
-                'Content-Type': 'application/json; charset=utf-8',
-                'Content-Length': Buffer.byteLength(body, 'utf-8')
-            });
-            res.end(body, 'utf-8');
-        });
-
-        req.pipe(upstreamReq);
-    });
-
-    server.on('connection', (socket) => {
-        connections.add(socket);
-        socket.on('close', () => connections.delete(socket));
-    });
-
-    return new Promise((resolve, reject) => {
-        server.once('error', reject);
-        server.listen(settings.port, settings.host, () => {
-            server.removeListener('error', reject);
-            resolve({
-                server,
-                connections,
-                settings,
-                upstream,
-                startedAt: toIsoTime(Date.now()),
-                listenUrl: buildProxyListenUrl(settings)
-            });
-        });
-    });
-}
-
-async function startBuiltinProxyRuntime(payload = {}) {
-    if (g_builtinProxyRuntime) {
-        return {
-            error: '内建代理已在运行',
-            runtime: {
-                listenUrl: g_builtinProxyRuntime.listenUrl,
-                upstreamProvider: g_builtinProxyRuntime.upstream.providerName
-            }
-        };
-    }
-
-    const saveResult = saveBuiltinProxySettings(payload);
-    if (saveResult.error) {
-        return { error: saveResult.error };
-    }
-    const settings = saveResult.settings;
-    const upstream = resolveBuiltinProxyUpstream(settings);
-    if (upstream.error) {
-        return { error: upstream.error };
-    }
-
-    try {
-        g_builtinProxyRuntime = await createBuiltinProxyServer(settings, upstream);
-        return {
-            success: true,
-            running: true,
-            listenUrl: g_builtinProxyRuntime.listenUrl,
-            upstreamProvider: upstream.providerName,
-            settings
-        };
-    } catch (e) {
-        return { error: `启动内建代理失败: ${e.message}` };
-    }
-}
-
-async function stopBuiltinProxyRuntime() {
-    if (!g_builtinProxyRuntime) {
-        return { success: true, running: false };
-    }
-    const runtime = g_builtinProxyRuntime;
-    g_builtinProxyRuntime = null;
-
-    await new Promise((resolve) => {
-        let settled = false;
-        const finish = () => {
-            if (settled) return;
-            settled = true;
-            resolve();
-        };
-
-        runtime.server.close(() => finish());
-        setTimeout(() => finish(), 1000);
-    });
-
-    for (const socket of runtime.connections) {
-        try { socket.destroy(); } catch (_) {}
-    }
-    runtime.connections.clear();
-
-    return {
-        success: true,
-        running: false
-    };
-}
-
-function getBuiltinProxyStatus() {
-    const settings = readBuiltinProxySettings();
-    return {
-        running: !!g_builtinProxyRuntime,
-        settings,
-        runtime: g_builtinProxyRuntime
-            ? {
-                provider: DEFAULT_LOCAL_PROVIDER_NAME,
-                startedAt: g_builtinProxyRuntime.startedAt,
-                listenUrl: g_builtinProxyRuntime.listenUrl,
-                upstreamProvider: g_builtinProxyRuntime.upstream.providerName,
-                upstreamBaseUrl: g_builtinProxyRuntime.upstream.baseUrl
-            }
-            : null
-    };
-}
+const {
+    startBuiltinClaudeProxyRuntime,
+    stopBuiltinClaudeProxyRuntime,
+    getBuiltinClaudeProxyStatus
+} = createBuiltinClaudeProxyRuntimeController({
+    BUILTIN_CLAUDE_PROXY_SETTINGS_FILE,
+    DEFAULT_BUILTIN_CLAUDE_PROXY_SETTINGS,
+    BUILTIN_PROXY_PROVIDER_NAME,
+    MAX_API_BODY_SIZE,
+    HTTP_KEEP_ALIVE_AGENT,
+    HTTPS_KEEP_ALIVE_AGENT,
+    readConfigOrVirtualDefault,
+    resolveBuiltinProxyProviderName,
+    resolveAuthTokenFromCurrentProfile
+});
 
 function applyBuiltinProxyProvider(params = {}) {
     return { error: '该功能已移除' };
@@ -8244,7 +6681,7 @@ function buildExportPayload(includeKeys) {
     const providers = config.model_providers || {};
     const providerData = {};
     for (const [name, provider] of Object.entries(providers)) {
-        if (isBuiltinProxyProvider(name)) {
+        if (isBuiltinManagedProvider(name)) {
             continue;
         }
         providerData[name] = {
@@ -8376,7 +6813,7 @@ function importConfigData(payload, options = {}) {
     let updatedProviders = 0;
 
     for (const [name, provider] of Object.entries(normalized.providers)) {
-        if (isBuiltinProxyProvider(name)) {
+        if (isBuiltinManagedProvider(name)) {
             continue;
         }
         if (existingProviders[name]) {
@@ -8410,7 +6847,7 @@ function importConfigData(payload, options = {}) {
     if (applyCurrentModels && normalized.currentModels) {
         const currentModels = readCurrentModels();
         for (const [name, model] of Object.entries(normalized.currentModels)) {
-            if (isBuiltinProxyProvider(name)) continue;
+            if (isBuiltinManagedProvider(name)) continue;
             if (typeof model !== 'string' || !model) continue;
             currentModels[name] = model;
         }
@@ -9101,8 +7538,8 @@ function cmdAdd(name, baseUrl, apiKey, silent = false) {
         throw new Error('名称仅支持字母/数字/._-');
     }
     if (isReservedProviderNameForCreation(providerName)) {
-        if (!silent) console.error('错误: local provider 为系统保留名称，不可新增');
-        throw new Error('local provider 为系统保留名称，不可新增');
+        if (!silent) console.error('错误: 提供商名称不可用');
+        throw new Error('提供商名称不可用');
     }
     if (isBuiltinProxyProvider(providerName)) {
         if (!silent) console.error('错误: codexmate-proxy 为保留名称，不可手动添加');
@@ -9175,9 +7612,7 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
         throw new Error('提供商名称必填');
     }
     if (isNonEditableProvider(name) && !allowManaged) {
-        const msg = isDefaultLocalProvider(name)
-            ? 'local provider 为系统保留项，不可编辑'
-            : 'codexmate-proxy 为保留名称，不可编辑';
+        const msg = 'codexmate-proxy 为保留名称，不可编辑';
         if (!silent) console.error(`错误: ${msg}`);
         throw new Error(msg);
     }
@@ -9576,384 +8011,18 @@ function resolveDownloadArtifact(tokenOrFileName, options = {}) {
 
 // API: 打包 Claude 配置目录（系统 zip 可用则使用，否则回退 zip-lib）
 async function prepareClaudeDirDownload() {
-    try {
-        if (!fs.existsSync(CLAUDE_DIR)) {
-            return { error: 'Claude 配置目录不存在', path: CLAUDE_DIR };
-        }
-
-        const tempDir = os.tmpdir();
-        const timestamp = Date.now();
-        const zipFileName = `claude-config-${timestamp}.zip`;
-        const zipFilePath = path.join(tempDir, zipFileName);
-
-        const zipTool = resolveZipTool();
-        if (zipTool.type === 'zip') {
-            const cmd = `"${zipTool.cmd}" -0 -q -r "${zipFilePath}" "${CLAUDE_DIR}"`;
-            execSync(cmd, { stdio: 'ignore' });
-        } else {
-            await zipLib.archiveFolder(CLAUDE_DIR, zipFilePath);
-        }
-
-        return {
-            success: true,
-            downloadPath: zipFilePath,
-            fileName: zipFileName,
-            sourcePath: CLAUDE_DIR
-        };
-    } catch (e) {
-        return { error: `打包失败：${e.message}` };
-    }
+    return await prepareDirectoryDownload(CLAUDE_DIR, {
+        missingMessage: 'Claude 配置目录不存在',
+        fileNamePrefix: 'claude-config'
+    });
 }
 
 // API: 打包 Codex 配置目录（同策略）
 async function prepareCodexDirDownload() {
-    try {
-        if (!fs.existsSync(CONFIG_DIR)) {
-            return { error: 'Codex 配置目录不存在', path: CONFIG_DIR };
-        }
-
-        const tempDir = os.tmpdir();
-        const timestamp = Date.now();
-        const zipFileName = `${CODEX_BACKUP_NAME}-${timestamp}.zip`;
-        const zipFilePath = path.join(tempDir, zipFileName);
-
-        const zipTool = resolveZipTool();
-        if (zipTool.type === 'zip') {
-            const cmd = `"${zipTool.cmd}" -0 -q -r "${zipFilePath}" "${CONFIG_DIR}"`;
-            execSync(cmd, { stdio: 'ignore' });
-        } else {
-            await zipLib.archiveFolder(CONFIG_DIR, zipFilePath);
-        }
-
-        return {
-            success: true,
-            downloadPath: zipFilePath,
-            fileName: zipFileName,
-            sourcePath: CONFIG_DIR
-        };
-    } catch (e) {
-        return { error: `打包失败：${e.message}` };
-    }
-}
-
-function copyDirRecursive(srcDir, destDir, options = {}) {
-    const dereferenceSymlinks = !!(options && options.dereferenceSymlinks);
-    const allowedRootRealPath = (options && typeof options.allowedRootRealPath === 'string')
-        ? options.allowedRootRealPath
-        : '';
-    const visitedRealPaths = options && options.visitedRealPaths instanceof Set
-        ? options.visitedRealPaths
-        : new Set();
-    const childOptions = {
-        ...options,
-        dereferenceSymlinks,
-        allowedRootRealPath,
-        visitedRealPaths
-    };
-    ensureDir(destDir);
-    const entries = fs.readdirSync(srcDir, { withFileTypes: true });
-    for (const entry of entries) {
-        const srcPath = path.join(srcDir, entry.name);
-        const destPath = path.join(destDir, entry.name);
-        if (entry.isDirectory()) {
-            if (!dereferenceSymlinks) {
-                copyDirRecursive(srcPath, destPath, childOptions);
-                continue;
-            }
-            const realPath = fs.realpathSync(srcPath);
-            if (allowedRootRealPath && !isPathInside(realPath, allowedRootRealPath)) {
-                throw new Error(`symlink escapes skill root: ${srcPath}`);
-            }
-            if (visitedRealPaths.has(realPath)) {
-                continue;
-            }
-            visitedRealPaths.add(realPath);
-            try {
-                copyDirRecursive(srcPath, destPath, childOptions);
-            } finally {
-                visitedRealPaths.delete(realPath);
-            }
-        } else if (entry.isSymbolicLink()) {
-            if (dereferenceSymlinks) {
-                const realPath = fs.realpathSync(srcPath);
-                if (allowedRootRealPath && !isPathInside(realPath, allowedRootRealPath)) {
-                    throw new Error(`symlink escapes skill root: ${srcPath}`);
-                }
-                const realStat = fs.statSync(realPath);
-                if (realStat.isDirectory()) {
-                    if (visitedRealPaths.has(realPath)) {
-                        continue;
-                    }
-                    visitedRealPaths.add(realPath);
-                    try {
-                        copyDirRecursive(realPath, destPath, childOptions);
-                    } finally {
-                        visitedRealPaths.delete(realPath);
-                    }
-                } else {
-                    fs.copyFileSync(realPath, destPath);
-                }
-            } else {
-                const target = fs.readlinkSync(srcPath);
-                fs.symlinkSync(target, destPath);
-            }
-        } else {
-            fs.copyFileSync(srcPath, destPath);
-        }
-    }
-}
-
-function inspectZipArchiveLimits(zipPath, options = {}) {
-    const maxEntryCount = Number.isFinite(options.maxEntryCount) && options.maxEntryCount > 0
-        ? Math.floor(options.maxEntryCount)
-        : MAX_SKILLS_ZIP_ENTRY_COUNT;
-    const maxUncompressedBytes = Number.isFinite(options.maxUncompressedBytes) && options.maxUncompressedBytes > 0
-        ? Math.floor(options.maxUncompressedBytes)
-        : MAX_SKILLS_ZIP_UNCOMPRESSED_BYTES;
-
-    return new Promise((resolve, reject) => {
-        yauzl.open(zipPath, { lazyEntries: true, autoClose: true }, (openErr, zipFile) => {
-            if (openErr) {
-                reject(openErr);
-                return;
-            }
-            if (!zipFile) {
-                reject(new Error('无法读取 ZIP 文件'));
-                return;
-            }
-            let entryCount = 0;
-            let totalUncompressedBytes = 0;
-            let settled = false;
-            const finish = (err, data) => {
-                if (settled) return;
-                settled = true;
-                try {
-                    zipFile.close();
-                } catch (_) {}
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(data);
-                }
-            };
-
-            zipFile.on('entry', (entry) => {
-                if (settled) return;
-                entryCount += 1;
-                const entrySize = Number.isFinite(entry.uncompressedSize) ? entry.uncompressedSize : 0;
-                totalUncompressedBytes += entrySize;
-                if (entryCount > maxEntryCount) {
-                    finish(new Error(`压缩包条目过多（>${maxEntryCount}）`));
-                    return;
-                }
-                if (totalUncompressedBytes > maxUncompressedBytes) {
-                    finish(new Error(`压缩包解压总大小超限（>${Math.floor(maxUncompressedBytes / 1024 / 1024)}MB）`));
-                    return;
-                }
-                zipFile.readEntry();
-            });
-
-            zipFile.on('end', () => {
-                finish(null, { entryCount, totalUncompressedBytes });
-            });
-
-            zipFile.on('error', (zipErr) => {
-                finish(zipErr);
-            });
-
-            zipFile.readEntry();
-        });
+    return await prepareDirectoryDownload(CONFIG_DIR, {
+        missingMessage: 'Codex 配置目录不存在',
+        fileNamePrefix: CODEX_BACKUP_NAME
     });
-}
-
-function writeUploadZipStream(req, prefix, originalName = '', maxSize = MAX_SKILLS_ZIP_UPLOAD_SIZE) {
-    return new Promise((resolve, reject) => {
-        const lengthHeader = parseInt(req.headers['content-length'] || '0', 10);
-        if (Number.isFinite(lengthHeader) && lengthHeader > maxSize) {
-            reject(new Error(`备份文件过大（>${Math.floor(maxSize / 1024 / 1024)}MB）`));
-            return;
-        }
-
-        const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-`));
-        const rawName = originalName && typeof originalName === 'string' ? originalName : `${prefix}.zip`;
-        const fileName = path.basename(rawName);
-        const zipPath = path.join(tempDir, fileName.toLowerCase().endsWith('.zip') ? fileName : `${fileName}.zip`);
-        const stream = fs.createWriteStream(zipPath);
-        let bytesWritten = 0;
-        let settled = false;
-        let hasContent = false;
-
-        const fail = (err) => {
-            if (settled) return;
-            settled = true;
-            try {
-                stream.destroy();
-            } catch (_) {}
-            try {
-                fs.rmSync(tempDir, { recursive: true, force: true });
-            } catch (_) {}
-            reject(err);
-        };
-
-        const done = () => {
-            if (settled) return;
-            settled = true;
-            if (!hasContent || bytesWritten <= 0) {
-                try {
-                    fs.rmSync(tempDir, { recursive: true, force: true });
-                } catch (_) {}
-                reject(new Error('备份文件为空'));
-                return;
-            }
-            resolve({ tempDir, zipPath });
-        };
-
-        req.on('error', (err) => fail(err));
-        req.on('aborted', () => fail(new Error('上传已中断')));
-        req.on('close', () => {
-            if (!settled && !req.complete) {
-                fail(new Error('上传已中断'));
-            }
-        });
-        stream.on('error', (err) => fail(err));
-        req.on('data', (chunk) => {
-            if (settled) return;
-            hasContent = true;
-            bytesWritten += chunk.length;
-            if (bytesWritten > maxSize) {
-                fail(new Error(`备份文件过大（>${Math.floor(maxSize / 1024 / 1024)}MB）`));
-                try {
-                    req.destroy();
-                } catch (_) {}
-                return;
-            }
-            stream.write(chunk);
-        });
-        req.on('end', () => {
-            if (settled) return;
-            stream.end(() => done());
-        });
-    });
-}
-
-function writeUploadZip(base64, prefix, originalName = '') {
-    let buffer;
-    try {
-        buffer = Buffer.from(base64 || '', 'base64');
-    } catch (e) {
-        return { error: '备份文件内容不是有效的 base64 编码' };
-    }
-
-    if (!buffer || buffer.length === 0) {
-        return { error: '备份文件为空' };
-    }
-
-    if (buffer.length > MAX_UPLOAD_SIZE) {
-        return { error: `备份文件过大（>${Math.floor(MAX_UPLOAD_SIZE / 1024 / 1024)}MB）` };
-    }
-
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-`));
-    const fileName = path.basename(originalName && typeof originalName === 'string' ? originalName : `${prefix}.zip`);
-    const zipPath = path.join(tempDir, fileName.toLowerCase().endsWith('.zip') ? fileName : `${fileName}.zip`);
-    fs.writeFileSync(zipPath, buffer);
-    return { tempDir, zipPath };
-}
-
-async function extractUploadZip(zipPath, extractDir) {
-    const unzipTool = resolveUnzipTool();
-    ensureDir(extractDir);
-    await unzipWithLibrary(zipPath, extractDir);
-}
-
-function findConfigSourceDir(extractedDir, markerDirName, requiredFileName) {
-    const markerPath = path.join(extractedDir, markerDirName);
-    if (fs.existsSync(markerPath) && fs.statSync(markerPath).isDirectory()) {
-        return markerPath;
-    }
-
-    const entries = fs.readdirSync(extractedDir, { withFileTypes: true }).filter((item) => item.isDirectory());
-    if (entries.length === 1) {
-        const onlyDir = path.join(extractedDir, entries[0].name);
-        const nestedMarker = path.join(onlyDir, markerDirName);
-        if (fs.existsSync(nestedMarker) && fs.statSync(nestedMarker).isDirectory()) {
-            return nestedMarker;
-        }
-        if (fs.existsSync(path.join(onlyDir, requiredFileName))) {
-            return onlyDir;
-        }
-    }
-
-    if (fs.existsSync(path.join(extractedDir, requiredFileName))) {
-        return extractedDir;
-    }
-
-    return extractedDir;
-}
-
-async function backupDirectoryIfExists(dirPath, prefix) {
-    if (!fs.existsSync(dirPath)) {
-        return { backupPath: '' };
-    }
-
-    const tempDir = os.tmpdir();
-    const timestamp = Date.now();
-    const zipFileName = `${prefix}-${timestamp}.zip`;
-    const zipFilePath = path.join(tempDir, zipFileName);
-    const zipTool = resolveZipTool();
-
-    try {
-        if (zipTool.type === 'zip') {
-            const cmd = `"${zipTool.cmd}" -0 -q -r "${zipFilePath}" "${dirPath}"`;
-            execSync(cmd, { stdio: 'ignore' });
-        } else {
-            await zipLib.archiveFolder(dirPath, zipFilePath);
-        }
-        return { backupPath: zipFilePath, fileName: zipFileName };
-    } catch (e) {
-        return { backupPath: '', warning: `备份失败: ${e.message}` };
-    }
-}
-
-async function restoreConfigDirectoryFromUpload(payload, options) {
-    const { targetDir, requiredFileName, markerDirName, tempPrefix, backupPrefix } = options;
-    if (!payload || typeof payload.fileBase64 !== 'string' || !payload.fileBase64.trim()) {
-        return { error: '缺少备份文件内容' };
-    }
-
-    const upload = writeUploadZip(payload.fileBase64, tempPrefix, payload.fileName);
-    if (upload.error) {
-        return { error: upload.error };
-    }
-
-    const tempDir = upload.tempDir;
-    const extractDir = path.join(tempDir, 'extract');
-    let backupPath = '';
-    try {
-        await extractUploadZip(upload.zipPath, extractDir);
-        const sourceDir = findConfigSourceDir(extractDir, markerDirName, requiredFileName);
-        const requiredPath = path.join(sourceDir, requiredFileName);
-        if (!fs.existsSync(requiredPath)) {
-            return { error: `无效备份，缺少 ${requiredFileName}` };
-        }
-
-        const backupResult = await backupDirectoryIfExists(targetDir, backupPrefix);
-        backupPath = backupResult.backupPath || '';
-
-        fs.rmSync(targetDir, { recursive: true, force: true });
-        copyDirRecursive(sourceDir, targetDir);
-
-        return {
-            success: true,
-            targetDir,
-            appliedFrom: payload.fileName || '',
-            backupPath,
-            backupWarning: backupResult.warning || ''
-        };
-    } catch (e) {
-        return { error: `导入失败：${e.message}` };
-    } finally {
-        fs.rmSync(tempDir, { recursive: true, force: true });
-    }
 }
 
 async function restoreClaudeDir(payload) {
@@ -10210,467 +8279,6 @@ function buildInstallStatusReport() {
     };
 }
 
-const ZIP_PATHS = [
-    'zip'
-];
-
-function findZipExecutable() {
-    for (const candidate of ZIP_PATHS) {
-        try {
-            if (candidate === 'zip') {
-                if (commandExists('zip', '--help')) {
-                    return 'zip';
-                }
-            } else if (fs.existsSync(candidate)) {
-                return candidate;
-            }
-        } catch (e) {}
-    }
-    return null;
-}
-
-function resolveZipTool() {
-    const zipExe = findZipExecutable();
-    if (zipExe) {
-        return { type: 'zip', cmd: zipExe };
-    }
-    return { type: 'lib', cmd: 'zip-lib' };
-}
-
-function resolveUnzipTool() {
-    return { type: 'lib', cmd: 'zip-lib' };
-}
-
-async function zipWithLibrary(absPath, outputPath) {
-    const stat = fs.lstatSync(absPath);
-    if (stat.isDirectory()) {
-        await zipLib.archiveFolder(absPath, outputPath);
-        return;
-    }
-    await zipLib.archiveFile(absPath, outputPath);
-}
-
-async function unzipWithLibrary(zipPath, outputDir) {
-    await zipLib.extract(zipPath, outputDir);
-}
-
-// 压缩（系统 zip 优先，其次 zip-lib）
-async function cmdZip(targetPath, options = {}) {
-    if (!targetPath) {
-        console.error('用法: codexmate zip <文件或文件夹路径> [--max:压缩级别]');
-        console.log('\n示例:');
-        console.log('  codexmate zip ./myproject');
-        console.log('  codexmate zip ./myproject --max:9');
-        console.log('  codexmate zip D:/data/folder --max:1');
-        console.log('\n压缩级别: 0(仅存储) ~ 9(极限压缩), 默认: 5');
-        process.exit(1);
-    }
-
-    const absPath = path.resolve(targetPath);
-    if (!fs.existsSync(absPath)) {
-        console.error('错误: 路径不存在:', absPath);
-        process.exit(1);
-    }
-
-    const compressionLevel = options.max !== undefined ? options.max : 5;
-    if (compressionLevel < 0 || compressionLevel > 9) {
-        console.error('错误: 压缩级别必须在 0-9 之间');
-        process.exit(1);
-    }
-
-    // 生成输出文件名
-    const baseName = path.basename(absPath);
-    const outputDir = path.dirname(absPath);
-    const outputPath = path.join(outputDir, `${baseName}.zip`);
-
-    const zipTool = resolveZipTool();
-    const useZipCmd = zipTool.type === 'zip';
-
-    console.log('\n压缩配置:');
-    console.log('  源路径:', absPath);
-    console.log('  输出文件:', outputPath);
-    console.log('  压缩工具:', useZipCmd ? '系统 zip' : 'zip-lib');
-    if (useZipCmd) {
-        console.log('  压缩级别:', compressionLevel);
-    } else {
-        console.log('  压缩级别: 固定（zip-lib 不支持 --max，已忽略）');
-    }
-    console.log('\n开始压缩...\n');
-
-    try {
-        if (useZipCmd) {
-            const cmd = `"${zipTool.cmd}" -${compressionLevel} -q -r "${outputPath}" "${absPath}"`;
-            execSync(cmd, { stdio: 'ignore' });
-        } else {
-            await zipWithLibrary(absPath, outputPath);
-        }
-
-        console.log('✓ 压缩完成!');
-        console.log('  输出文件:', outputPath);
-        console.log();
-    } catch (e) {
-        console.error('压缩失败:', e.message);
-        process.exit(1);
-    }
-}
-
-// 解压（zip-lib）
-async function cmdUnzip(zipPath, outputDir) {
-    if (!zipPath) {
-        console.error('用法: codexmate unzip <zip文件路径> [输出目录]');
-        console.log('\n示例:');
-        console.log('  codexmate unzip ./archive.zip');
-        console.log('  codexmate unzip ./archive.zip ./output');
-        console.log('  codexmate unzip D:/data/file.zip D:/extracted');
-        process.exit(1);
-    }
-
-    const absZipPath = path.resolve(zipPath);
-    if (!fs.existsSync(absZipPath)) {
-        console.error('错误: 文件不存在:', absZipPath);
-        process.exit(1);
-    }
-
-    if (!absZipPath.toLowerCase().endsWith('.zip')) {
-        console.error('错误: 仅支持 .zip 文件');
-        process.exit(1);
-    }
-
-    // 默认输出目录：zip文件同级目录下同名文件夹
-    const baseName = path.basename(absZipPath, '.zip');
-    const defaultOutputDir = path.join(path.dirname(absZipPath), baseName);
-    const absOutputDir = outputDir ? path.resolve(outputDir) : defaultOutputDir;
-
-    const unzipTool = resolveUnzipTool();
-
-    console.log('\n解压配置:');
-    console.log('  源文件:', absZipPath);
-    console.log('  输出目录:', absOutputDir);
-    console.log('  解压工具:', 'zip-lib');
-    console.log('\n开始解压...\n');
-
-    try {
-        await unzipWithLibrary(absZipPath, absOutputDir);
-        console.log('✓ 解压完成!');
-        console.log('  输出目录:', absOutputDir);
-        console.log();
-    } catch (e) {
-        console.error('解压失败:', e.message);
-        process.exit(1);
-    }
-}
-
-function splitExtractSuffixInput(rawValue) {
-    if (Array.isArray(rawValue)) {
-        return rawValue.flatMap((item) => splitExtractSuffixInput(item));
-    }
-    if (typeof rawValue !== 'string') {
-        return [];
-    }
-    return rawValue
-        .split(/[,\s]+/g)
-        .map((item) => item.trim())
-        .filter(Boolean);
-}
-
-function normalizeExtractSuffix(rawSuffix, fallbackSuffixes = DEFAULT_EXTRACT_SUFFIXES) {
-    const fallbackItems = splitExtractSuffixInput(fallbackSuffixes);
-    const sourceItems = splitExtractSuffixInput(rawSuffix);
-    const source = sourceItems.length > 0 ? sourceItems : fallbackItems;
-    const dedup = new Set();
-
-    for (const item of source) {
-        const lower = item.toLowerCase();
-        if (!lower) {
-            continue;
-        }
-        const normalized = lower.startsWith('.') ? lower : `.${lower}`;
-        if (normalized.length > 1) {
-            dedup.add(normalized);
-        }
-    }
-
-    if (dedup.size === 0) {
-        return [...DEFAULT_EXTRACT_SUFFIXES];
-    }
-    return Array.from(dedup);
-}
-
-function buildDefaultExtractOutputDir(baseCwd = process.cwd()) {
-    const normalizedCwd = path.resolve(baseCwd);
-    const parentDir = path.dirname(normalizedCwd);
-    const timestamp = formatTimestampForFileName().replace(/-/g, '');
-    return path.join(parentDir, timestamp);
-}
-
-function sanitizeNameSegment(rawValue, fallback = 'item') {
-    const value = typeof rawValue === 'string' ? rawValue.trim() : '';
-    const sanitized = value
-        .replace(/[^\w.-]+/g, '_')
-        .replace(/^_+|_+$/g, '');
-    return sanitized || fallback;
-}
-
-function resolveDuplicateOutputPath(outputDir, originalFileName, zipPath = '', counters = new Map()) {
-    const fallbackName = `file${path.extname(originalFileName || '')}`;
-    const fileName = path.basename(originalFileName || '') || fallbackName;
-    const firstChoice = path.join(outputDir, fileName);
-    const firstChoiceKey = `exact:${fileName}`;
-    if (!counters.has(firstChoiceKey)) {
-        counters.set(firstChoiceKey, true);
-        if (!fs.existsSync(firstChoice)) {
-            return firstChoice;
-        }
-    }
-
-    const ext = path.extname(fileName);
-    const baseName = path.basename(fileName, ext);
-    const safeBaseName = sanitizeNameSegment(baseName, 'file');
-    const zipBaseName = sanitizeNameSegment(path.basename(zipPath || '', '.zip'), 'zip');
-    const duplicateKey = `dup:${safeBaseName}|${zipBaseName}|${ext}`;
-    let index = counters.has(duplicateKey) ? counters.get(duplicateKey) : 1;
-
-    for (; index <= 100000; index++) {
-        const candidateName = `${safeBaseName}__${zipBaseName}__${index}${ext}`;
-        const candidatePath = path.join(outputDir, candidateName);
-        if (!fs.existsSync(candidatePath)) {
-            counters.set(duplicateKey, index + 1);
-            return candidatePath;
-        }
-    }
-
-    throw new Error(`重名文件过多，无法生成唯一文件名: ${fileName}`);
-}
-
-function collectZipFilesFromDir(rootDir, recursive = true) {
-    const queue = [rootDir];
-    const result = [];
-
-    while (queue.length > 0) {
-        const currentDir = queue.shift();
-        let entries = [];
-        try {
-            entries = fs.readdirSync(currentDir, { withFileTypes: true });
-        } catch (e) {
-            throw new Error(`读取目录失败: ${currentDir} (${e.message})`);
-        }
-
-        for (const entry of entries) {
-            const entryPath = path.join(currentDir, entry.name);
-            if (entry.isDirectory()) {
-                if (recursive) {
-                    queue.push(entryPath);
-                }
-                continue;
-            }
-            if (entry.isFile() && entry.name.toLowerCase().endsWith('.zip')) {
-                result.push(entryPath);
-            }
-        }
-    }
-
-    result.sort((a, b) => a.localeCompare(b));
-    return result;
-}
-
-function extractMatchedEntriesFromZip(zipPath, outputDir, suffixes, duplicateCounters = new Map()) {
-    const normalizedSuffixes = normalizeExtractSuffix(suffixes);
-    return new Promise((resolve, reject) => {
-        yauzl.open(zipPath, { lazyEntries: true, autoClose: false }, (openErr, zipFile) => {
-            if (openErr) {
-                reject(openErr);
-                return;
-            }
-            if (!zipFile) {
-                reject(new Error('无法读取 ZIP 文件'));
-                return;
-            }
-
-            let settled = false;
-            let matched = 0;
-            let extracted = 0;
-            let skippedDir = 0;
-            let skippedExt = 0;
-
-            const finish = (err) => {
-                if (settled) return;
-                settled = true;
-                try {
-                    zipFile.close();
-                } catch (_) {}
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve({ matched, extracted, skippedDir, skippedExt });
-                }
-            };
-
-            zipFile.on('entry', (entry) => {
-                if (settled) return;
-                const rawEntryName = typeof entry.fileName === 'string' ? entry.fileName : '';
-                const normalizedEntryName = rawEntryName.replace(/\\/g, '/');
-
-                if (!normalizedEntryName || normalizedEntryName.endsWith('/')) {
-                    skippedDir += 1;
-                    zipFile.readEntry();
-                    return;
-                }
-
-                const entryBaseName = path.basename(normalizedEntryName);
-                const lowerBaseName = entryBaseName.toLowerCase();
-                const matchedSuffix = normalizedSuffixes.some((suffix) => lowerBaseName.endsWith(suffix));
-                if (!entryBaseName || !matchedSuffix) {
-                    skippedExt += 1;
-                    zipFile.readEntry();
-                    return;
-                }
-
-                matched += 1;
-                zipFile.openReadStream(entry, (streamErr, readStream) => {
-                    if (streamErr || !readStream) {
-                        finish(streamErr || new Error('无法读取 ZIP 条目流'));
-                        return;
-                    }
-
-                    let completed = false;
-                    const outputPath = resolveDuplicateOutputPath(outputDir, entryBaseName, zipPath, duplicateCounters);
-                    const writeStream = fs.createWriteStream(outputPath);
-                    const fail = (writeErr) => {
-                        if (completed) return;
-                        completed = true;
-                        try {
-                            readStream.destroy();
-                        } catch (_) {}
-                        try {
-                            writeStream.destroy();
-                        } catch (_) {}
-                        try {
-                            if (fs.existsSync(outputPath)) {
-                                fs.unlinkSync(outputPath);
-                            }
-                        } catch (_) {}
-                        finish(writeErr);
-                    };
-
-                    readStream.on('error', fail);
-                    writeStream.on('error', fail);
-                    writeStream.on('finish', () => {
-                        if (completed || settled) return;
-                        completed = true;
-                        extracted += 1;
-                        zipFile.readEntry();
-                    });
-
-                    readStream.pipe(writeStream);
-                });
-            });
-
-            zipFile.on('end', () => {
-                finish(null);
-            });
-            zipFile.on('error', (zipErr) => {
-                finish(zipErr);
-            });
-
-            zipFile.readEntry();
-        });
-    });
-}
-
-async function cmdUnzipExt(zipDirPath, outputDir, options = {}) {
-    if (!zipDirPath) {
-        console.error('用法: codexmate unzip-ext <zip目录> [输出目录] [--ext:后缀[,后缀...]] [--no-recursive]');
-        console.log('\n示例:');
-        console.log('  codexmate unzip-ext ./archives');
-        console.log('  codexmate unzip-ext ./archives ./output --ext:json,txt');
-        console.log('  codexmate unzip-ext D:/data/zips --ext:txt --no-recursive');
-        console.log('  说明: 默认递归扫描子目录，可通过 --no-recursive 关闭递归');
-        process.exit(1);
-    }
-
-    const recursive = options.recursive !== false;
-    const suffixes = normalizeExtractSuffix(options.ext);
-    const absZipDir = path.resolve(zipDirPath);
-    const absOutputDir = outputDir ? path.resolve(outputDir) : buildDefaultExtractOutputDir(process.cwd());
-
-    if (!fs.existsSync(absZipDir)) {
-        console.error('错误: 目录不存在:', absZipDir);
-        process.exit(1);
-    }
-    try {
-        if (!fs.statSync(absZipDir).isDirectory()) {
-            console.error('错误: 仅支持目录路径:', absZipDir);
-            process.exit(1);
-        }
-    } catch (e) {
-        console.error('错误: 无法读取目录信息:', e.message);
-        process.exit(1);
-    }
-
-    let zipFiles = [];
-    try {
-        zipFiles = collectZipFilesFromDir(absZipDir, recursive);
-    } catch (e) {
-        console.error('扫描 ZIP 文件失败:', e.message);
-        process.exit(1);
-    }
-
-    if (zipFiles.length === 0) {
-        console.error('错误: 未找到任何 ZIP 文件');
-        process.exit(1);
-    }
-
-    ensureDir(absOutputDir);
-
-    console.log('\n批量解压配置:');
-    console.log('  ZIP 目录:', absZipDir);
-    console.log('  输出目录:', absOutputDir);
-    console.log('  后缀过滤:', suffixes.join(', '));
-    console.log('  递归扫描:', recursive ? '是' : '否');
-    console.log('  ZIP 数量:', zipFiles.length);
-    console.log('\n开始提取...\n');
-
-    let totalMatched = 0;
-    let totalExtracted = 0;
-    let totalSkippedDir = 0;
-    let totalSkippedExt = 0;
-    const failed = [];
-    const duplicateCounters = new Map();
-
-    for (const zipFilePath of zipFiles) {
-        try {
-            await inspectZipArchiveLimits(zipFilePath, {
-                maxEntryCount: MAX_SKILLS_ZIP_ENTRY_COUNT,
-                maxUncompressedBytes: MAX_SKILLS_ZIP_UNCOMPRESSED_BYTES
-            });
-            const result = await extractMatchedEntriesFromZip(zipFilePath, absOutputDir, suffixes, duplicateCounters);
-            totalMatched += result.matched;
-            totalExtracted += result.extracted;
-            totalSkippedDir += result.skippedDir;
-            totalSkippedExt += result.skippedExt;
-            console.log(`✓ ${path.basename(zipFilePath)}: 命中 ${result.matched}，提取 ${result.extracted}`);
-        } catch (e) {
-            failed.push({ zipFilePath, message: e && e.message ? e.message : String(e) });
-            console.error(`✗ ${path.basename(zipFilePath)}: ${e && e.message ? e.message : e}`);
-        }
-    }
-
-    console.log('\n提取结果:');
-    console.log('  输出目录:', absOutputDir);
-    console.log('  扫描 ZIP:', zipFiles.length);
-    console.log('  命中条目:', totalMatched);
-    console.log('  已提取:', totalExtracted);
-    console.log('  已跳过(目录条目):', totalSkippedDir);
-    console.log('  已跳过(后缀不匹配):', totalSkippedExt);
-    if (failed.length > 0) {
-        console.error('  失败数量:', failed.length);
-        for (const item of failed) {
-            console.error(`    - ${item.zipFilePath}: ${item.message}`);
-        }
-        process.exit(1);
-    }
-    console.log();
-}
 
 function resolveExportOutputPath(outputPath, defaultFileName) {
     const fallback = path.resolve(process.cwd(), defaultFileName);
@@ -11462,7 +9070,7 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                                     key: maskKey(p.preferred_auth_method || ''),
                                     hasKey: !!(p.preferred_auth_method && p.preferred_auth_method.trim()),
                                     current: name === current,
-                                    readOnly: isBuiltinProxyProvider(name),
+                                    readOnly: isBuiltinManagedProvider(name),
                                     nonDeletable: isNonDeletableProvider(name),
                                     nonEditable: isNonEditableProvider(name)
                                 }))
@@ -11749,6 +9357,15 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             break;
                         case 'proxy-stop':
                             result = await stopBuiltinProxyRuntime();
+                            break;
+                        case 'claude-proxy-status':
+                            result = getBuiltinClaudeProxyStatus();
+                            break;
+                        case 'claude-proxy-start':
+                            result = await startBuiltinClaudeProxyRuntime(params || {});
+                            break;
+                        case 'claude-proxy-stop':
+                            result = await stopBuiltinClaudeProxyRuntime();
                             break;
                         case 'proxy-enable-codex-default':
                             result = await ensureBuiltinProxyForCodexDefault(params || {});
@@ -12119,7 +9736,8 @@ function cmdStart(options = {}) {
         stopWatch();
         Promise.allSettled([
             serverHandle.stop(),
-            stopBuiltinProxyRuntime()
+            stopBuiltinProxyRuntime(),
+            stopBuiltinClaudeProxyRuntime()
         ]).finally(() => process.exit(0));
     };
 
@@ -12996,7 +10614,7 @@ function buildMcpProviderListPayload() {
             key: maskKey(p.preferred_auth_method || ''),
             hasKey: !!(p.preferred_auth_method && p.preferred_auth_method.trim()),
             current: name === current,
-            readOnly: isBuiltinProxyProvider(name),
+            readOnly: isBuiltinManagedProvider(name),
             nonDeletable: isNonDeletableProvider(name),
             nonEditable: isNonEditableProvider(name)
         }))
@@ -13779,6 +11397,14 @@ function createMcpTools(options = {}) {
     });
 
     pushTool({
+        name: 'codexmate.claude_proxy.status',
+        description: 'Get builtin Claude-compatible proxy runtime status and persisted config.',
+        readOnly: true,
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        handler: async () => getBuiltinClaudeProxyStatus()
+    });
+
+    pushTool({
         name: 'codexmate.workflow.list',
         description: 'List available workflows (builtin + custom).',
         readOnly: true,
@@ -14050,11 +11676,38 @@ function createMcpTools(options = {}) {
     });
 
     pushTool({
+        name: 'codexmate.claude_proxy.start',
+        description: 'Start builtin Claude-compatible proxy runtime with optional overrides.',
+        readOnly: false,
+        inputSchema: {
+            type: 'object',
+            properties: {
+                enabled: { type: 'boolean' },
+                host: { type: 'string' },
+                port: { type: 'number' },
+                provider: { type: 'string' },
+                authSource: { type: 'string' },
+                timeoutMs: { type: 'number' }
+            },
+            additionalProperties: false
+        },
+        handler: async (args = {}) => startBuiltinClaudeProxyRuntime(args || {})
+    });
+
+    pushTool({
         name: 'codexmate.proxy.stop',
         description: 'Stop builtin proxy runtime.',
         readOnly: false,
         inputSchema: { type: 'object', properties: {}, additionalProperties: false },
         handler: async () => stopBuiltinProxyRuntime()
+    });
+
+    pushTool({
+        name: 'codexmate.claude_proxy.stop',
+        description: 'Stop builtin Claude-compatible proxy runtime.',
+        readOnly: false,
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        handler: async () => stopBuiltinClaudeProxyRuntime()
     });
 
     pushTool({
@@ -14339,7 +11992,10 @@ async function cmdMcp(args = []) {
             if (done) return;
             done = true;
             server.stop();
-            stopBuiltinProxyRuntime().finally(() => resolve());
+            Promise.allSettled([
+                stopBuiltinProxyRuntime(),
+                stopBuiltinClaudeProxyRuntime()
+            ]).finally(() => resolve());
         };
         process.once('SIGINT', finish);
         process.once('SIGTERM', finish);
@@ -14424,51 +12080,14 @@ async function main() {
         case 'mcp': await cmdMcp(args.slice(1)); break;
         case 'export-session': await cmdExportSession(args.slice(1)); break;
         case 'zip': {
-            // 解析 --max:N 参数
-            const zipOptions = {};
-            let targetPath = null;
-            for (let i = 1; i < args.length; i++) {
-                const arg = args[i];
-                if (arg.startsWith('--max:')) {
-                    zipOptions.max = parseInt(arg.substring(6), 10);
-                } else if (!targetPath) {
-                    targetPath = arg;
-                }
-            }
-            await cmdZip(targetPath, zipOptions);
+            const { targetPath, options } = parseZipCommandArgs(args.slice(1));
+            await cmdZip(targetPath, options);
             break;
         }
         case 'unzip': await cmdUnzip(args[1], args[2]); break;
         case 'unzip-ext': {
-            const unzipExtOptions = {
-                ext: [],
-                recursive: true
-            };
-            let zipDirPath = null;
-            let outputDir = null;
-            for (let i = 1; i < args.length; i++) {
-                const arg = args[i];
-                if (arg.startsWith('--ext:')) {
-                    unzipExtOptions.ext.push(...splitExtractSuffixInput(arg.substring(6)));
-                } else if (arg.startsWith('--ext=')) {
-                    unzipExtOptions.ext.push(...splitExtractSuffixInput(arg.substring(6)));
-                } else if (arg === '--ext') {
-                    const nextArg = args[i + 1];
-                    if (typeof nextArg === 'string' && !nextArg.startsWith('--')) {
-                        unzipExtOptions.ext.push(...splitExtractSuffixInput(nextArg));
-                        i += 1;
-                    }
-                } else if (arg === '--recursive') {
-                    unzipExtOptions.recursive = true;
-                } else if (arg === '--no-recursive') {
-                    unzipExtOptions.recursive = false;
-                } else if (!zipDirPath) {
-                    zipDirPath = arg;
-                } else if (!outputDir) {
-                    outputDir = arg;
-                }
-            }
-            await cmdUnzipExt(zipDirPath, outputDir, unzipExtOptions);
+            const { zipDirPath, outputDir, options } = parseUnzipExtCommandArgs(args.slice(1));
+            await cmdUnzipExt(zipDirPath, outputDir, options);
             break;
         }
         default:

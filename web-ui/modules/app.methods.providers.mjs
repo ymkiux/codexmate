@@ -1,5 +1,4 @@
 const PROVIDER_NAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
-const RESERVED_LOCAL_PROVIDER_NAME = 'local';
 const RESERVED_PROXY_PROVIDER_NAME = 'codexmate-proxy';
 
 function normalizeText(value) {
@@ -22,7 +21,7 @@ function isValidHttpUrl(value) {
 
 function isReservedProviderCreationNameInput(name) {
     const normalized = normalizeText(name).toLowerCase();
-    return normalized === RESERVED_LOCAL_PROVIDER_NAME || normalized === RESERVED_PROXY_PROVIDER_NAME;
+    return normalized === RESERVED_PROXY_PROVIDER_NAME;
 }
 
 function isValidProviderNameInputValue(name) {
@@ -65,9 +64,7 @@ function getProviderValidationForContext(vm, mode = 'add') {
         } else if (!isValidProviderNameInputValue(name)) {
             errors.name = '名称仅支持字母/数字/._-';
         } else if (isReservedProviderCreationNameInput(name)) {
-            errors.name = name.toLowerCase() === RESERVED_LOCAL_PROVIDER_NAME
-                ? 'local provider 为系统保留名称，不可新增'
-                : 'codexmate-proxy 为保留名称，不可手动添加';
+            errors.name = 'codexmate-proxy 为保留名称，不可手动添加';
         } else if (findProviderByName(vm.providersList, name)) {
             errors.name = '名称已存在';
         }
@@ -167,22 +164,7 @@ export function createProvidersMethods(options = {}) {
             return list.find((item) => !!(item && item.current)) || null;
         },
 
-        isLocalLikeProvider(providerOrName) {
-            if (!providerOrName) return false;
-            const rawName = typeof providerOrName === 'object'
-                ? String(providerOrName.name || '')
-                : String(providerOrName);
-            const normalized = rawName.trim().toLowerCase();
-            return normalized === RESERVED_LOCAL_PROVIDER_NAME;
-        },
-
         providerPillState(provider) {
-            if (this.isLocalLikeProvider(provider)) {
-                const currentProfile = this.getCurrentCodexAuthProfile();
-                return currentProfile
-                    ? { configured: true, text: '已登录' }
-                    : { configured: false, text: '未登录' };
-            }
             const configured = !!(provider && provider.hasKey);
             return {
                 configured,
@@ -212,18 +194,10 @@ export function createProvidersMethods(options = {}) {
         isNonDeletableProvider(providerOrName) {
             if (!providerOrName) return false;
             if (typeof providerOrName === 'object') {
-                const directName = String(providerOrName.name || '').trim().toLowerCase();
-                if (directName === RESERVED_LOCAL_PROVIDER_NAME) {
-                    return true;
-                }
                 return !!providerOrName.nonDeletable;
             }
             const name = String(providerOrName).trim();
             if (!name) return false;
-            const normalized = name.toLowerCase();
-            if (normalized === RESERVED_LOCAL_PROVIDER_NAME) {
-                return true;
-            }
             const target = (this.providersList || []).find((item) => item && item.name === name);
             return !!(target && target.nonDeletable);
         },
@@ -237,7 +211,7 @@ export function createProvidersMethods(options = {}) {
         },
 
         shouldAllowProviderShare(provider) {
-            return !this.isReadOnlyProvider(provider) && !this.isLocalLikeProvider(provider);
+            return !this.isReadOnlyProvider(provider);
         },
 
         async deleteProvider(name) {

@@ -204,6 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 claudeSpeedLoading: {},
                 claudeShareLoading: {},
                 providerShareLoading: {},
+                shareCommandPrefix: 'npm start',
                 providerSwitchInProgress: false,
                 pendingProviderSwitch: '',
                 providerSwitchDisplayTarget: '',
@@ -326,6 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 codexDownloadProgress: 0,
                 codexDownloadTimer: null,
                 settingsTab: 'backup',
+                sessionTrashEnabled: true,
                 sessionTrashItems: [],
                 sessionTrashVisibleCount: SESSION_TRASH_PAGE_SIZE,
                 sessionTrashTotalCount: 0,
@@ -359,6 +361,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             this.restoreSessionFilterCache();
             this.restoreSessionPinnedMap();
+            this.shareCommandPrefix = this.normalizeShareCommandPrefix(localStorage.getItem('codexmateShareCommandPrefix'));
+            this.sessionTrashEnabled = this.normalizeSessionTrashEnabled(localStorage.getItem('codexmateSessionTrashEnabled'));
             window.addEventListener('resize', this.onWindowResize);
             window.addEventListener('keydown', this.handleGlobalKeydown);
             window.addEventListener('beforeunload', this.handleBeforeUnload);
