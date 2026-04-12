@@ -127,7 +127,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(usagePanel, /sessionsUsageError && !sessionsUsageList\.length" class="usage-empty">/);
     assert.match(usagePanel, /v-else-if="!sessionsUsageList\.length" class="usage-empty">暂无可用于统计的会话数据/);
     assert.match(usagePanel, /sessionUsageCharts\.modelCoverage\.missingModelSessionsPreview\.length/);
-    assert.match(usagePanel, /当前仍缺模型名的会话/);
+    assert.match(usagePanel, /仍缺模型名的会话/);
     assert.match(html, /data-main-tab="market"/);
     assert.match(html, /onMainTabPointerDown\('market', \$event\)/);
     assert.match(html, /onMainTabClick\('market', \$event\)/);
@@ -282,7 +282,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(usagePanel, /v-if="card\.note" class="usage-summary-note"/);
     assert.match(usagePanel, /sessionUsageCharts\.usedModels/);
     assert.match(usagePanel, /sessionUsageCharts\.modelCoverage/);
-    assert.match(usagePanel, /当前范围内没读到模型名/);
+    assert.match(usagePanel, /当前范围没读到模型名/);
     assert.match(usagePanel, /class="usage-card-head"/);
     assert.match(usagePanel, /class="usage-model-list"/);
     assert.match(usagePanel, /sessionUsageCharts\.buckets/);
