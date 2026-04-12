@@ -328,6 +328,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'sessionListVisibleCount',
         'openclawAuthProfilesByProvider',
         'openclawPendingAuthProfileUpdates',
+        'sessionTrashEnabled',
         'shareCommandPrefix'
     ] : [
         '__mainTabSwitchState',
@@ -336,6 +337,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'sessionListVisibleCount',
         'sessionListInitialBatchSize',
         'sessionListLoadStep',
+        'sessionTrashEnabled',
         'shareCommandPrefix',
         'sessionsUsageError',
         'sessionsUsageList',
@@ -390,6 +392,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'isValidProviderUrlInput',
         'loadSessionsUsage',
         'onSessionListScroll',
+        'normalizeSessionTrashEnabled',
         'normalizeShareCommandPrefix',
         'normalizeProviderDraft',
         'primeSessionListRender',
@@ -397,6 +400,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'emitSessionLoadNativeDialog',
         'resetSessionListRender',
         'scheduleSessionListViewportFill',
+        'setSessionTrashEnabled',
         'setShareCommandPrefix',
         'setSessionListRef',
         'hasRenderableSessionTimeline',

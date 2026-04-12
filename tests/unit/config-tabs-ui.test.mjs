@@ -166,6 +166,9 @@ test('config template keeps expected config tabs in top and side navigation', ()
         /<span class="selector-title">配置重置<\/span>/
     );
     assert.match(html, /class="settings-tab-actions trash-header-actions"/);
+    assert.match(html, /<span class="selector-title">会话删除行为<\/span>/);
+    assert.match(html, /<input type="checkbox" :checked="sessionTrashEnabled" @change="setSessionTrashEnabled\(\$event\.target\.checked\)">/);
+    assert.match(html, /默认开启。关闭后，会话浏览里的删除会直接永久删除，不再进入回收站。/);
     assert.match(html, /<button class="btn-tool btn-tool-compact" @click="loadSessionTrash\(\{ forceRefresh: true \}\)"/);
     assert.match(html, /<button class="btn-tool btn-tool-compact" @click="clearSessionTrash"/);
     assert.doesNotMatch(html, /<span class="selector-title">会话回收站<\/span>/);

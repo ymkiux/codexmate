@@ -161,6 +161,23 @@ export function createSessionActionMethods(options = {}) {
             return 'npm start';
         },
 
+        normalizeSessionTrashEnabled(value) {
+            if (value === false) return false;
+            const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+            if (normalized === '0' || normalized === 'false' || normalized === 'off' || normalized === 'no') {
+                return false;
+            }
+            return true;
+        },
+
+        setSessionTrashEnabled(value) {
+            const enabled = this.normalizeSessionTrashEnabled(value);
+            this.sessionTrashEnabled = enabled;
+            try {
+                localStorage.setItem('codexmateSessionTrashEnabled', enabled ? 'true' : 'false');
+            } catch (_) {}
+        },
+
         getShareCommandPrefixInvocation() {
             const prefix = this.normalizeShareCommandPrefix(this.shareCommandPrefix);
             return prefix === 'codexmate' ? 'codexmate' : 'npm start';
@@ -437,13 +454,27 @@ export function createSessionActionMethods(options = {}) {
                 this.showMessage('不支持此操作', 'error');
                 return;
             }
+            const useTrash = this.sessionTrashEnabled !== false;
+            if (!useTrash && typeof this.requestConfirmDialog === 'function') {
+                const confirmed = await this.requestConfirmDialog({
+                    title: '直接删除会话',
+                    message: '关闭回收站后，删除会话将直接永久删除，且无法恢复。',
+                    confirmText: '直接删除',
+                    cancelText: '取消',
+                    danger: true
+                });
+                if (!confirmed) {
+                    return;
+                }
+            }
             const key = this.getSessionExportKey(session);
             if (this.sessionDeleting[key]) {
                 return;
             }
             this.sessionDeleting[key] = true;
             try {
-                const res = await api('trash-session', {
+                const action = useTrash ? 'trash-session' : 'delete-session';
+                const res = await api(action, {
                     source: session.source,
                     sessionId: session.sessionId,
                     filePath: session.filePath
@@ -453,22 +484,26 @@ export function createSessionActionMethods(options = {}) {
                     return;
                 }
                 this.removeSessionPin(session);
-                this.invalidateSessionTrashRequests();
-                this.showMessage('已移入回收站', 'success');
+                if (useTrash) {
+                    this.invalidateSessionTrashRequests();
+                    this.showMessage('已移入回收站', 'success');
+                    if (this.sessionTrashLoadedOnce) {
+                        this.prependSessionTrashItem(this.buildSessionTrashItemFromSession(session, res), {
+                            totalCount: res && res.totalCount !== undefined ? res.totalCount : undefined
+                        });
+                    } else {
+                        this.sessionTrashTotalCount = this.normalizeSessionTrashTotalCount(
+                            res && res.totalCount !== undefined
+                                ? res.totalCount
+                                : (this.normalizeSessionTrashTotalCount(this.sessionTrashTotalCount, this.sessionTrashItems) + 1),
+                            this.sessionTrashItems
+                        );
+                    }
+                } else {
+                    this.showMessage('已删除', 'success');
+                }
                 if (typeof this.invalidateSessionsUsageData === 'function') {
                     this.invalidateSessionsUsageData({ preserveList: true });
-                }
-                if (this.sessionTrashLoadedOnce) {
-                    this.prependSessionTrashItem(this.buildSessionTrashItemFromSession(session, res), {
-                        totalCount: res && res.totalCount !== undefined ? res.totalCount : undefined
-                    });
-                } else {
-                    this.sessionTrashTotalCount = this.normalizeSessionTrashTotalCount(
-                        res && res.totalCount !== undefined
-                            ? res.totalCount
-                            : (this.normalizeSessionTrashTotalCount(this.sessionTrashTotalCount, this.sessionTrashItems) + 1),
-                        this.sessionTrashItems
-                    );
                 }
                 try {
                     await this.removeSessionFromCurrentList(session);
