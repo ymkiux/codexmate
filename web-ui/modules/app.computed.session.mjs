@@ -56,6 +56,13 @@ function formatUsageEstimatedCost(value, options = {}) {
     }).format(numeric);
 }
 
+function formatUsageRangeLabel(range) {
+    const normalized = typeof range === 'string' ? range.trim().toLowerCase() : '7d';
+    if (normalized === '30d') return '近 30 天';
+    if (normalized === 'all') return '全部';
+    return '近 7 天';
+}
+
 function formatUsageDuration(value, options = {}) {
     const numeric = Number(value);
     if (!Number.isFinite(numeric) || numeric <= 0) {
@@ -373,6 +380,7 @@ export function createSessionComputed() {
             const filteredUsageSessions = this.sessionUsageCharts && Array.isArray(this.sessionUsageCharts.filteredSessions)
                 ? this.sessionUsageCharts.filteredSessions
                 : this.sessionsUsageList;
+            const usageRangeLabel = formatUsageRangeLabel(this.sessionsUsageTimeRange);
             const estimatedCost = estimateUsageCostSummary(
                 filteredUsageSessions,
                 this.providersList,
@@ -395,8 +403,11 @@ export function createSessionComputed() {
                 },
                 {
                     key: 'estimated-cost',
-                    label: '预估费用',
+                    label: `预估费用 · ${usageRangeLabel}`,
                     value: estimatedCost.hasEstimate ? formatUsageEstimatedCost(estimatedCost.totalCostUsd) : '暂无',
+                    note: estimatedCost.hasEstimate
+                        ? `覆盖 ${estimatedCost.estimatedSessions}/${estimatedCost.totalSessions} 个会话`
+                        : `${usageRangeLabel} 内暂无可估算会话`,
                     title: estimatedCost.hasEstimate
                         ? `${estimatedCost.catalogSessions > 0
                             ? (estimatedCost.configuredSessions > 0 ? '按 Provider 配置 + 公开模型目录单价估算' : '按公开模型目录单价估算')
