@@ -19,6 +19,16 @@ test('getSupplementalModelsForBaseUrl returns the BigModel Claude-compatible cat
     assert(!models.includes('glm-image'));
 });
 
+test('getSupplementalModelsForBaseUrl returns Anthropic Claude models for official endpoints', () => {
+    const models = getSupplementalModelsForBaseUrl('https://api.anthropic.com');
+
+    assert(models.includes('claude-opus-4-1'));
+    assert(models.includes('claude-sonnet-4'));
+    assert(models.includes('claude-3-7-sonnet'));
+    assert(models.includes('claude-3-haiku'));
+    assert(!models.includes('glm-5.1'));
+});
+
 test('mergeModelCatalog keeps remote order and appends missing Claude endpoint extras once', () => {
     const merged = mergeModelCatalog(
         ['glm-4.7', 'glm-5'],
