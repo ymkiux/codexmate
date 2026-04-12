@@ -25,6 +25,137 @@ function formatCompactUsageSummaryNumber(value) {
     }).format(Math.floor(numeric));
 }
 
+function readUsageCostNumber(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric < 0) {
+        return null;
+    }
+    return numeric;
+}
+
+function formatUsageEstimatedCost(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+        return '$0.00';
+    }
+    if (numeric < 0.01) {
+        return '<$0.01';
+    }
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: numeric >= 100 ? 0 : 2,
+        maximumFractionDigits: numeric >= 100 ? 0 : 2
+    }).format(numeric);
+}
+
+function buildUsagePricingIndex(providersList = []) {
+    const byProvider = new Map();
+    const byModel = new Map();
+    const list = Array.isArray(providersList) ? providersList : [];
+    for (const provider of list) {
+        if (!provider || typeof provider !== 'object') continue;
+        const providerName = typeof provider.name === 'string' ? provider.name.trim() : '';
+        const models = Array.isArray(provider.models) ? provider.models : [];
+        const providerMap = new Map();
+        for (const model of models) {
+            if (!model || typeof model !== 'object') continue;
+            const modelId = typeof model.id === 'string' ? model.id.trim() : '';
+            if (!modelId) continue;
+            const cost = model.cost && typeof model.cost === 'object' && !Array.isArray(model.cost)
+                ? model.cost
+                : null;
+            const pricing = {
+                input: readUsageCostNumber(cost && cost.input),
+                output: readUsageCostNumber(cost && cost.output),
+                cacheRead: readUsageCostNumber(cost && cost.cacheRead),
+                cacheWrite: readUsageCostNumber(cost && cost.cacheWrite)
+            };
+            const hasKnownRate = Object.values(pricing).some((value) => value !== null && value > 0);
+            if (!hasKnownRate) continue;
+            providerMap.set(modelId, pricing);
+            const modelMatches = byModel.get(modelId) || [];
+            modelMatches.push({ provider: providerName, pricing });
+            byModel.set(modelId, modelMatches);
+        }
+        if (providerName && providerMap.size) {
+            byProvider.set(providerName, providerMap);
+        }
+    }
+    return { byProvider, byModel };
+}
+
+function resolveUsagePricingForSession(session, pricingIndex, fallbackProvider = '') {
+    if (!session || typeof session !== 'object' || !pricingIndex || typeof pricingIndex !== 'object') {
+        return null;
+    }
+    const model = typeof session.model === 'string' ? session.model.trim() : '';
+    if (!model) return null;
+    const provider = typeof session.provider === 'string' ? session.provider.trim() : '';
+    const effectiveProvider = provider || fallbackProvider;
+    if (effectiveProvider) {
+        const providerMap = pricingIndex.byProvider instanceof Map ? pricingIndex.byProvider.get(effectiveProvider) : null;
+        if (providerMap instanceof Map && providerMap.has(model)) {
+            return providerMap.get(model);
+        }
+    }
+    const modelMatches = pricingIndex.byModel instanceof Map ? pricingIndex.byModel.get(model) : null;
+    if (Array.isArray(modelMatches) && modelMatches.length === 1) {
+        return modelMatches[0].pricing;
+    }
+    return null;
+}
+
+function estimateUsageCostSummary(sessions, providersList, currentProvider) {
+    const list = Array.isArray(sessions) ? sessions : [];
+    const pricingIndex = buildUsagePricingIndex(providersList);
+    let totalCostUsd = 0;
+    let estimatedSessions = 0;
+    let totalTokens = 0;
+    let estimatedTokens = 0;
+
+    for (const session of list) {
+        if (!session || typeof session !== 'object') continue;
+        const pricing = resolveUsagePricingForSession(session, pricingIndex, currentProvider);
+        const totalSessionTokens = Number.isFinite(Number(session.totalTokens))
+            ? Math.max(0, Math.floor(Number(session.totalTokens)))
+            : 0;
+        totalTokens += totalSessionTokens;
+        if (!pricing) {
+            continue;
+        }
+        const inputTokens = Number.isFinite(Number(session.inputTokens)) ? Math.max(0, Math.floor(Number(session.inputTokens))) : null;
+        const cachedInputTokens = Number.isFinite(Number(session.cachedInputTokens)) ? Math.max(0, Math.floor(Number(session.cachedInputTokens))) : 0;
+        const outputTokens = Number.isFinite(Number(session.outputTokens)) ? Math.max(0, Math.floor(Number(session.outputTokens))) : null;
+        const reasoningOutputTokens = Number.isFinite(Number(session.reasoningOutputTokens)) ? Math.max(0, Math.floor(Number(session.reasoningOutputTokens))) : 0;
+        if (inputTokens === null && outputTokens === null && reasoningOutputTokens === 0) {
+            continue;
+        }
+        const billableInputTokens = Math.max(0, (inputTokens || 0) - cachedInputTokens);
+        const estimatedUsd = (
+            ((pricing.input || 0) * billableInputTokens)
+            + ((pricing.cacheRead || 0) * cachedInputTokens)
+            + ((pricing.output || 0) * ((outputTokens || 0) + reasoningOutputTokens))
+        ) / 1000000;
+        totalCostUsd += estimatedUsd;
+        estimatedSessions += 1;
+        estimatedTokens += totalSessionTokens || (billableInputTokens + cachedInputTokens + (outputTokens || 0) + reasoningOutputTokens);
+    }
+
+    const coveragePercent = totalTokens > 0
+        ? Math.round((estimatedTokens / totalTokens) * 100)
+        : (estimatedSessions > 0 ? 100 : 0);
+    return {
+        totalCostUsd,
+        estimatedSessions,
+        totalSessions: list.length,
+        estimatedTokens,
+        totalTokens,
+        coveragePercent,
+        hasEstimate: estimatedSessions > 0
+    };
+}
+
 export function createSessionComputed() {
     return {
         isSessionQueryEnabled() {
@@ -160,6 +291,11 @@ export function createSessionComputed() {
             const summary = this.sessionUsageCharts && this.sessionUsageCharts.summary
                 ? this.sessionUsageCharts.summary
                 : { totalSessions: 0, totalMessages: 0, totalTokens: 0, totalContextWindow: 0, activeDays: 0, avgMessagesPerSession: 0, busiestDay: null, busiestHour: null };
+            const estimatedCost = estimateUsageCostSummary(
+                this.sessionsUsageList,
+                this.providersList,
+                this.currentProvider
+            );
             return [
                 { key: 'sessions', label: '总会话数', value: formatUsageSummaryNumber(summary.totalSessions || 0) },
                 { key: 'messages', label: '总消息数', value: formatUsageSummaryNumber(summary.totalMessages || 0) },
@@ -174,6 +310,14 @@ export function createSessionComputed() {
                     label: '总上下文数',
                     value: formatCompactUsageSummaryNumber(summary.totalContextWindow || 0),
                     title: formatUsageSummaryNumber(summary.totalContextWindow || 0)
+                },
+                {
+                    key: 'estimated-cost',
+                    label: '约费用',
+                    value: estimatedCost.hasEstimate ? formatUsageEstimatedCost(estimatedCost.totalCostUsd) : '暂无',
+                    title: estimatedCost.hasEstimate
+                        ? `按已知模型单价估算，覆盖 ${estimatedCost.estimatedSessions}/${estimatedCost.totalSessions} 个会话，约 ${estimatedCost.coveragePercent}% token`
+                        : '缺少可匹配的模型单价或 token 拆分，暂时无法估算'
                 },
                 { key: 'days', label: '活跃天数', value: formatUsageSummaryNumber(summary.activeDays || 0) },
                 { key: 'avg-messages', label: '平均每会话消息', value: summary.avgMessagesPerSession || 0 },
