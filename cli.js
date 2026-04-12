@@ -5481,6 +5481,129 @@ async function listSessionBrowse(params = {}) {
 }
 
 async function listSessionUsage(params = {}) {
+    function normalizeSessionModelList(values = []) {
+        const models = [];
+        for (const value of values) {
+            if (typeof value !== 'string') {
+                continue;
+            }
+            const normalized = value.trim();
+            if (!normalized || models.includes(normalized)) {
+                continue;
+            }
+            models.push(normalized);
+        }
+        return models;
+    }
+
+    function readSessionModelsFromFile(filePath) {
+        const targetPath = typeof filePath === 'string' ? filePath.trim() : '';
+        if (!targetPath) {
+            return [];
+        }
+
+        const cache = listSessionUsage.__modelsByFileCache instanceof Map
+            ? listSessionUsage.__modelsByFileCache
+            : new Map();
+        listSessionUsage.__modelsByFileCache = cache;
+
+        let stat;
+        try {
+            stat = fs.statSync(targetPath);
+        } catch (e) {
+            return [];
+        }
+
+        const cacheKey = `${targetPath}:${stat.size}:${stat.mtimeMs}`;
+        if (cache.has(cacheKey)) {
+            return [...cache.get(cacheKey)];
+        }
+
+        let content = '';
+        try {
+            content = fs.readFileSync(targetPath, 'utf-8');
+        } catch (e) {
+            return [];
+        }
+
+        const models = [];
+        const pushModel = (value) => {
+            if (typeof value !== 'string') {
+                return;
+            }
+            const normalized = value.trim();
+            if (!normalized || models.includes(normalized)) {
+                return;
+            }
+            models.push(normalized);
+        };
+
+        for (const line of content.split(/\r?\n/)) {
+            if (!line.trim()) {
+                continue;
+            }
+            let record;
+            try {
+                record = JSON.parse(line);
+            } catch (e) {
+                continue;
+            }
+            if (!record || typeof record !== 'object' || Array.isArray(record)) {
+                continue;
+            }
+            const payload = record.payload && typeof record.payload === 'object' && !Array.isArray(record.payload)
+                ? record.payload
+                : null;
+            const info = payload && payload.info && typeof payload.info === 'object' && !Array.isArray(payload.info)
+                ? payload.info
+                : null;
+            const collaborationMode = payload && payload.collaboration_mode && typeof payload.collaboration_mode === 'object' && !Array.isArray(payload.collaboration_mode)
+                ? payload.collaboration_mode
+                : null;
+            const collaborationSettings = collaborationMode && collaborationMode.settings && typeof collaborationMode.settings === 'object' && !Array.isArray(collaborationMode.settings)
+                ? collaborationMode.settings
+                : null;
+            const message = record.message && typeof record.message === 'object' && !Array.isArray(record.message)
+                ? record.message
+                : null;
+            const candidates = [
+                payload && payload.model,
+                payload && payload.model_name,
+                payload && payload.model_id,
+                payload && payload.modelId,
+                info && info.model,
+                info && info.model_name,
+                info && info.model_id,
+                info && info.modelId,
+                collaborationSettings && collaborationSettings.model,
+                collaborationSettings && collaborationSettings.model_name,
+                collaborationSettings && collaborationSettings.model_id,
+                collaborationSettings && collaborationSettings.modelId,
+                message && message.model,
+                message && message.model_name,
+                message && message.model_id,
+                message && message.modelId,
+                record.model,
+                record.modelName,
+                record.model_name,
+                record.model_id,
+                record.modelId
+            ];
+            for (const candidate of candidates) {
+                pushModel(candidate);
+            }
+        }
+
+        cache.set(cacheKey, models);
+        if (cache.size > 500) {
+            const firstKey = cache.keys().next().value;
+            if (firstKey) {
+                cache.delete(firstKey);
+            }
+        }
+        return [...models];
+    }
+
     const source = params.source === 'codex' || params.source === 'claude'
         ? params.source
         : 'all';
@@ -5500,6 +5623,21 @@ async function listSessionUsage(params = {}) {
             }
             const normalized = { ...item };
             delete normalized.__messageCountExact;
+            const filePath = typeof normalized.filePath === 'string' ? normalized.filePath.trim() : '';
+            const fullFileModels = filePath ? readSessionModelsFromFile(filePath) : [];
+            const mergedModels = normalizeSessionModelList([
+                ...(Array.isArray(normalized.models) ? normalized.models : []),
+                ...fullFileModels,
+                normalized.model,
+                normalized.modelName,
+                normalized.modelId
+            ]);
+            if (mergedModels.length > 0) {
+                normalized.models = mergedModels;
+                if ((!normalized.model || !String(normalized.model).trim())) {
+                    normalized.model = mergedModels[0];
+                }
+            }
             const hasModel = [normalized.model, normalized.modelName, normalized.modelId]
                 .some((value) => typeof value === 'string' && value.trim());
             const hasModels = Array.isArray(normalized.models)
@@ -5507,8 +5645,6 @@ async function listSessionUsage(params = {}) {
             if (hasModel || hasModels) {
                 return normalized;
             }
-
-            const filePath = typeof normalized.filePath === 'string' ? normalized.filePath.trim() : '';
             if (!filePath) {
                 return normalized;
             }
@@ -5532,10 +5668,19 @@ async function listSessionUsage(params = {}) {
             if (typeof summary.model === 'string' && summary.model.trim()) {
                 normalized.model = summary.model.trim();
             }
-            if (Array.isArray(summary.models)) {
-                normalized.models = summary.models
-                    .filter((value, index, list) => typeof value === 'string' && value.trim() && list.indexOf(value) === index)
-                    .map((value) => value.trim());
+            const summaryModels = Array.isArray(summary.models) ? summary.models : [];
+            const allModels = normalizeSessionModelList([
+                ...summaryModels,
+                ...fullFileModels,
+                normalized.model,
+                normalized.modelName,
+                normalized.modelId
+            ]);
+            if (allModels.length > 0) {
+                normalized.models = allModels;
+                if ((!normalized.model || !String(normalized.model).trim())) {
+                    normalized.model = allModels[0];
+                }
             }
             if ((!normalized.provider || !String(normalized.provider).trim()) && typeof summary.provider === 'string' && summary.provider.trim()) {
                 normalized.provider = summary.provider.trim();
