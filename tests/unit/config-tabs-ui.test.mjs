@@ -74,9 +74,14 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(orchestrationPanel, /@click="addTaskOrchestrationToQueue\(\)"/);
     assert.match(orchestrationPanel, /@click="startTaskQueueRunner\(\)"/);
     assert.match(orchestrationPanel, /@click="retryTaskRunFromUi\(taskOrchestration.selectedRunId\)"/);
+    assert.match(orchestrationPanel, /class="settings-tab-actions task-header-actions"/);
+    assert.match(orchestrationPanel, /class="btn-tool task-action-preview" @click="previewTaskPlan\(\)"/);
+    assert.match(orchestrationPanel, /class="task-action-row-right"/);
     assert.match(orchestrationPanel, /taskOrchestrationSelectedRunNodes/);
     assert.match(taskOrchestrationStyles, /\.task-section-header\s*\{[\s\S]*align-items:\s*center;[\s\S]*justify-content:\s*space-between;/);
     assert.match(taskOrchestrationStyles, /\.task-section-header \.settings-tab-actions\s*\{[\s\S]*flex-wrap:\s*nowrap;[\s\S]*margin-left:\s*auto;/);
+    assert.match(taskOrchestrationStyles, /\.task-action-row\s*\{[\s\S]*align-items:\s*center;[\s\S]*justify-content:\s*space-between;[\s\S]*flex-wrap:\s*nowrap;/);
+    assert.match(taskOrchestrationStyles, /\.task-action-row-right\s*\{[\s\S]*display:\s*flex;[\s\S]*justify-content:\s*flex-end;[\s\S]*flex-wrap:\s*nowrap;/);
     assert.match(taskOrchestrationStyles, /\.task-runtime-item-actions\s*\{[\s\S]*flex-direction:\s*row;[\s\S]*align-items:\s*center;/);
     assert.match(html, /id="side-tab-market"/);
     assert.match(html, /id="tab-market"/);
