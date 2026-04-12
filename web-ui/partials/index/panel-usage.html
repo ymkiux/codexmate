@@ -83,15 +83,48 @@
                                 </div>
                             </section>
 
-                            <section class="usage-card">
-                                <div class="usage-card-title">使用模型</div>
-                                <div v-if="!sessionUsageCharts.usedModels.length" class="usage-list-value">暂无模型数据</div>
-                                <div v-else class="usage-model-list">
-                                    <div v-for="item in sessionUsageCharts.usedModels" :key="item.key" class="usage-model-chip" :title="`${item.model} · ${item.count} 会话 · ${item.messageTotal} 消息${item.tokenTotal ? ` · ${item.tokenTotal} token` : ''}`">
-                                        <div class="usage-model-name">{{ item.model }}</div>
-                                        <div class="usage-model-meta">{{ item.count }} 会话<span v-if="item.sourceLabels.length"> · {{ item.sourceLabels.join(' / ') }}</span></div>
+                            <section class="usage-card usage-card-models">
+                                <div class="usage-card-head">
+                                    <div>
+                                        <div class="usage-card-title">使用模型</div>
+                                        <div class="usage-card-subtitle">按当前时间范围统计已识别模型名，不再把缺失情况藏起来。</div>
+                                    </div>
+                                    <div class="usage-card-kicker">覆盖 {{ sessionUsageCharts.modelCoverage.modeledSessions }}/{{ sessionUsageCharts.modelCoverage.totalSessions }}</div>
+                                </div>
+                                <div class="usage-model-coverage-strip">
+                                    <div class="usage-model-coverage-item">
+                                        <strong>{{ sessionUsageCharts.usedModels.length }}</strong>
+                                        <span>已识别模型</span>
+                                    </div>
+                                    <div class="usage-model-coverage-item">
+                                        <strong>{{ sessionUsageCharts.modelCoverage.coveragePercent }}%</strong>
+                                        <span>模型覆盖率</span>
+                                    </div>
+                                    <div class="usage-model-coverage-item">
+                                        <strong>{{ sessionUsageCharts.modelCoverage.missingModelSessions }}</strong>
+                                        <span>缺少模型名</span>
                                     </div>
                                 </div>
+                                <div v-if="!sessionUsageCharts.usedModels.length" class="usage-diagnostic-empty">
+                                    <div class="usage-diagnostic-title">当前范围内没读到模型名</div>
+                                    <div class="usage-diagnostic-copy">
+                                        已扫描 {{ sessionUsageCharts.modelCoverage.totalSessions }} 个会话，但这些会话没有可识别的 `model / modelName / modelId` 字段，所以这里没法列出模型。
+                                    </div>
+                                    <div class="usage-diagnostic-meta">
+                                        Codex {{ sessionUsageCharts.modelCoverage.missingModelSourceTotals.codex || 0 }} 个，Claude Code {{ sessionUsageCharts.modelCoverage.missingModelSourceTotals.claude || 0 }} 个。
+                                    </div>
+                                </div>
+                                <template v-else>
+                                    <div v-if="sessionUsageCharts.modelCoverage.missingModelSessions > 0" class="usage-inline-note">
+                                        还有 {{ sessionUsageCharts.modelCoverage.missingModelSessions }} 个会话缺少模型名，所以当前列表不是 100% 完整覆盖。
+                                    </div>
+                                    <div class="usage-model-list">
+                                        <div v-for="item in sessionUsageCharts.usedModels" :key="item.key" class="usage-model-chip" :title="`${item.model} · ${item.count} 会话 · ${item.messageTotal} 消息${item.tokenTotal ? ` · ${item.tokenTotal} token` : ''}`">
+                                            <div class="usage-model-name">{{ item.model }}</div>
+                                            <div class="usage-model-meta">{{ item.count }} 会话<span v-if="item.sourceLabels.length"> · {{ item.sourceLabels.join(' / ') }}</span></div>
+                                        </div>
+                                    </div>
+                                </template>
                             </section>
 
                             <section class="usage-card">

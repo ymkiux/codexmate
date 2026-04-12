@@ -748,7 +748,7 @@ test('buildUsageChartGroups keeps all used model names for the selected range', 
     const result = buildUsageChartGroups([
         {
             source: 'codex',
-            model: 'gpt-5.3-codex',
+            modelId: 'gpt-5.3-codex',
             createdAt: '2026-04-10T07:30:00.000Z',
             updatedAt: '2026-04-10T08:00:00.000Z',
             messageCount: 4,
@@ -757,7 +757,7 @@ test('buildUsageChartGroups keeps all used model names for the selected range', 
         },
         {
             source: 'claude',
-            model: 'claude-sonnet-4',
+            modelName: 'claude-sonnet-4',
             createdAt: '2026-04-09T07:30:00.000Z',
             updatedAt: '2026-04-09T08:00:00.000Z',
             messageCount: 6,
@@ -781,6 +781,14 @@ test('buildUsageChartGroups keeps all used model names for the selected range', 
             messageCount: 1,
             totalTokens: 100000,
             contextWindow: 64000
+        },
+        {
+            source: 'claude',
+            createdAt: '2026-04-11T07:30:00.000Z',
+            updatedAt: '2026-04-11T08:00:00.000Z',
+            messageCount: 2,
+            totalTokens: 90000,
+            contextWindow: 64000
         }
     ], {
         range: '7d',
@@ -793,6 +801,13 @@ test('buildUsageChartGroups keeps all used model names for the selected range', 
     );
     assert.deepStrictEqual(result.usedModels[0].sourceLabels, ['Claude Code']);
     assert.deepStrictEqual(result.usedModels[1].sourceLabels, ['Codex']);
+    assert.deepStrictEqual(result.modelCoverage, {
+        totalSessions: 4,
+        modeledSessions: 3,
+        missingModelSessions: 1,
+        coveragePercent: 75,
+        missingModelSourceTotals: { codex: 0, claude: 1 }
+    });
 });
 
 test('sessionUsageSummaryCards explains why usage cost is unavailable for the selected range', () => {
@@ -1271,4 +1286,51 @@ test('appendTaskWorkflowId deduplicates ids and forces workflow engine', () => {
 
     assert.strictEqual(context.taskOrchestration.selectedEngine, 'workflow');
     assert.strictEqual(context.taskOrchestration.workflowIdsText, 'diagnose-config\nsafe-provider-switch');
+});
+
+test('ensureTaskOrchestrationState creates workbench defaults including workspaceTab', () => {
+    const methods = createTaskOrchestrationMethods({ api: async () => ({}) });
+    const context = {};
+    const state = methods.ensureTaskOrchestrationState.call(context);
+
+    assert.strictEqual(state.workspaceTab, 'queue');
+    assert.strictEqual(state.selectedRunError, '');
+    assert.strictEqual(state.detailRequestToken, 0);
+});
+
+test('selectTaskRun switches workbench to detail and keeps latest detail response only', async () => {
+    const deferred = [];
+    const api = async (name, payload) => {
+        if (name !== 'task-run-detail') {
+            return {};
+        }
+        let resolve;
+        const promise = new Promise((nextResolve) => {
+            resolve = nextResolve;
+        });
+        deferred.push({ payload, resolve });
+        return promise;
+    };
+    const methods = createTaskOrchestrationMethods({ api });
+    const context = {
+        ensureTaskOrchestrationState: methods.ensureTaskOrchestrationState,
+        showMessage() {},
+        syncTaskOrchestrationPolling() {}
+    };
+    context.taskOrchestration = methods.ensureTaskOrchestrationState.call(context);
+
+    const firstRequest = methods.loadTaskRunDetail.call(context, 'run-1', { silent: true });
+    const secondRequest = methods.loadTaskRunDetail.call(context, 'run-2', { silent: true });
+
+    assert.strictEqual(context.taskOrchestration.workspaceTab, 'detail');
+    assert.strictEqual(context.taskOrchestration.selectedRunId, 'run-2');
+    assert.strictEqual(deferred.length, 2);
+
+    deferred[1].resolve({ run: { runId: 'run-2', status: 'running' }, nodes: [] });
+    await secondRequest;
+    deferred[0].resolve({ run: { runId: 'run-1', status: 'failed' }, nodes: [{ id: 'stale' }] });
+    await firstRequest;
+
+    assert.strictEqual(context.taskOrchestration.selectedRunDetail.run.runId, 'run-2');
+    assert.strictEqual(context.taskOrchestration.selectedRunError, '');
 });
