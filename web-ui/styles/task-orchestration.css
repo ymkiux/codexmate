@@ -68,10 +68,17 @@
 
 .task-action-row {
     margin-top: 14px;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 2px;
 }
 
 .task-action-row > .btn-tool,
-.task-section-header .settings-tab-actions > .btn-tool-compact {
+.task-section-header .settings-tab-actions > .btn-tool-compact,
+.task-action-row-right > .btn-tool {
     min-height: 36px;
     height: 36px;
     display: inline-flex;
@@ -80,10 +87,27 @@
     box-sizing: border-box;
 }
 
-.task-action-row > .btn-tool {
-    flex: 1 1 120px;
+.task-action-preview {
+    flex: 0 0 auto;
+    min-width: 88px;
 }
 
+.task-action-row-right {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: nowrap;
+    margin-left: auto;
+}
+
+.task-action-row-right > .btn-tool {
+    flex: 0 0 auto;
+    min-width: 88px;
+}
+
+.task-header-actions,
 .task-section-header .settings-tab-actions {
     display: flex;
     flex-wrap: nowrap;
@@ -91,6 +115,9 @@
     align-items: center;
     justify-content: flex-end;
     margin-left: auto;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 2px;
 }
 
 .task-section-header .settings-tab-actions > .btn-tool-compact {
@@ -271,10 +298,11 @@
         align-items: flex-start;
     }
 
+    .task-header-actions,
     .task-section-header .settings-tab-actions {
-        flex-wrap: wrap;
         justify-content: flex-start;
         margin-left: 0;
+        width: 100%;
     }
 
     .task-runtime-item-actions {
@@ -282,7 +310,11 @@
         justify-content: flex-start;
     }
 
-    .task-action-row > .btn-tool {
-        flex-basis: calc(50% - 5px);
+    .task-action-row {
+        justify-content: flex-start;
+    }
+
+    .task-action-row-right {
+        justify-content: flex-start;
     }
 }

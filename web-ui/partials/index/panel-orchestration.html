@@ -11,7 +11,7 @@
                                     <span class="selector-title">任务编排</span>
                                     <div class="skills-panel-note">生成计划，执行或入队，并查看运行记录。</div>
                                 </div>
-                                <div class="settings-tab-actions">
+                                <div class="settings-tab-actions task-header-actions">
                                     <button type="button" class="btn-tool btn-tool-compact" @click="loadTaskOrchestrationOverview({ forceRefresh: true, includeDetail: true })" :disabled="taskOrchestration.loading">
                                         {{ taskOrchestration.loading ? '刷新中...' : '刷新' }}
                                     </button>
@@ -71,18 +71,20 @@
                             </div>
 
                             <div class="task-action-row">
-                                <button type="button" class="btn-tool" @click="previewTaskPlan()" :disabled="taskOrchestration.planning || taskOrchestration.running || !taskOrchestration.target.trim()">
+                                <button type="button" class="btn-tool task-action-preview" @click="previewTaskPlan()" :disabled="taskOrchestration.planning || taskOrchestration.running || !taskOrchestration.target.trim()">
                                     {{ taskOrchestration.planning ? '规划中...' : '预览' }}
                                 </button>
-                                <button type="button" class="btn-tool btn-primary" @click="runTaskOrchestration()" :disabled="taskOrchestration.running || !taskOrchestration.target.trim()">
-                                    {{ taskOrchestration.running ? '启动中...' : '执行' }}
-                                </button>
-                                <button type="button" class="btn-tool" @click="addTaskOrchestrationToQueue()" :disabled="taskOrchestration.queueAdding || !taskOrchestration.target.trim()">
-                                    {{ taskOrchestration.queueAdding ? '加入中...' : '入队' }}
-                                </button>
-                                <button type="button" class="btn-tool" @click="startTaskQueueRunner()" :disabled="taskOrchestration.queueStarting">
-                                    {{ taskOrchestration.queueStarting ? '启动中...' : '开始队列' }}
-                                </button>
+                                <div class="task-action-row-right">
+                                    <button type="button" class="btn-tool btn-primary" @click="runTaskOrchestration()" :disabled="taskOrchestration.running || !taskOrchestration.target.trim()">
+                                        {{ taskOrchestration.running ? '启动中...' : '执行' }}
+                                    </button>
+                                    <button type="button" class="btn-tool" @click="addTaskOrchestrationToQueue()" :disabled="taskOrchestration.queueAdding || !taskOrchestration.target.trim()">
+                                        {{ taskOrchestration.queueAdding ? '加入中...' : '入队' }}
+                                    </button>
+                                    <button type="button" class="btn-tool" @click="startTaskQueueRunner()" :disabled="taskOrchestration.queueStarting">
+                                        {{ taskOrchestration.queueStarting ? '启动中...' : '开始队列' }}
+                                    </button>
+                                </div>
                             </div>
                         </section>
 
