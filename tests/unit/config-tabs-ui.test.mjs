@@ -17,6 +17,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     const orchestrationPanel = readProjectFile('web-ui/partials/index/panel-orchestration.html');
     const baseTheme = readProjectFile('web-ui/styles/base-theme.css');
     const controlsForms = readProjectFile('web-ui/styles/controls-forms.css');
+    const taskOrchestrationStyles = readProjectFile('web-ui/styles/task-orchestration.css');
     const sideRail = html.match(/<aside class="side-rail"[\s\S]*?<\/aside>/)?.[0] || '';
     const topTabModes = [...html.matchAll(/id="tab-config-([a-z]+)"/g)]
         .map((match) => match[1]);
@@ -74,6 +75,9 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(orchestrationPanel, /@click="startTaskQueueRunner\(\)"/);
     assert.match(orchestrationPanel, /@click="retryTaskRunFromUi\(taskOrchestration.selectedRunId\)"/);
     assert.match(orchestrationPanel, /taskOrchestrationSelectedRunNodes/);
+    assert.match(taskOrchestrationStyles, /\.task-section-header\s*\{[\s\S]*align-items:\s*center;[\s\S]*justify-content:\s*space-between;/);
+    assert.match(taskOrchestrationStyles, /\.task-section-header \.settings-tab-actions\s*\{[\s\S]*flex-wrap:\s*nowrap;[\s\S]*margin-left:\s*auto;/);
+    assert.match(taskOrchestrationStyles, /\.task-runtime-item-actions\s*\{[\s\S]*flex-direction:\s*row;[\s\S]*align-items:\s*center;/);
     assert.match(html, /id="side-tab-market"/);
     assert.match(html, /id="tab-market"/);
     assert.match(html, /id="side-tab-docs"/);
