@@ -363,8 +363,11 @@ export function createSessionComputed() {
             const summary = this.sessionUsageCharts && this.sessionUsageCharts.summary
                 ? this.sessionUsageCharts.summary
                 : { totalSessions: 0, totalMessages: 0, totalTokens: 0, totalContextWindow: 0, activeDurationMs: 0, totalDurationMs: 0, activeDays: 0, avgMessagesPerSession: 0, busiestDay: null, busiestHour: null };
+            const filteredUsageSessions = this.sessionUsageCharts && Array.isArray(this.sessionUsageCharts.filteredSessions)
+                ? this.sessionUsageCharts.filteredSessions
+                : this.sessionsUsageList;
             const estimatedCost = estimateUsageCostSummary(
-                this.sessionsUsageList,
+                filteredUsageSessions,
                 this.providersList,
                 this.currentProvider
             );

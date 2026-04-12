@@ -12,6 +12,7 @@
                         <div class="usage-range-group" role="group" aria-label="Usage 时间范围">
                             <button type="button" class="usage-range-btn" :class="{ active: sessionsUsageTimeRange === '7d' }" @click="sessionsUsageTimeRange = '7d'">近 7 天</button>
                             <button type="button" class="usage-range-btn" :class="{ active: sessionsUsageTimeRange === '30d' }" @click="sessionsUsageTimeRange = '30d'">近 30 天</button>
+                            <button type="button" class="usage-range-btn" :class="{ active: sessionsUsageTimeRange === 'all' }" @click="sessionsUsageTimeRange = 'all'">全部</button>
                             <button type="button" class="usage-range-btn" @click="loadSessionsUsage({ forceRefresh: true })" :disabled="sessionsUsageLoading">{{ sessionsUsageLoading ? '刷新中...' : '刷新统计' }}</button>
                         </div>
                     </div>

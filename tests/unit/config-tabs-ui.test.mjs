@@ -239,6 +239,8 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.doesNotMatch(sessionsPanel, /sessionUsageSummaryCards/);
     assert.match(usagePanel, /sessionsUsageTimeRange === '7d'/);
     assert.match(usagePanel, /sessionsUsageTimeRange === '30d'/);
+    assert.match(usagePanel, /sessionsUsageTimeRange === 'all'/);
+    assert.match(usagePanel, />全部<\/button>/);
     assert.match(usagePanel, /sessionsUsageList\.length/);
     assert.match(usagePanel, /loadSessionsUsage\(\{ forceRefresh: true \}\)/);
     assert.match(usagePanel, /sessionUsageSummaryCards/);

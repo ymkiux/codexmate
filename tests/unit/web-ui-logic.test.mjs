@@ -29,6 +29,7 @@ const {
     normalizeSessionPathFilter,
     buildSessionFilterCacheState,
     buildSessionListParams,
+    buildUsageChartGroups,
     formatSessionTimelineTimestamp,
     buildSessionTimelineNodes,
     runLatestOnlyQueue,
@@ -841,6 +842,54 @@ test('sessionUsageSummaryCards falls back to public catalog pricing when provide
     assert(costCard, 'missing estimated cost summary card');
     assert.strictEqual(costCard.value, '$1.77');
     assert.match(costCard.title, /公开模型目录单价估算/);
+    assert.match(costCard.title, /覆盖 1\/1 个会话/);
+});
+
+test('sessionUsageSummaryCards recalculates estimated cost from the selected usage range', () => {
+    const computed = createSessionComputed();
+    const sessions = [
+        {
+            source: 'codex',
+            provider: 'maxx',
+            model: 'gpt-5.3-codex',
+            createdAt: '2026-04-06T07:30:00.000Z',
+            updatedAt: '2026-04-06T08:00:00.000Z',
+            messageCount: 4,
+            totalTokens: 400000,
+            inputTokens: 300000,
+            cachedInputTokens: 100000,
+            outputTokens: 100000,
+            reasoningOutputTokens: 0,
+            contextWindow: 258400
+        },
+        {
+            source: 'codex',
+            provider: 'maxx',
+            model: 'gpt-5.3-codex',
+            createdAt: '2026-02-01T07:30:00.000Z',
+            updatedAt: '2026-02-01T08:00:00.000Z',
+            messageCount: 4,
+            totalTokens: 800000,
+            inputTokens: 400000,
+            cachedInputTokens: 0,
+            outputTokens: 400000,
+            reasoningOutputTokens: 0,
+            contextWindow: 258400
+        }
+    ];
+    const cards = computed.sessionUsageSummaryCards.call({
+        sessionUsageCharts: buildUsageChartGroups(sessions, {
+            range: '30d',
+            now: Date.UTC(2026, 3, 6, 12, 0, 0)
+        }),
+        sessionsUsageList: sessions,
+        providersList: [],
+        currentProvider: 'maxx'
+    });
+
+    const costCard = cards.find((card) => card.key === 'estimated-cost');
+    assert(costCard, 'missing estimated cost summary card');
+    assert.strictEqual(costCard.value, '$1.77');
     assert.match(costCard.title, /覆盖 1\/1 个会话/);
 });
 
