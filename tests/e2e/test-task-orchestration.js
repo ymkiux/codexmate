@@ -36,6 +36,24 @@ module.exports = async function testTaskOrchestration(ctx) {
     assert(planPayload.plan && Array.isArray(planPayload.plan.nodes), 'task plan should include nodes');
     assert(planPayload.plan.nodes.length >= 2, 'task plan should include multiple nodes');
 
+    const invalidWorkflowPlanResult = runSync(node, [
+        cliPath,
+        'task',
+        'plan',
+        '--target',
+        'plain target',
+        '--workflow-id',
+        'missing-workflow',
+        '--engine',
+        'workflow',
+        '--json'
+    ], { env });
+    assert(invalidWorkflowPlanResult.status !== 0, 'task plan should fail for unknown workflow ids');
+    const invalidWorkflowPlanPayload = parseJsonOutput(invalidWorkflowPlanResult.stdout);
+    assert(invalidWorkflowPlanPayload.ok === false, 'invalid workflow plan should be rejected');
+    assert(Array.isArray(invalidWorkflowPlanPayload.issues), 'invalid workflow plan should include issues');
+    assert(invalidWorkflowPlanPayload.issues.some((item) => String(item.message || '').includes('unknown workflow')), 'invalid workflow plan should mention unknown workflow');
+
     const runResult = runSync(node, [
         cliPath,
         'task',
@@ -152,6 +170,36 @@ module.exports = async function testTaskOrchestration(ctx) {
 
     const apiRunDetail = await api('task-run-detail', { runId: apiQueueStart.detail.runId });
     assert(apiRunDetail && apiRunDetail.runId === apiQueueStart.detail.runId, 'task-run-detail API should return detail');
+
+    const missingQueueStartResult = runSync(node, [
+        cliPath,
+        'task',
+        'queue',
+        'start',
+        'missing-task',
+        '--json'
+    ], { env });
+    assert(missingQueueStartResult.status !== 0, 'task queue start should fail for missing task');
+    const missingQueueStartPayload = parseJsonOutput(missingQueueStartResult.stdout);
+    assert(typeof missingQueueStartPayload.error === 'string' && missingQueueStartPayload.error.includes('task not found'), 'missing task queue start should report not found');
+
+    const invalidRunIdResult = runSync(node, [
+        cliPath,
+        'task',
+        'run',
+        '--target',
+        '诊断当前配置',
+        '--workflow-id',
+        'diagnose-config',
+        '--engine',
+        'workflow',
+        '--run-id',
+        '../escaped-run',
+        '--json'
+    ], { env });
+    assert(invalidRunIdResult.status !== 0, 'task run should reject unsafe run ids');
+    const invalidRunIdPayload = parseJsonOutput(invalidRunIdResult.stdout);
+    assert(typeof invalidRunIdPayload.error === 'string' && invalidRunIdPayload.error.includes('unsupported characters'), 'unsafe run id should report validation error');
 
     const apiRetry = await api('task-retry', {
         runId: apiQueueStart.detail.runId,

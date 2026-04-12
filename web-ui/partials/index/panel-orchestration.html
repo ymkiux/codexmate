@@ -87,6 +87,7 @@
                         </section>
 
                         <section class="selector-section task-plan-card">
+                            <div v-if="taskOrchestration.lastError" class="task-issue-item">{{ taskOrchestration.lastError }}</div>
                             <div class="selector-header task-section-header">
                                 <div>
                                     <span class="selector-title">计划预览</span>
@@ -151,12 +152,16 @@
                             </div>
                             <div v-if="!taskOrchestration.queue.length" class="session-empty">当前没有排队任务。</div>
                             <div v-else class="task-runtime-list">
-                                <button
+                                <div
                                     v-for="item in taskOrchestration.queue"
                                     :key="item.taskId"
-                                    type="button"
-                                    class="task-runtime-item"
-                                    @click="item.lastRunId ? selectTaskRun(item.lastRunId) : null">
+                                    :class="['task-runtime-item', { active: item.lastRunId && taskOrchestration.selectedRunId === item.lastRunId, clickable: !!item.lastRunId }]"
+                                    :role="item.lastRunId ? 'button' : null"
+                                    :tabindex="item.lastRunId ? 0 : -1"
+                                    :aria-disabled="item.lastRunId ? null : 'true'"
+                                    @click="item.lastRunId ? selectTaskRun(item.lastRunId) : null"
+                                    @keydown.enter.prevent="item.lastRunId ? selectTaskRun(item.lastRunId) : null"
+                                    @keydown.space.prevent="item.lastRunId ? selectTaskRun(item.lastRunId) : null">
                                     <div class="task-runtime-item-main">
                                         <div class="task-runtime-item-title">{{ item.title || item.target || item.taskId }}</div>
                                         <div class="task-runtime-item-meta">{{ item.taskId }} · {{ item.updatedAt || item.createdAt }}</div>
@@ -166,7 +171,7 @@
                                         <span :class="['pill', taskRunStatusTone(item.status)]">{{ item.status }}</span>
                                         <button type="button" class="btn-mini" @click.stop="cancelTaskRunFromUi(item.taskId)" :disabled="item.status !== 'queued' && item.status !== 'running'">取消</button>
                                     </div>
-                                </button>
+                                </div>
                             </div>
                         </section>
 
@@ -217,6 +222,7 @@
                             </div>
                         </div>
 
+                        <div v-if="taskOrchestration.selectedRunError" class="task-issue-item">{{ taskOrchestration.selectedRunError }}</div>
                         <div v-if="!taskOrchestrationSelectedRun" class="session-empty">选择一个 run 查看详情。</div>
                         <template v-else>
                             <div class="task-detail-summary-strip">
