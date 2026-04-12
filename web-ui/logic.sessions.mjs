@@ -46,6 +46,27 @@ export function normalizeSessionPathFilter(pathFilter) {
     return typeof pathFilter === 'string' ? pathFilter.trim() : '';
 }
 
+function collectSessionModelNames(session) {
+    if (!session || typeof session !== 'object') {
+        return [];
+    }
+    const values = Array.isArray(session.models)
+        ? [...session.models, session.model, session.modelName, session.modelId]
+        : [session.model, session.modelName, session.modelId];
+    const models = [];
+    for (const value of values) {
+        if (typeof value !== 'string') {
+            continue;
+        }
+        const normalized = value.trim();
+        if (!normalized || models.includes(normalized)) {
+            continue;
+        }
+        models.push(normalized);
+    }
+    return models;
+}
+
 export function buildSessionFilterCacheState(source, pathFilter) {
     return {
         source: normalizeSessionSource(source, 'all'),
@@ -285,21 +306,21 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
             });
         }
 
-        const modelId = [session.model, session.modelName, session.modelId]
-            .map((value) => (typeof value === 'string' ? value.trim() : ''))
-            .find(Boolean) || '';
-        if (modelId) {
-            const prev = modelMap.get(modelId) || {
-                count: 0,
-                messageTotal: 0,
-                tokenTotal: 0,
-                sources: new Set()
-            };
-            prev.count += 1;
-            prev.messageTotal += messageCount;
-            prev.tokenTotal += sessionTotalTokens;
-            prev.sources.add(source);
-            modelMap.set(modelId, prev);
+        const sessionModels = collectSessionModelNames(session);
+        if (sessionModels.length > 0) {
+            for (const modelId of sessionModels) {
+                const prev = modelMap.get(modelId) || {
+                    count: 0,
+                    messageTotal: 0,
+                    tokenTotal: 0,
+                    sources: new Set()
+                };
+                prev.count += 1;
+                prev.messageTotal += messageCount;
+                prev.tokenTotal += sessionTotalTokens;
+                prev.sources.add(source);
+                modelMap.set(modelId, prev);
+            }
         } else {
             missingModelSessions += 1;
             missingModelSourceTotals[source] += 1;
@@ -375,7 +396,7 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
 
     const modelCoverage = {
         totalSessions,
-        modeledSessions: usedModels.reduce((sum, item) => sum + item.count, 0),
+        modeledSessions: Math.max(0, totalSessions - missingModelSessions),
         missingModelSessions,
         missingModelSourceTotals,
         coveragePercent: totalSessions > 0 ? Math.round(((totalSessions - missingModelSessions) / totalSessions) * 100) : 0

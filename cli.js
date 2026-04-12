@@ -4643,9 +4643,9 @@ function applyUsageTotalsToState(state, usageTotals) {
     }
 }
 
-function readSessionModelFromRecord(record) {
+function readSessionModelsFromRecord(record) {
     if (!record || typeof record !== 'object' || Array.isArray(record)) {
-        return '';
+        return [];
     }
     const payload = record.payload && typeof record.payload === 'object' && !Array.isArray(record.payload)
         ? record.payload
@@ -4685,12 +4685,23 @@ function readSessionModelFromRecord(record) {
         record.model_id,
         record.modelId
     ];
+    const models = [];
     for (const candidate of candidates) {
-        if (typeof candidate === 'string' && candidate.trim()) {
-            return candidate.trim();
+        if (typeof candidate !== 'string') {
+            continue;
         }
+        const normalized = candidate.trim();
+        if (!normalized || models.includes(normalized)) {
+            continue;
+        }
+        models.push(normalized);
     }
-    return '';
+    return models;
+}
+
+function readSessionModelFromRecord(record) {
+    const models = readSessionModelsFromRecord(record);
+    return models[0] || '';
 }
 
 function readExplicitSessionProviderFromRecord(record) {
@@ -4834,6 +4845,7 @@ function parseCodexSessionSummary(filePath, options = {}) {
     let reasoningOutputTokens = 0;
     let provider = 'codex';
     let model = '';
+    const models = [];
     const usageState = { totalTokens, contextWindow, inputTokens, cachedInputTokens, outputTokens, reasoningOutputTokens };
     const previewMessages = [];
 
@@ -4857,8 +4869,13 @@ function parseCodexSessionSummary(filePath, options = {}) {
             provider = readSessionProviderFromRecord(record, 'codex') || provider;
             continue;
         }
-
-        model = readSessionModelFromRecord(record) || model;
+        const recordModels = readSessionModelsFromRecord(record);
+        for (const recordModel of recordModels) {
+            if (!models.includes(recordModel)) {
+                models.push(recordModel);
+            }
+        }
+        model = recordModels[0] || model;
 
         if (record.type === 'response_item' && record.payload && record.payload.type === 'message') {
             const role = normalizeRole(record.payload.role);
@@ -4879,7 +4896,13 @@ function parseCodexSessionSummary(filePath, options = {}) {
         outputTokens = usageState.outputTokens || 0;
         reasoningOutputTokens = usageState.reasoningOutputTokens || 0;
         provider = readExplicitSessionProviderFromRecord(record) || provider;
-        model = readSessionModelFromRecord(record) || model;
+        const recordModels = readSessionModelsFromRecord(record);
+        for (const recordModel of recordModels) {
+            if (!models.includes(recordModel)) {
+                models.push(recordModel);
+            }
+        }
+        model = recordModels[0] || model;
     }
 
     const filteredPreviewMessages = removeLeadingSystemMessage(previewMessages);
@@ -4918,6 +4941,7 @@ function parseCodexSessionSummary(filePath, options = {}) {
         sourceLabel: 'Codex',
         provider,
         model,
+        models,
         sessionId,
         title: firstPrompt || sessionId,
         cwd,
@@ -4968,6 +4992,7 @@ function parseClaudeSessionSummary(filePath, options = {}) {
     let reasoningOutputTokens = 0;
     let provider = 'claude';
     let model = '';
+    const models = [];
     const usageState = { totalTokens, contextWindow, inputTokens, cachedInputTokens, outputTokens, reasoningOutputTokens };
     const previewMessages = [];
     let createdAt = '';
@@ -4994,7 +5019,13 @@ function parseClaudeSessionSummary(filePath, options = {}) {
         }
 
         provider = readExplicitSessionProviderFromRecord(record) || provider;
-        model = readSessionModelFromRecord(record) || model;
+        const recordModels = readSessionModelsFromRecord(record);
+        for (const recordModel of recordModels) {
+            if (!models.includes(recordModel)) {
+                models.push(recordModel);
+            }
+        }
+        model = recordModels[0] || model;
 
         const role = normalizeRole(record.type);
         if (role === 'assistant' || role === 'user' || role === 'system') {
@@ -5016,7 +5047,13 @@ function parseClaudeSessionSummary(filePath, options = {}) {
         outputTokens = usageState.outputTokens || 0;
         reasoningOutputTokens = usageState.reasoningOutputTokens || 0;
         provider = readExplicitSessionProviderFromRecord(record) || provider;
-        model = readSessionModelFromRecord(record) || model;
+        const recordModels = readSessionModelsFromRecord(record);
+        for (const recordModel of recordModels) {
+            if (!models.includes(recordModel)) {
+                models.push(recordModel);
+            }
+        }
+        model = recordModels[0] || model;
     }
 
     const filteredPreviewMessages = removeLeadingSystemMessage(previewMessages);
@@ -5054,6 +5091,7 @@ function parseClaudeSessionSummary(filePath, options = {}) {
         sourceLabel: 'Claude Code',
         provider,
         model,
+        models,
         sessionId,
         title: firstPrompt || sessionId,
         cwd,
@@ -5194,6 +5232,7 @@ function listClaudeSessions(limit, options = {}) {
             let outputTokens = 0;
             let reasoningOutputTokens = 0;
             let model = typeof entry.model === 'string' ? entry.model.trim() : '';
+            const models = model ? [model] : [];
 
             const usageState = { totalTokens, contextWindow, inputTokens, cachedInputTokens, outputTokens, reasoningOutputTokens };
             applySessionUsageSummaryFromIndexEntry(usageState, entry);
@@ -5214,7 +5253,13 @@ function listClaudeSessions(limit, options = {}) {
                 const quickMessages = [];
                 for (const record of quickRecords) {
                     applySessionUsageSummaryFromRecord(usageState, record, 'claude');
-                    model = readSessionModelFromRecord(record) || model;
+                    const recordModels = readSessionModelsFromRecord(record);
+                    for (const recordModel of recordModels) {
+                        if (!models.includes(recordModel)) {
+                            models.push(recordModel);
+                        }
+                    }
+                    model = recordModels[0] || model;
                     const role = normalizeRole(record.type);
                     if (role === 'assistant' || role === 'user' || role === 'system') {
                         const content = record.message ? record.message.content : '';
@@ -5237,7 +5282,13 @@ function listClaudeSessions(limit, options = {}) {
             const tailRecords = parseJsonlTailRecords(filePath, summaryReadBytes);
             for (const record of tailRecords) {
                 applySessionUsageSummaryFromRecord(usageState, record, 'claude');
-                model = readSessionModelFromRecord(record) || model;
+                const recordModels = readSessionModelsFromRecord(record);
+                for (const recordModel of recordModels) {
+                    if (!models.includes(recordModel)) {
+                        models.push(recordModel);
+                    }
+                }
+                model = recordModels[0] || model;
             }
             totalTokens = usageState.totalTokens || 0;
             contextWindow = usageState.contextWindow || 0;
@@ -5269,6 +5320,7 @@ function listClaudeSessions(limit, options = {}) {
                 outputTokens,
                 reasoningOutputTokens,
                 model,
+                models,
                 __messageCountExact: quickRecords.length > 0 && isSessionSummaryMessageCountExact(fileStat, summaryReadBytes),
                 filePath,
                 keywords,
@@ -5450,7 +5502,9 @@ async function listSessionUsage(params = {}) {
             delete normalized.__messageCountExact;
             const hasModel = [normalized.model, normalized.modelName, normalized.modelId]
                 .some((value) => typeof value === 'string' && value.trim());
-            if (hasModel) {
+            const hasModels = Array.isArray(normalized.models)
+                && normalized.models.some((value) => typeof value === 'string' && value.trim());
+            if (hasModel || hasModels) {
                 return normalized;
             }
 
@@ -5477,6 +5531,11 @@ async function listSessionUsage(params = {}) {
             }
             if (typeof summary.model === 'string' && summary.model.trim()) {
                 normalized.model = summary.model.trim();
+            }
+            if (Array.isArray(summary.models)) {
+                normalized.models = summary.models
+                    .filter((value, index, list) => typeof value === 'string' && value.trim() && list.indexOf(value) === index)
+                    .map((value) => value.trim());
             }
             if ((!normalized.provider || !String(normalized.provider).trim()) && typeof summary.provider === 'string' && summary.provider.trim()) {
                 normalized.provider = summary.provider.trim();

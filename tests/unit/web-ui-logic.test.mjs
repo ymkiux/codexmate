@@ -810,6 +810,45 @@ test('buildUsageChartGroups keeps all used model names for the selected range', 
     });
 });
 
+test('buildUsageChartGroups collects every model name from session model arrays without double-counting coverage', () => {
+    const result = buildUsageChartGroups([
+        {
+            source: 'codex',
+            model: 'gpt-5.3-codex',
+            models: ['gpt-5.3-codex', 'gpt-5.2-codex', 'gpt-5.3-codex'],
+            createdAt: '2026-04-10T07:30:00.000Z',
+            updatedAt: '2026-04-10T08:00:00.000Z',
+            messageCount: 4,
+            totalTokens: 400000,
+            contextWindow: 258400
+        },
+        {
+            source: 'codex',
+            model: 'gpt-5.1-codex-max',
+            createdAt: '2026-04-08T07:30:00.000Z',
+            updatedAt: '2026-04-08T08:00:00.000Z',
+            messageCount: 3,
+            totalTokens: 200000,
+            contextWindow: 128000
+        }
+    ], {
+        range: 'all',
+        now: Date.UTC(2026, 3, 12, 12, 0, 0)
+    });
+
+    assert.deepStrictEqual(
+        result.usedModels.map((item) => item.model),
+        ['gpt-5.2-codex', 'gpt-5.3-codex', 'gpt-5.1-codex-max']
+    );
+    assert.deepStrictEqual(result.modelCoverage, {
+        totalSessions: 2,
+        modeledSessions: 2,
+        missingModelSessions: 0,
+        coveragePercent: 100,
+        missingModelSourceTotals: { codex: 0, claude: 0 }
+    });
+});
+
 test('sessionUsageSummaryCards explains why usage cost is unavailable for the selected range', () => {
     const computed = createSessionComputed();
     const cards = computed.sessionUsageSummaryCards.call({
