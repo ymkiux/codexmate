@@ -66,6 +66,13 @@
     min-width: 108px;
 }
 
+.task-hero-actions > .btn-tool + .btn-tool,
+.task-hero-actions > .btn-tool-compact + .btn-tool,
+.task-hero-actions > .btn-tool + .btn-tool-compact,
+.task-hero-actions > .btn-tool-compact + .btn-tool-compact {
+    margin-top: 0;
+}
+
 .task-hero-meta-strip {
     display: flex;
     flex-wrap: wrap;
