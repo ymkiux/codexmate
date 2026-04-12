@@ -414,6 +414,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'taskRunStatusTone',
         'isTaskRunActive',
         'formatTaskNodeDependencies',
+        'formatTaskNodeLogs',
         'loadTaskOrchestrationOverview',
         'previewTaskPlan',
         'runTaskOrchestration',

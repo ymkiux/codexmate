@@ -386,7 +386,7 @@
                                             <div v-if="node.summary" class="task-runtime-item-summary">{{ node.summary }}</div>
                                             <div v-if="node.error && node.error !== node.summary" class="task-node-deps">错误：{{ node.error }}</div>
                                             <div class="task-node-deps">依赖：{{ formatTaskNodeDependencies(node) }}</div>
-                                            <pre class="task-log-block">{{ Array.isArray(node.logs) && node.logs.length ? node.logs.map((item) => `${item.at || ''} ${item.level || ''} ${item.message || ''}`.trim()).join('\n') : '(no logs)' }}</pre>
+                                            <pre class="task-log-block">{{ formatTaskNodeLogs(node.logs) }}</pre>
                                         </div>
                                     </div>
                                 </template>

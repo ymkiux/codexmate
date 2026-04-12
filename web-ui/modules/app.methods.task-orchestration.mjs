@@ -110,6 +110,13 @@ export function createTaskOrchestrationMethods(options = {}) {
             return dependsOn.length > 0 ? dependsOn.join(', ') : '无';
         },
 
+        formatTaskNodeLogs(logs) {
+            if (!Array.isArray(logs) || logs.length === 0) {
+                return '(no logs)';
+            }
+            return logs.map((item) => `${item && item.at ? item.at : ''} ${item && item.level ? item.level : ''} ${item && item.message ? item.message : ''}`.trim()).join('\n');
+        },
+
         appendTaskWorkflowId(workflowId) {
             const state = this.ensureTaskOrchestrationState();
             const normalizedWorkflowId = typeof workflowId === 'string' ? workflowId.trim() : '';
