@@ -81,7 +81,18 @@
                                 <label class="selector-field task-field-wide">
                                     <span class="selector-label">Workflow ID（每行一条）</span>
                                     <textarea v-model="taskOrchestration.workflowIdsText" class="task-textarea" rows="3" placeholder="例如：\ndiagnose-config\nsafe-provider-switch"></textarea>
-                                    <span class="task-field-hint">只在 Workflow 引擎下需要，用来指定复用的固定流程。</span>
+                                    <span class="task-field-hint">只在 Workflow 引擎下需要，用来指定复用的固定流程。当前本地可用 {{ taskOrchestration.workflows.length }} 个。</span>
+                                    <div v-if="taskOrchestration.workflows.length" class="task-workflow-suggestions">
+                                        <button
+                                            v-for="workflow in taskOrchestration.workflows"
+                                            :key="workflow.id || workflow.name"
+                                            type="button"
+                                            class="task-workflow-chip"
+                                            @click="appendTaskWorkflowId(workflow.id || workflow.name)">
+                                            <span>{{ workflow.name || workflow.id }}</span>
+                                            <small v-if="workflow.stepCount">{{ workflow.stepCount }} 步</small>
+                                        </button>
+                                    </div>
                                 </label>
                             </div>
 
@@ -102,6 +113,22 @@
                                 <div class="task-config-pill">自动修复 · {{ taskOrchestration.autoFixRounds }}</div>
                                 <div class="task-config-pill">写入 · {{ taskOrchestration.allowWrite ? '允许' : '只读' }}</div>
                                 <div class="task-config-pill">模式 · {{ taskOrchestration.dryRun ? '仅预演' : '真实执行' }}</div>
+                            </div>
+
+                            <div class="task-readiness-card">
+                                <div class="task-readiness-head">
+                                    <div>
+                                        <div class="task-readiness-title">草稿状态</div>
+                                        <div class="task-readiness-copy">{{ taskOrchestrationDraftReadiness.summary }}</div>
+                                    </div>
+                                    <span :class="['pill', taskOrchestrationDraftReadiness.tone]">{{ taskOrchestrationDraftReadiness.title }}</span>
+                                </div>
+                                <div class="task-readiness-grid">
+                                    <div v-for="item in taskOrchestrationDraftChecklist" :key="item.key" :class="['task-readiness-item', { done: item.done }]">
+                                        <strong>{{ item.label }}</strong>
+                                        <span>{{ item.detail }}</span>
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="task-action-row">

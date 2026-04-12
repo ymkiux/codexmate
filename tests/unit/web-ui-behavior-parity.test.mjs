@@ -426,7 +426,8 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'taskOrchestrationHasLiveActivity',
         'stopTaskOrchestrationPolling',
         'syncTaskOrchestrationPolling',
-        'resetTaskOrchestrationDraft'
+        'resetTaskOrchestrationDraft',
+        'appendTaskWorkflowId'
     ];
     const allowedMissingCurrentMethodKeys = [
         'closeInstallModal',
@@ -474,7 +475,10 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'mainTabSubtitle',
         'taskOrchestrationSelectedRun',
         'taskOrchestrationSelectedRunNodes',
-        'taskOrchestrationQueueStats'
+        'taskOrchestrationQueueStats',
+        'taskOrchestrationDraftMetrics',
+        'taskOrchestrationDraftChecklist',
+        'taskOrchestrationDraftReadiness'
     ];
     const allowedMissingCurrentComputedKeys = [
         'hasLocalAndProxy',
