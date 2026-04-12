@@ -14,6 +14,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     const openclawModal = readProjectFile('web-ui/partials/index/modal-openclaw-config.html');
     const sessionsPanel = readProjectFile('web-ui/partials/index/panel-sessions.html');
     const usagePanel = readProjectFile('web-ui/partials/index/panel-usage.html');
+    const orchestrationPanel = readProjectFile('web-ui/partials/index/panel-orchestration.html');
     const baseTheme = readProjectFile('web-ui/styles/base-theme.css');
     const controlsForms = readProjectFile('web-ui/styles/controls-forms.css');
     const sideRail = html.match(/<aside class="side-rail"[\s\S]*?<\/aside>/)?.[0] || '';
@@ -57,6 +58,22 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /settingsTab === 'trash'/);
     assert.match(html, /settingsTab === 'device'/);
     assert.match(html, /sessionTrashCount/);
+    assert.match(html, /id="side-tab-orchestration"/);
+    assert.match(html, /id="tab-orchestration"/);
+    assert.match(html, /data-main-tab="orchestration"/);
+    assert.match(html, /onMainTabPointerDown\('orchestration', \$event\)/);
+    assert.match(html, /onMainTabClick\('orchestration', \$event\)/);
+    assert.match(html, /aria-controls="panel-orchestration"/);
+    assert.match(html, /:aria-selected="mainTab === 'orchestration'"/);
+    assert.match(html, /id="panel-orchestration"/);
+    assert.match(html, /v-show="mainTab === 'orchestration'"/);
+    assert.match(orchestrationPanel, /<span class="selector-title">任务目标<\/span>/);
+    assert.match(orchestrationPanel, /@click="previewTaskPlan\(\)"/);
+    assert.match(orchestrationPanel, /@click="runTaskOrchestration\(\)"/);
+    assert.match(orchestrationPanel, /@click="addTaskOrchestrationToQueue\(\)"/);
+    assert.match(orchestrationPanel, /@click="startTaskQueueRunner\(\)"/);
+    assert.match(orchestrationPanel, /@click="retryTaskRunFromUi\(taskOrchestration.selectedRunId\)"/);
+    assert.match(orchestrationPanel, /taskOrchestrationSelectedRunNodes/);
     assert.match(html, /id="side-tab-market"/);
     assert.match(html, /id="tab-market"/);
     assert.match(html, /id="side-tab-docs"/);
@@ -119,6 +136,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.doesNotMatch(html, /class="market-target-switch market-target-switch-compact" role="tablist" aria-label="选择 Skills 管理目标"/);
     assert.match(html, /class="side-section" role="navigation" aria-label="配置管理"/);
     assert.match(html, /class="side-section" role="navigation" aria-label="会话管理"/);
+    assert.match(html, /class="side-section" role="navigation" aria-label="任务编排"/);
     assert.match(html, /class="side-section" role="navigation" aria-label="技能市场"/);
     assert.match(html, /class="side-section" role="navigation" aria-label="文档"/);
     assert.match(html, /class="side-section" role="navigation" aria-label="设置"/);

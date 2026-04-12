@@ -85,6 +85,7 @@ export function switchMainTab(tab) {
     const leavingSessions = previousTab === 'sessions' && nextTab !== 'sessions';
     const enteringSessionsTab = nextTab === 'sessions';
     const enteringUsageTab = nextTab === 'usage';
+    const enteringOrchestrationTab = nextTab === 'orchestration';
     emitSessionLoadDebug(this, 'switchMainTab:start', `from=${previousTab}\nto=${nextTab}`);
     this.mainTab = nextTab;
 
@@ -138,6 +139,15 @@ export function switchMainTab(tab) {
     }
     if (enteringUsageTab && !this.sessionsUsageLoadedOnce && typeof this.loadSessionsUsage === 'function') {
         this.loadSessionsUsage();
+    }
+    if (enteringOrchestrationTab && typeof this.loadTaskOrchestrationOverview === 'function') {
+        void this.loadTaskOrchestrationOverview({
+            silent: true,
+            includeDetail: true
+        });
+    }
+    if (nextTab !== 'orchestration' && typeof this.stopTaskOrchestrationPolling === 'function') {
+        this.stopTaskOrchestrationPolling();
     }
     if (nextTab === 'sessions') {
         this.prepareSessionTabRender();
