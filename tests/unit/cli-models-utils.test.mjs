@@ -22,8 +22,11 @@ test('getSupplementalModelsForBaseUrl returns the BigModel Claude-compatible cat
 test('getSupplementalModelsForBaseUrl returns Anthropic Claude models for official endpoints', () => {
     const models = getSupplementalModelsForBaseUrl('https://api.anthropic.com');
 
+    assert(models.includes('claude-opus-4-6'));
     assert(models.includes('claude-opus-4-1'));
-    assert(models.includes('claude-sonnet-4'));
+    assert(models.includes('claude-sonnet-4-6'));
+    assert(models.includes('claude-sonnet-4-5'));
+    assert(models.includes('claude-haiku-4-5'));
     assert(models.includes('claude-3-7-sonnet'));
     assert(models.includes('claude-3-haiku'));
     assert(!models.includes('glm-5.1'));
