@@ -237,9 +237,12 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
     let latestSessionMs = 0;
     const pathMap = new Map();
     const modelMap = new Map();
+    const missingModelProviderMap = new Map();
+    const missingModelSessionMap = new Map();
     const sourceMessageTotals = { codex: 0, claude: 0 };
     const missingModelSourceTotals = { codex: 0, claude: 0 };
     let missingModelSessions = 0;
+    let providerOnlySessions = 0;
     const hourCounts = Array.from({ length: 24 }, (_, hour) => ({
         key: String(hour).padStart(2, '0'),
         label: String(hour).padStart(2, '0'),
@@ -306,7 +309,16 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
             });
         }
 
+        const sourceLabel = source === 'codex' ? 'Codex' : 'Claude Code';
+        const normalizedTitle = typeof session.title === 'string' && session.title.trim()
+            ? session.title.trim()
+            : (typeof session.sessionId === 'string' && session.sessionId.trim() ? session.sessionId.trim() : '未命名会话');
         const sessionModels = collectSessionModelNames(session);
+        const explicitProvider = typeof session.provider === 'string' ? session.provider.trim() : '';
+        const normalizedExplicitProvider = explicitProvider.toLowerCase();
+        const hasSpecificProvider = !!explicitProvider
+            && normalizedExplicitProvider !== source
+            && normalizedExplicitProvider !== (source === 'codex' ? 'codex' : 'claude');
         if (sessionModels.length > 0) {
             for (const modelId of sessionModels) {
                 const prev = modelMap.get(modelId) || {
@@ -324,11 +336,34 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
         } else {
             missingModelSessions += 1;
             missingModelSourceTotals[source] += 1;
+            const missingKey = typeof session.sessionId === 'string' && session.sessionId.trim()
+                ? `${source}:${session.sessionId.trim()}`
+                : [source, session.filePath || normalizedTitle, String(updatedAtMs), String(sessionIndex)].join(':');
+            missingModelSessionMap.set(missingKey, {
+                key: missingKey,
+                title: normalizedTitle,
+                sessionId: typeof session.sessionId === 'string' ? session.sessionId.trim() : '',
+                source,
+                sourceLabel,
+                provider: explicitProvider,
+                updatedAt: session.updatedAt || '',
+                updatedAtMs,
+                updatedAtLabel: formatSessionTimelineTimestamp(session.updatedAt || ''),
+                reason: hasSpecificProvider ? 'provider-only' : 'missing-model',
+                reasonLabel: hasSpecificProvider ? '只写 provider，没写真实 model' : '原始记录里没有模型字段'
+            });
+            if (hasSpecificProvider) {
+                providerOnlySessions += 1;
+                const prev = missingModelProviderMap.get(normalizedExplicitProvider) || {
+                    key: normalizedExplicitProvider,
+                    label: explicitProvider,
+                    count: 0
+                };
+                prev.count += 1;
+                missingModelProviderMap.set(normalizedExplicitProvider, prev);
+            }
         }
 
-        const normalizedTitle = typeof session.title === 'string' && session.title.trim()
-            ? session.title.trim()
-            : (typeof session.sessionId === 'string' && session.sessionId.trim() ? session.sessionId.trim() : '未命名会话');
         const sessionEntry = {
             key: [
                 source,
@@ -340,7 +375,7 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
             ].join(':'),
             title: normalizedTitle,
             source,
-            sourceLabel: source === 'codex' ? 'Codex' : 'Claude Code',
+            sourceLabel,
             cwd,
             messageCount,
             updatedAt: session.updatedAt || '',
@@ -394,11 +429,20 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
         .sort((a, b) => b.updatedAtMs - a.updatedAtMs || b.messageCount - a.messageCount || a.title.localeCompare(b.title, 'zh-Hans-CN'))
         .slice(0, 6);
 
+    const missingModelProviders = [...missingModelProviderMap.values()]
+        .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'zh-Hans-CN'));
+    const missingModelSessionsPreview = [...missingModelSessionMap.values()]
+        .sort((a, b) => b.updatedAtMs - a.updatedAtMs || a.title.localeCompare(b.title, 'zh-Hans-CN'))
+        .slice(0, 5);
+
     const modelCoverage = {
         totalSessions,
         modeledSessions: Math.max(0, totalSessions - missingModelSessions),
         missingModelSessions,
+        providerOnlySessions,
         missingModelSourceTotals,
+        missingModelProviders,
+        missingModelSessionsPreview,
         coveragePercent: totalSessions > 0 ? Math.round(((totalSessions - missingModelSessions) / totalSessions) * 100) : 0
     };
 

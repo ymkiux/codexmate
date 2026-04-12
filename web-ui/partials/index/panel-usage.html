@@ -115,8 +115,38 @@
                                     </div>
                                 </div>
                                 <template v-else>
-                                    <div v-if="sessionUsageCharts.modelCoverage.missingModelSessions > 0" class="usage-inline-note">
+                                    <div v-if="sessionUsageCharts.modelCoverage.providerOnlySessions > 0" class="usage-inline-note">
+                                        还有 {{ sessionUsageCharts.modelCoverage.missingModelSessions }} 个会话没写具体模型名，其中
+                                        <span
+                                            v-for="item in sessionUsageCharts.modelCoverage.missingModelProviders"
+                                            :key="item.key"
+                                            class="usage-inline-tag">
+                                            {{ item.label }} {{ item.count }} 个
+                                        </span>
+                                        属于旧记录只写了 provider、没写真实 model，不能硬编成某个 `gpt-*`。
+                                    </div>
+                                    <div v-else-if="sessionUsageCharts.modelCoverage.missingModelSessions > 0" class="usage-inline-note">
                                         还有 {{ sessionUsageCharts.modelCoverage.missingModelSessions }} 个会话缺少模型名，所以当前列表不是 100% 完整覆盖。
+                                    </div>
+                                    <div v-if="sessionUsageCharts.modelCoverage.missingModelSessionsPreview.length" class="usage-diagnostic-list">
+                                        <div class="usage-diagnostic-list-title">当前仍缺模型名的会话</div>
+                                        <div
+                                            v-for="item in sessionUsageCharts.modelCoverage.missingModelSessionsPreview"
+                                            :key="item.key"
+                                            class="usage-diagnostic-row">
+                                            <div class="usage-diagnostic-row-main">
+                                                <div class="usage-diagnostic-row-title">{{ item.title }}</div>
+                                                <div class="usage-diagnostic-row-meta">
+                                                    <span>{{ item.sourceLabel }}</span>
+                                                    <span v-if="item.sessionId">{{ item.sessionId }}</span>
+                                                    <span v-else-if="item.updatedAtLabel">{{ item.updatedAtLabel }}</span>
+                                                </div>
+                                            </div>
+                                            <div class="usage-diagnostic-row-side">
+                                                <span v-if="item.provider" class="usage-inline-tag">{{ item.provider }}</span>
+                                                <span class="usage-inline-stat">{{ item.reasonLabel }}</span>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="usage-model-list">
                                         <div v-for="item in sessionUsageCharts.usedModels" :key="item.key" class="usage-model-chip" :title="`${item.model} · ${item.count} 会话 · ${item.messageTotal} 消息${item.tokenTotal ? ` · ${item.tokenTotal} token` : ''}`">

@@ -447,6 +447,71 @@
     color: #7a5110;
 }
 
+.usage-inline-tag {
+    display: inline-flex;
+    align-items: center;
+    margin: 0 6px 0 0;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(122, 81, 16, 0.10);
+    border: 1px solid rgba(122, 81, 16, 0.14);
+    color: inherit;
+    font-weight: 700;
+}
+
+.usage-diagnostic-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.usage-diagnostic-list-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+}
+
+.usage-diagnostic-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid var(--color-border-soft);
+    background: var(--color-surface-alt);
+}
+
+.usage-diagnostic-row-main,
+.usage-diagnostic-row-side {
+    min-width: 0;
+}
+
+.usage-diagnostic-row-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.usage-diagnostic-row-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--color-text-secondary);
+}
+
+.usage-diagnostic-row-side {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
 .usage-model-list {
     display: flex;
     flex-wrap: wrap;

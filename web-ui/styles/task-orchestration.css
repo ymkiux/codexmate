@@ -56,31 +56,29 @@
     line-height: 1.65;
 }
 
-.task-hero-stats {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 12px;
-    margin-top: 16px;
-}
-
-.task-hero-stat {
-    padding: 14px;
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.48);
-    border: 1px solid rgba(199, 116, 98, 0.14);
+.task-hero-meta-strip {
     display: flex;
-    flex-direction: column;
-    gap: 4px;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
 }
 
-.task-hero-stat strong {
-    font-size: 22px;
-    color: var(--color-text-primary);
-}
-
-.task-hero-stat span {
-    font-size: 12px;
+.task-hero-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 34px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.56);
+    border: 1px solid rgba(199, 116, 98, 0.14);
     color: var(--color-text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.task-hero-meta strong {
+    color: var(--color-text-primary);
 }
 
 .task-compose-flow-card,
@@ -145,7 +143,14 @@
 .task-template-block {
     padding: 12px 14px;
     background: var(--color-surface-alt);
+}
+
+.task-template-panel {
     margin-bottom: 14px;
+    padding: 12px 14px;
+    border: 1px solid var(--color-border-soft);
+    border-radius: 16px;
+    background: var(--color-surface-alt);
 }
 
 .task-template-chip-group,
@@ -304,12 +309,30 @@
 }
 
 .task-draft-overview,
+.task-draft-inline,
 .task-advanced-panel {
     margin-top: 14px;
     padding: 14px;
     border: 1px solid var(--color-border-soft);
     border-radius: 16px;
     background: var(--color-surface-alt);
+}
+
+.task-draft-inline {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.task-draft-inline-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.task-draft-inline-copy {
+    min-width: 0;
 }
 
 .task-draft-overview-head {
@@ -695,8 +718,7 @@
 
 @media (max-width: 1200px) {
     .task-layout-grid-primary,
-    .task-layout-grid-secondary,
-    .task-hero-stats {
+    .task-layout-grid-secondary {
         grid-template-columns: 1fr;
     }
 }
