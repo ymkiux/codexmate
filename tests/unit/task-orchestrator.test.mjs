@@ -64,6 +64,23 @@ test('buildTaskPlan can map workflow ids onto sequential workflow nodes', () => 
     assert.strictEqual(plan.nodes[1].write, true);
 });
 
+test('buildTaskPlan keeps workflow follow-ups inside the final workflow node payload', () => {
+    const plan = buildTaskPlan({
+        target: '诊断并整理结果',
+        workflowIds: ['diagnose-config', 'safe-provider-switch'],
+        engine: 'workflow',
+        followUps: ['整理结论', '输出建议']
+    }, {
+        workflowCatalog: [
+            { id: 'diagnose-config', name: '诊断配置', readOnly: true },
+            { id: 'safe-provider-switch', name: '安全切换', readOnly: false }
+        ]
+    });
+    assert.strictEqual(plan.nodes.length, 2);
+    assert.strictEqual(plan.nodes.every((node) => node.kind === 'workflow'), true);
+    assert.deepStrictEqual(plan.nodes[1].input.followUps, ['整理结论', '输出建议']);
+});
+
 
 test('validateTaskPlan rejects unknown workflow ids instead of silently falling back', () => {
     const plan = buildTaskPlan({
@@ -124,6 +141,9 @@ test('executeTaskPlan respects dependency blocking and concurrency', async () =>
     assert.deepStrictEqual(callOrder[0], { id: 'inspect', deps: [] });
     assert.ok(callOrder.some((item) => item.id === 'work-a'));
     assert.ok(callOrder.some((item) => item.id === 'work-b'));
+    assert.deepStrictEqual(callOrder.find((item) => item.id === 'work-a')?.deps, ['inspect']);
+    assert.deepStrictEqual(callOrder.find((item) => item.id === 'work-b')?.deps, ['inspect']);
+    assert.deepStrictEqual([...(callOrder.find((item) => item.id === 'verify')?.deps || [])].sort(), ['work-a', 'work-b']);
     assert.strictEqual(run.nodes.find((node) => node.id === 'verify').status, 'success');
 });
 

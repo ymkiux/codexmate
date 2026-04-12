@@ -218,4 +218,6 @@ module.exports = async function testTaskOrchestration(ctx) {
     assert(apiCancelQueued.ok === true, 'second task-queue-add API should succeed');
     const apiCancel = await api('task-cancel', { taskId: apiCancelQueued.task.taskId });
     assert(apiCancel.ok === true, 'task-cancel API should cancel queued task');
+    const canceledTask = await api('task-queue-show', { taskId: apiCancelQueued.task.taskId });
+    assert(canceledTask && canceledTask.status === 'cancelled', 'task-cancel API should mark queued task as cancelled');
 };

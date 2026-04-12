@@ -166,6 +166,7 @@ export function createMainTabsComputed() {
         taskOrchestrationSelectedRunNodes() {
             const detail = this.taskOrchestrationSelectedRun;
             const run = detail && detail.run && typeof detail.run === 'object' ? detail.run : {};
+            if (detail && Array.isArray(detail.nodes)) return detail.nodes;
             return Array.isArray(run.nodes) ? run.nodes : [];
         },
         taskOrchestrationQueueStats() {

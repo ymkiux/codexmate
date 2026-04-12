@@ -410,7 +410,7 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
         }));
 
     const usedModels = [...modelMap.entries()]
-        .sort((a, b) => b[1].count - a[1].count || b[1].tokenTotal - a[1].tokenTotal || a[0].localeCompare(b[0], 'zh-Hans-CN'))
+        .sort((a, b) => b[1].count - a[1].count)
         .map(([modelId, meta]) => {
             const sourceLabels = [...meta.sources]
                 .sort((a, b) => a.localeCompare(b, 'en-US'))

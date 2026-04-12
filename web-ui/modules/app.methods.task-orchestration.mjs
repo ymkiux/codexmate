@@ -149,11 +149,6 @@ export function createTaskOrchestrationMethods(options = {}) {
                 state.runs = Array.isArray(res && res.runs) ? res.runs : [];
                 state.overviewWarnings = Array.isArray(res && res.warnings) ? res.warnings : [];
                 state.lastLoadedAt = new Date().toISOString();
-                if (state.selectedRunId && !state.runs.some((item) => item && item.runId === state.selectedRunId)) {
-                    state.selectedRunId = '';
-                    state.selectedRunDetail = null;
-                    state.selectedRunError = '';
-                }
                 if (!state.selectedRunId && state.runs.length > 0) {
                     state.selectedRunId = state.runs[0].runId || '';
                 }
@@ -308,7 +303,9 @@ export function createTaskOrchestrationMethods(options = {}) {
             state.detailRequestToken = requestToken;
             state.selectedRunLoading = true;
             state.selectedRunId = normalizedRunId;
-            state.workspaceTab = 'detail';
+            if (options.switchToDetail === true || !options.silent) {
+                state.workspaceTab = 'detail';
+            }
             state.selectedRunError = '';
             if (previousRunId !== normalizedRunId) {
                 state.selectedRunDetail = null;
@@ -348,7 +345,7 @@ export function createTaskOrchestrationMethods(options = {}) {
         },
 
         async selectTaskRun(runId) {
-            return this.loadTaskRunDetail(runId, { silent: false });
+            return this.loadTaskRunDetail(runId, { silent: false, switchToDetail: true });
         },
 
         async retryTaskRunFromUi(runId) {

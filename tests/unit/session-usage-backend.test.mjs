@@ -299,12 +299,19 @@ test('listSessionUsage backfills missing model metadata from parsed session summ
 test('listSessionUsage scans the full session file so middle model names are not dropped', async () => {
     const tempDir = fs.mkdtempSync(path.join(__dirname, 'tmp-session-model-scan-'));
     const filePath = path.join(tempDir, 'codex-middle.jsonl');
+    const fillerLine = JSON.stringify({
+        timestamp: '2026-04-12T09:07:40.000Z',
+        type: 'log',
+        payload: { message: 'x'.repeat(256) }
+    });
+    const fillerLines = Array.from({ length: 320 }, () => fillerLine);
     fs.writeFileSync(filePath, [
         JSON.stringify({
             timestamp: '2026-04-12T09:07:24.127Z',
             type: 'session_meta',
             payload: { id: 'codex-middle', cwd: '/repo' }
         }),
+        ...fillerLines,
         JSON.stringify({
             timestamp: '2026-04-12T09:08:00.000Z',
             type: 'turn_context',
@@ -316,6 +323,7 @@ test('listSessionUsage scans the full session file so middle model names are not
             payload: { info: { model_name: 'gpt-5.2-codex' } }
         })
     ].join('\n'));
+    assert(fs.statSync(filePath).size > 65536, 'fixture should exceed head-read window');
 
     const codexParses = [];
     const listSessionUsage = instantiateListSessionUsage({

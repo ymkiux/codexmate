@@ -813,10 +813,10 @@ test('buildUsageChartGroups keeps all used model names for the selected range', 
 
     assert.deepStrictEqual(
         result.usedModels.map((item) => item.model),
-        ['claude-sonnet-4', 'gpt-5.3-codex', 'gpt-5.1-codex-max']
+        ['gpt-5.3-codex', 'claude-sonnet-4', 'gpt-5.1-codex-max']
     );
-    assert.deepStrictEqual(result.usedModels[0].sourceLabels, ['Claude Code']);
-    assert.deepStrictEqual(result.usedModels[1].sourceLabels, ['Codex']);
+    assert.deepStrictEqual(result.usedModels[0].sourceLabels, ['Codex']);
+    assert.deepStrictEqual(result.usedModels[1].sourceLabels, ['Claude Code']);
     assert.strictEqual(result.modelCoverage.totalSessions, 4);
     assert.strictEqual(result.modelCoverage.modeledSessions, 3);
     assert.strictEqual(result.modelCoverage.missingModelSessions, 1);
@@ -887,7 +887,7 @@ test('buildUsageChartGroups collects every model name from session model arrays 
 
     assert.deepStrictEqual(
         result.usedModels.map((item) => item.model),
-        ['gpt-5.2-codex', 'gpt-5.3-codex', 'gpt-5.1-codex-max']
+        ['gpt-5.3-codex', 'gpt-5.2-codex', 'gpt-5.1-codex-max']
     );
     assert.strictEqual(result.modelCoverage.totalSessions, 2);
     assert.strictEqual(result.modelCoverage.modeledSessions, 2);
@@ -1549,6 +1549,22 @@ test('ensureTaskOrchestrationState backfills missing workbench fields on existin
     assert.deepStrictEqual(state.overviewWarnings, []);
 });
 
+test('taskOrchestrationSelectedRunNodes prefers top-level detail nodes when present', () => {
+    const computed = createMainTabsComputed();
+    const context = {
+        taskOrchestrationSelectedRun: {
+            run: {
+                nodes: [{ id: 'run-node' }]
+            },
+            nodes: [{ id: 'detail-node' }]
+        }
+    };
+
+    const nodes = computed.taskOrchestrationSelectedRunNodes.call(context);
+
+    assert.deepStrictEqual(nodes, [{ id: 'detail-node' }]);
+});
+
 test('taskOrchestrationQueueStats counts queue statuses in one pass without changing totals', () => {
     const computed = createMainTabsComputed();
     const context = {
@@ -1604,6 +1620,37 @@ test('startTaskQueueRunner surfaces already-running queue state distinctly', asy
     ]);
 });
 
+test('loadTaskOrchestrationOverview keeps selected run detail when overview slice omits it', async () => {
+    const methods = createTaskOrchestrationMethods({
+        api: async (name) => {
+            if (name === 'task-overview') {
+                return {
+                    runs: [{ runId: 'run-new', status: 'running' }],
+                    queue: [],
+                    workflows: [],
+                    warnings: []
+                };
+            }
+            throw new Error(`unexpected api call: ${name}`);
+        }
+    });
+    const context = {
+        ensureTaskOrchestrationState: methods.ensureTaskOrchestrationState,
+        loadTaskRunDetail: async () => null,
+        isTaskRunActive: () => false,
+        showMessage() {},
+        syncTaskOrchestrationPolling() {}
+    };
+    context.taskOrchestration = methods.ensureTaskOrchestrationState.call(context);
+    context.taskOrchestration.selectedRunId = 'run-old';
+    context.taskOrchestration.selectedRunDetail = { run: { runId: 'run-old', status: 'success' }, nodes: [{ id: 'kept' }] };
+
+    await methods.loadTaskOrchestrationOverview.call(context, { silent: true, includeDetail: false });
+
+    assert.strictEqual(context.taskOrchestration.selectedRunId, 'run-old');
+    assert.strictEqual(context.taskOrchestration.selectedRunDetail.run.runId, 'run-old');
+});
+
 test('selectTaskRun switches workbench to detail and keeps latest detail response only', async () => {
     const deferred = [];
     const api = async (name, payload) => {
@@ -1620,13 +1667,15 @@ test('selectTaskRun switches workbench to detail and keeps latest detail respons
     const methods = createTaskOrchestrationMethods({ api });
     const context = {
         ensureTaskOrchestrationState: methods.ensureTaskOrchestrationState,
+        loadTaskRunDetail: methods.loadTaskRunDetail,
+        selectTaskRun: methods.selectTaskRun,
         showMessage() {},
         syncTaskOrchestrationPolling() {}
     };
     context.taskOrchestration = methods.ensureTaskOrchestrationState.call(context);
 
-    const firstRequest = methods.loadTaskRunDetail.call(context, 'run-1', { silent: true });
-    const secondRequest = methods.loadTaskRunDetail.call(context, 'run-2', { silent: true });
+    const firstRequest = methods.selectTaskRun.call(context, 'run-1');
+    const secondRequest = methods.selectTaskRun.call(context, 'run-2');
 
     assert.strictEqual(context.taskOrchestration.workspaceTab, 'detail');
     assert.strictEqual(context.taskOrchestration.selectedRunId, 'run-2');
