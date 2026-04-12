@@ -45,7 +45,9 @@ const {
     buildModelProbeSpec,
     buildModelConversationSpecs,
     extractModelResponseText,
-    normalizeWireApi
+    normalizeWireApi,
+    getSupplementalModelsForBaseUrl,
+    mergeModelCatalog
 } = require('./lib/cli-models-utils');
 const {
     probeUrl,
@@ -1296,8 +1298,17 @@ async function fetchModelsFromBaseUrl(baseUrl, apiKey) {
 
     const promise = (async () => {
         const result = await fetchModelsFromBaseUrlCore(baseUrl, apiKey);
-        writeModelsCacheEntry(cacheKey, result);
-        return result;
+        const supplementalModels = getSupplementalModelsForBaseUrl(baseUrl);
+        const mergedModels = mergeModelCatalog(result && Array.isArray(result.models) ? result.models : [], supplementalModels);
+        const finalResult = mergedModels.length > 0
+            ? {
+                models: mergedModels,
+                unlimited: false,
+                source: (result && result.error) ? 'catalog' : (result && result.source ? result.source : 'catalog')
+            }
+            : result;
+        writeModelsCacheEntry(cacheKey, finalResult);
+        return finalResult;
     })();
 
     g_modelsInFlight.set(cacheKey, promise);
