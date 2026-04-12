@@ -82,6 +82,9 @@ const {
     createConfigBootstrapController
 } = require('./cli/config-bootstrap');
 const {
+    createAgentsFileController
+} = require('./cli/agents-files');
+const {
     createArchiveHelperController
 } = require('./cli/archive-helpers');
 const {
@@ -1402,26 +1405,6 @@ async function fetchProviderModels(providerName, overrides = {}) {
     return { models: res.models || [], provider: targetProvider, unlimited: false };
 }
 
-function resolveAgentsFilePath(params = {}) {
-    const baseDir = typeof params.baseDir === 'string' && params.baseDir.trim()
-        ? params.baseDir.trim()
-        : CONFIG_DIR;
-    return path.join(baseDir, AGENTS_FILE_NAME);
-}
-
-function validateAgentsBaseDir(filePath) {
-    const dirPath = path.dirname(filePath);
-    try {
-        const stat = fs.statSync(dirPath);
-        if (!stat.isDirectory()) {
-            return { error: `目标不是目录: ${dirPath}` };
-        }
-    } catch (e) {
-        return { error: `目标目录不存在: ${dirPath}` };
-    }
-    return { ok: true, dirPath };
-}
-
 function normalizeCodexSkillName(name) {
     const value = typeof name === 'string' ? name.trim() : '';
     if (!value) {
@@ -2430,105 +2413,32 @@ function deleteCodexSkills(params = {}) {
     return deleteSkills({ ...(params || {}), targetApp: 'codex' });
 }
 
-function readAgentsFile(params = {}) {
-    const filePath = resolveAgentsFilePath(params);
-    const dirCheck = validateAgentsBaseDir(filePath);
-    if (dirCheck.error) {
-        return { error: dirCheck.error };
+// buildAgentsDiff keeps the metaOnly optimization inside cli/agents-files.js.
+const {
+    resolveAgentsFilePath,
+    validateAgentsBaseDir,
+    readAgentsFile,
+    applyAgentsFile,
+    normalizeDiffText,
+    buildAgentsDiff
+} = createAgentsFileController({
+    fs,
+    path,
+    os,
+    stripUtf8Bom,
+    detectLineEnding,
+    normalizeLineEnding,
+    ensureUtf8Bom,
+    buildLineDiff,
+    CONFIG_DIR,
+    AGENTS_FILE_NAME,
+    readOpenclawAgentsFile() {
+        return readOpenclawAgentsFile(...arguments);
+    },
+    readOpenclawWorkspaceFile() {
+        return readOpenclawWorkspaceFile(...arguments);
     }
-
-    if (!fs.existsSync(filePath)) {
-        return {
-            exists: false,
-            path: filePath,
-            content: '',
-            lineEnding: os.EOL === '\r\n' ? '\r\n' : '\n'
-        };
-    }
-
-    if (params.metaOnly) {
-        return {
-            exists: true,
-            path: filePath,
-            content: '',
-            lineEnding: os.EOL === '\r\n' ? '\r\n' : '\n'
-        };
-    }
-
-    try {
-        const raw = fs.readFileSync(filePath, 'utf-8');
-        return {
-            exists: true,
-            path: filePath,
-            content: stripUtf8Bom(raw),
-            lineEnding: detectLineEnding(raw)
-        };
-    } catch (e) {
-        return { error: `读取 AGENTS.md 失败: ${e.message}` };
-    }
-}
-
-function applyAgentsFile(params = {}) {
-    const filePath = resolveAgentsFilePath(params);
-    const dirCheck = validateAgentsBaseDir(filePath);
-    if (dirCheck.error) {
-        return { error: dirCheck.error };
-    }
-
-    const content = typeof params.content === 'string' ? params.content : '';
-    const lineEnding = params.lineEnding === '\r\n' ? '\r\n' : '\n';
-    const normalized = normalizeLineEnding(content, lineEnding);
-    const finalContent = ensureUtf8Bom(normalized);
-
-    try {
-        fs.writeFileSync(filePath, finalContent, 'utf-8');
-        return { success: true, path: filePath };
-    } catch (e) {
-        return { error: `写入 AGENTS.md 失败: ${e.message}` };
-    }
-}
-
-function normalizeDiffText(input) {
-    const safe = typeof input === 'string' ? input : '';
-    return normalizeLineEnding(stripUtf8Bom(safe), '\n');
-}
-
-function buildAgentsDiff(params = {}) {
-    const hasBaseContent = typeof params.baseContent === 'string';
-    const contextRaw = typeof params.context === 'string' ? params.context.trim() : '';
-    const context = contextRaw || 'codex';
-    const metaOnly = hasBaseContent;
-    let readResult;
-    if (context === 'openclaw') {
-        readResult = readOpenclawAgentsFile({ metaOnly });
-    } else if (context === 'openclaw-workspace') {
-        readResult = readOpenclawWorkspaceFile({ ...params, metaOnly });
-    } else if (context === 'codex') {
-        readResult = readAgentsFile({ ...params, metaOnly });
-    } else {
-        return { error: `Unsupported agents diff context: ${context}` };
-    }
-    if (readResult && readResult.error) {
-        return { error: readResult.error };
-    }
-
-    const beforeText = normalizeDiffText(
-        hasBaseContent ? params.baseContent : (readResult && readResult.content ? readResult.content : '')
-    );
-    const afterText = normalizeDiffText(params.content);
-    const diff = buildLineDiff(beforeText, afterText);
-    const hasChanges = diff.truncated ? beforeText !== afterText : (diff.stats.added > 0 || diff.stats.removed > 0);
-    return {
-        diff: {
-            ...diff,
-            hasChanges
-        },
-        path: readResult && readResult.path ? readResult.path : '',
-        exists: !!(readResult && readResult.exists),
-        context,
-        configError: readResult && readResult.configError ? readResult.configError : ''
-    };
-}
+});
 
 const {
     readOpenclawConfigFile,
