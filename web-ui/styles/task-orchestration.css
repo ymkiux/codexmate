@@ -69,8 +69,9 @@
 .task-action-row {
     margin-top: 14px;
     align-items: center;
-    justify-content: space-between;
-    flex-wrap: nowrap;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 10px;
     overflow-x: auto;
     overflow-y: hidden;
     padding-bottom: 2px;
@@ -96,10 +97,9 @@
     display: flex;
     flex: 0 0 auto;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: flex-start;
     gap: 10px;
     flex-wrap: nowrap;
-    margin-left: auto;
 }
 
 .task-action-row-right > .btn-tool {
@@ -316,5 +316,6 @@
 
     .task-action-row-right {
         justify-content: flex-start;
+        flex-wrap: wrap;
     }
 }
