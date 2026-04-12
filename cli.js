@@ -82,6 +82,12 @@ const {
     createConfigBootstrapController
 } = require('./cli/config-bootstrap');
 const {
+    createArchiveHelperController
+} = require('./cli/archive-helpers');
+const {
+    createZipCommandController
+} = require('./cli/zip-commands');
+const {
     readBundledWebUiCss,
     readBundledWebUiHtml,
     readExecutableBundledJavaScriptModule,
@@ -2599,6 +2605,61 @@ const {
     CODEXMATE_MANAGED_MARKER,
     BUILTIN_PROXY_PROVIDER_NAME,
     EMPTY_CONFIG_FALLBACK_TEMPLATE
+});
+
+const {
+    resolveZipTool,
+    resolveUnzipTool,
+    zipWithLibrary,
+    unzipWithLibrary,
+    copyDirRecursive,
+    inspectZipArchiveLimits,
+    writeUploadZipStream,
+    writeUploadZip,
+    extractUploadZip,
+    findConfigSourceDir,
+    prepareDirectoryDownload,
+    backupDirectoryIfExists,
+    restoreConfigDirectoryFromUpload
+} = createArchiveHelperController({
+    fs,
+    path,
+    os,
+    execSync,
+    zipLib,
+    yauzl,
+    ensureDir,
+    isPathInside,
+    commandExists,
+    MAX_UPLOAD_SIZE,
+    MAX_SKILLS_ZIP_UPLOAD_SIZE,
+    MAX_SKILLS_ZIP_ENTRY_COUNT,
+    MAX_SKILLS_ZIP_UNCOMPRESSED_BYTES
+});
+
+const {
+    cmdZip,
+    cmdUnzip,
+    cmdUnzipExt,
+    splitExtractSuffixInput,
+    parseZipCommandArgs,
+    parseUnzipExtCommandArgs
+} = createZipCommandController({
+    fs,
+    path,
+    execSync,
+    process,
+    yauzl,
+    formatTimestampForFileName,
+    inspectZipArchiveLimits,
+    resolveZipTool,
+    resolveUnzipTool,
+    zipWithLibrary,
+    unzipWithLibrary,
+    DEFAULT_EXTRACT_SUFFIXES,
+    MAX_SKILLS_ZIP_ENTRY_COUNT,
+    MAX_SKILLS_ZIP_UNCOMPRESSED_BYTES,
+    ensureDir
 });
 
 async function buildConfigHealthReport(params = {}) {
@@ -8040,384 +8101,18 @@ function resolveDownloadArtifact(tokenOrFileName, options = {}) {
 
 // API: 打包 Claude 配置目录（系统 zip 可用则使用，否则回退 zip-lib）
 async function prepareClaudeDirDownload() {
-    try {
-        if (!fs.existsSync(CLAUDE_DIR)) {
-            return { error: 'Claude 配置目录不存在', path: CLAUDE_DIR };
-        }
-
-        const tempDir = os.tmpdir();
-        const timestamp = Date.now();
-        const zipFileName = `claude-config-${timestamp}.zip`;
-        const zipFilePath = path.join(tempDir, zipFileName);
-
-        const zipTool = resolveZipTool();
-        if (zipTool.type === 'zip') {
-            const cmd = `"${zipTool.cmd}" -0 -q -r "${zipFilePath}" "${CLAUDE_DIR}"`;
-            execSync(cmd, { stdio: 'ignore' });
-        } else {
-            await zipLib.archiveFolder(CLAUDE_DIR, zipFilePath);
-        }
-
-        return {
-            success: true,
-            downloadPath: zipFilePath,
-            fileName: zipFileName,
-            sourcePath: CLAUDE_DIR
-        };
-    } catch (e) {
-        return { error: `打包失败：${e.message}` };
-    }
+    return await prepareDirectoryDownload(CLAUDE_DIR, {
+        missingMessage: 'Claude 配置目录不存在',
+        fileNamePrefix: 'claude-config'
+    });
 }
 
 // API: 打包 Codex 配置目录（同策略）
 async function prepareCodexDirDownload() {
-    try {
-        if (!fs.existsSync(CONFIG_DIR)) {
-            return { error: 'Codex 配置目录不存在', path: CONFIG_DIR };
-        }
-
-        const tempDir = os.tmpdir();
-        const timestamp = Date.now();
-        const zipFileName = `${CODEX_BACKUP_NAME}-${timestamp}.zip`;
-        const zipFilePath = path.join(tempDir, zipFileName);
-
-        const zipTool = resolveZipTool();
-        if (zipTool.type === 'zip') {
-            const cmd = `"${zipTool.cmd}" -0 -q -r "${zipFilePath}" "${CONFIG_DIR}"`;
-            execSync(cmd, { stdio: 'ignore' });
-        } else {
-            await zipLib.archiveFolder(CONFIG_DIR, zipFilePath);
-        }
-
-        return {
-            success: true,
-            downloadPath: zipFilePath,
-            fileName: zipFileName,
-            sourcePath: CONFIG_DIR
-        };
-    } catch (e) {
-        return { error: `打包失败：${e.message}` };
-    }
-}
-
-function copyDirRecursive(srcDir, destDir, options = {}) {
-    const dereferenceSymlinks = !!(options && options.dereferenceSymlinks);
-    const allowedRootRealPath = (options && typeof options.allowedRootRealPath === 'string')
-        ? options.allowedRootRealPath
-        : '';
-    const visitedRealPaths = options && options.visitedRealPaths instanceof Set
-        ? options.visitedRealPaths
-        : new Set();
-    const childOptions = {
-        ...options,
-        dereferenceSymlinks,
-        allowedRootRealPath,
-        visitedRealPaths
-    };
-    ensureDir(destDir);
-    const entries = fs.readdirSync(srcDir, { withFileTypes: true });
-    for (const entry of entries) {
-        const srcPath = path.join(srcDir, entry.name);
-        const destPath = path.join(destDir, entry.name);
-        if (entry.isDirectory()) {
-            if (!dereferenceSymlinks) {
-                copyDirRecursive(srcPath, destPath, childOptions);
-                continue;
-            }
-            const realPath = fs.realpathSync(srcPath);
-            if (allowedRootRealPath && !isPathInside(realPath, allowedRootRealPath)) {
-                throw new Error(`symlink escapes skill root: ${srcPath}`);
-            }
-            if (visitedRealPaths.has(realPath)) {
-                continue;
-            }
-            visitedRealPaths.add(realPath);
-            try {
-                copyDirRecursive(srcPath, destPath, childOptions);
-            } finally {
-                visitedRealPaths.delete(realPath);
-            }
-        } else if (entry.isSymbolicLink()) {
-            if (dereferenceSymlinks) {
-                const realPath = fs.realpathSync(srcPath);
-                if (allowedRootRealPath && !isPathInside(realPath, allowedRootRealPath)) {
-                    throw new Error(`symlink escapes skill root: ${srcPath}`);
-                }
-                const realStat = fs.statSync(realPath);
-                if (realStat.isDirectory()) {
-                    if (visitedRealPaths.has(realPath)) {
-                        continue;
-                    }
-                    visitedRealPaths.add(realPath);
-                    try {
-                        copyDirRecursive(realPath, destPath, childOptions);
-                    } finally {
-                        visitedRealPaths.delete(realPath);
-                    }
-                } else {
-                    fs.copyFileSync(realPath, destPath);
-                }
-            } else {
-                const target = fs.readlinkSync(srcPath);
-                fs.symlinkSync(target, destPath);
-            }
-        } else {
-            fs.copyFileSync(srcPath, destPath);
-        }
-    }
-}
-
-function inspectZipArchiveLimits(zipPath, options = {}) {
-    const maxEntryCount = Number.isFinite(options.maxEntryCount) && options.maxEntryCount > 0
-        ? Math.floor(options.maxEntryCount)
-        : MAX_SKILLS_ZIP_ENTRY_COUNT;
-    const maxUncompressedBytes = Number.isFinite(options.maxUncompressedBytes) && options.maxUncompressedBytes > 0
-        ? Math.floor(options.maxUncompressedBytes)
-        : MAX_SKILLS_ZIP_UNCOMPRESSED_BYTES;
-
-    return new Promise((resolve, reject) => {
-        yauzl.open(zipPath, { lazyEntries: true, autoClose: true }, (openErr, zipFile) => {
-            if (openErr) {
-                reject(openErr);
-                return;
-            }
-            if (!zipFile) {
-                reject(new Error('无法读取 ZIP 文件'));
-                return;
-            }
-            let entryCount = 0;
-            let totalUncompressedBytes = 0;
-            let settled = false;
-            const finish = (err, data) => {
-                if (settled) return;
-                settled = true;
-                try {
-                    zipFile.close();
-                } catch (_) {}
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(data);
-                }
-            };
-
-            zipFile.on('entry', (entry) => {
-                if (settled) return;
-                entryCount += 1;
-                const entrySize = Number.isFinite(entry.uncompressedSize) ? entry.uncompressedSize : 0;
-                totalUncompressedBytes += entrySize;
-                if (entryCount > maxEntryCount) {
-                    finish(new Error(`压缩包条目过多（>${maxEntryCount}）`));
-                    return;
-                }
-                if (totalUncompressedBytes > maxUncompressedBytes) {
-                    finish(new Error(`压缩包解压总大小超限（>${Math.floor(maxUncompressedBytes / 1024 / 1024)}MB）`));
-                    return;
-                }
-                zipFile.readEntry();
-            });
-
-            zipFile.on('end', () => {
-                finish(null, { entryCount, totalUncompressedBytes });
-            });
-
-            zipFile.on('error', (zipErr) => {
-                finish(zipErr);
-            });
-
-            zipFile.readEntry();
-        });
+    return await prepareDirectoryDownload(CONFIG_DIR, {
+        missingMessage: 'Codex 配置目录不存在',
+        fileNamePrefix: CODEX_BACKUP_NAME
     });
-}
-
-function writeUploadZipStream(req, prefix, originalName = '', maxSize = MAX_SKILLS_ZIP_UPLOAD_SIZE) {
-    return new Promise((resolve, reject) => {
-        const lengthHeader = parseInt(req.headers['content-length'] || '0', 10);
-        if (Number.isFinite(lengthHeader) && lengthHeader > maxSize) {
-            reject(new Error(`备份文件过大（>${Math.floor(maxSize / 1024 / 1024)}MB）`));
-            return;
-        }
-
-        const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-`));
-        const rawName = originalName && typeof originalName === 'string' ? originalName : `${prefix}.zip`;
-        const fileName = path.basename(rawName);
-        const zipPath = path.join(tempDir, fileName.toLowerCase().endsWith('.zip') ? fileName : `${fileName}.zip`);
-        const stream = fs.createWriteStream(zipPath);
-        let bytesWritten = 0;
-        let settled = false;
-        let hasContent = false;
-
-        const fail = (err) => {
-            if (settled) return;
-            settled = true;
-            try {
-                stream.destroy();
-            } catch (_) {}
-            try {
-                fs.rmSync(tempDir, { recursive: true, force: true });
-            } catch (_) {}
-            reject(err);
-        };
-
-        const done = () => {
-            if (settled) return;
-            settled = true;
-            if (!hasContent || bytesWritten <= 0) {
-                try {
-                    fs.rmSync(tempDir, { recursive: true, force: true });
-                } catch (_) {}
-                reject(new Error('备份文件为空'));
-                return;
-            }
-            resolve({ tempDir, zipPath });
-        };
-
-        req.on('error', (err) => fail(err));
-        req.on('aborted', () => fail(new Error('上传已中断')));
-        req.on('close', () => {
-            if (!settled && !req.complete) {
-                fail(new Error('上传已中断'));
-            }
-        });
-        stream.on('error', (err) => fail(err));
-        req.on('data', (chunk) => {
-            if (settled) return;
-            hasContent = true;
-            bytesWritten += chunk.length;
-            if (bytesWritten > maxSize) {
-                fail(new Error(`备份文件过大（>${Math.floor(maxSize / 1024 / 1024)}MB）`));
-                try {
-                    req.destroy();
-                } catch (_) {}
-                return;
-            }
-            stream.write(chunk);
-        });
-        req.on('end', () => {
-            if (settled) return;
-            stream.end(() => done());
-        });
-    });
-}
-
-function writeUploadZip(base64, prefix, originalName = '') {
-    let buffer;
-    try {
-        buffer = Buffer.from(base64 || '', 'base64');
-    } catch (e) {
-        return { error: '备份文件内容不是有效的 base64 编码' };
-    }
-
-    if (!buffer || buffer.length === 0) {
-        return { error: '备份文件为空' };
-    }
-
-    if (buffer.length > MAX_UPLOAD_SIZE) {
-        return { error: `备份文件过大（>${Math.floor(MAX_UPLOAD_SIZE / 1024 / 1024)}MB）` };
-    }
-
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-`));
-    const fileName = path.basename(originalName && typeof originalName === 'string' ? originalName : `${prefix}.zip`);
-    const zipPath = path.join(tempDir, fileName.toLowerCase().endsWith('.zip') ? fileName : `${fileName}.zip`);
-    fs.writeFileSync(zipPath, buffer);
-    return { tempDir, zipPath };
-}
-
-async function extractUploadZip(zipPath, extractDir) {
-    const unzipTool = resolveUnzipTool();
-    ensureDir(extractDir);
-    await unzipWithLibrary(zipPath, extractDir);
-}
-
-function findConfigSourceDir(extractedDir, markerDirName, requiredFileName) {
-    const markerPath = path.join(extractedDir, markerDirName);
-    if (fs.existsSync(markerPath) && fs.statSync(markerPath).isDirectory()) {
-        return markerPath;
-    }
-
-    const entries = fs.readdirSync(extractedDir, { withFileTypes: true }).filter((item) => item.isDirectory());
-    if (entries.length === 1) {
-        const onlyDir = path.join(extractedDir, entries[0].name);
-        const nestedMarker = path.join(onlyDir, markerDirName);
-        if (fs.existsSync(nestedMarker) && fs.statSync(nestedMarker).isDirectory()) {
-            return nestedMarker;
-        }
-        if (fs.existsSync(path.join(onlyDir, requiredFileName))) {
-            return onlyDir;
-        }
-    }
-
-    if (fs.existsSync(path.join(extractedDir, requiredFileName))) {
-        return extractedDir;
-    }
-
-    return extractedDir;
-}
-
-async function backupDirectoryIfExists(dirPath, prefix) {
-    if (!fs.existsSync(dirPath)) {
-        return { backupPath: '' };
-    }
-
-    const tempDir = os.tmpdir();
-    const timestamp = Date.now();
-    const zipFileName = `${prefix}-${timestamp}.zip`;
-    const zipFilePath = path.join(tempDir, zipFileName);
-    const zipTool = resolveZipTool();
-
-    try {
-        if (zipTool.type === 'zip') {
-            const cmd = `"${zipTool.cmd}" -0 -q -r "${zipFilePath}" "${dirPath}"`;
-            execSync(cmd, { stdio: 'ignore' });
-        } else {
-            await zipLib.archiveFolder(dirPath, zipFilePath);
-        }
-        return { backupPath: zipFilePath, fileName: zipFileName };
-    } catch (e) {
-        return { backupPath: '', warning: `备份失败: ${e.message}` };
-    }
-}
-
-async function restoreConfigDirectoryFromUpload(payload, options) {
-    const { targetDir, requiredFileName, markerDirName, tempPrefix, backupPrefix } = options;
-    if (!payload || typeof payload.fileBase64 !== 'string' || !payload.fileBase64.trim()) {
-        return { error: '缺少备份文件内容' };
-    }
-
-    const upload = writeUploadZip(payload.fileBase64, tempPrefix, payload.fileName);
-    if (upload.error) {
-        return { error: upload.error };
-    }
-
-    const tempDir = upload.tempDir;
-    const extractDir = path.join(tempDir, 'extract');
-    let backupPath = '';
-    try {
-        await extractUploadZip(upload.zipPath, extractDir);
-        const sourceDir = findConfigSourceDir(extractDir, markerDirName, requiredFileName);
-        const requiredPath = path.join(sourceDir, requiredFileName);
-        if (!fs.existsSync(requiredPath)) {
-            return { error: `无效备份，缺少 ${requiredFileName}` };
-        }
-
-        const backupResult = await backupDirectoryIfExists(targetDir, backupPrefix);
-        backupPath = backupResult.backupPath || '';
-
-        fs.rmSync(targetDir, { recursive: true, force: true });
-        copyDirRecursive(sourceDir, targetDir);
-
-        return {
-            success: true,
-            targetDir,
-            appliedFrom: payload.fileName || '',
-            backupPath,
-            backupWarning: backupResult.warning || ''
-        };
-    } catch (e) {
-        return { error: `导入失败：${e.message}` };
-    } finally {
-        fs.rmSync(tempDir, { recursive: true, force: true });
-    }
 }
 
 async function restoreClaudeDir(payload) {
@@ -8674,467 +8369,6 @@ function buildInstallStatusReport() {
     };
 }
 
-const ZIP_PATHS = [
-    'zip'
-];
-
-function findZipExecutable() {
-    for (const candidate of ZIP_PATHS) {
-        try {
-            if (candidate === 'zip') {
-                if (commandExists('zip', '--help')) {
-                    return 'zip';
-                }
-            } else if (fs.existsSync(candidate)) {
-                return candidate;
-            }
-        } catch (e) {}
-    }
-    return null;
-}
-
-function resolveZipTool() {
-    const zipExe = findZipExecutable();
-    if (zipExe) {
-        return { type: 'zip', cmd: zipExe };
-    }
-    return { type: 'lib', cmd: 'zip-lib' };
-}
-
-function resolveUnzipTool() {
-    return { type: 'lib', cmd: 'zip-lib' };
-}
-
-async function zipWithLibrary(absPath, outputPath) {
-    const stat = fs.lstatSync(absPath);
-    if (stat.isDirectory()) {
-        await zipLib.archiveFolder(absPath, outputPath);
-        return;
-    }
-    await zipLib.archiveFile(absPath, outputPath);
-}
-
-async function unzipWithLibrary(zipPath, outputDir) {
-    await zipLib.extract(zipPath, outputDir);
-}
-
-// 压缩（系统 zip 优先，其次 zip-lib）
-async function cmdZip(targetPath, options = {}) {
-    if (!targetPath) {
-        console.error('用法: codexmate zip <文件或文件夹路径> [--max:压缩级别]');
-        console.log('\n示例:');
-        console.log('  codexmate zip ./myproject');
-        console.log('  codexmate zip ./myproject --max:9');
-        console.log('  codexmate zip D:/data/folder --max:1');
-        console.log('\n压缩级别: 0(仅存储) ~ 9(极限压缩), 默认: 5');
-        process.exit(1);
-    }
-
-    const absPath = path.resolve(targetPath);
-    if (!fs.existsSync(absPath)) {
-        console.error('错误: 路径不存在:', absPath);
-        process.exit(1);
-    }
-
-    const compressionLevel = options.max !== undefined ? options.max : 5;
-    if (compressionLevel < 0 || compressionLevel > 9) {
-        console.error('错误: 压缩级别必须在 0-9 之间');
-        process.exit(1);
-    }
-
-    // 生成输出文件名
-    const baseName = path.basename(absPath);
-    const outputDir = path.dirname(absPath);
-    const outputPath = path.join(outputDir, `${baseName}.zip`);
-
-    const zipTool = resolveZipTool();
-    const useZipCmd = zipTool.type === 'zip';
-
-    console.log('\n压缩配置:');
-    console.log('  源路径:', absPath);
-    console.log('  输出文件:', outputPath);
-    console.log('  压缩工具:', useZipCmd ? '系统 zip' : 'zip-lib');
-    if (useZipCmd) {
-        console.log('  压缩级别:', compressionLevel);
-    } else {
-        console.log('  压缩级别: 固定（zip-lib 不支持 --max，已忽略）');
-    }
-    console.log('\n开始压缩...\n');
-
-    try {
-        if (useZipCmd) {
-            const cmd = `"${zipTool.cmd}" -${compressionLevel} -q -r "${outputPath}" "${absPath}"`;
-            execSync(cmd, { stdio: 'ignore' });
-        } else {
-            await zipWithLibrary(absPath, outputPath);
-        }
-
-        console.log('✓ 压缩完成!');
-        console.log('  输出文件:', outputPath);
-        console.log();
-    } catch (e) {
-        console.error('压缩失败:', e.message);
-        process.exit(1);
-    }
-}
-
-// 解压（zip-lib）
-async function cmdUnzip(zipPath, outputDir) {
-    if (!zipPath) {
-        console.error('用法: codexmate unzip <zip文件路径> [输出目录]');
-        console.log('\n示例:');
-        console.log('  codexmate unzip ./archive.zip');
-        console.log('  codexmate unzip ./archive.zip ./output');
-        console.log('  codexmate unzip D:/data/file.zip D:/extracted');
-        process.exit(1);
-    }
-
-    const absZipPath = path.resolve(zipPath);
-    if (!fs.existsSync(absZipPath)) {
-        console.error('错误: 文件不存在:', absZipPath);
-        process.exit(1);
-    }
-
-    if (!absZipPath.toLowerCase().endsWith('.zip')) {
-        console.error('错误: 仅支持 .zip 文件');
-        process.exit(1);
-    }
-
-    // 默认输出目录：zip文件同级目录下同名文件夹
-    const baseName = path.basename(absZipPath, '.zip');
-    const defaultOutputDir = path.join(path.dirname(absZipPath), baseName);
-    const absOutputDir = outputDir ? path.resolve(outputDir) : defaultOutputDir;
-
-    const unzipTool = resolveUnzipTool();
-
-    console.log('\n解压配置:');
-    console.log('  源文件:', absZipPath);
-    console.log('  输出目录:', absOutputDir);
-    console.log('  解压工具:', 'zip-lib');
-    console.log('\n开始解压...\n');
-
-    try {
-        await unzipWithLibrary(absZipPath, absOutputDir);
-        console.log('✓ 解压完成!');
-        console.log('  输出目录:', absOutputDir);
-        console.log();
-    } catch (e) {
-        console.error('解压失败:', e.message);
-        process.exit(1);
-    }
-}
-
-function splitExtractSuffixInput(rawValue) {
-    if (Array.isArray(rawValue)) {
-        return rawValue.flatMap((item) => splitExtractSuffixInput(item));
-    }
-    if (typeof rawValue !== 'string') {
-        return [];
-    }
-    return rawValue
-        .split(/[,\s]+/g)
-        .map((item) => item.trim())
-        .filter(Boolean);
-}
-
-function normalizeExtractSuffix(rawSuffix, fallbackSuffixes = DEFAULT_EXTRACT_SUFFIXES) {
-    const fallbackItems = splitExtractSuffixInput(fallbackSuffixes);
-    const sourceItems = splitExtractSuffixInput(rawSuffix);
-    const source = sourceItems.length > 0 ? sourceItems : fallbackItems;
-    const dedup = new Set();
-
-    for (const item of source) {
-        const lower = item.toLowerCase();
-        if (!lower) {
-            continue;
-        }
-        const normalized = lower.startsWith('.') ? lower : `.${lower}`;
-        if (normalized.length > 1) {
-            dedup.add(normalized);
-        }
-    }
-
-    if (dedup.size === 0) {
-        return [...DEFAULT_EXTRACT_SUFFIXES];
-    }
-    return Array.from(dedup);
-}
-
-function buildDefaultExtractOutputDir(baseCwd = process.cwd()) {
-    const normalizedCwd = path.resolve(baseCwd);
-    const parentDir = path.dirname(normalizedCwd);
-    const timestamp = formatTimestampForFileName().replace(/-/g, '');
-    return path.join(parentDir, timestamp);
-}
-
-function sanitizeNameSegment(rawValue, fallback = 'item') {
-    const value = typeof rawValue === 'string' ? rawValue.trim() : '';
-    const sanitized = value
-        .replace(/[^\w.-]+/g, '_')
-        .replace(/^_+|_+$/g, '');
-    return sanitized || fallback;
-}
-
-function resolveDuplicateOutputPath(outputDir, originalFileName, zipPath = '', counters = new Map()) {
-    const fallbackName = `file${path.extname(originalFileName || '')}`;
-    const fileName = path.basename(originalFileName || '') || fallbackName;
-    const firstChoice = path.join(outputDir, fileName);
-    const firstChoiceKey = `exact:${fileName}`;
-    if (!counters.has(firstChoiceKey)) {
-        counters.set(firstChoiceKey, true);
-        if (!fs.existsSync(firstChoice)) {
-            return firstChoice;
-        }
-    }
-
-    const ext = path.extname(fileName);
-    const baseName = path.basename(fileName, ext);
-    const safeBaseName = sanitizeNameSegment(baseName, 'file');
-    const zipBaseName = sanitizeNameSegment(path.basename(zipPath || '', '.zip'), 'zip');
-    const duplicateKey = `dup:${safeBaseName}|${zipBaseName}|${ext}`;
-    let index = counters.has(duplicateKey) ? counters.get(duplicateKey) : 1;
-
-    for (; index <= 100000; index++) {
-        const candidateName = `${safeBaseName}__${zipBaseName}__${index}${ext}`;
-        const candidatePath = path.join(outputDir, candidateName);
-        if (!fs.existsSync(candidatePath)) {
-            counters.set(duplicateKey, index + 1);
-            return candidatePath;
-        }
-    }
-
-    throw new Error(`重名文件过多，无法生成唯一文件名: ${fileName}`);
-}
-
-function collectZipFilesFromDir(rootDir, recursive = true) {
-    const queue = [rootDir];
-    const result = [];
-
-    while (queue.length > 0) {
-        const currentDir = queue.shift();
-        let entries = [];
-        try {
-            entries = fs.readdirSync(currentDir, { withFileTypes: true });
-        } catch (e) {
-            throw new Error(`读取目录失败: ${currentDir} (${e.message})`);
-        }
-
-        for (const entry of entries) {
-            const entryPath = path.join(currentDir, entry.name);
-            if (entry.isDirectory()) {
-                if (recursive) {
-                    queue.push(entryPath);
-                }
-                continue;
-            }
-            if (entry.isFile() && entry.name.toLowerCase().endsWith('.zip')) {
-                result.push(entryPath);
-            }
-        }
-    }
-
-    result.sort((a, b) => a.localeCompare(b));
-    return result;
-}
-
-function extractMatchedEntriesFromZip(zipPath, outputDir, suffixes, duplicateCounters = new Map()) {
-    const normalizedSuffixes = normalizeExtractSuffix(suffixes);
-    return new Promise((resolve, reject) => {
-        yauzl.open(zipPath, { lazyEntries: true, autoClose: false }, (openErr, zipFile) => {
-            if (openErr) {
-                reject(openErr);
-                return;
-            }
-            if (!zipFile) {
-                reject(new Error('无法读取 ZIP 文件'));
-                return;
-            }
-
-            let settled = false;
-            let matched = 0;
-            let extracted = 0;
-            let skippedDir = 0;
-            let skippedExt = 0;
-
-            const finish = (err) => {
-                if (settled) return;
-                settled = true;
-                try {
-                    zipFile.close();
-                } catch (_) {}
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve({ matched, extracted, skippedDir, skippedExt });
-                }
-            };
-
-            zipFile.on('entry', (entry) => {
-                if (settled) return;
-                const rawEntryName = typeof entry.fileName === 'string' ? entry.fileName : '';
-                const normalizedEntryName = rawEntryName.replace(/\\/g, '/');
-
-                if (!normalizedEntryName || normalizedEntryName.endsWith('/')) {
-                    skippedDir += 1;
-                    zipFile.readEntry();
-                    return;
-                }
-
-                const entryBaseName = path.basename(normalizedEntryName);
-                const lowerBaseName = entryBaseName.toLowerCase();
-                const matchedSuffix = normalizedSuffixes.some((suffix) => lowerBaseName.endsWith(suffix));
-                if (!entryBaseName || !matchedSuffix) {
-                    skippedExt += 1;
-                    zipFile.readEntry();
-                    return;
-                }
-
-                matched += 1;
-                zipFile.openReadStream(entry, (streamErr, readStream) => {
-                    if (streamErr || !readStream) {
-                        finish(streamErr || new Error('无法读取 ZIP 条目流'));
-                        return;
-                    }
-
-                    let completed = false;
-                    const outputPath = resolveDuplicateOutputPath(outputDir, entryBaseName, zipPath, duplicateCounters);
-                    const writeStream = fs.createWriteStream(outputPath);
-                    const fail = (writeErr) => {
-                        if (completed) return;
-                        completed = true;
-                        try {
-                            readStream.destroy();
-                        } catch (_) {}
-                        try {
-                            writeStream.destroy();
-                        } catch (_) {}
-                        try {
-                            if (fs.existsSync(outputPath)) {
-                                fs.unlinkSync(outputPath);
-                            }
-                        } catch (_) {}
-                        finish(writeErr);
-                    };
-
-                    readStream.on('error', fail);
-                    writeStream.on('error', fail);
-                    writeStream.on('finish', () => {
-                        if (completed || settled) return;
-                        completed = true;
-                        extracted += 1;
-                        zipFile.readEntry();
-                    });
-
-                    readStream.pipe(writeStream);
-                });
-            });
-
-            zipFile.on('end', () => {
-                finish(null);
-            });
-            zipFile.on('error', (zipErr) => {
-                finish(zipErr);
-            });
-
-            zipFile.readEntry();
-        });
-    });
-}
-
-async function cmdUnzipExt(zipDirPath, outputDir, options = {}) {
-    if (!zipDirPath) {
-        console.error('用法: codexmate unzip-ext <zip目录> [输出目录] [--ext:后缀[,后缀...]] [--no-recursive]');
-        console.log('\n示例:');
-        console.log('  codexmate unzip-ext ./archives');
-        console.log('  codexmate unzip-ext ./archives ./output --ext:json,txt');
-        console.log('  codexmate unzip-ext D:/data/zips --ext:txt --no-recursive');
-        console.log('  说明: 默认递归扫描子目录，可通过 --no-recursive 关闭递归');
-        process.exit(1);
-    }
-
-    const recursive = options.recursive !== false;
-    const suffixes = normalizeExtractSuffix(options.ext);
-    const absZipDir = path.resolve(zipDirPath);
-    const absOutputDir = outputDir ? path.resolve(outputDir) : buildDefaultExtractOutputDir(process.cwd());
-
-    if (!fs.existsSync(absZipDir)) {
-        console.error('错误: 目录不存在:', absZipDir);
-        process.exit(1);
-    }
-    try {
-        if (!fs.statSync(absZipDir).isDirectory()) {
-            console.error('错误: 仅支持目录路径:', absZipDir);
-            process.exit(1);
-        }
-    } catch (e) {
-        console.error('错误: 无法读取目录信息:', e.message);
-        process.exit(1);
-    }
-
-    let zipFiles = [];
-    try {
-        zipFiles = collectZipFilesFromDir(absZipDir, recursive);
-    } catch (e) {
-        console.error('扫描 ZIP 文件失败:', e.message);
-        process.exit(1);
-    }
-
-    if (zipFiles.length === 0) {
-        console.error('错误: 未找到任何 ZIP 文件');
-        process.exit(1);
-    }
-
-    ensureDir(absOutputDir);
-
-    console.log('\n批量解压配置:');
-    console.log('  ZIP 目录:', absZipDir);
-    console.log('  输出目录:', absOutputDir);
-    console.log('  后缀过滤:', suffixes.join(', '));
-    console.log('  递归扫描:', recursive ? '是' : '否');
-    console.log('  ZIP 数量:', zipFiles.length);
-    console.log('\n开始提取...\n');
-
-    let totalMatched = 0;
-    let totalExtracted = 0;
-    let totalSkippedDir = 0;
-    let totalSkippedExt = 0;
-    const failed = [];
-    const duplicateCounters = new Map();
-
-    for (const zipFilePath of zipFiles) {
-        try {
-            await inspectZipArchiveLimits(zipFilePath, {
-                maxEntryCount: MAX_SKILLS_ZIP_ENTRY_COUNT,
-                maxUncompressedBytes: MAX_SKILLS_ZIP_UNCOMPRESSED_BYTES
-            });
-            const result = await extractMatchedEntriesFromZip(zipFilePath, absOutputDir, suffixes, duplicateCounters);
-            totalMatched += result.matched;
-            totalExtracted += result.extracted;
-            totalSkippedDir += result.skippedDir;
-            totalSkippedExt += result.skippedExt;
-            console.log(`✓ ${path.basename(zipFilePath)}: 命中 ${result.matched}，提取 ${result.extracted}`);
-        } catch (e) {
-            failed.push({ zipFilePath, message: e && e.message ? e.message : String(e) });
-            console.error(`✗ ${path.basename(zipFilePath)}: ${e && e.message ? e.message : e}`);
-        }
-    }
-
-    console.log('\n提取结果:');
-    console.log('  输出目录:', absOutputDir);
-    console.log('  扫描 ZIP:', zipFiles.length);
-    console.log('  命中条目:', totalMatched);
-    console.log('  已提取:', totalExtracted);
-    console.log('  已跳过(目录条目):', totalSkippedDir);
-    console.log('  已跳过(后缀不匹配):', totalSkippedExt);
-    if (failed.length > 0) {
-        console.error('  失败数量:', failed.length);
-        for (const item of failed) {
-            console.error(`    - ${item.zipFilePath}: ${item.message}`);
-        }
-        process.exit(1);
-    }
-    console.log();
-}
 
 function resolveExportOutputPath(outputPath, defaultFileName) {
     const fallback = path.resolve(process.cwd(), defaultFileName);
@@ -12936,51 +12170,14 @@ async function main() {
         case 'mcp': await cmdMcp(args.slice(1)); break;
         case 'export-session': await cmdExportSession(args.slice(1)); break;
         case 'zip': {
-            // 解析 --max:N 参数
-            const zipOptions = {};
-            let targetPath = null;
-            for (let i = 1; i < args.length; i++) {
-                const arg = args[i];
-                if (arg.startsWith('--max:')) {
-                    zipOptions.max = parseInt(arg.substring(6), 10);
-                } else if (!targetPath) {
-                    targetPath = arg;
-                }
-            }
-            await cmdZip(targetPath, zipOptions);
+            const { targetPath, options } = parseZipCommandArgs(args.slice(1));
+            await cmdZip(targetPath, options);
             break;
         }
         case 'unzip': await cmdUnzip(args[1], args[2]); break;
         case 'unzip-ext': {
-            const unzipExtOptions = {
-                ext: [],
-                recursive: true
-            };
-            let zipDirPath = null;
-            let outputDir = null;
-            for (let i = 1; i < args.length; i++) {
-                const arg = args[i];
-                if (arg.startsWith('--ext:')) {
-                    unzipExtOptions.ext.push(...splitExtractSuffixInput(arg.substring(6)));
-                } else if (arg.startsWith('--ext=')) {
-                    unzipExtOptions.ext.push(...splitExtractSuffixInput(arg.substring(6)));
-                } else if (arg === '--ext') {
-                    const nextArg = args[i + 1];
-                    if (typeof nextArg === 'string' && !nextArg.startsWith('--')) {
-                        unzipExtOptions.ext.push(...splitExtractSuffixInput(nextArg));
-                        i += 1;
-                    }
-                } else if (arg === '--recursive') {
-                    unzipExtOptions.recursive = true;
-                } else if (arg === '--no-recursive') {
-                    unzipExtOptions.recursive = false;
-                } else if (!zipDirPath) {
-                    zipDirPath = arg;
-                } else if (!outputDir) {
-                    outputDir = arg;
-                }
-            }
-            await cmdUnzipExt(zipDirPath, outputDir, unzipExtOptions);
+            const { zipDirPath, outputDir, options } = parseUnzipExtCommandArgs(args.slice(1));
+            await cmdUnzipExt(zipDirPath, outputDir, options);
             break;
         }
         default:
