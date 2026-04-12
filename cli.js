@@ -4650,15 +4650,38 @@ function readSessionModelFromRecord(record) {
     const payload = record.payload && typeof record.payload === 'object' && !Array.isArray(record.payload)
         ? record.payload
         : null;
+    const info = payload && payload.info && typeof payload.info === 'object' && !Array.isArray(payload.info)
+        ? payload.info
+        : null;
+    const collaborationMode = payload && payload.collaboration_mode && typeof payload.collaboration_mode === 'object' && !Array.isArray(payload.collaboration_mode)
+        ? payload.collaboration_mode
+        : null;
+    const collaborationSettings = collaborationMode && collaborationMode.settings && typeof collaborationMode.settings === 'object' && !Array.isArray(collaborationMode.settings)
+        ? collaborationMode.settings
+        : null;
     const message = record.message && typeof record.message === 'object' && !Array.isArray(record.message)
         ? record.message
         : null;
     const candidates = [
         payload && payload.model,
+        payload && payload.model_name,
         payload && payload.model_id,
         payload && payload.modelId,
+        info && info.model,
+        info && info.model_name,
+        info && info.model_id,
+        info && info.modelId,
+        collaborationSettings && collaborationSettings.model,
+        collaborationSettings && collaborationSettings.model_name,
+        collaborationSettings && collaborationSettings.model_id,
+        collaborationSettings && collaborationSettings.modelId,
         message && message.model,
+        message && message.model_name,
+        message && message.model_id,
+        message && message.modelId,
         record.model,
+        record.modelName,
+        record.model_name,
         record.model_id,
         record.modelId
     ];
@@ -5425,6 +5448,39 @@ async function listSessionUsage(params = {}) {
             }
             const normalized = { ...item };
             delete normalized.__messageCountExact;
+            const hasModel = [normalized.model, normalized.modelName, normalized.modelId]
+                .some((value) => typeof value === 'string' && value.trim());
+            if (hasModel) {
+                return normalized;
+            }
+
+            const filePath = typeof normalized.filePath === 'string' ? normalized.filePath.trim() : '';
+            if (!filePath) {
+                return normalized;
+            }
+
+            const summaryOptions = {
+                summaryReadBytes: SESSION_BROWSE_SUMMARY_READ_BYTES,
+                titleReadBytes: SESSION_BROWSE_SUMMARY_READ_BYTES
+            };
+            let summary = null;
+            try {
+                summary = normalized.source === 'claude'
+                    ? parseClaudeSessionSummary(filePath, summaryOptions)
+                    : parseCodexSessionSummary(filePath, summaryOptions);
+            } catch (e) {
+                summary = null;
+            }
+
+            if (!summary || typeof summary !== 'object' || Array.isArray(summary)) {
+                return normalized;
+            }
+            if (typeof summary.model === 'string' && summary.model.trim()) {
+                normalized.model = summary.model.trim();
+            }
+            if ((!normalized.provider || !String(normalized.provider).trim()) && typeof summary.provider === 'string' && summary.provider.trim()) {
+                normalized.provider = summary.provider.trim();
+            }
             return normalized;
         })
         : [];

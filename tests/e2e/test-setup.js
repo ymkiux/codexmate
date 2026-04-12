@@ -89,6 +89,18 @@ module.exports = async function testSetup(ctx) {
             timestamp: '2025-01-01T00:00:02.000Z'
         },
         {
+            type: 'turn_context',
+            payload: {
+                model: 'gpt-5.3-codex',
+                collaboration_mode: {
+                    settings: {
+                        model: 'gpt-5.3-codex'
+                    }
+                }
+            },
+            timestamp: '2025-01-01T00:00:02.500Z'
+        },
+        {
             type: 'event_msg',
             payload: {
                 type: 'token_usage',
@@ -183,6 +195,7 @@ module.exports = async function testSetup(ctx) {
                 created: '2025-02-01T00:00:00.000Z',
                 modified: '2025-02-01T00:00:01.000Z',
                 summary: 'Claude Code sample session',
+                model: 'claude-3-7-sonnet',
                 provider: 'claude',
                 capabilities: { code: true },
                 keywords: ['claude_code', 'sample'],
