@@ -7,7 +7,7 @@
                     :aria-labelledby="'tab-usage'">
                     <div class="usage-toolbar">
                         <div class="selector-header" style="padding:0;border:0;background:none;">
-                            <span class="selector-title">本地使用概览</span>
+                            <span class="selector-title">Usage 概览</span>
                         </div>
                         <div class="usage-range-group" role="group" aria-label="Usage 时间范围">
                             <button type="button" class="usage-range-btn" :class="{ active: sessionsUsageTimeRange === '7d' }" @click="sessionsUsageTimeRange = '7d'">近 7 天</button>
@@ -87,49 +87,42 @@
                                 <div class="usage-card-head">
                                     <div>
                                         <div class="usage-card-title">使用模型</div>
-                                        <div class="usage-card-subtitle">按当前时间范围统计已识别模型名，不再把缺失情况藏起来。</div>
+                                        <div class="usage-card-subtitle">只列出当前范围内真正落盘的 model 名，缺字段的旧记录不硬猜。</div>
                                     </div>
-                                    <div class="usage-card-kicker">覆盖 {{ sessionUsageCharts.modelCoverage.modeledSessions }}/{{ sessionUsageCharts.modelCoverage.totalSessions }}</div>
+                                    <div class="usage-card-kicker">已识别 {{ sessionUsageCharts.modelCoverage.modeledSessions }}/{{ sessionUsageCharts.modelCoverage.totalSessions }}</div>
                                 </div>
                                 <div class="usage-model-coverage-strip">
                                     <div class="usage-model-coverage-item">
                                         <strong>{{ sessionUsageCharts.usedModels.length }}</strong>
-                                        <span>已识别模型</span>
+                                        <span>模型数</span>
                                     </div>
                                     <div class="usage-model-coverage-item">
                                         <strong>{{ sessionUsageCharts.modelCoverage.coveragePercent }}%</strong>
-                                        <span>模型覆盖率</span>
+                                        <span>会话覆盖率</span>
                                     </div>
                                     <div class="usage-model-coverage-item">
                                         <strong>{{ sessionUsageCharts.modelCoverage.missingModelSessions }}</strong>
-                                        <span>缺少模型名</span>
+                                        <span>缺 model</span>
                                     </div>
                                 </div>
                                 <div v-if="!sessionUsageCharts.usedModels.length" class="usage-diagnostic-empty">
-                                    <div class="usage-diagnostic-title">当前范围内没读到模型名</div>
+                                    <div class="usage-diagnostic-title">当前范围没读到模型名</div>
                                     <div class="usage-diagnostic-copy">
-                                        已扫描 {{ sessionUsageCharts.modelCoverage.totalSessions }} 个会话，但这些会话没有可识别的 `model / modelName / modelId` 字段，所以这里没法列出模型。
+                                        已扫描 {{ sessionUsageCharts.modelCoverage.totalSessions }} 个会话，但原始记录里没有可识别的 `model / modelName / modelId` 字段。
                                     </div>
-                                    <div class="usage-diagnostic-meta">
-                                        Codex {{ sessionUsageCharts.modelCoverage.missingModelSourceTotals.codex || 0 }} 个，Claude Code {{ sessionUsageCharts.modelCoverage.missingModelSourceTotals.claude || 0 }} 个。
+                                    <div v-if="sessionUsageCharts.modelCoverage.providerOnlySessions > 0" class="usage-diagnostic-meta">
+                                        其中 {{ sessionUsageCharts.modelCoverage.providerOnlySessions }} 个旧会话只写了 provider，没写真实 model。
                                     </div>
                                 </div>
                                 <template v-else>
                                     <div v-if="sessionUsageCharts.modelCoverage.providerOnlySessions > 0" class="usage-inline-note">
-                                        还有 {{ sessionUsageCharts.modelCoverage.missingModelSessions }} 个会话没写具体模型名，其中
-                                        <span
-                                            v-for="item in sessionUsageCharts.modelCoverage.missingModelProviders"
-                                            :key="item.key"
-                                            class="usage-inline-tag">
-                                            {{ item.label }} {{ item.count }} 个
-                                        </span>
-                                        属于旧记录只写了 provider、没写真实 model，不能硬编成某个 `gpt-*`。
+                                        另有 {{ sessionUsageCharts.modelCoverage.missingModelSessions }} 个会话没写具体模型名，当前列表只统计真实落盘的 model。
                                     </div>
                                     <div v-else-if="sessionUsageCharts.modelCoverage.missingModelSessions > 0" class="usage-inline-note">
-                                        还有 {{ sessionUsageCharts.modelCoverage.missingModelSessions }} 个会话缺少模型名，所以当前列表不是 100% 完整覆盖。
+                                        另有 {{ sessionUsageCharts.modelCoverage.missingModelSessions }} 个会话缺少 model 字段，未计入当前列表。
                                     </div>
                                     <div v-if="sessionUsageCharts.modelCoverage.missingModelSessionsPreview.length" class="usage-diagnostic-list">
-                                        <div class="usage-diagnostic-list-title">当前仍缺模型名的会话</div>
+                                        <div class="usage-diagnostic-list-title">仍缺模型名的会话</div>
                                         <div
                                             v-for="item in sessionUsageCharts.modelCoverage.missingModelSessionsPreview"
                                             :key="item.key"
@@ -137,7 +130,6 @@
                                             <div class="usage-diagnostic-row-main">
                                                 <div class="usage-diagnostic-row-title">{{ item.title }}</div>
                                                 <div class="usage-diagnostic-row-meta">
-                                                    <span>{{ item.sourceLabel }}</span>
                                                     <span v-if="item.sessionId">{{ item.sessionId }}</span>
                                                     <span v-else-if="item.updatedAtLabel">{{ item.updatedAtLabel }}</span>
                                                 </div>
@@ -151,7 +143,7 @@
                                     <div class="usage-model-list">
                                         <div v-for="item in sessionUsageCharts.usedModels" :key="item.key" class="usage-model-chip" :title="`${item.model} · ${item.count} 会话 · ${item.messageTotal} 消息${item.tokenTotal ? ` · ${item.tokenTotal} token` : ''}`">
                                             <div class="usage-model-name">{{ item.model }}</div>
-                                            <div class="usage-model-meta">{{ item.count }} 会话<span v-if="item.sourceLabels.length"> · {{ item.sourceLabels.join(' / ') }}</span></div>
+                                            <div class="usage-model-meta">{{ item.count }} 会话 · {{ item.messageTotal }} 消息<span v-if="item.tokenTotal"> · {{ item.tokenTotal.toLocaleString('en-US') }} token</span></div>
                                         </div>
                                     </div>
                                 </template>

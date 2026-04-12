@@ -56,6 +56,16 @@
     line-height: 1.65;
 }
 
+.task-hero-actions {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    align-self: flex-start;
+}
+
+.task-hero-actions > .btn-tool-compact {
+    min-width: 108px;
+}
+
 .task-hero-meta-strip {
     display: flex;
     flex-wrap: wrap;
@@ -751,5 +761,9 @@
         margin-left: 0;
         width: 100%;
         justify-content: flex-start;
+    }
+
+    .task-hero-actions {
+        flex-wrap: wrap;
     }
 }

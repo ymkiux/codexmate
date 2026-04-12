@@ -65,7 +65,7 @@ function formatUsageRangeLabel(range) {
 
 function formatUsageEstimateDiagnostic(summary, rangeLabel) {
     if (!summary || typeof summary !== 'object') {
-        return `${rangeLabel} 内暂无可估算会话`;
+        return '当前范围内暂无可估算会话';
     }
     const totalSessions = Number.isFinite(Number(summary.totalSessions))
         ? Math.max(0, Math.floor(Number(summary.totalSessions)))
@@ -81,7 +81,7 @@ function formatUsageEstimateDiagnostic(summary, rangeLabel) {
         : 0;
     const parts = [];
     if (estimatedSessions > 0 || totalSessions > 0) {
-        parts.push(`覆盖 ${estimatedSessions}/${totalSessions} 个会话`);
+        parts.push(`覆盖 ${estimatedSessions}/${totalSessions} 会话`);
     }
     if (missingPricingSessions > 0) {
         parts.push(`${missingPricingSessions} 个缺少模型单价`);
@@ -89,7 +89,7 @@ function formatUsageEstimateDiagnostic(summary, rangeLabel) {
     if (missingTokenSessions > 0) {
         parts.push(`${missingTokenSessions} 个缺少 token 拆分`);
     }
-    return parts.length ? parts.join('，') : `${rangeLabel} 内暂无可估算会话`;
+    return parts.length ? parts.join('，') : '当前范围内暂无可估算会话';
 }
 
 function formatUsageDuration(value, options = {}) {
@@ -140,6 +140,7 @@ function createUsagePricingEntry(pricing, source) {
     return {
         input: readUsageCostNumber(pricing && pricing.input),
         output: readUsageCostNumber(pricing && pricing.output),
+        reasoningOutput: readUsageCostNumber(pricing && (pricing.reasoningOutput ?? pricing.reasoning)),
         cacheRead: readUsageCostNumber(pricing && pricing.cacheRead),
         cacheWrite: readUsageCostNumber(pricing && pricing.cacheWrite),
         source: resolvedSource
@@ -166,7 +167,8 @@ function buildUsagePricingIndex(providersList = []) {
                     : null,
                 'provider-config'
             );
-            const hasKnownRate = Object.values(pricing).some((value) => value !== null && value > 0);
+            const hasKnownRate = [pricing.input, pricing.output, pricing.reasoningOutput, pricing.cacheRead, pricing.cacheWrite]
+                .some((value) => value !== null);
             if (!hasKnownRate) continue;
             providerMap.set(modelId, pricing);
             const modelMatches = byModel.get(modelId) || [];
@@ -226,32 +228,34 @@ function estimateUsageCostSummary(sessions, providersList, currentProvider) {
 
     for (const session of list) {
         if (!session || typeof session !== 'object') continue;
-        const pricing = resolveUsagePricingForSession(session, pricingIndex, currentProvider);
-        const totalSessionTokens = Number.isFinite(Number(session.totalTokens))
-            ? Math.max(0, Math.floor(Number(session.totalTokens)))
-            : 0;
-        totalTokens += totalSessionTokens;
-        if (!pricing) {
-            missingPricingSessions += 1;
-            continue;
-        }
         const inputTokens = Number.isFinite(Number(session.inputTokens)) ? Math.max(0, Math.floor(Number(session.inputTokens))) : null;
         const cachedInputTokens = Number.isFinite(Number(session.cachedInputTokens)) ? Math.max(0, Math.floor(Number(session.cachedInputTokens))) : 0;
         const outputTokens = Number.isFinite(Number(session.outputTokens)) ? Math.max(0, Math.floor(Number(session.outputTokens))) : null;
         const reasoningOutputTokens = Number.isFinite(Number(session.reasoningOutputTokens)) ? Math.max(0, Math.floor(Number(session.reasoningOutputTokens))) : 0;
+        const billableInputTokens = Math.max(0, (inputTokens || 0) - cachedInputTokens);
+        const fallbackSessionTokens = billableInputTokens + cachedInputTokens + (outputTokens || 0) + reasoningOutputTokens;
+        const totalSessionTokens = Number.isFinite(Number(session.totalTokens))
+            ? Math.max(0, Math.floor(Number(session.totalTokens)))
+            : fallbackSessionTokens;
+        totalTokens += totalSessionTokens;
+        const pricing = resolveUsagePricingForSession(session, pricingIndex, currentProvider);
+        if (!pricing) {
+            missingPricingSessions += 1;
+            continue;
+        }
         if (inputTokens === null && outputTokens === null && reasoningOutputTokens === 0) {
             missingTokenSessions += 1;
             continue;
         }
-        const billableInputTokens = Math.max(0, (inputTokens || 0) - cachedInputTokens);
         const estimatedUsd = (
             ((pricing.input || 0) * billableInputTokens)
             + ((pricing.cacheRead || 0) * cachedInputTokens)
-            + ((pricing.output || 0) * ((outputTokens || 0) + reasoningOutputTokens))
+            + (((pricing.reasoningOutput ?? pricing.output) || 0) * reasoningOutputTokens)
+            + ((pricing.output || 0) * (outputTokens || 0))
         ) / 1000000;
         totalCostUsd += estimatedUsd;
         estimatedSessions += 1;
-        estimatedTokens += totalSessionTokens || (billableInputTokens + cachedInputTokens + (outputTokens || 0) + reasoningOutputTokens);
+        estimatedTokens += totalSessionTokens;
         if (pricing.source === 'public-catalog') {
             catalogSessions += 1;
         } else {
@@ -443,9 +447,9 @@ export function createSessionComputed() {
                     note: formatUsageEstimateDiagnostic(estimatedCost, usageRangeLabel),
                     title: estimatedCost.hasEstimate
                         ? `${estimatedCost.catalogSessions > 0
-                            ? (estimatedCost.configuredSessions > 0 ? '按 Provider 配置 + 公开模型目录单价估算' : '按公开模型目录单价估算')
-                            : '按 Provider 配置单价估算'}，估算 ${formatUsageEstimatedCost(estimatedCost.totalCostUsd, { precise: true })}，覆盖 ${estimatedCost.estimatedSessions}/${estimatedCost.totalSessions} 个会话，约 ${estimatedCost.coveragePercent}% token`
-                        : '缺少可匹配的模型单价或 token 拆分。请先在 Provider 配置里补 models.cost，或确认 session 已记录 input/output token。'
+                            ? (estimatedCost.configuredSessions > 0 ? '按已配置单价 + 公开模型目录估算' : '按公开模型目录估算')
+                            : '按已配置单价估算'}，估算 ${formatUsageEstimatedCost(estimatedCost.totalCostUsd, { precise: true })}，覆盖 ${estimatedCost.estimatedSessions}/${estimatedCost.totalSessions} 个会话，约 ${estimatedCost.coveragePercent}% token`
+                        : '缺少可匹配的模型单价或 token 拆分。请先补 models.cost，或确认会话已记录 input/output token。'
                 },
                 {
                     key: 'active-duration',
