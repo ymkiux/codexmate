@@ -23,6 +23,7 @@ function createDefaultTaskOrchestrationState() {
         queue: [],
         runs: [],
         selectedRunId: '',
+        workspaceTab: 'queue',
         selectedRunDetail: null,
         selectedRunLoading: false,
         selectedRunError: '',
@@ -297,6 +298,7 @@ export function createTaskOrchestrationMethods(options = {}) {
             state.detailRequestToken = requestToken;
             state.selectedRunLoading = true;
             state.selectedRunId = normalizedRunId;
+            state.workspaceTab = 'detail';
             state.selectedRunError = '';
             if (previousRunId !== normalizedRunId) {
                 state.selectedRunDetail = null;

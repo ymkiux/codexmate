@@ -217,6 +217,8 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
     const pathMap = new Map();
     const modelMap = new Map();
     const sourceMessageTotals = { codex: 0, claude: 0 };
+    const missingModelSourceTotals = { codex: 0, claude: 0 };
+    let missingModelSessions = 0;
     const hourCounts = Array.from({ length: 24 }, (_, hour) => ({
         key: String(hour).padStart(2, '0'),
         label: String(hour).padStart(2, '0'),
@@ -283,7 +285,9 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
             });
         }
 
-        const modelId = typeof session.model === 'string' ? session.model.trim() : '';
+        const modelId = [session.model, session.modelName, session.modelId]
+            .map((value) => (typeof value === 'string' ? value.trim() : ''))
+            .find(Boolean) || '';
         if (modelId) {
             const prev = modelMap.get(modelId) || {
                 count: 0,
@@ -296,6 +300,9 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
             prev.tokenTotal += sessionTotalTokens;
             prev.sources.add(source);
             modelMap.set(modelId, prev);
+        } else {
+            missingModelSessions += 1;
+            missingModelSourceTotals[source] += 1;
         }
 
         const normalizedTitle = typeof session.title === 'string' && session.title.trim()
@@ -366,6 +373,14 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
         .sort((a, b) => b.updatedAtMs - a.updatedAtMs || b.messageCount - a.messageCount || a.title.localeCompare(b.title, 'zh-Hans-CN'))
         .slice(0, 6);
 
+    const modelCoverage = {
+        totalSessions,
+        modeledSessions: usedModels.reduce((sum, item) => sum + item.count, 0),
+        missingModelSessions,
+        missingModelSourceTotals,
+        coveragePercent: totalSessions > 0 ? Math.round(((totalSessions - missingModelSessions) / totalSessions) * 100) : 0
+    };
+
     const sortedTopSessionsByMessages = topSessionsByMessages
         .sort((a, b) => b.messageCount - a.messageCount || b.updatedAtMs - a.updatedAtMs || a.title.localeCompare(b.title, 'zh-Hans-CN'))
         .slice(0, 6);
@@ -419,6 +434,7 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
         },
         sourceShare,
         usedModels,
+        modelCoverage,
         topPaths,
         recentSessions: sortedRecentSessions,
         topSessionsByMessages: sortedTopSessionsByMessages,

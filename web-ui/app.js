@@ -371,6 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     queue: [],
                     runs: [],
                     selectedRunId: '',
+                    workspaceTab: 'queue',
                     selectedRunDetail: null,
                     selectedRunLoading: false,
                     lastLoadedAt: '',
