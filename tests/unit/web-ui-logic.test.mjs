@@ -732,7 +732,8 @@ test('sessionUsageSummaryCards uses compact units for long token and context tot
     assert.strictEqual(contextCard.value, '256K');
     assert.strictEqual(contextCard.title, '256,000');
     assert.strictEqual(costCard.value, '暂无');
-    assert.strictEqual(costCard.label, '预估费用');
+    assert.strictEqual(costCard.label, '预估费用 · 近 7 天');
+    assert.strictEqual(costCard.note, '近 7 天 内暂无可估算会话');
     assert.strictEqual(activeDurationCard.value, '2天 3小时');
     assert.strictEqual(totalDurationCard.value, '7天 5小时');
 });
@@ -800,6 +801,8 @@ test('sessionUsageSummaryCards estimates usage cost from configured provider pri
     assert(activeDurationCard, 'missing active duration summary card');
     assert(totalDurationCard, 'missing total duration summary card');
     assert.strictEqual(costCard.value, '$1.25');
+    assert.strictEqual(costCard.label, '预估费用 · 近 7 天');
+    assert.strictEqual(costCard.note, '覆盖 1/2 个会话');
     assert.match(costCard.title, /覆盖 1\/2 个会话/);
     assert.match(costCard.title, /约 67% token/);
     assert.strictEqual(activeDurationCard.value, '1小时 30分');
@@ -841,6 +844,8 @@ test('sessionUsageSummaryCards falls back to public catalog pricing when provide
     const costCard = cards.find((card) => card.key === 'estimated-cost');
     assert(costCard, 'missing estimated cost summary card');
     assert.strictEqual(costCard.value, '$1.77');
+    assert.strictEqual(costCard.label, '预估费用 · 近 7 天');
+    assert.strictEqual(costCard.note, '覆盖 1/1 个会话');
     assert.match(costCard.title, /公开模型目录单价估算/);
     assert.match(costCard.title, /覆盖 1\/1 个会话/);
 });
@@ -883,6 +888,7 @@ test('sessionUsageSummaryCards recalculates estimated cost from the selected usa
             now: Date.UTC(2026, 3, 6, 12, 0, 0)
         }),
         sessionsUsageList: sessions,
+        sessionsUsageTimeRange: '30d',
         providersList: [],
         currentProvider: 'maxx'
     });
@@ -890,6 +896,8 @@ test('sessionUsageSummaryCards recalculates estimated cost from the selected usa
     const costCard = cards.find((card) => card.key === 'estimated-cost');
     assert(costCard, 'missing estimated cost summary card');
     assert.strictEqual(costCard.value, '$1.77');
+    assert.strictEqual(costCard.label, '预估费用 · 近 30 天');
+    assert.strictEqual(costCard.note, '覆盖 1/1 个会话');
     assert.match(costCard.title, /覆盖 1\/1 个会话/);
 });
 
@@ -931,6 +939,7 @@ test('sessionUsageSummaryCards shows a distinct all-range estimated cost when ol
             now: Date.UTC(2026, 3, 12, 12, 0, 0)
         }),
         sessionsUsageList: sessions,
+        sessionsUsageTimeRange: 'all',
         providersList: [],
         currentProvider: 'maxx'
     });
@@ -938,6 +947,8 @@ test('sessionUsageSummaryCards shows a distinct all-range estimated cost when ol
     const costCard = cards.find((card) => card.key === 'estimated-cost');
     assert(costCard, 'missing estimated cost summary card');
     assert.strictEqual(costCard.value, '$8.07');
+    assert.strictEqual(costCard.label, '预估费用 · 全部');
+    assert.strictEqual(costCard.note, '覆盖 2/2 个会话');
     assert.match(costCard.title, /估算 \$8\.07/);
     assert.match(costCard.title, /覆盖 2\/2 个会话/);
 });

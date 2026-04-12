@@ -25,6 +25,7 @@
                             <div v-for="card in sessionUsageSummaryCards" :key="card.key" class="usage-summary-card">
                                 <div class="usage-summary-label">{{ card.label }}</div>
                                 <div class="usage-summary-value" :title="card.title || null">{{ card.value }}</div>
+                                <div v-if="card.note" class="usage-summary-note">{{ card.note }}</div>
                             </div>
                         </div>
 
