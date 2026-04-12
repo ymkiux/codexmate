@@ -1,5 +1,6 @@
 import {
     findDuplicateClaudeConfigName,
+    getClaudeModelCatalogForBaseUrl,
     matchClaudeConfigFromSettings,
     normalizeClaudeConfig,
     normalizeClaudeSettingsEnv,
@@ -316,10 +317,15 @@ export function createStartupClaudeMethods(options = {}) {
                 this.resetClaudeModelsState();
                 return;
             }
+            const localCatalog = getClaudeModelCatalogForBaseUrl(baseUrl);
             if (!apiKey && externalCredentialType) {
-                this.claudeModels = [];
-                this.claudeModelsSource = 'unlimited';
-                this.claudeModelsHasCurrent = true;
+                this.claudeModels = localCatalog;
+                this.claudeModelsSource = localCatalog.length ? 'catalog' : 'unlimited';
+                if (localCatalog.length) {
+                    this.updateClaudeModelsCurrent();
+                } else {
+                    this.claudeModelsHasCurrent = true;
+                }
                 this.claudeModelsLoading = false;
                 return;
             }

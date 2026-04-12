@@ -21,6 +21,7 @@ const {
     normalizeClaudeValue,
     normalizeClaudeConfig,
     normalizeClaudeSettingsEnv,
+    getClaudeModelCatalogForBaseUrl,
     matchClaudeConfigFromSettings,
     findDuplicateClaudeConfigName,
     buildAgentsDiffPreview,
@@ -106,6 +107,21 @@ test('normalizeClaudeSettingsEnv fills missing fields with empty strings', () =>
         useKey: '',
         externalCredentialType: ''
     });
+});
+
+test('getClaudeModelCatalogForBaseUrl returns the built-in Anthropic model catalog', () => {
+    const models = getClaudeModelCatalogForBaseUrl('https://api.anthropic.com');
+    assert(models.includes('claude-opus-4-6'));
+    assert(models.includes('claude-sonnet-4-6'));
+    assert(models.includes('claude-haiku-4-5'));
+    assert(!models.includes('glm-5.1'));
+});
+
+test('getClaudeModelCatalogForBaseUrl appends BigModel extras for Claude-compatible endpoints', () => {
+    const models = getClaudeModelCatalogForBaseUrl('https://open.bigmodel.cn/api/anthropic');
+    assert(models.includes('claude-opus-4-6'));
+    assert(models.includes('glm-5.1'));
+    assert(models.includes('glm-coding'));
 });
 
 test('buildSessionListParams normalizes source and path filter before building request', () => {
