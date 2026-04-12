@@ -164,8 +164,10 @@ const SESSION_SCAN_MIN_FILES = 800;
 const SESSION_BROWSE_SCAN_FACTOR = 2;
 const SESSION_BROWSE_MIN_FILES = 120;
 const SESSION_BROWSE_SUMMARY_READ_BYTES = 64 * 1024;
+const SESSION_USAGE_TAIL_READ_BYTES = 64 * 1024;
 const SESSION_INVENTORY_CACHE_MAX_ENTRIES = 12;
 const MAX_SESSION_PATH_LIST_SIZE = 2000;
+const MAX_SESSION_USAGE_LIST_SIZE = 2000;
 const FAST_SESSION_DETAIL_PREVIEW_FILE_BYTES = 256 * 1024;
 const FAST_SESSION_DETAIL_PREVIEW_CHUNK_BYTES = 64 * 1024;
 const FAST_SESSION_DETAIL_PREVIEW_MAX_BYTES = 1024 * 1024;
@@ -3239,6 +3241,34 @@ function getFileHeadText(filePath, maxBytes = SESSION_SUMMARY_READ_BYTES) {
     }
 }
 
+function getFileTailText(filePath, maxBytes = SESSION_USAGE_TAIL_READ_BYTES) {
+    let fd;
+    try {
+        fd = fs.openSync(filePath, 'r');
+        const stat = fs.fstatSync(fd);
+        const size = Math.min(maxBytes, stat.size);
+        if (size <= 0) {
+            return '';
+        }
+
+        const start = Math.max(0, stat.size - size);
+        const buffer = Buffer.alloc(size);
+        fs.readSync(fd, buffer, 0, size, start);
+        let text = buffer.toString('utf-8');
+        if (start > 0) {
+            const newlineIndex = text.indexOf('\n');
+            text = newlineIndex >= 0 ? text.slice(newlineIndex + 1) : '';
+        }
+        return text;
+    } catch (e) {
+        return '';
+    } finally {
+        if (fd !== undefined) {
+            try { fs.closeSync(fd); } catch (e) {}
+        }
+    }
+}
+
 function parseJsonlContent(content) {
     if (!content) {
         return [];
@@ -3263,6 +3293,15 @@ function parseJsonlHeadRecords(filePath, maxBytes = SESSION_SUMMARY_READ_BYTES) 
     }
 
     return parseJsonlContent(headText);
+}
+
+function parseJsonlTailRecords(filePath, maxBytes = SESSION_USAGE_TAIL_READ_BYTES) {
+    const tailText = getFileTailText(filePath, maxBytes);
+    if (!tailText) {
+        return [];
+    }
+
+    return parseJsonlContent(tailText);
 }
 
 function buildClaudeStoredIndexMessageCount(messageCount) {
@@ -4548,6 +4587,30 @@ function readTotalTokensFromUsage(usage) {
     return (inputTokens || 0) + (outputTokens || 0) + (reasoningOutputTokens || 0);
 }
 
+function readUsageTotalsFromUsage(usage) {
+    if (!usage || typeof usage !== 'object' || Array.isArray(usage)) {
+        return null;
+    }
+    const inputTokens = readNonNegativeInteger(usage.input_tokens ?? usage.inputTokens);
+    const cachedInputTokens = readNonNegativeInteger(usage.cached_input_tokens ?? usage.cachedInputTokens);
+    const outputTokens = readNonNegativeInteger(usage.output_tokens ?? usage.outputTokens);
+    const reasoningOutputTokens = readNonNegativeInteger(usage.reasoning_output_tokens ?? usage.reasoningOutputTokens);
+    const totalTokens = readNonNegativeInteger(usage.total_tokens ?? usage.totalTokens)
+        ?? ((inputTokens === null && cachedInputTokens === null && outputTokens === null && reasoningOutputTokens === null)
+            ? null
+            : ((inputTokens || 0) + (outputTokens || 0) + (reasoningOutputTokens || 0)));
+    if (inputTokens === null && cachedInputTokens === null && outputTokens === null && reasoningOutputTokens === null && totalTokens === null) {
+        return null;
+    }
+    return {
+        inputTokens,
+        cachedInputTokens,
+        outputTokens,
+        reasoningOutputTokens,
+        totalTokens
+    };
+}
+
 function readContextWindowValue(target) {
     if (!target || typeof target !== 'object' || Array.isArray(target)) {
         return null;
@@ -4560,6 +4623,90 @@ function readContextWindowValue(target) {
     );
 }
 
+function applyUsageTotalsToState(state, usageTotals) {
+    if (!state || typeof state !== 'object' || !usageTotals || typeof usageTotals !== 'object' || Array.isArray(usageTotals)) {
+        return;
+    }
+    const pairs = [
+        ['inputTokens', usageTotals.inputTokens],
+        ['cachedInputTokens', usageTotals.cachedInputTokens],
+        ['outputTokens', usageTotals.outputTokens],
+        ['reasoningOutputTokens', usageTotals.reasoningOutputTokens],
+        ['totalTokens', usageTotals.totalTokens]
+    ];
+    for (const [key, value] of pairs) {
+        const normalized = readNonNegativeInteger(value);
+        if (normalized === null) {
+            continue;
+        }
+        state[key] = Math.max(readNonNegativeInteger(state[key]) || 0, normalized);
+    }
+}
+
+function readSessionModelFromRecord(record) {
+    if (!record || typeof record !== 'object' || Array.isArray(record)) {
+        return '';
+    }
+    const payload = record.payload && typeof record.payload === 'object' && !Array.isArray(record.payload)
+        ? record.payload
+        : null;
+    const message = record.message && typeof record.message === 'object' && !Array.isArray(record.message)
+        ? record.message
+        : null;
+    const candidates = [
+        payload && payload.model,
+        payload && payload.model_id,
+        payload && payload.modelId,
+        message && message.model,
+        record.model,
+        record.model_id,
+        record.modelId
+    ];
+    for (const candidate of candidates) {
+        if (typeof candidate === 'string' && candidate.trim()) {
+            return candidate.trim();
+        }
+    }
+    return '';
+}
+
+function readExplicitSessionProviderFromRecord(record) {
+    if (!record || typeof record !== 'object' || Array.isArray(record)) {
+        return '';
+    }
+    const payload = record.payload && typeof record.payload === 'object' && !Array.isArray(record.payload)
+        ? record.payload
+        : null;
+    const message = record.message && typeof record.message === 'object' && !Array.isArray(record.message)
+        ? record.message
+        : null;
+    const candidates = [
+        payload && payload.model_provider,
+        payload && payload.modelProvider,
+        payload && payload.provider,
+        payload && payload.provider_name,
+        payload && payload.providerName,
+        message && message.provider,
+        record.provider,
+        record.provider_name,
+        record.providerName
+    ];
+    for (const candidate of candidates) {
+        if (typeof candidate === 'string' && candidate.trim()) {
+            return candidate.trim();
+        }
+    }
+    return '';
+}
+
+function readSessionProviderFromRecord(record, source = '') {
+    const provider = readExplicitSessionProviderFromRecord(record);
+    if (provider) {
+        return provider;
+    }
+    return source === 'claude' ? 'claude' : 'codex';
+}
+
 function applySessionUsageSummaryFromRecord(state, record, source) {
     if (!state || typeof state !== 'object' || !record || typeof record !== 'object' || Array.isArray(record)) {
         return;
@@ -4567,6 +4714,7 @@ function applySessionUsageSummaryFromRecord(state, record, source) {
 
     let totalTokens = null;
     let contextWindow = null;
+    let usageTotals = null;
 
     if (source === 'codex') {
         const payload = record.payload && typeof record.payload === 'object' && !Array.isArray(record.payload)
@@ -4575,6 +4723,9 @@ function applySessionUsageSummaryFromRecord(state, record, source) {
         const info = payload && payload.info && typeof payload.info === 'object' && !Array.isArray(payload.info)
             ? payload.info
             : null;
+        usageTotals = readUsageTotalsFromUsage(info && info.total_token_usage)
+            ?? readUsageTotalsFromUsage(payload && payload.total_token_usage)
+            ?? readUsageTotalsFromUsage(payload && payload.usage);
         totalTokens = readTotalTokensFromUsage(info && info.total_token_usage)
             ?? readTotalTokensFromUsage(payload && payload.total_token_usage)
             ?? readTotalTokensFromUsage(payload && payload.usage);
@@ -4587,6 +4738,9 @@ function applySessionUsageSummaryFromRecord(state, record, source) {
         const payload = record.payload && typeof record.payload === 'object' && !Array.isArray(record.payload)
             ? record.payload
             : null;
+        usageTotals = readUsageTotalsFromUsage(record.usage)
+            ?? readUsageTotalsFromUsage(message && message.usage)
+            ?? readUsageTotalsFromUsage(payload && payload.usage);
         totalTokens = readTotalTokensFromUsage(record.usage)
             ?? readTotalTokensFromUsage(message && message.usage)
             ?? readTotalTokensFromUsage(payload && payload.usage);
@@ -4594,6 +4748,8 @@ function applySessionUsageSummaryFromRecord(state, record, source) {
             ?? readContextWindowValue(message)
             ?? readContextWindowValue(payload);
     }
+
+    applyUsageTotalsToState(state, usageTotals);
 
     if (totalTokens !== null) {
         state.totalTokens = Math.max(readNonNegativeInteger(state.totalTokens) || 0, totalTokens);
@@ -4610,7 +4766,10 @@ function applySessionUsageSummaryFromIndexEntry(state, entry) {
     const totalTokens = readNonNegativeInteger(entry.totalTokens)
         ?? readTotalTokensFromUsage(entry.totalTokenUsage)
         ?? readTotalTokensFromUsage(entry.usage);
+    const usageTotals = readUsageTotalsFromUsage(entry.totalTokenUsage)
+        ?? readUsageTotalsFromUsage(entry.usage);
     const contextWindow = readContextWindowValue(entry);
+    applyUsageTotalsToState(state, usageTotals);
     if (totalTokens !== null) {
         state.totalTokens = Math.max(readNonNegativeInteger(state.totalTokens) || 0, totalTokens);
     }
@@ -4646,7 +4805,13 @@ function parseCodexSessionSummary(filePath, options = {}) {
     let messageCount = 0;
     let totalTokens = 0;
     let contextWindow = 0;
-    const usageState = { totalTokens, contextWindow };
+    let inputTokens = 0;
+    let cachedInputTokens = 0;
+    let outputTokens = 0;
+    let reasoningOutputTokens = 0;
+    let provider = 'codex';
+    let model = '';
+    const usageState = { totalTokens, contextWindow, inputTokens, cachedInputTokens, outputTokens, reasoningOutputTokens };
     const previewMessages = [];
 
     for (const record of records) {
@@ -4657,13 +4822,20 @@ function parseCodexSessionSummary(filePath, options = {}) {
         applySessionUsageSummaryFromRecord(usageState, record, 'codex');
         totalTokens = usageState.totalTokens || 0;
         contextWindow = usageState.contextWindow || 0;
+        inputTokens = usageState.inputTokens || 0;
+        cachedInputTokens = usageState.cachedInputTokens || 0;
+        outputTokens = usageState.outputTokens || 0;
+        reasoningOutputTokens = usageState.reasoningOutputTokens || 0;
 
         if (record.type === 'session_meta' && record.payload) {
             sessionId = record.payload.id || sessionId;
             cwd = record.payload.cwd || cwd;
             createdAt = toIsoTime(record.payload.timestamp || record.timestamp, createdAt);
+            provider = readSessionProviderFromRecord(record, 'codex') || provider;
             continue;
         }
+
+        model = readSessionModelFromRecord(record) || model;
 
         if (record.type === 'response_item' && record.payload && record.payload.type === 'message') {
             const role = normalizeRole(record.payload.role);
@@ -4672,6 +4844,19 @@ function parseCodexSessionSummary(filePath, options = {}) {
                 previewMessages.push({ role, text });
             }
         }
+    }
+
+    const tailRecords = parseJsonlTailRecords(filePath, summaryReadBytes);
+    for (const record of tailRecords) {
+        applySessionUsageSummaryFromRecord(usageState, record, 'codex');
+        totalTokens = usageState.totalTokens || 0;
+        contextWindow = usageState.contextWindow || 0;
+        inputTokens = usageState.inputTokens || 0;
+        cachedInputTokens = usageState.cachedInputTokens || 0;
+        outputTokens = usageState.outputTokens || 0;
+        reasoningOutputTokens = usageState.reasoningOutputTokens || 0;
+        provider = readExplicitSessionProviderFromRecord(record) || provider;
+        model = readSessionModelFromRecord(record) || model;
     }
 
     const filteredPreviewMessages = removeLeadingSystemMessage(previewMessages);
@@ -4708,7 +4893,8 @@ function parseCodexSessionSummary(filePath, options = {}) {
     return {
         source: 'codex',
         sourceLabel: 'Codex',
-        provider: 'codex',
+        provider,
+        model,
         sessionId,
         title: firstPrompt || sessionId,
         cwd,
@@ -4717,6 +4903,10 @@ function parseCodexSessionSummary(filePath, options = {}) {
         messageCount,
         totalTokens,
         contextWindow,
+        inputTokens,
+        cachedInputTokens,
+        outputTokens,
+        reasoningOutputTokens,
         __messageCountExact: isSessionSummaryMessageCountExact(stat, summaryReadBytes),
         filePath,
         keywords: [],
@@ -4749,7 +4939,13 @@ function parseClaudeSessionSummary(filePath, options = {}) {
     let messageCount = 0;
     let totalTokens = 0;
     let contextWindow = 0;
-    const usageState = { totalTokens, contextWindow };
+    let inputTokens = 0;
+    let cachedInputTokens = 0;
+    let outputTokens = 0;
+    let reasoningOutputTokens = 0;
+    let provider = 'claude';
+    let model = '';
+    const usageState = { totalTokens, contextWindow, inputTokens, cachedInputTokens, outputTokens, reasoningOutputTokens };
     const previewMessages = [];
     let createdAt = '';
     let updatedAt = stat.mtime.toISOString();
@@ -4765,10 +4961,17 @@ function parseClaudeSessionSummary(filePath, options = {}) {
         applySessionUsageSummaryFromRecord(usageState, record, 'claude');
         totalTokens = usageState.totalTokens || 0;
         contextWindow = usageState.contextWindow || 0;
+        inputTokens = usageState.inputTokens || 0;
+        cachedInputTokens = usageState.cachedInputTokens || 0;
+        outputTokens = usageState.outputTokens || 0;
+        reasoningOutputTokens = usageState.reasoningOutputTokens || 0;
 
         if (!cwd && record.cwd) {
             cwd = record.cwd;
         }
+
+        provider = readExplicitSessionProviderFromRecord(record) || provider;
+        model = readSessionModelFromRecord(record) || model;
 
         const role = normalizeRole(record.type);
         if (role === 'assistant' || role === 'user' || role === 'system') {
@@ -4778,6 +4981,19 @@ function parseClaudeSessionSummary(filePath, options = {}) {
                 text: extractMessageText(userContent)
             });
         }
+    }
+
+    const tailRecords = parseJsonlTailRecords(filePath, summaryReadBytes);
+    for (const record of tailRecords) {
+        applySessionUsageSummaryFromRecord(usageState, record, 'claude');
+        totalTokens = usageState.totalTokens || 0;
+        contextWindow = usageState.contextWindow || 0;
+        inputTokens = usageState.inputTokens || 0;
+        cachedInputTokens = usageState.cachedInputTokens || 0;
+        outputTokens = usageState.outputTokens || 0;
+        reasoningOutputTokens = usageState.reasoningOutputTokens || 0;
+        provider = readExplicitSessionProviderFromRecord(record) || provider;
+        model = readSessionModelFromRecord(record) || model;
     }
 
     const filteredPreviewMessages = removeLeadingSystemMessage(previewMessages);
@@ -4813,7 +5029,8 @@ function parseClaudeSessionSummary(filePath, options = {}) {
     return {
         source: 'claude',
         sourceLabel: 'Claude Code',
-        provider: 'claude',
+        provider,
+        model,
         sessionId,
         title: firstPrompt || sessionId,
         cwd,
@@ -4822,6 +5039,10 @@ function parseClaudeSessionSummary(filePath, options = {}) {
         messageCount,
         totalTokens,
         contextWindow,
+        inputTokens,
+        cachedInputTokens,
+        outputTokens,
+        reasoningOutputTokens,
         __messageCountExact: isSessionSummaryMessageCountExact(stat, summaryReadBytes),
         filePath,
         keywords: [],
@@ -4945,11 +5166,20 @@ function listClaudeSessions(limit, options = {}) {
             let messageCount = Number.isFinite(entry.messageCount) ? Math.max(0, entry.messageCount - 1) : 0;
             let totalTokens = 0;
             let contextWindow = 0;
+            let inputTokens = 0;
+            let cachedInputTokens = 0;
+            let outputTokens = 0;
+            let reasoningOutputTokens = 0;
+            let model = typeof entry.model === 'string' ? entry.model.trim() : '';
 
-            const usageState = { totalTokens, contextWindow };
+            const usageState = { totalTokens, contextWindow, inputTokens, cachedInputTokens, outputTokens, reasoningOutputTokens };
             applySessionUsageSummaryFromIndexEntry(usageState, entry);
             totalTokens = usageState.totalTokens || 0;
             contextWindow = usageState.contextWindow || 0;
+            inputTokens = usageState.inputTokens || 0;
+            cachedInputTokens = usageState.cachedInputTokens || 0;
+            outputTokens = usageState.outputTokens || 0;
+            reasoningOutputTokens = usageState.reasoningOutputTokens || 0;
 
             const quickRecords = parseJsonlHeadRecords(filePath, summaryReadBytes);
             if (quickRecords.length > 0) {
@@ -4961,6 +5191,7 @@ function listClaudeSessions(limit, options = {}) {
                 const quickMessages = [];
                 for (const record of quickRecords) {
                     applySessionUsageSummaryFromRecord(usageState, record, 'claude');
+                    model = readSessionModelFromRecord(record) || model;
                     const role = normalizeRole(record.type);
                     if (role === 'assistant' || role === 'user' || role === 'system') {
                         const content = record.message ? record.message.content : '';
@@ -4969,12 +5200,28 @@ function listClaudeSessions(limit, options = {}) {
                 }
                 totalTokens = usageState.totalTokens || 0;
                 contextWindow = usageState.contextWindow || 0;
+                inputTokens = usageState.inputTokens || 0;
+                cachedInputTokens = usageState.cachedInputTokens || 0;
+                outputTokens = usageState.outputTokens || 0;
+                reasoningOutputTokens = usageState.reasoningOutputTokens || 0;
                 const filteredQuickMessages = removeLeadingSystemMessage(quickMessages);
                 const firstUser = filteredQuickMessages.find(item => item.role === 'user' && item.text);
                 if (firstUser) {
                     title = truncateText(firstUser.text, 120);
                 }
             }
+
+            const tailRecords = parseJsonlTailRecords(filePath, summaryReadBytes);
+            for (const record of tailRecords) {
+                applySessionUsageSummaryFromRecord(usageState, record, 'claude');
+                model = readSessionModelFromRecord(record) || model;
+            }
+            totalTokens = usageState.totalTokens || 0;
+            contextWindow = usageState.contextWindow || 0;
+            inputTokens = usageState.inputTokens || 0;
+            cachedInputTokens = usageState.cachedInputTokens || 0;
+            outputTokens = usageState.outputTokens || 0;
+            reasoningOutputTokens = usageState.reasoningOutputTokens || 0;
 
             const provider = typeof entry.provider === 'string' && entry.provider.trim()
                 ? entry.provider.trim()
@@ -4994,6 +5241,11 @@ function listClaudeSessions(limit, options = {}) {
                 messageCount,
                 totalTokens,
                 contextWindow,
+                inputTokens,
+                cachedInputTokens,
+                outputTokens,
+                reasoningOutputTokens,
+                model,
                 __messageCountExact: quickRecords.length > 0 && isSessionSummaryMessageCountExact(fileStat, summaryReadBytes),
                 filePath,
                 keywords,
@@ -5159,8 +5411,8 @@ async function listSessionUsage(params = {}) {
         : 'all';
     const rawLimit = Number(params.limit);
     const limit = Number.isFinite(rawLimit)
-        ? Math.max(1, Math.min(rawLimit, MAX_SESSION_LIST_SIZE))
-        : 200;
+        ? Math.max(1, Math.min(rawLimit, MAX_SESSION_USAGE_LIST_SIZE))
+        : MAX_SESSION_USAGE_LIST_SIZE;
     const sessions = await listSessionBrowse({
         source,
         limit,

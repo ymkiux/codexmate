@@ -30,6 +30,23 @@ const setSessionInventoryCacheSrc = extractFunction(cliContent, 'setSessionInven
 const listSessionInventoryBySourceSrc = extractFunction(cliContent, 'listSessionInventoryBySource');
 const listSessionPathsSrc = extractFunction(cliContent, 'listSessionPaths');
 const resolveSessionFilePathSrc = extractFunction(cliContent, 'resolveSessionFilePath');
+const getFileHeadTextSrc = extractFunction(cliContent, 'getFileHeadText');
+const getFileTailTextSrc = extractFunction(cliContent, 'getFileTailText');
+const parseJsonlContentSrc = extractFunction(cliContent, 'parseJsonlContent');
+const parseJsonlHeadRecordsSrc = extractFunction(cliContent, 'parseJsonlHeadRecords');
+const parseJsonlTailRecordsSrc = extractFunction(cliContent, 'parseJsonlTailRecords');
+const isSessionSummaryMessageCountExactSrc = extractFunction(cliContent, 'isSessionSummaryMessageCountExact');
+const removeLeadingSystemMessageSrc = extractFunction(cliContent, 'removeLeadingSystemMessage');
+const readNonNegativeIntegerSrc = extractFunction(cliContent, 'readNonNegativeInteger');
+const readTotalTokensFromUsageSrc = extractFunction(cliContent, 'readTotalTokensFromUsage');
+const readUsageTotalsFromUsageSrc = extractFunction(cliContent, 'readUsageTotalsFromUsage');
+const readContextWindowValueSrc = extractFunction(cliContent, 'readContextWindowValue');
+const applyUsageTotalsToStateSrc = extractFunction(cliContent, 'applyUsageTotalsToState');
+const readSessionModelFromRecordSrc = extractFunction(cliContent, 'readSessionModelFromRecord');
+const readExplicitSessionProviderFromRecordSrc = extractFunction(cliContent, 'readExplicitSessionProviderFromRecord');
+const readSessionProviderFromRecordSrc = extractFunction(cliContent, 'readSessionProviderFromRecord');
+const applySessionUsageSummaryFromRecordSrc = extractFunction(cliContent, 'applySessionUsageSummaryFromRecord');
+const parseCodexSessionSummarySrc = extractFunction(cliContent, 'parseCodexSessionSummary');
 
 function instantiateListSessionUsage(bindings = {}) {
     const bindingNames = Object.keys(bindings);
@@ -123,7 +140,7 @@ test('listSessionUsage uses lightweight session listing without exact hydration'
         throw new Error('should not call listAllSessionsData');
     };
     const listSessionUsage = instantiateListSessionUsage({
-        MAX_SESSION_LIST_SIZE: 300,
+        MAX_SESSION_USAGE_LIST_SIZE: 2000,
         listSessionBrowse,
         listAllSessionsData
     });
@@ -165,7 +182,7 @@ test('listSessionUsage normalizes source and default limit for lightweight usage
         return [];
     };
     const listSessionUsage = instantiateListSessionUsage({
-        MAX_SESSION_LIST_SIZE: 300,
+        MAX_SESSION_USAGE_LIST_SIZE: 2000,
         listSessionBrowse,
         listAllSessionsData: async () => {
             throw new Error('should not call listAllSessionsData');
@@ -182,15 +199,139 @@ test('listSessionUsage normalizes source and default limit for lightweight usage
     assert.deepStrictEqual(calls, [
         {
             source: 'all',
-            limit: 300,
+            limit: 2000,
             forceRefresh: true
         },
         {
             source: 'all',
-            limit: 200,
+            limit: 2000,
             forceRefresh: false
         }
     ]);
+});
+
+test('parseCodexSessionSummary reads token totals and model data from tail records', () => {
+    const parseCodexSessionSummary = instantiateFunctionBundle(
+        [
+            getFileHeadTextSrc,
+            getFileTailTextSrc,
+            parseJsonlContentSrc,
+            parseJsonlHeadRecordsSrc,
+            parseJsonlTailRecordsSrc,
+            isSessionSummaryMessageCountExactSrc,
+            removeLeadingSystemMessageSrc,
+            readNonNegativeIntegerSrc,
+            readTotalTokensFromUsageSrc,
+            readUsageTotalsFromUsageSrc,
+            readContextWindowValueSrc,
+            applyUsageTotalsToStateSrc,
+            readSessionModelFromRecordSrc,
+            readExplicitSessionProviderFromRecordSrc,
+            readSessionProviderFromRecordSrc,
+            applySessionUsageSummaryFromRecordSrc,
+            parseCodexSessionSummarySrc
+        ],
+        'parseCodexSessionSummary',
+        {
+            fs,
+            path,
+            Buffer,
+            SESSION_SUMMARY_READ_BYTES: 512,
+            SESSION_TITLE_READ_BYTES: 512,
+            SESSION_USAGE_TAIL_READ_BYTES: 256,
+            toIsoTime(value, fallback = '') {
+                const iso = new Date(value).toISOString();
+                return iso === 'Invalid Date' ? fallback : iso;
+            },
+            updateLatestIso(current, next) {
+                const currentMs = Date.parse(current || '');
+                const nextMs = Date.parse(next || '');
+                if (!Number.isFinite(nextMs)) return current || '';
+                if (!Number.isFinite(currentMs) || nextMs > currentMs) return new Date(nextMs).toISOString();
+                return current || '';
+            },
+            normalizeRole(role) {
+                return typeof role === 'string' ? role.trim().toLowerCase() : '';
+            },
+            extractMessageText(content) {
+                if (typeof content === 'string') return content;
+                if (Array.isArray(content)) {
+                    return content.map((item) => item && item.text ? item.text : '').join(' ').trim();
+                }
+                return '';
+            },
+            truncateText(text) {
+                return typeof text === 'string' ? text : '';
+            },
+            isBootstrapLikeText() {
+                return false;
+            }
+        }
+    );
+
+    const tempDir = fs.mkdtempSync(path.join(__dirname, 'tmp-session-usage-'));
+    const filePath = path.join(tempDir, 'codex-tail.jsonl');
+    fs.writeFileSync(filePath, [
+        JSON.stringify({
+            timestamp: '2026-04-12T09:07:26.688Z',
+            type: 'session_meta',
+            payload: {
+                id: 'codex-tail',
+                timestamp: '2026-04-12T09:07:24.127Z',
+                cwd: '/repo',
+                model_provider: 'maxx'
+            }
+        }),
+        JSON.stringify({
+            timestamp: '2026-04-12T09:07:26.690Z',
+            type: 'response_item',
+            payload: {
+                type: 'message',
+                role: 'user',
+                content: [{ type: 'input_text', text: 'hello world' }]
+            }
+        }),
+        JSON.stringify({
+            timestamp: '2026-04-12T09:11:35.573Z',
+            type: 'turn_context',
+            payload: {
+                model: 'gpt-5.3-codex',
+                model_context_window: 258400
+            }
+        }),
+        JSON.stringify({
+            timestamp: '2026-04-12T09:11:35.588Z',
+            type: 'event_msg',
+            payload: {
+                type: 'token_count',
+                info: {
+                    total_token_usage: {
+                        input_tokens: 348969,
+                        cached_input_tokens: 305664,
+                        output_tokens: 3032,
+                        reasoning_output_tokens: 1515,
+                        total_tokens: 352001
+                    },
+                    model_context_window: 258400
+                }
+            }
+        })
+    ].join('\n'));
+
+    try {
+        const result = parseCodexSessionSummary(filePath, { summaryReadBytes: 512, titleReadBytes: 512 });
+        assert(result, 'expected codex session summary');
+        assert.strictEqual(result.provider, 'maxx');
+        assert.strictEqual(result.model, 'gpt-5.3-codex');
+        assert.strictEqual(result.totalTokens, 352001);
+        assert.strictEqual(result.inputTokens, 348969);
+        assert.strictEqual(result.cachedInputTokens, 305664);
+        assert.strictEqual(result.outputTokens, 3032);
+        assert.strictEqual(result.reasoningOutputTokens, 1515);
+        assert.strictEqual(result.contextWindow, 258400);
+    } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+    }
 });
 
 test('listSessionInventoryBySource reuses cached summaries and registers session lookups', () => {

@@ -708,17 +708,84 @@ test('sessionUsageSummaryCards uses compact units for long token and context tot
                 busiestDay: null,
                 busiestHour: null
             }
-        }
+        },
+        sessionsUsageList: [],
+        providersList: [],
+        currentProvider: ''
     });
 
     const tokensCard = cards.find((card) => card.key === 'tokens');
     const contextCard = cards.find((card) => card.key === 'context-window');
+    const costCard = cards.find((card) => card.key === 'estimated-cost');
     assert(tokensCard, 'missing tokens summary card');
     assert(contextCard, 'missing context summary card');
+    assert(costCard, 'missing estimated cost summary card');
     assert.strictEqual(tokensCard.value, '1.2M');
     assert.strictEqual(tokensCard.title, '1,234,567');
     assert.strictEqual(contextCard.value, '256K');
     assert.strictEqual(contextCard.title, '256,000');
+    assert.strictEqual(costCard.value, '暂无');
+});
+
+test('sessionUsageSummaryCards estimates usage cost from configured provider pricing', () => {
+    const computed = createSessionComputed();
+    const cards = computed.sessionUsageSummaryCards.call({
+        sessionUsageCharts: {
+            summary: {
+                totalSessions: 2,
+                totalMessages: 10,
+                totalTokens: 600000,
+                totalContextWindow: 256000,
+                activeDays: 2,
+                avgMessagesPerSession: 5,
+                busiestDay: null,
+                busiestHour: null
+            }
+        },
+        sessionsUsageList: [
+            {
+                provider: 'maxx',
+                model: 'gpt-5.3-codex',
+                totalTokens: 400000,
+                inputTokens: 300000,
+                cachedInputTokens: 100000,
+                outputTokens: 50000,
+                reasoningOutputTokens: 50000
+            },
+            {
+                provider: 'maxx',
+                model: 'unknown-model',
+                totalTokens: 200000,
+                inputTokens: 100000,
+                cachedInputTokens: 0,
+                outputTokens: 100000,
+                reasoningOutputTokens: 0
+            }
+        ],
+        providersList: [
+            {
+                name: 'maxx',
+                models: [
+                    {
+                        id: 'gpt-5.3-codex',
+                        cost: {
+                            input: 2,
+                            output: 8,
+                            cacheRead: 0.5,
+                            cacheWrite: 0
+                        }
+                    }
+                ]
+            }
+        ],
+        currentProvider: 'maxx'
+    });
+
+    const costCard = cards.find((card) => card.key === 'estimated-cost');
+    assert(costCard, 'missing estimated cost summary card');
+    assert.strictEqual(costCard.value, '$1.25');
+    assert.match(costCard.title, /覆盖 1\/2 个会话/);
+    assert.match(costCard.title, /约 67% token/);
 });
 
 test('activeSessionVisibleMessages falls back to the initial preview batch before priming completes', () => {

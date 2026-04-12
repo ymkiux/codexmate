@@ -478,7 +478,7 @@ export function createSessionBrowserMethods(options = {}) {
             try {
                 const res = await api('list-sessions-usage', {
                     source: 'all',
-                    limit: 200,
+                    limit: 2000,
                     forceRefresh: !!options.forceRefresh
                 });
                 if (res.error) {
