@@ -33,19 +33,26 @@ function readUsageCostNumber(value) {
     return numeric;
 }
 
-function formatUsageEstimatedCost(value) {
+function formatUsageEstimatedCost(value, options = {}) {
     const numeric = Number(value);
     if (!Number.isFinite(numeric) || numeric <= 0) {
         return '$0.00';
     }
-    if (numeric < 0.01) {
-        return '<$0.01';
+    const precise = options && options.precise === true;
+    if (numeric < 0.0001) {
+        return '<$0.0001';
+    }
+    let fractionDigits = 2;
+    if (numeric < 1) {
+        fractionDigits = precise ? 6 : 4;
+    } else if (numeric >= 100) {
+        fractionDigits = 0;
     }
     return new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'USD',
-        minimumFractionDigits: numeric >= 100 ? 0 : 2,
-        maximumFractionDigits: numeric >= 100 ? 0 : 2
+        minimumFractionDigits: fractionDigits,
+        maximumFractionDigits: fractionDigits
     }).format(numeric);
 }
 
@@ -393,7 +400,7 @@ export function createSessionComputed() {
                     title: estimatedCost.hasEstimate
                         ? `${estimatedCost.catalogSessions > 0
                             ? (estimatedCost.configuredSessions > 0 ? '按 Provider 配置 + 公开模型目录单价估算' : '按公开模型目录单价估算')
-                            : '按 Provider 配置单价估算'}，覆盖 ${estimatedCost.estimatedSessions}/${estimatedCost.totalSessions} 个会话，约 ${estimatedCost.coveragePercent}% token`
+                            : '按 Provider 配置单价估算'}，估算 ${formatUsageEstimatedCost(estimatedCost.totalCostUsd, { precise: true })}，覆盖 ${estimatedCost.estimatedSessions}/${estimatedCost.totalSessions} 个会话，约 ${estimatedCost.coveragePercent}% token`
                         : '缺少可匹配的模型单价或 token 拆分。请先在 Provider 配置里补 models.cost，或确认 session 已记录 input/output token。'
                 },
                 {
