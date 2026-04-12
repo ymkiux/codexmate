@@ -153,6 +153,27 @@ export function createSessionActionMethods(options = {}) {
             return this.quoteShellArg(value);
         },
 
+        normalizeShareCommandPrefix(value) {
+            const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+            if (normalized === 'codexmate') {
+                return 'codexmate';
+            }
+            return 'npm start';
+        },
+
+        getShareCommandPrefixInvocation() {
+            const prefix = this.normalizeShareCommandPrefix(this.shareCommandPrefix);
+            return prefix === 'codexmate' ? 'codexmate' : 'npm start';
+        },
+
+        setShareCommandPrefix(value) {
+            const normalized = this.normalizeShareCommandPrefix(value);
+            this.shareCommandPrefix = normalized;
+            try {
+                localStorage.setItem('codexmateShareCommandPrefix', normalized);
+            } catch (_) {}
+        },
+
         fallbackCopyText(text) {
             let textarea = null;
             try {
@@ -258,14 +279,15 @@ export function createSessionActionMethods(options = {}) {
             const model = typeof payload.model === 'string' ? payload.model.trim() : '';
             if (!name || !baseUrl) return '';
 
+            const cli = this.getShareCommandPrefixInvocation();
             const nameArg = this.quoteShellArg(name);
             const urlArg = this.quoteShellArg(baseUrl);
             const keyArg = apiKey ? this.quoteShellArg(apiKey) : '';
-            const switchCmd = `codexmate switch ${nameArg}`;
+            const switchCmd = `${cli} switch ${nameArg}`;
             const addCmd = apiKey
-                ? `codexmate add ${nameArg} ${urlArg} ${keyArg}`
-                : `codexmate add ${nameArg} ${urlArg}`;
-            const modelCmd = model ? ` && codexmate use ${this.quoteShellArg(model)}` : '';
+                ? `${cli} add ${nameArg} ${urlArg} ${keyArg}`
+                : `${cli} add ${nameArg} ${urlArg}`;
+            const modelCmd = model ? ` && ${cli} use ${this.quoteShellArg(model)}` : '';
             return `${addCmd} && ${switchCmd}${modelCmd}`;
         },
 
@@ -280,7 +302,7 @@ export function createSessionActionMethods(options = {}) {
             const urlArg = this.quoteShellArg(baseUrl);
             const keyArg = this.quoteShellArg(apiKey);
             const modelArg = this.quoteShellArg(model);
-            return `codexmate claude ${urlArg} ${keyArg} ${modelArg}`;
+            return `${this.getShareCommandPrefixInvocation()} claude ${urlArg} ${keyArg} ${modelArg}`;
         },
 
         async copyProviderShareCommand(provider) {
@@ -290,7 +312,7 @@ export function createSessionActionMethods(options = {}) {
                 return;
             }
             if (!this.shouldAllowProviderShare(provider)) {
-                this.showMessage('本地入口不可分享', 'info');
+                this.showMessage('不可分享', 'info');
                 return;
             }
             if (this.providerShareLoading[name]) {

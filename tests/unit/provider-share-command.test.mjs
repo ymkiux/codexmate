@@ -53,16 +53,46 @@ function instantiateFunction(funcSource, funcName, bindings = {}) {
     return Function(...bindingNames, `${funcSource}\nreturn ${funcName};`)(...bindingValues);
 }
 
-function createProviderShareCommandBuilder(appSourceText) {
+function createProviderShareCommandBuilder(appSourceText, shareCommandPrefix = 'npm start') {
     const quoteShellArgSource = extractMethodAsFunction(appSourceText, 'quoteShellArg(value) {', 'quoteShellArg');
+    const normalizeShareCommandPrefixSource = extractMethodAsFunction(appSourceText, 'normalizeShareCommandPrefix(value) {', 'normalizeShareCommandPrefix');
+    const getShareCommandPrefixInvocationSource = extractMethodAsFunction(appSourceText, 'getShareCommandPrefixInvocation() {', 'getShareCommandPrefixInvocation');
     const buildProviderShareCommandSource = extractMethodAsFunction(
         appSourceText,
         'buildProviderShareCommand(payload) {',
         'buildProviderShareCommand'
     );
     const quoteShellArg = instantiateFunction(quoteShellArgSource, 'quoteShellArg');
+    const normalizeShareCommandPrefix = instantiateFunction(normalizeShareCommandPrefixSource, 'normalizeShareCommandPrefix');
+    const getShareCommandPrefixInvocation = instantiateFunction(getShareCommandPrefixInvocationSource, 'getShareCommandPrefixInvocation');
     const buildProviderShareCommand = instantiateFunction(buildProviderShareCommandSource, 'buildProviderShareCommand');
-    return (payload) => buildProviderShareCommand.call({ quoteShellArg }, payload);
+    return (payload) => buildProviderShareCommand.call({
+        quoteShellArg,
+        normalizeShareCommandPrefix,
+        getShareCommandPrefixInvocation,
+        shareCommandPrefix
+    }, payload);
+}
+
+function createClaudeShareCommandBuilder(appSourceText, shareCommandPrefix = 'npm start') {
+    const quoteShellArgSource = extractMethodAsFunction(appSourceText, 'quoteShellArg(value) {', 'quoteShellArg');
+    const normalizeShareCommandPrefixSource = extractMethodAsFunction(appSourceText, 'normalizeShareCommandPrefix(value) {', 'normalizeShareCommandPrefix');
+    const getShareCommandPrefixInvocationSource = extractMethodAsFunction(appSourceText, 'getShareCommandPrefixInvocation() {', 'getShareCommandPrefixInvocation');
+    const buildClaudeShareCommandSource = extractMethodAsFunction(
+        appSourceText,
+        'buildClaudeShareCommand(payload) {',
+        'buildClaudeShareCommand'
+    );
+    const quoteShellArg = instantiateFunction(quoteShellArgSource, 'quoteShellArg');
+    const normalizeShareCommandPrefix = instantiateFunction(normalizeShareCommandPrefixSource, 'normalizeShareCommandPrefix');
+    const getShareCommandPrefixInvocation = instantiateFunction(getShareCommandPrefixInvocationSource, 'getShareCommandPrefixInvocation');
+    const buildClaudeShareCommand = instantiateFunction(buildClaudeShareCommandSource, 'buildClaudeShareCommand');
+    return (payload) => buildClaudeShareCommand.call({
+        quoteShellArg,
+        normalizeShareCommandPrefix,
+        getShareCommandPrefixInvocation,
+        shareCommandPrefix
+    }, payload);
 }
 
 test('buildProviderSharePayload includes model for shared provider', () => {
@@ -126,7 +156,7 @@ test('buildProviderShareCommand appends model switch command when model exists',
 
     assert.strictEqual(
         command,
-        "codexmate add alpha 'https://api.example.com/v1' sk-alpha && codexmate switch alpha && codexmate use alpha-share-model"
+        "npm start add alpha 'https://api.example.com/v1' sk-alpha && npm start switch alpha && npm start use alpha-share-model"
     );
 });
 
@@ -139,7 +169,36 @@ test('buildProviderShareCommand keeps legacy command when payload model is empty
         model: ''
     });
 
-    assert.strictEqual(command, "codexmate add alpha 'https://api.example.com/v1' sk-alpha && codexmate switch alpha");
+    assert.strictEqual(command, "npm start add alpha 'https://api.example.com/v1' sk-alpha && npm start switch alpha");
+});
+
+test('buildProviderShareCommand supports codexmate prefix', () => {
+    const buildProviderShareCommand = createProviderShareCommandBuilder(appSource, 'codexmate');
+    const command = buildProviderShareCommand({
+        name: 'alpha',
+        baseUrl: 'https://api.example.com/v1',
+        apiKey: 'sk-alpha',
+        model: 'alpha-share-model'
+    });
+
+    assert.strictEqual(
+        command,
+        "codexmate add alpha 'https://api.example.com/v1' sk-alpha && codexmate switch alpha && codexmate use alpha-share-model"
+    );
+});
+
+test('buildClaudeShareCommand respects the configured share prefix', () => {
+    const buildClaudeShareCommand = createClaudeShareCommandBuilder(appSource);
+    const command = buildClaudeShareCommand({
+        baseUrl: 'https://claude.example.com',
+        apiKey: 'sk-claude',
+        model: 'claude-3-7-sonnet'
+    });
+
+    assert.strictEqual(
+        command,
+        "npm start claude 'https://claude.example.com' sk-claude claude-3-7-sonnet"
+    );
 });
 
 test('applyConfigTemplate rejects invalid positive integer context budget values', () => {
@@ -1063,4 +1122,135 @@ test('applyCodexConfigDirect surfaces backend validation details from direct app
     }]);
     assert.strictEqual(context.codexApplying, false);
     assert.strictEqual(context._pendingCodexApplyOptions, null);
+});
+
+test('applyConfigTemplate rejects missing provider blocks instead of synthesizing local', () => {
+    const normalizePositiveIntegerParamSource = extractBlockBySignature(
+        cliSource,
+        'function normalizePositiveIntegerParam(value) {'
+    );
+    const applyConfigTemplateSource = extractBlockBySignature(cliSource, 'function applyConfigTemplate(params = {}) {');
+    const applyConfigTemplate = instantiateFunction(applyConfigTemplateSource, 'applyConfigTemplate', {
+        toml: require('@iarna/toml'),
+        normalizePositiveIntegerParam: instantiateFunction(normalizePositiveIntegerParamSource, 'normalizePositiveIntegerParam'),
+        writeConfig() {
+            throw new Error('should not write config');
+        },
+        updateAuthJson() {
+            throw new Error('should not update auth');
+        },
+        readModels() {
+            return [];
+        },
+        writeModels() {},
+        readCurrentModels() {
+            return {};
+        },
+        writeCurrentModels() {},
+        recordRecentConfig() {}
+    });
+
+    const result = applyConfigTemplate({
+        template: [
+            'model_provider = "local"',
+            'model = "gpt-5"',
+            '',
+            '[model_providers.openai]',
+            'base_url = "https://api.openai.com/v1"',
+            'preferred_auth_method = ""'
+        ].join('\n')
+    });
+
+    assert.deepStrictEqual(result, { error: '模板中找不到当前 provider: local' });
+});
+
+test('buildMcpProviderListPayload keeps regular providers editable', () => {
+    const buildMcpProviderListPayloadSource = extractBlockBySignature(
+        cliSource,
+        'function buildMcpProviderListPayload() {'
+    );
+    const buildMcpProviderListPayload = instantiateFunction(
+        buildMcpProviderListPayloadSource,
+        'buildMcpProviderListPayload',
+        {
+            readConfigOrVirtualDefault: () => ({
+                isVirtual: false,
+                errorType: '',
+                reason: '',
+                config: {
+                    model_provider: 'openai',
+                    model_providers: {
+                        openai: {
+                            base_url: 'https://api.openai.com/v1',
+                            preferred_auth_method: 'sk-live'
+                        }
+                    }
+                }
+            }),
+            maskKey: (value) => value ? '***' : '',
+            isBuiltinManagedProvider: () => false,
+            isNonDeletableProvider: () => false,
+            isNonEditableProvider: () => false
+        }
+    );
+
+    const payload = buildMcpProviderListPayload();
+    const openai = payload.providers.find((item) => item.name === 'openai');
+
+    assert.ok(openai, 'regular provider should remain present');
+    assert.strictEqual(openai.readOnly, false);
+    assert.strictEqual(openai.nonEditable, false);
+    assert.strictEqual(openai.nonDeletable, false);
+    assert.strictEqual(openai.current, true);
+});
+
+test('applyCodexConfigDirect applies provider config without local proxy indirection', async () => {
+    const applyCodexConfigDirectSource = extractBlockBySignature(
+        appSource,
+        'async applyCodexConfigDirect(options = {}) {'
+    ).replace(/^async applyCodexConfigDirect/, 'async function applyCodexConfigDirect');
+    const apiCalls = [];
+    const applyCodexConfigDirect = instantiateFunction(applyCodexConfigDirectSource, 'applyCodexConfigDirect', {
+        defaultModelContextWindow: 190000,
+        defaultModelAutoCompactTokenLimit: 185000,
+        hasResponseError: (response) => !!(response && response.error),
+        getResponseMessage: (response, fallback) => (response && response.error) || fallback,
+        api: async (action, params) => {
+            apiCalls.push({ action, params });
+            if (action === 'get-config-template') return { template: 'template-local' };
+            if (action === 'apply-config-template') return { success: true };
+            throw new Error(`Unexpected api action: ${action}`);
+        }
+    });
+
+    const context = {
+        codexApplying: false,
+        _pendingCodexApplyOptions: null,
+        currentProvider: 'openai',
+        currentModel: 'gpt-5',
+        serviceTier: 'fast',
+        modelReasoningEffort: 'high',
+        modelContextWindowInput: '190000',
+        modelAutoCompactTokenLimitInput: '185000',
+        normalizePositiveIntegerInput(value, label, fallback = '') {
+            const raw = value === undefined || value === null || value === ''
+                ? String(fallback || '')
+                : String(value);
+            const text = raw.trim();
+            const numeric = Number.parseInt(text, 10);
+            if (!Number.isFinite(numeric) || numeric <= 0) {
+                return { ok: false, error: `${label} invalid` };
+            }
+            return { ok: true, value: numeric, text: String(numeric) };
+        },
+        showMessage() {},
+        async loadAll() {}
+    };
+
+    await applyCodexConfigDirect.call(context, { silent: true });
+
+    assert.deepStrictEqual(apiCalls.map((item) => item.action), [
+        'get-config-template',
+        'apply-config-template'
+    ]);
 });

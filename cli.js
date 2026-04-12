@@ -10,7 +10,6 @@ const yauzl = require('yauzl');
 const { exec, execSync, spawn, spawnSync } = require('child_process');
 const http = require('http');
 const https = require('https');
-const net = require('net');
 const readline = require('readline');
 const {
     expandHomePath,
@@ -45,7 +44,8 @@ const {
     buildModelsCacheKey,
     buildModelProbeSpec,
     buildModelConversationSpecs,
-    extractModelResponseText
+    extractModelResponseText,
+    normalizeWireApi
 } = require('./lib/cli-models-utils');
 const {
     probeUrl,
@@ -66,6 +66,15 @@ const {
     executeWorkflowDefinition
 } = require('./lib/workflow-engine');
 const { buildConfigHealthReport: buildConfigHealthReportCore } = require('./cli/config-health');
+const {
+    createAuthProfileController
+} = require('./cli/auth-profiles');
+const {
+    createBuiltinProxyRuntimeController
+} = require('./cli/builtin-proxy');
+const {
+    createBuiltinClaudeProxyRuntimeController
+} = require('./cli/claude-proxy');
 const {
     readBundledWebUiCss,
     readBundledWebUiHtml,
@@ -89,6 +98,7 @@ const MODELS_FILE = path.join(CONFIG_DIR, 'models.json');
 const CURRENT_MODELS_FILE = path.join(CONFIG_DIR, 'provider-current-models.json');
 const INIT_MARK_FILE = path.join(CONFIG_DIR, 'codexmate-init.json');
 const BUILTIN_PROXY_SETTINGS_FILE = path.join(CONFIG_DIR, 'codexmate-proxy.json');
+const BUILTIN_CLAUDE_PROXY_SETTINGS_FILE = path.join(CONFIG_DIR, 'codexmate-claude-proxy.json');
 const CODEX_SESSIONS_DIR = path.join(CONFIG_DIR, 'sessions');
 const SESSION_TRASH_DIR = path.join(CONFIG_DIR, 'codexmate-session-trash');
 const SESSION_TRASH_FILES_DIR = path.join(SESSION_TRASH_DIR, 'files');
@@ -165,6 +175,14 @@ const DEFAULT_BUILTIN_PROXY_SETTINGS = Object.freeze({
     enabled: false,
     host: '127.0.0.1',
     port: 8318,
+    provider: '',
+    authSource: 'provider',
+    timeoutMs: 30000
+});
+const DEFAULT_BUILTIN_CLAUDE_PROXY_SETTINGS = Object.freeze({
+    enabled: false,
+    host: '127.0.0.1',
+    port: 8328,
     provider: '',
     authSource: 'provider',
     timeoutMs: 30000
@@ -520,28 +538,25 @@ let g_sessionFileLookupCache = {
 let g_exactMessageCountCache = new Map();
 let g_modelsCache = new Map();
 let g_modelsInFlight = new Map();
-let g_builtinProxyRuntime = null;
-const DEFAULT_LOCAL_PROVIDER_NAME = 'local';
 
 function isBuiltinProxyProvider(providerName) {
     return typeof providerName === 'string' && providerName.trim().toLowerCase() === BUILTIN_PROXY_PROVIDER_NAME.toLowerCase();
 }
 
 function isReservedProviderNameForCreation(providerName) {
-    return typeof providerName === 'string'
-        && providerName.trim().toLowerCase() === DEFAULT_LOCAL_PROVIDER_NAME;
+    return false;
 }
 
-function isDefaultLocalProvider(providerName) {
-    return typeof providerName === 'string' && providerName.trim() === DEFAULT_LOCAL_PROVIDER_NAME;
+function isBuiltinManagedProvider(providerName) {
+    return isBuiltinProxyProvider(providerName);
 }
 
 function isNonDeletableProvider(providerName) {
-    return isBuiltinProxyProvider(providerName) || isDefaultLocalProvider(providerName);
+    return isBuiltinManagedProvider(providerName);
 }
 
 function isNonEditableProvider(providerName) {
-    return isBuiltinProxyProvider(providerName) || isDefaultLocalProvider(providerName);
+    return isBuiltinManagedProvider(providerName);
 }
 
 // ============================================================================
@@ -1162,315 +1177,26 @@ function collectModelProviderHeaderSegmentKeySet(content) {
     return keys;
 }
 
-function normalizeAuthProfileName(value) {
-    const raw = typeof value === 'string' ? value.trim() : '';
-    if (!raw) return '';
-    const sanitized = raw
-        .replace(/[\\\/:*?"<>|]/g, '-')
-        .replace(/\s+/g, '-')
-        .replace(/^-+|-+$/g, '')
-        .slice(0, 120);
-    return sanitized;
-}
-
-function normalizeAuthRegistry(raw) {
-    const fallback = { version: 1, current: '', items: [] };
-    if (!isPlainObject(raw)) return fallback;
-    const items = Array.isArray(raw.items)
-        ? raw.items.filter(item => isPlainObject(item) && typeof item.name === 'string' && item.name.trim())
-        : [];
-    return {
-        version: 1,
-        current: typeof raw.current === 'string' ? raw.current.trim() : '',
-        items: items.map((item) => ({
-            name: normalizeAuthProfileName(item.name) || item.name.trim(),
-            fileName: typeof item.fileName === 'string' ? path.basename(item.fileName) : '',
-            type: typeof item.type === 'string' ? item.type : '',
-            email: typeof item.email === 'string' ? item.email : '',
-            accountId: typeof item.accountId === 'string' ? item.accountId : '',
-            expired: typeof item.expired === 'string' ? item.expired : '',
-            lastRefresh: typeof item.lastRefresh === 'string' ? item.lastRefresh : '',
-            updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : '',
-            importedAt: typeof item.importedAt === 'string' ? item.importedAt : '',
-            sourceFile: typeof item.sourceFile === 'string' ? item.sourceFile : ''
-        }))
-    };
-}
-
-function ensureAuthProfileStoragePrepared() {
-    ensureDir(AUTH_PROFILES_DIR);
-}
-
-function readAuthRegistry() {
-    ensureAuthProfileStoragePrepared();
-    const parsed = readJsonFile(AUTH_REGISTRY_FILE, null);
-    return normalizeAuthRegistry(parsed);
-}
-
-function writeAuthRegistry(registry) {
-    ensureAuthProfileStoragePrepared();
-    writeJsonAtomic(AUTH_REGISTRY_FILE, normalizeAuthRegistry(registry));
-}
-
-function parseAuthProfileJson(rawContent, label = '') {
-    let parsed;
-    try {
-        parsed = JSON.parse(stripUtf8Bom(String(rawContent || '')));
-    } catch (e) {
-        throw new Error(`认证文件不是有效 JSON${label ? `: ${label}` : ''}`);
-    }
-    if (!isPlainObject(parsed)) {
-        throw new Error('认证文件根节点必须是对象');
-    }
-    const hasCredential = ['access_token', 'refresh_token', 'id_token', 'OPENAI_API_KEY']
-        .some((key) => typeof parsed[key] === 'string' && parsed[key].trim());
-    if (!hasCredential) {
-        throw new Error('认证文件缺少可用凭据（access_token / refresh_token / id_token / OPENAI_API_KEY）');
-    }
-    return parsed;
-}
-
-function buildAuthProfileSummary(name, payload, fileName = '') {
-    const safePayload = isPlainObject(payload) ? payload : {};
-    return {
-        name,
-        fileName: fileName || `${name}.json`,
-        type: typeof safePayload.type === 'string' ? safePayload.type : '',
-        email: typeof safePayload.email === 'string' ? safePayload.email : '',
-        accountId: typeof safePayload.account_id === 'string'
-            ? safePayload.account_id
-            : (typeof safePayload.accountId === 'string' ? safePayload.accountId : ''),
-        expired: typeof safePayload.expired === 'string' ? safePayload.expired : '',
-        lastRefresh: typeof safePayload.last_refresh === 'string'
-            ? safePayload.last_refresh
-            : (typeof safePayload.lastRefresh === 'string' ? safePayload.lastRefresh : ''),
-        updatedAt: toIsoTime(Date.now())
-    };
-}
-
-function getAuthProfileNameFallback(payload, fallbackName = '') {
-    const fromPayload = isPlainObject(payload)
-        ? (payload.email || payload.account_id || payload.accountId || '')
-        : '';
-    const fromFallback = typeof fallbackName === 'string' ? fallbackName : '';
-    const resolved = normalizeAuthProfileName(fromPayload) || normalizeAuthProfileName(fromFallback);
-    if (resolved) return resolved;
-    return `auth-${Date.now()}`;
-}
-
-function listAuthProfilesInfo() {
-    const registry = readAuthRegistry();
-    return registry.items.map((item) => ({
-        ...item,
-        current: item.name === registry.current
-    }));
-}
-
-function upsertAuthProfile(payload, options = {}) {
-    ensureAuthProfileStoragePrepared();
-    const safePayload = parseAuthProfileJson(JSON.stringify(payload || {}));
-    const sourceFile = typeof options.sourceFile === 'string' ? options.sourceFile : '';
-    const preferredName = normalizeAuthProfileName(options.name || '');
-    const profileName = preferredName || getAuthProfileNameFallback(safePayload, sourceFile);
-    const fileName = `${profileName}.json`;
-    const profilePath = path.join(AUTH_PROFILES_DIR, fileName);
-
-    ensureDir(AUTH_PROFILES_DIR);
-    writeJsonAtomic(profilePath, safePayload);
-
-    const registry = readAuthRegistry();
-    const meta = buildAuthProfileSummary(profileName, safePayload, fileName);
-    meta.importedAt = toIsoTime(Date.now());
-    meta.sourceFile = sourceFile || '';
-
-    const idx = registry.items.findIndex((item) => item.name === profileName);
-    if (idx >= 0) {
-        registry.items[idx] = {
-            ...registry.items[idx],
-            ...meta
-        };
-    } else {
-        registry.items.push(meta);
-    }
-    registry.items.sort((a, b) => a.name.localeCompare(b.name));
-
-    const shouldActivate = options.activate !== false;
-    if (shouldActivate) {
-        writeJsonAtomic(AUTH_FILE, safePayload);
-        registry.current = profileName;
-    }
-    writeAuthRegistry(registry);
-
-    return {
-        success: true,
-        profile: {
-            ...meta,
-            current: shouldActivate ? true : registry.current === profileName
-        }
-    };
-}
-
-function importAuthProfileFromFile(filePath, options = {}) {
-    const absPath = path.resolve(String(filePath || ''));
-    if (!absPath || !fs.existsSync(absPath) || !fs.statSync(absPath).isFile()) {
-        throw new Error('认证文件不存在');
-    }
-    const raw = fs.readFileSync(absPath, 'utf-8');
-    const payload = parseAuthProfileJson(raw, path.basename(absPath));
-    const fallbackName = path.basename(absPath, path.extname(absPath));
-    return upsertAuthProfile(payload, {
-        ...options,
-        sourceFile: absPath,
-        name: options.name || fallbackName
-    });
-}
-
-function importAuthProfileFromUpload(payload = {}) {
-    const fileBase64 = typeof payload.fileBase64 === 'string' ? payload.fileBase64.trim() : '';
-    if (!fileBase64) {
-        return { error: '缺少认证文件内容' };
-    }
-    let buffer;
-    try {
-        buffer = Buffer.from(fileBase64, 'base64');
-    } catch (e) {
-        return { error: '认证文件不是有效的 base64 编码' };
-    }
-    if (!buffer || buffer.length === 0) {
-        return { error: '认证文件为空' };
-    }
-    if (buffer.length > 10 * 1024 * 1024) {
-        return { error: '认证文件过大（>10MB）' };
-    }
-
-    try {
-        const raw = buffer.toString('utf-8');
-        const profileData = parseAuthProfileJson(raw, payload.fileName || 'upload.json');
-        return upsertAuthProfile(profileData, {
-            name: payload.name || path.basename(payload.fileName || '', path.extname(payload.fileName || '')),
-            sourceFile: payload.fileName || '',
-            activate: payload.activate !== false
-        });
-    } catch (e) {
-        return { error: e.message || '导入认证文件失败' };
-    }
-}
-
-function switchAuthProfile(name, options = {}) {
-    ensureAuthProfileStoragePrepared();
-    const profileName = normalizeAuthProfileName(name);
-    if (!profileName) {
-        throw new Error('认证名称不能为空');
-    }
-    const registry = readAuthRegistry();
-    const profile = registry.items.find((item) => item.name === profileName);
-    if (!profile) {
-        throw new Error(`认证不存在: ${profileName}`);
-    }
-    const fileName = profile.fileName || `${profileName}.json`;
-    const profilePath = path.join(AUTH_PROFILES_DIR, fileName);
-    if (!fs.existsSync(profilePath)) {
-        throw new Error(`认证文件不存在: ${fileName}`);
-    }
-    const raw = fs.readFileSync(profilePath, 'utf-8');
-    const profileData = parseAuthProfileJson(raw, fileName);
-    writeJsonAtomic(AUTH_FILE, profileData);
-
-    registry.current = profileName;
-    const idx = registry.items.findIndex((item) => item.name === profileName);
-    if (idx >= 0) {
-        registry.items[idx] = {
-            ...registry.items[idx],
-            updatedAt: toIsoTime(Date.now())
-        };
-    }
-    writeAuthRegistry(registry);
-
-    if (!options.silent) {
-        console.log(`✓ 已切换认证: ${profileName}`);
-        if (profile.email) {
-            console.log(`  账号: ${profile.email}`);
-        }
-        console.log();
-    }
-    return {
-        success: true,
-        profile: {
-            ...profile,
-            current: true
-        }
-    };
-}
-
-function deleteAuthProfile(name) {
-    ensureAuthProfileStoragePrepared();
-    const profileName = normalizeAuthProfileName(name);
-    if (!profileName) {
-        return { error: '认证名称不能为空' };
-    }
-    const registry = readAuthRegistry();
-    const idx = registry.items.findIndex((item) => item.name === profileName);
-    if (idx < 0) {
-        return { error: '认证不存在' };
-    }
-    const profile = registry.items[idx];
-    const fileName = profile.fileName || `${profileName}.json`;
-    const profilePath = path.join(AUTH_PROFILES_DIR, fileName);
-
-    if (fs.existsSync(profilePath)) {
-        try {
-            fs.unlinkSync(profilePath);
-        } catch (e) {
-            return { error: `删除认证文件失败: ${e.message}` };
-        }
-    }
-
-    registry.items.splice(idx, 1);
-    let switchedTo = '';
-    if (registry.current === profileName) {
-        if (registry.items.length > 0) {
-            const next = registry.items[0];
-            try {
-                const nextPath = path.join(AUTH_PROFILES_DIR, next.fileName || `${next.name}.json`);
-                const raw = fs.readFileSync(nextPath, 'utf-8');
-                const nextData = parseAuthProfileJson(raw, next.fileName || `${next.name}.json`);
-                writeJsonAtomic(AUTH_FILE, nextData);
-                registry.current = next.name;
-                switchedTo = next.name;
-            } catch (e) {
-                registry.current = '';
-            }
-        } else {
-            registry.current = '';
-        }
-    }
-    writeAuthRegistry(registry);
-    return {
-        success: true,
-        switchedTo
-    };
-}
-
-function resolveAuthTokenFromCurrentProfile() {
-    ensureAuthProfileStoragePrepared();
-    const registry = readAuthRegistry();
-    if (!registry.current) return '';
-    const profile = registry.items.find((item) => item.name === registry.current);
-    if (!profile) return '';
-    const filePath = path.join(AUTH_PROFILES_DIR, profile.fileName || `${profile.name}.json`);
-    if (!fs.existsSync(filePath)) return '';
-    try {
-        const raw = fs.readFileSync(filePath, 'utf-8');
-        const payload = parseAuthProfileJson(raw, profile.fileName || `${profile.name}.json`);
-        if (typeof payload.access_token === 'string' && payload.access_token.trim()) {
-            return payload.access_token.trim();
-        }
-        if (typeof payload.OPENAI_API_KEY === 'string' && payload.OPENAI_API_KEY.trim()) {
-            return payload.OPENAI_API_KEY.trim();
-        }
-    } catch (e) {}
-    return '';
-}
+const {
+    listAuthProfilesInfo,
+    importAuthProfileFromFile,
+    importAuthProfileFromUpload,
+    switchAuthProfile,
+    deleteAuthProfile,
+    resolveAuthTokenFromCurrentProfile
+} = createAuthProfileController({
+    fs,
+    path,
+    ensureDir,
+    readJsonFile,
+    writeJsonAtomic,
+    stripUtf8Bom,
+    toIsoTime,
+    isPlainObject,
+    AUTH_PROFILES_DIR,
+    AUTH_REGISTRY_FILE,
+    AUTH_FILE
+});
 
 function getCodexSessionsDir() {
     const candidates = [];
@@ -3456,8 +3182,9 @@ function sanitizeRemovedBuiltinProxyProvider(config) {
     const currentProvider = typeof safeConfig.model_provider === 'string' ? safeConfig.model_provider.trim() : '';
     const hasRemovedBuiltin = !!(providers && providers[BUILTIN_PROXY_PROVIDER_NAME]);
     const currentIsRemovedBuiltin = currentProvider === BUILTIN_PROXY_PROVIDER_NAME;
+    const currentIsRemovedVirtualLocal = currentProvider === 'local' && !(providers && isPlainObject(providers.local));
 
-    if (!hasRemovedBuiltin && !currentIsRemovedBuiltin) {
+    if (!hasRemovedBuiltin && !currentIsRemovedBuiltin && !currentIsRemovedVirtualLocal) {
         return safeConfig;
     }
 
@@ -3473,8 +3200,8 @@ function sanitizeRemovedBuiltinProxyProvider(config) {
     return {
         ...safeConfig,
         model_providers: nextProviders,
-        model_provider: currentIsRemovedBuiltin ? fallbackProvider : safeConfig.model_provider,
-        model: currentIsRemovedBuiltin ? fallbackModel : safeConfig.model
+        model_provider: (currentIsRemovedBuiltin || currentIsRemovedVirtualLocal) ? fallbackProvider : safeConfig.model_provider,
+        model: (currentIsRemovedBuiltin || currentIsRemovedVirtualLocal) ? fallbackModel : safeConfig.model
     };
 }
 
@@ -3797,7 +3524,7 @@ function addProviderToConfig(params = {}) {
         return { error: 'URL 仅支持 http/https' };
     }
     if (isReservedProviderNameForCreation(name)) {
-        return { error: 'local provider 为系统保留名称，不可新增' };
+        return { error: '提供商名称不可用' };
     }
     if (isBuiltinProxyProvider(name) && !allowManaged) {
         return { error: 'codexmate-proxy 为保留名称，不可手动添加' };
@@ -3878,9 +3605,6 @@ function updateProviderInConfig(params = {}) {
         return { error: 'URL 仅支持 http/https' };
     }
     if (isNonEditableProvider(name) && !allowManaged) {
-        if (isDefaultLocalProvider(name)) {
-            return { error: 'local provider 为系统保留项，不可编辑' };
-        }
         return { error: 'codexmate-proxy 为保留名称，不可编辑' };
     }
 
@@ -3896,9 +3620,6 @@ function deleteProviderFromConfig(params = {}) {
     const name = typeof params.name === 'string' ? params.name.trim() : '';
     if (!name) return { error: '名称不能为空' };
     if (isNonDeletableProvider(name)) {
-        if (isDefaultLocalProvider(name)) {
-            return { error: 'local provider 为系统保留项，不可删除' };
-        }
         return { error: 'codexmate-proxy 为保留名称，不可删除' };
     }
     if (!fs.existsSync(CONFIG_FILE)) {
@@ -3927,9 +3648,7 @@ function deleteProviderFromConfig(params = {}) {
 function performProviderDeletion(name, options = {}) {
     const silent = !!options.silent;
     if (isNonDeletableProvider(name)) {
-        const msg = isDefaultLocalProvider(name)
-            ? 'local provider 为系统保留项，不可删除'
-            : 'codexmate-proxy 为保留名称，不可删除';
+        const msg = 'codexmate-proxy 为保留名称，不可删除';
         if (!silent) console.error('错误:', msg);
         return { error: msg };
     }
@@ -6398,513 +6117,53 @@ function findClaudeSessionIndexPath(sessionFilePath) {
     return '';
 }
 
-function canListenPort(host, port) {
-    return new Promise((resolve) => {
-        const tester = net.createServer();
-        tester.unref();
-        tester.once('error', () => {
-            resolve(false);
-        });
-        tester.once('listening', () => {
-            tester.close(() => resolve(true));
-        });
-        tester.listen(port, host);
-    });
-}
+const {
+    findAvailablePort,
+    saveBuiltinProxySettings,
+    removePersistedBuiltinProxyProviderFromConfig,
+    hasCodexConfigReadyForProxy,
+    resolveBuiltinProxyProviderName,
+    startBuiltinProxyRuntime,
+    stopBuiltinProxyRuntime,
+    getBuiltinProxyStatus
+} = createBuiltinProxyRuntimeController({
+    fs,
+    https,
+    CONFIG_FILE,
+    BUILTIN_PROXY_SETTINGS_FILE,
+    DEFAULT_BUILTIN_PROXY_SETTINGS,
+    BUILTIN_PROXY_PROVIDER_NAME,
+    CODEXMATE_MANAGED_MARKER,
+    HTTP_KEEP_ALIVE_AGENT,
+    HTTPS_KEEP_ALIVE_AGENT,
+    readConfig,
+    writeConfig,
+    readConfigOrVirtualDefault,
+    resolveAuthTokenFromCurrentProfile,
+    isPlainObject,
+    isBuiltinManagedProvider,
+    findProviderSectionRanges,
+    findProviderDescendantSectionRanges,
+    normalizeLegacySegments,
+    buildLegacySegmentsKey,
+    formatHostForUrl
+});
 
-async function findAvailablePort(host, startPort, maxAttempts = 20) {
-    const start = parseInt(String(startPort), 10);
-    if (!Number.isFinite(start) || start <= 0) {
-        return 0;
-    }
-    const attempts = Number.isFinite(maxAttempts) && maxAttempts > 0 ? maxAttempts : 20;
-    for (let offset = 0; offset < attempts; offset += 1) {
-        const candidate = start + offset;
-        if (candidate > 65535) {
-            break;
-        }
-        // eslint-disable-next-line no-await-in-loop
-        const ok = await canListenPort(host, candidate);
-        if (ok) {
-            return candidate;
-        }
-    }
-    return 0;
-}
-
-function normalizeBuiltinProxySettings(raw) {
-    const merged = {
-        ...DEFAULT_BUILTIN_PROXY_SETTINGS,
-        ...(isPlainObject(raw) ? raw : {})
-    };
-    const host = typeof merged.host === 'string' ? merged.host.trim() : '';
-    const port = parseInt(String(merged.port), 10);
-    const provider = typeof merged.provider === 'string' ? merged.provider.trim() : '';
-    const authSourceRaw = typeof merged.authSource === 'string' ? merged.authSource.trim().toLowerCase() : '';
-    const timeoutMs = parseInt(String(merged.timeoutMs), 10);
-    const authSource = authSourceRaw === 'profile' || authSourceRaw === 'none' ? authSourceRaw : 'provider';
-
-    return {
-        enabled: merged.enabled !== false,
-        host: host || DEFAULT_BUILTIN_PROXY_SETTINGS.host,
-        port: Number.isFinite(port) && port > 0 && port <= 65535 ? port : DEFAULT_BUILTIN_PROXY_SETTINGS.port,
-        provider,
-        authSource,
-        timeoutMs: Number.isFinite(timeoutMs) && timeoutMs >= 1000 ? timeoutMs : DEFAULT_BUILTIN_PROXY_SETTINGS.timeoutMs
-    };
-}
-
-function readBuiltinProxySettings() {
-    const parsed = readJsonFile(BUILTIN_PROXY_SETTINGS_FILE, null);
-    return normalizeBuiltinProxySettings(parsed);
-}
-
-function resolveBuiltinProxyProviderName(rawProviderName, providers = {}, preferredProvider = '') {
-    const providerMap = providers && isPlainObject(providers) ? providers : {};
-    const providerNames = Object.keys(providerMap)
-        .filter((name) => name && name !== BUILTIN_PROXY_PROVIDER_NAME);
-    const requested = typeof rawProviderName === 'string' ? rawProviderName.trim() : '';
-    if (requested && requested !== BUILTIN_PROXY_PROVIDER_NAME && providerMap[requested]) {
-        return requested;
-    }
-    const preferred = typeof preferredProvider === 'string' ? preferredProvider.trim() : '';
-    if (preferred && preferred !== BUILTIN_PROXY_PROVIDER_NAME && providerMap[preferred]) {
-        return preferred;
-    }
-    return providerNames[0] || '';
-}
-
-function saveBuiltinProxySettings(payload = {}, options = {}) {
-    const current = readBuiltinProxySettings();
-    const merged = normalizeBuiltinProxySettings({
-        ...current,
-        ...(isPlainObject(payload) ? payload : {})
-    });
-
-    if (!merged.host) {
-        return { error: '代理 host 不能为空' };
-    }
-    if (!Number.isFinite(merged.port) || merged.port <= 0 || merged.port > 65535) {
-        return { error: '代理端口无效（1-65535）' };
-    }
-
-    const { config } = readConfigOrVirtualDefault();
-    const providers = config && isPlainObject(config.model_providers) ? config.model_providers : {};
-    const preferredProvider = typeof config.model_provider === 'string' ? config.model_provider.trim() : '';
-    const finalProvider = resolveBuiltinProxyProviderName(merged.provider, providers, preferredProvider);
-
-    const normalized = {
-        ...merged,
-        provider: finalProvider
-    };
-
-    if (!options.skipWrite) {
-        writeJsonAtomic(BUILTIN_PROXY_SETTINGS_FILE, normalized);
-    }
-
-    return {
-        success: true,
-        settings: normalized
-    };
-}
-
-function buildProxyListenUrl(settings) {
-    const host = formatHostForUrl(settings.host || DEFAULT_BUILTIN_PROXY_SETTINGS.host);
-    return `http://${host}:${settings.port}`;
-}
-
-function buildBuiltinProxyProviderBaseUrl(settings) {
-    return `${buildProxyListenUrl(settings).replace(/\/+$/, '')}/v1`;
-}
-
-function buildBuiltinProxyProviderConfig(settings) {
-    return {
-        name: BUILTIN_PROXY_PROVIDER_NAME,
-        base_url: buildBuiltinProxyProviderBaseUrl(settings),
-        wire_api: 'responses',
-        requires_openai_auth: false,
-        preferred_auth_method: '',
-        request_max_retries: 4,
-        stream_max_retries: 10,
-        stream_idle_timeout_ms: 300000
-    };
-}
-
-function injectBuiltinProxyProvider(config) {
-    return isPlainObject(config) ? config : {};
-}
-
-function removePersistedBuiltinProxyProviderFromConfig() {
-    if (!fs.existsSync(CONFIG_FILE)) {
-        return { success: true, removed: false };
-    }
-
-    let config;
-    try {
-        config = readConfig();
-    } catch (e) {
-        return { error: e.message || '读取 config.toml 失败' };
-    }
-
-    if (!config.model_providers || !config.model_providers[BUILTIN_PROXY_PROVIDER_NAME]) {
-        return { success: true, removed: false };
-    }
-
-    const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
-    const lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
-    const hasBom = content.charCodeAt(0) === 0xFEFF;
-    const providerConfig = config.model_providers[BUILTIN_PROXY_PROVIDER_NAME];
-    const providerSegments = providerConfig && Array.isArray(providerConfig.__codexmate_legacy_segments)
-        ? providerConfig.__codexmate_legacy_segments
-        : null;
-    const providerSegmentVariants = (() => {
-        const variants = [];
-        const seen = new Set();
-        const pushVariant = (segments) => {
-            const normalized = normalizeLegacySegments(segments);
-            const key = buildLegacySegmentsKey(normalized);
-            if (!key || seen.has(key)) return;
-            seen.add(key);
-            variants.push(normalized);
-        };
-        if (providerConfig && Array.isArray(providerConfig.__codexmate_legacy_segments)) {
-            pushVariant(providerConfig.__codexmate_legacy_segments);
-        }
-        if (providerConfig && Array.isArray(providerConfig.__codexmate_legacy_segment_variants)) {
-            for (const segments of providerConfig.__codexmate_legacy_segment_variants) {
-                pushVariant(segments);
-            }
-        }
-        if (providerSegments) {
-            pushVariant(providerSegments);
-        }
-        if (variants.length === 0) {
-            pushVariant(String(BUILTIN_PROXY_PROVIDER_NAME || '').split('.').filter((item) => item));
-        }
-        return variants;
-    })();
-
-    let updatedContent = null;
-    const combinedRanges = [];
-    for (const segments of providerSegmentVariants) {
-        combinedRanges.push(...findProviderSectionRanges(content, BUILTIN_PROXY_PROVIDER_NAME, segments));
-        combinedRanges.push(...findProviderDescendantSectionRanges(content, segments));
-    }
-    if (combinedRanges.length === 0) {
-        combinedRanges.push(...findProviderSectionRanges(content, BUILTIN_PROXY_PROVIDER_NAME, providerSegments));
-    }
-
-    if (combinedRanges.length > 0) {
-        const sorted = combinedRanges.sort((a, b) => b.start - a.start || b.end - a.end);
-        const seen = new Set();
-        let removedContent = content;
-        for (const range of sorted) {
-            const rangeKey = `${range.start}:${range.end}`;
-            if (seen.has(rangeKey)) continue;
-            seen.add(rangeKey);
-            removedContent = removedContent.slice(0, range.start) + removedContent.slice(range.end);
-        }
-        updatedContent = removedContent.replace(/\n{3,}/g, lineEnding + lineEnding);
-    }
-
-    if (!updatedContent) {
-        const rebuilt = JSON.parse(JSON.stringify(config));
-        delete rebuilt.model_providers[BUILTIN_PROXY_PROVIDER_NAME];
-        const hasMarker = content.includes(CODEXMATE_MANAGED_MARKER);
-        let rebuiltToml = toml.stringify(rebuilt).trimEnd();
-        rebuiltToml = rebuiltToml.replace(/\n/g, lineEnding);
-        if (hasMarker && !rebuiltToml.includes(CODEXMATE_MANAGED_MARKER)) {
-            rebuiltToml = `${CODEXMATE_MANAGED_MARKER}${lineEnding}${rebuiltToml}`;
-        }
-        updatedContent = rebuiltToml + lineEnding;
-        if (hasBom && updatedContent.charCodeAt(0) !== 0xFEFF) {
-            updatedContent = '\uFEFF' + updatedContent;
-        }
-    }
-
-    try {
-        writeConfig(updatedContent.trimEnd() + lineEnding);
-    } catch (e) {
-        return { error: e.message || '写入 config.toml 失败' };
-    }
-
-    return { success: true, removed: true };
-}
-
-function hasCodexConfigReadyForProxy() {
-    const result = readConfigOrVirtualDefault();
-    if (!result || result.isVirtual) {
-        return false;
-    }
-    const config = result.config || {};
-    if (!isPlainObject(config.model_providers)) {
-        return false;
-    }
-    const providerNames = Object.keys(config.model_providers)
-        .filter((name) => name && name !== BUILTIN_PROXY_PROVIDER_NAME);
-    return providerNames.length > 0;
-}
-
-function resolveBuiltinProxyUpstream(settings) {
-    const { config } = readConfigOrVirtualDefault();
-    const providers = config && isPlainObject(config.model_providers) ? config.model_providers : {};
-    const currentProvider = typeof config.model_provider === 'string' ? config.model_provider.trim() : '';
-    const providerName = resolveBuiltinProxyProviderName(settings.provider, providers, currentProvider);
-    if (!providerName) {
-        return { error: '未找到可用的上游 provider，请先添加 provider' };
-    }
-    if (providerName === BUILTIN_PROXY_PROVIDER_NAME) {
-        return { error: `上游 provider 不能是 ${BUILTIN_PROXY_PROVIDER_NAME}` };
-    }
-    const provider = providers[providerName];
-    if (!provider || !isPlainObject(provider)) {
-        return { error: `上游 provider 不存在: ${providerName}` };
-    }
-
-    const baseUrl = typeof provider.base_url === 'string' ? provider.base_url.trim() : '';
-    if (!baseUrl || !isValidHttpUrl(baseUrl)) {
-        return { error: `上游 provider base_url 无效: ${providerName}` };
-    }
-
-    let token = '';
-    if (settings.authSource === 'profile') {
-        token = resolveAuthTokenFromCurrentProfile();
-    } else if (settings.authSource === 'provider') {
-        token = typeof provider.preferred_auth_method === 'string' ? provider.preferred_auth_method.trim() : '';
-        if (!token) {
-            token = resolveAuthTokenFromCurrentProfile();
-        }
-    }
-
-    let authHeader = '';
-    if (token) {
-        authHeader = /^bearer\s+/i.test(token) ? token : `Bearer ${token}`;
-    }
-
-    return {
-        providerName,
-        baseUrl: normalizeBaseUrl(baseUrl),
-        authHeader
-    };
-}
-
-function createBuiltinProxyServer(settings, upstream) {
-    const connections = new Set();
-    const timeoutMs = settings.timeoutMs;
-
-    const server = http.createServer((req, res) => {
-        let parsedIncoming;
-        try {
-            parsedIncoming = new URL(req.url || '/', 'http://localhost');
-        } catch (e) {
-            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
-            res.end(JSON.stringify({ error: 'invalid request path' }));
-            return;
-        }
-
-        const incomingPath = parsedIncoming.pathname || '/';
-        if (incomingPath === '/health' || incomingPath === '/status') {
-            const body = JSON.stringify({
-                ok: true,
-                upstreamProvider: upstream.providerName,
-                upstreamBaseUrl: upstream.baseUrl
-            });
-            res.writeHead(200, {
-                'Content-Type': 'application/json; charset=utf-8',
-                'Content-Length': Buffer.byteLength(body, 'utf-8')
-            });
-            res.end(body, 'utf-8');
-            return;
-        }
-
-        if (!(incomingPath === '/v1' || incomingPath.startsWith('/v1/'))) {
-            const body = JSON.stringify({ error: 'proxy only supports /v1/* paths' });
-            res.writeHead(404, {
-                'Content-Type': 'application/json; charset=utf-8',
-                'Content-Length': Buffer.byteLength(body, 'utf-8')
-            });
-            res.end(body, 'utf-8');
-            return;
-        }
-
-        const suffix = incomingPath === '/v1'
-            ? ''
-            : incomingPath.replace(/^\/v1\/?/, '');
-        const targetBase = joinApiUrl(upstream.baseUrl, suffix);
-        if (!targetBase) {
-            const body = JSON.stringify({ error: 'failed to build upstream URL' });
-            res.writeHead(500, {
-                'Content-Type': 'application/json; charset=utf-8',
-                'Content-Length': Buffer.byteLength(body, 'utf-8')
-            });
-            res.end(body, 'utf-8');
-            return;
-        }
-
-        let targetUrl;
-        try {
-            targetUrl = new URL(targetBase);
-            targetUrl.search = parsedIncoming.search || '';
-        } catch (e) {
-            const body = JSON.stringify({ error: `invalid upstream URL: ${e.message}` });
-            res.writeHead(500, {
-                'Content-Type': 'application/json; charset=utf-8',
-                'Content-Length': Buffer.byteLength(body, 'utf-8')
-            });
-            res.end(body, 'utf-8');
-            return;
-        }
-
-        const requestHeaders = { ...req.headers };
-        delete requestHeaders.host;
-        delete requestHeaders.connection;
-        delete requestHeaders['content-length'];
-        if (upstream.authHeader) {
-            requestHeaders.authorization = upstream.authHeader;
-        }
-        requestHeaders['x-codexmate-proxy'] = '1';
-        if (!requestHeaders['x-forwarded-for'] && req.socket && req.socket.remoteAddress) {
-            requestHeaders['x-forwarded-for'] = req.socket.remoteAddress;
-        }
-
-        const transport = targetUrl.protocol === 'https:' ? https : http;
-        const upstreamReq = transport.request({
-            protocol: targetUrl.protocol,
-            hostname: targetUrl.hostname,
-            port: targetUrl.port || (targetUrl.protocol === 'https:' ? 443 : 80),
-            method: req.method || 'GET',
-            path: `${targetUrl.pathname}${targetUrl.search}`,
-            headers: requestHeaders,
-            agent: targetUrl.protocol === 'https:' ? HTTPS_KEEP_ALIVE_AGENT : HTTP_KEEP_ALIVE_AGENT
-        }, (upstreamRes) => {
-            const responseHeaders = { ...upstreamRes.headers };
-            delete responseHeaders.connection;
-            res.writeHead(upstreamRes.statusCode || 502, responseHeaders);
-            upstreamRes.pipe(res);
-        });
-
-        upstreamReq.setTimeout(timeoutMs, () => {
-            upstreamReq.destroy(new Error(`upstream timeout (${timeoutMs}ms)`));
-        });
-
-        upstreamReq.on('error', (err) => {
-            if (res.headersSent) {
-                try { res.destroy(err); } catch (_) {}
-                return;
-            }
-            const body = JSON.stringify({ error: `proxy request failed: ${err.message}` });
-            res.writeHead(502, {
-                'Content-Type': 'application/json; charset=utf-8',
-                'Content-Length': Buffer.byteLength(body, 'utf-8')
-            });
-            res.end(body, 'utf-8');
-        });
-
-        req.pipe(upstreamReq);
-    });
-
-    server.on('connection', (socket) => {
-        connections.add(socket);
-        socket.on('close', () => connections.delete(socket));
-    });
-
-    return new Promise((resolve, reject) => {
-        server.once('error', reject);
-        server.listen(settings.port, settings.host, () => {
-            server.removeListener('error', reject);
-            resolve({
-                server,
-                connections,
-                settings,
-                upstream,
-                startedAt: toIsoTime(Date.now()),
-                listenUrl: buildProxyListenUrl(settings)
-            });
-        });
-    });
-}
-
-async function startBuiltinProxyRuntime(payload = {}) {
-    if (g_builtinProxyRuntime) {
-        return {
-            error: '内建代理已在运行',
-            runtime: {
-                listenUrl: g_builtinProxyRuntime.listenUrl,
-                upstreamProvider: g_builtinProxyRuntime.upstream.providerName
-            }
-        };
-    }
-
-    const saveResult = saveBuiltinProxySettings(payload);
-    if (saveResult.error) {
-        return { error: saveResult.error };
-    }
-    const settings = saveResult.settings;
-    const upstream = resolveBuiltinProxyUpstream(settings);
-    if (upstream.error) {
-        return { error: upstream.error };
-    }
-
-    try {
-        g_builtinProxyRuntime = await createBuiltinProxyServer(settings, upstream);
-        return {
-            success: true,
-            running: true,
-            listenUrl: g_builtinProxyRuntime.listenUrl,
-            upstreamProvider: upstream.providerName,
-            settings
-        };
-    } catch (e) {
-        return { error: `启动内建代理失败: ${e.message}` };
-    }
-}
-
-async function stopBuiltinProxyRuntime() {
-    if (!g_builtinProxyRuntime) {
-        return { success: true, running: false };
-    }
-    const runtime = g_builtinProxyRuntime;
-    g_builtinProxyRuntime = null;
-
-    await new Promise((resolve) => {
-        let settled = false;
-        const finish = () => {
-            if (settled) return;
-            settled = true;
-            resolve();
-        };
-
-        runtime.server.close(() => finish());
-        setTimeout(() => finish(), 1000);
-    });
-
-    for (const socket of runtime.connections) {
-        try { socket.destroy(); } catch (_) {}
-    }
-    runtime.connections.clear();
-
-    return {
-        success: true,
-        running: false
-    };
-}
-
-function getBuiltinProxyStatus() {
-    const settings = readBuiltinProxySettings();
-    return {
-        running: !!g_builtinProxyRuntime,
-        settings,
-        runtime: g_builtinProxyRuntime
-            ? {
-                provider: DEFAULT_LOCAL_PROVIDER_NAME,
-                startedAt: g_builtinProxyRuntime.startedAt,
-                listenUrl: g_builtinProxyRuntime.listenUrl,
-                upstreamProvider: g_builtinProxyRuntime.upstream.providerName,
-                upstreamBaseUrl: g_builtinProxyRuntime.upstream.baseUrl
-            }
-            : null
-    };
-}
+const {
+    startBuiltinClaudeProxyRuntime,
+    stopBuiltinClaudeProxyRuntime,
+    getBuiltinClaudeProxyStatus
+} = createBuiltinClaudeProxyRuntimeController({
+    BUILTIN_CLAUDE_PROXY_SETTINGS_FILE,
+    DEFAULT_BUILTIN_CLAUDE_PROXY_SETTINGS,
+    BUILTIN_PROXY_PROVIDER_NAME,
+    MAX_API_BODY_SIZE,
+    HTTP_KEEP_ALIVE_AGENT,
+    HTTPS_KEEP_ALIVE_AGENT,
+    readConfigOrVirtualDefault,
+    resolveBuiltinProxyProviderName,
+    resolveAuthTokenFromCurrentProfile
+});
 
 function applyBuiltinProxyProvider(params = {}) {
     return { error: '该功能已移除' };
@@ -8244,7 +7503,7 @@ function buildExportPayload(includeKeys) {
     const providers = config.model_providers || {};
     const providerData = {};
     for (const [name, provider] of Object.entries(providers)) {
-        if (isBuiltinProxyProvider(name)) {
+        if (isBuiltinManagedProvider(name)) {
             continue;
         }
         providerData[name] = {
@@ -8376,7 +7635,7 @@ function importConfigData(payload, options = {}) {
     let updatedProviders = 0;
 
     for (const [name, provider] of Object.entries(normalized.providers)) {
-        if (isBuiltinProxyProvider(name)) {
+        if (isBuiltinManagedProvider(name)) {
             continue;
         }
         if (existingProviders[name]) {
@@ -8410,7 +7669,7 @@ function importConfigData(payload, options = {}) {
     if (applyCurrentModels && normalized.currentModels) {
         const currentModels = readCurrentModels();
         for (const [name, model] of Object.entries(normalized.currentModels)) {
-            if (isBuiltinProxyProvider(name)) continue;
+            if (isBuiltinManagedProvider(name)) continue;
             if (typeof model !== 'string' || !model) continue;
             currentModels[name] = model;
         }
@@ -9101,8 +8360,8 @@ function cmdAdd(name, baseUrl, apiKey, silent = false) {
         throw new Error('名称仅支持字母/数字/._-');
     }
     if (isReservedProviderNameForCreation(providerName)) {
-        if (!silent) console.error('错误: local provider 为系统保留名称，不可新增');
-        throw new Error('local provider 为系统保留名称，不可新增');
+        if (!silent) console.error('错误: 提供商名称不可用');
+        throw new Error('提供商名称不可用');
     }
     if (isBuiltinProxyProvider(providerName)) {
         if (!silent) console.error('错误: codexmate-proxy 为保留名称，不可手动添加');
@@ -9175,9 +8434,7 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
         throw new Error('提供商名称必填');
     }
     if (isNonEditableProvider(name) && !allowManaged) {
-        const msg = isDefaultLocalProvider(name)
-            ? 'local provider 为系统保留项，不可编辑'
-            : 'codexmate-proxy 为保留名称，不可编辑';
+        const msg = 'codexmate-proxy 为保留名称，不可编辑';
         if (!silent) console.error(`错误: ${msg}`);
         throw new Error(msg);
     }
@@ -11462,7 +10719,7 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                                     key: maskKey(p.preferred_auth_method || ''),
                                     hasKey: !!(p.preferred_auth_method && p.preferred_auth_method.trim()),
                                     current: name === current,
-                                    readOnly: isBuiltinProxyProvider(name),
+                                    readOnly: isBuiltinManagedProvider(name),
                                     nonDeletable: isNonDeletableProvider(name),
                                     nonEditable: isNonEditableProvider(name)
                                 }))
@@ -11749,6 +11006,15 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             break;
                         case 'proxy-stop':
                             result = await stopBuiltinProxyRuntime();
+                            break;
+                        case 'claude-proxy-status':
+                            result = getBuiltinClaudeProxyStatus();
+                            break;
+                        case 'claude-proxy-start':
+                            result = await startBuiltinClaudeProxyRuntime(params || {});
+                            break;
+                        case 'claude-proxy-stop':
+                            result = await stopBuiltinClaudeProxyRuntime();
                             break;
                         case 'proxy-enable-codex-default':
                             result = await ensureBuiltinProxyForCodexDefault(params || {});
@@ -12119,7 +11385,8 @@ function cmdStart(options = {}) {
         stopWatch();
         Promise.allSettled([
             serverHandle.stop(),
-            stopBuiltinProxyRuntime()
+            stopBuiltinProxyRuntime(),
+            stopBuiltinClaudeProxyRuntime()
         ]).finally(() => process.exit(0));
     };
 
@@ -12996,7 +12263,7 @@ function buildMcpProviderListPayload() {
             key: maskKey(p.preferred_auth_method || ''),
             hasKey: !!(p.preferred_auth_method && p.preferred_auth_method.trim()),
             current: name === current,
-            readOnly: isBuiltinProxyProvider(name),
+            readOnly: isBuiltinManagedProvider(name),
             nonDeletable: isNonDeletableProvider(name),
             nonEditable: isNonEditableProvider(name)
         }))
@@ -13779,6 +13046,14 @@ function createMcpTools(options = {}) {
     });
 
     pushTool({
+        name: 'codexmate.claude_proxy.status',
+        description: 'Get builtin Claude-compatible proxy runtime status and persisted config.',
+        readOnly: true,
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        handler: async () => getBuiltinClaudeProxyStatus()
+    });
+
+    pushTool({
         name: 'codexmate.workflow.list',
         description: 'List available workflows (builtin + custom).',
         readOnly: true,
@@ -14050,11 +13325,38 @@ function createMcpTools(options = {}) {
     });
 
     pushTool({
+        name: 'codexmate.claude_proxy.start',
+        description: 'Start builtin Claude-compatible proxy runtime with optional overrides.',
+        readOnly: false,
+        inputSchema: {
+            type: 'object',
+            properties: {
+                enabled: { type: 'boolean' },
+                host: { type: 'string' },
+                port: { type: 'number' },
+                provider: { type: 'string' },
+                authSource: { type: 'string' },
+                timeoutMs: { type: 'number' }
+            },
+            additionalProperties: false
+        },
+        handler: async (args = {}) => startBuiltinClaudeProxyRuntime(args || {})
+    });
+
+    pushTool({
         name: 'codexmate.proxy.stop',
         description: 'Stop builtin proxy runtime.',
         readOnly: false,
         inputSchema: { type: 'object', properties: {}, additionalProperties: false },
         handler: async () => stopBuiltinProxyRuntime()
+    });
+
+    pushTool({
+        name: 'codexmate.claude_proxy.stop',
+        description: 'Stop builtin Claude-compatible proxy runtime.',
+        readOnly: false,
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        handler: async () => stopBuiltinClaudeProxyRuntime()
     });
 
     pushTool({
@@ -14339,7 +13641,10 @@ async function cmdMcp(args = []) {
             if (done) return;
             done = true;
             server.stop();
-            stopBuiltinProxyRuntime().finally(() => resolve());
+            Promise.allSettled([
+                stopBuiltinProxyRuntime(),
+                stopBuiltinClaudeProxyRuntime()
+            ]).finally(() => resolve());
         };
         process.once('SIGINT', finish);
         process.once('SIGTERM', finish);
