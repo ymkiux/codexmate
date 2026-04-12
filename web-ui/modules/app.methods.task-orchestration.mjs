@@ -25,6 +25,8 @@ function createDefaultTaskOrchestrationState() {
         selectedRunId: '',
         selectedRunDetail: null,
         selectedRunLoading: false,
+        selectedRunError: '',
+        detailRequestToken: 0,
         lastLoadedAt: '',
         lastError: ''
     };
@@ -123,10 +125,13 @@ export function createTaskOrchestrationMethods(options = {}) {
                 state.workflows = Array.isArray(res && res.workflows) ? res.workflows : [];
                 state.queue = Array.isArray(res && res.queue) ? res.queue : [];
                 state.runs = Array.isArray(res && res.runs) ? res.runs : [];
-                if (Array.isArray(res && res.warnings) && res.warnings.length > 0) {
-                    state.planWarnings = res.warnings;
-                }
+                state.planWarnings = Array.isArray(res && res.warnings) ? res.warnings : [];
                 state.lastLoadedAt = new Date().toISOString();
+                if (state.selectedRunId && !state.runs.some((item) => item && item.runId === state.selectedRunId)) {
+                    state.selectedRunId = '';
+                    state.selectedRunDetail = null;
+                    state.selectedRunError = '';
+                }
                 if (!state.selectedRunId && state.runs.length > 0) {
                     state.selectedRunId = state.runs[0].runId || '';
                 }
@@ -269,30 +274,50 @@ export function createTaskOrchestrationMethods(options = {}) {
             if (!normalizedRunId) {
                 state.selectedRunDetail = null;
                 state.selectedRunId = '';
+                state.selectedRunError = '';
                 this.syncTaskOrchestrationPolling();
                 return null;
             }
+            const requestToken = (state.detailRequestToken || 0) + 1;
+            const previousRunId = state.selectedRunId;
+            state.detailRequestToken = requestToken;
             state.selectedRunLoading = true;
             state.selectedRunId = normalizedRunId;
+            state.selectedRunError = '';
+            if (previousRunId !== normalizedRunId) {
+                state.selectedRunDetail = null;
+            }
             try {
                 const res = await api('task-run-detail', { runId: normalizedRunId });
+                if (state.detailRequestToken !== requestToken) {
+                    return res;
+                }
                 if (res && res.error) {
+                    state.selectedRunDetail = null;
+                    state.selectedRunError = res.error;
                     if (!options.silent) {
                         this.showMessage(res.error, 'error');
                     }
                     return res;
                 }
                 state.selectedRunDetail = res;
+                state.selectedRunError = '';
                 this.syncTaskOrchestrationPolling();
                 return res;
             } catch (error) {
                 const message = error && error.message ? error.message : '加载任务详情失败';
+                if (state.detailRequestToken === requestToken) {
+                    state.selectedRunDetail = null;
+                    state.selectedRunError = message;
+                }
                 if (!options.silent) {
                     this.showMessage(message, 'error');
                 }
                 return { error: message };
             } finally {
-                state.selectedRunLoading = false;
+                if (state.detailRequestToken === requestToken) {
+                    state.selectedRunLoading = false;
+                }
             }
         },
 
@@ -395,8 +420,22 @@ export function createTaskOrchestrationMethods(options = {}) {
         },
 
         resetTaskOrchestrationDraft() {
-            this.taskOrchestration = createDefaultTaskOrchestrationState();
-            this.stopTaskOrchestrationPolling();
+            const state = this.ensureTaskOrchestrationState();
+            state.target = '';
+            state.title = '';
+            state.notes = '';
+            state.followUpsText = '';
+            state.workflowIdsText = '';
+            state.selectedEngine = 'codex';
+            state.allowWrite = false;
+            state.dryRun = false;
+            state.concurrency = 2;
+            state.autoFixRounds = 1;
+            state.plan = null;
+            state.planIssues = [];
+            state.planWarnings = [];
+            state.lastError = '';
+            this.syncTaskOrchestrationPolling();
         }
     };
 }

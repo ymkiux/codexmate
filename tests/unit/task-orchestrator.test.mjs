@@ -64,6 +64,29 @@ test('buildTaskPlan can map workflow ids onto sequential workflow nodes', () => 
     assert.strictEqual(plan.nodes[1].write, true);
 });
 
+
+test('validateTaskPlan rejects unknown workflow ids instead of silently falling back', () => {
+    const plan = buildTaskPlan({
+        target: '诊断配置',
+        workflowIds: ['missing-workflow'],
+        engine: 'workflow'
+    }, {
+        workflowCatalog: [
+            { id: 'diagnose-config', name: '诊断配置', readOnly: true }
+        ]
+    });
+    assert.strictEqual(plan.engine, 'workflow');
+    assert.strictEqual(plan.nodes.length, 1);
+    assert.strictEqual(plan.nodes[0].kind, 'workflow');
+    const validation = validateTaskPlan(plan, {
+        workflowCatalog: [
+            { id: 'diagnose-config', name: '诊断配置', readOnly: true }
+        ]
+    });
+    assert.strictEqual(validation.ok, false);
+    assert.ok(validation.issues.some((item) => item.code === 'task-node-workflow-unknown'));
+});
+
 test('validateTaskPlan rejects dependency cycles', () => {
     const result = validateTaskPlan({
         nodes: [
@@ -153,4 +176,23 @@ test('executeTaskPlan marks downstream nodes blocked when dependency fails', asy
     assert.strictEqual(run.status, 'failed');
     assert.strictEqual(run.nodes.find((node) => node.id === 'fail').status, 'failed');
     assert.strictEqual(run.nodes.find((node) => node.id === 'after').status, 'blocked');
+});
+
+
+test('executeTaskPlan keeps payload logs without duplicating them', async () => {
+    const run = await executeTaskPlan({
+        nodes: [
+            { id: 'work', kind: 'codex', prompt: 'work', dependsOn: [], write: false }
+        ]
+    }, {
+        async executeNode() {
+            return {
+                success: true,
+                summary: 'ok',
+                logs: [{ level: 'info', message: 'payload log' }]
+            };
+        }
+    });
+    const nodeLogs = run.nodes[0].logs || [];
+    assert.strictEqual(nodeLogs.filter((item) => item.message === 'payload log').length, 1);
 });

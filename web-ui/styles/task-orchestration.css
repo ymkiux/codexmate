@@ -153,8 +153,12 @@
 .task-runtime-item {
     width: 100%;
     padding: 12px;
-    cursor: pointer;
+    cursor: default;
     text-align: left;
+}
+
+.task-runtime-item.clickable {
+    cursor: pointer;
 }
 
 .task-runtime-item.active {

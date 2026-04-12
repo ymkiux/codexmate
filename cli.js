@@ -9497,13 +9497,13 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             break;
                         case 'task-run-detail':
                             {
-                                const runId = params && typeof params.runId === 'string' ? params.runId.trim() : '';
-                                if (!runId) {
-                                    result = { error: 'runId is required' };
+                                const runIdValidation = validateTaskRunId(params && typeof params.runId === 'string' ? params.runId : '');
+                                if (!runIdValidation.ok) {
+                                    result = { error: runIdValidation.error };
                                     break;
                                 }
-                                const detail = readTaskRunDetail(runId);
-                                result = detail || { error: `task run not found: ${runId}` };
+                                const detail = readTaskRunDetail(runIdValidation.runId);
+                                result = detail || { error: `task run not found: ${runIdValidation.runId}` };
                             }
                             break;
                         case 'task-queue-add':
@@ -10646,6 +10646,8 @@ async function cmdTask(args = []) {
             const result = await startTaskQueueProcessing({ taskId, detach: options.detach });
             if (options.json) {
                 console.log(JSON.stringify(result, null, 2));
+            } else if (result.error) {
+                throw new Error(result.error);
             } else if (result.detached) {
                 console.log('✓ 队列处理已在后台启动');
                 console.log();
@@ -10654,6 +10656,9 @@ async function cmdTask(args = []) {
             } else {
                 console.log('队列中暂无可执行任务');
                 console.log();
+            }
+            if (result.error) {
+                throw new Error(result.error);
             }
             return;
         }
@@ -11858,6 +11863,17 @@ function createTaskRunId() {
     return `tr-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
 }
 
+function validateTaskRunId(value) {
+    const runId = typeof value === 'string' ? value.trim() : '';
+    if (!runId) {
+        return { ok: false, error: 'runId is required', runId: '' };
+    }
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(runId)) {
+        return { ok: false, error: 'runId contains unsupported characters', runId: '' };
+    }
+    return { ok: true, error: '', runId };
+}
+
 function normalizeTaskEngine(value) {
     const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
     return normalized === 'workflow' ? 'workflow' : 'codex';
@@ -12058,11 +12074,16 @@ function listTaskRunRecords(limit = 20) {
 }
 
 function getTaskRunDetailPath(runId) {
-    const safeId = typeof runId === 'string' ? runId.trim() : '';
-    if (!safeId) {
+    const validation = validateTaskRunId(runId);
+    if (!validation.ok) {
         return '';
     }
-    return path.join(TASK_RUN_DETAILS_DIR, `${safeId}.json`);
+    const baseDir = path.resolve(TASK_RUN_DETAILS_DIR);
+    const detailPath = path.resolve(baseDir, `${validation.runId}.json`);
+    if (!(detailPath === baseDir || detailPath.startsWith(`${baseDir}${path.sep}`))) {
+        return '';
+    }
+    return detailPath;
 }
 
 function writeTaskRunDetail(detail = {}) {
@@ -12500,10 +12521,17 @@ function addTaskToQueue(params = {}) {
 }
 
 async function runTaskNow(params = {}) {
+    const rawRunId = params && typeof params.runId === 'string' ? params.runId.trim() : '';
+    const runIdValidation = rawRunId
+        ? validateTaskRunId(rawRunId)
+        : { ok: true, runId: createTaskRunId(), error: '' };
+    if (!runIdValidation.ok) {
+        return { error: runIdValidation.error };
+    }
     const plan = coerceTaskPlanPayload(params || {});
     const detail = await runTaskPlanInternal(plan, {
         taskId: typeof params.taskId === 'string' && params.taskId.trim() ? params.taskId.trim() : createTaskId(),
-        runId: typeof params.runId === 'string' && params.runId.trim() ? params.runId.trim() : createTaskRunId()
+        runId: runIdValidation.runId
     });
     return detail;
 }
@@ -12511,6 +12539,13 @@ async function runTaskNow(params = {}) {
 async function startTaskQueueProcessing(options = {}) {
     const taskId = typeof options.taskId === 'string' ? options.taskId.trim() : '';
     const detach = options.detach === true;
+    const queueItemById = taskId ? getTaskQueueItem(taskId) : null;
+    if (taskId && !queueItemById) {
+        return { error: `task not found: ${taskId}` };
+    }
+    if (queueItemById && queueItemById.status !== 'queued') {
+        return { error: `task is not queued: ${taskId}` };
+    }
     const runner = async () => {
         let latestDetail = null;
         while (true) {
@@ -12561,13 +12596,13 @@ async function startTaskQueueProcessing(options = {}) {
 }
 
 async function retryTaskRun(params = {}) {
-    const runId = typeof params.runId === 'string' ? params.runId.trim() : '';
-    if (!runId) {
-        return { error: 'runId is required' };
+    const runIdValidation = validateTaskRunId(params && typeof params.runId === 'string' ? params.runId : '');
+    if (!runIdValidation.ok) {
+        return { error: runIdValidation.error };
     }
-    const detail = readTaskRunDetail(runId);
+    const detail = readTaskRunDetail(runIdValidation.runId);
     if (!detail || !detail.plan) {
-        return { error: `task run not found: ${runId}` };
+        return { error: `task run not found: ${runIdValidation.runId}` };
     }
     const plan = cloneJson(detail.plan, {});
     const detach = params.detach === true;
@@ -12658,13 +12693,13 @@ function cancelTaskRunOrQueue(params = {}) {
 }
 
 function getTaskLogs(params = {}) {
-    const runId = typeof params.runId === 'string' ? params.runId.trim() : '';
-    if (!runId) {
-        return { error: 'runId is required' };
+    const runIdValidation = validateTaskRunId(params && typeof params.runId === 'string' ? params.runId : '');
+    if (!runIdValidation.ok) {
+        return { error: runIdValidation.error };
     }
-    const detail = readTaskRunDetail(runId);
+    const detail = readTaskRunDetail(runIdValidation.runId);
     if (!detail) {
-        return { error: `task run not found: ${runId}` };
+        return { error: `task run not found: ${runIdValidation.runId}` };
     }
     const run = detail.run && typeof detail.run === 'object' ? detail.run : {};
     const lines = [];
@@ -12679,7 +12714,7 @@ function getTaskLogs(params = {}) {
         lines.push('');
     }
     return {
-        runId,
+        runId: runIdValidation.runId,
         logs: lines.join('\n').trim(),
         detail
     };
