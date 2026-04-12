@@ -42,12 +42,12 @@
 
                     <div class="task-layout-grid task-layout-grid-primary">
                         <section class="selector-section task-compose-flow-card">
-                            <div class="task-flow-section">
+                            <div class="task-flow-section task-flow-section-compact">
                                 <div class="task-flow-head">
                                     <div class="task-flow-step">1</div>
                                     <div>
-                                        <div class="task-flow-title">先写结果，不要先想命令</div>
-                                        <div class="task-flow-copy">把目标、边界和收尾动作写清楚，编排器才知道该拆哪些节点。</div>
+                                        <div class="task-flow-title">先把结果写清楚</div>
+                                        <div class="task-flow-copy">只保留真正影响执行的输入，别让页面先把人绕晕。</div>
                                     </div>
                                 </div>
 
@@ -64,57 +64,58 @@
                                     <label class="selector-field task-field task-field-wide task-goal-field">
                                         <span class="selector-label">目标</span>
                                         <textarea v-model="taskOrchestration.target" class="task-textarea task-textarea-goal" rows="5" placeholder="例如：修复当前 PR review 评论，并补对应回归测试；不要改无关模块"></textarea>
-                                        <span class="task-field-hint">尽量写成结果导向句子，最好同时带范围、约束和验收标准。</span>
+                                        <span class="task-field-hint">一句话写清结果、边界和验收标准就够了。</span>
                                     </label>
                                     <label class="selector-field">
                                         <span class="selector-label">标题</span>
                                         <input v-model="taskOrchestration.title" type="text" placeholder="可选，默认从目标自动提取">
-                                        <span class="task-field-hint">给队列和运行记录一个更容易识别的短标题。</span>
                                     </label>
-                                    <label class="selector-field task-field-wide">
-                                        <span class="selector-label">说明</span>
-                                        <textarea v-model="taskOrchestration.notes" class="task-textarea" rows="3" placeholder="例如：不要重写现有架构，只做增量实现"></textarea>
-                                        <span class="task-field-hint">补充边界、禁区、风格要求或验证要求。</span>
-                                    </label>
-                                    <label class="selector-field task-field-wide">
-                                        <span class="selector-label">后续动作（每行一条）</span>
-                                        <textarea v-model="taskOrchestration.followUpsText" class="task-textarea" rows="3" placeholder="例如：\n继续处理 review 评论\n最后补回归测试"></textarea>
-                                        <span class="task-field-hint">把完成主目标后的固定收尾动作写在这里。</span>
-                                    </label>
+                                </div>
+
+                                <div class="task-draft-overview">
+                                    <div class="task-draft-overview-head">
+                                        <div>
+                                            <div class="task-readiness-title">{{ taskOrchestrationDraftReadiness.title }}</div>
+                                            <div class="task-readiness-copy">{{ taskOrchestrationDraftReadiness.summary }}</div>
+                                        </div>
+                                        <span :class="['pill', taskOrchestrationDraftReadiness.tone]">{{ taskOrchestrationDraftReadiness.title }}</span>
+                                    </div>
+                                    <div class="task-checklist-inline">
+                                        <div v-for="item in taskOrchestrationDraftChecklist" :key="item.key" :class="['task-check-chip', { done: item.done }]">
+                                            <strong>{{ item.label }}</strong>
+                                            <span>{{ item.detail }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="task-config-strip">
+                                        <div class="task-config-pill">{{ taskOrchestration.selectedEngine === 'workflow' ? 'Workflow' : 'Codex' }}</div>
+                                        <div class="task-config-pill">并发 {{ taskOrchestration.concurrency }}</div>
+                                        <div class="task-config-pill">自动修复 {{ taskOrchestration.autoFixRounds }}</div>
+                                        <div class="task-config-pill">{{ taskOrchestration.allowWrite ? '允许写入' : '只读' }}</div>
+                                        <div class="task-config-pill">{{ taskOrchestration.dryRun ? '仅预演' : '真实执行' }}</div>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div class="task-flow-section">
+                            <div class="task-flow-section task-flow-section-compact">
                                 <div class="task-flow-head">
                                     <div class="task-flow-step">2</div>
                                     <div>
-                                        <div class="task-flow-title">选择执行策略</div>
-                                        <div class="task-flow-copy">把真正会影响执行结果的设置放在一起，不让用户在页面里到处找。</div>
+                                        <div class="task-flow-title">选择执行方式</div>
+                                        <div class="task-flow-copy">默认只露出常用项，细节收进高级设置。</div>
                                     </div>
                                 </div>
 
-                                <div class="selector-grid task-composer-grid task-composer-grid-secondary">
+                                <div class="selector-grid task-composer-grid task-composer-grid-compact">
                                     <label class="selector-field">
                                         <span class="selector-label">引擎</span>
                                         <select v-model="taskOrchestration.selectedEngine">
                                             <option value="codex">Codex</option>
                                             <option value="workflow">Workflow</option>
                                         </select>
-                                        <span class="task-field-hint">Codex 适合开放式任务，Workflow 适合固定流程。</span>
                                     </label>
-                                    <label class="selector-field">
-                                        <span class="selector-label">并发</span>
-                                        <input v-model="taskOrchestration.concurrency" type="number" min="1" max="8">
-                                        <span class="task-field-hint">复杂任务先从 1~2 开始更稳。</span>
-                                    </label>
-                                    <label class="selector-field">
-                                        <span class="selector-label">自动修复</span>
-                                        <input v-model="taskOrchestration.autoFixRounds" type="number" min="0" max="5">
-                                        <span class="task-field-hint">失败后允许自动再试几轮修复。</span>
-                                    </label>
-                                    <div class="selector-field task-toggle-card">
+                                    <div class="selector-field task-toggle-card task-toggle-card-inline">
                                         <span class="selector-label">运行模式</span>
-                                        <div class="task-toggle-stack">
+                                        <div class="task-toggle-inline">
                                             <label class="task-toggle">
                                                 <input v-model="taskOrchestration.allowWrite" type="checkbox">
                                                 <span>允许写入</span>
@@ -124,33 +125,57 @@
                                                 <span>仅预演</span>
                                             </label>
                                         </div>
-                                        <span class="task-field-hint">建议先预演一轮，再切真实执行。</span>
                                     </div>
-                                    <label class="selector-field task-field-wide">
-                                        <span class="selector-label">Workflow ID（每行一条）</span>
-                                        <textarea v-model="taskOrchestration.workflowIdsText" class="task-textarea" rows="3" placeholder="例如：\ndiagnose-config\nsafe-provider-switch"></textarea>
-                                        <span class="task-field-hint">只在 Workflow 引擎下需要。当前本地可用 {{ taskOrchestration.workflows.length }} 个。</span>
-                                        <div v-if="taskOrchestration.workflows.length" class="task-workflow-suggestions">
-                                            <button
-                                                v-for="workflow in taskOrchestration.workflows"
-                                                :key="workflow.id || workflow.name"
-                                                type="button"
-                                                class="task-workflow-chip"
-                                                @click="appendTaskWorkflowId(workflow.id || workflow.name)">
-                                                <span>{{ workflow.name || workflow.id }}</span>
-                                                <small v-if="workflow.stepCount">{{ workflow.stepCount }} 步</small>
-                                            </button>
-                                        </div>
-                                    </label>
                                 </div>
+
+                                <details class="task-advanced-panel">
+                                    <summary class="task-advanced-summary">高级设置</summary>
+                                    <div class="selector-grid task-composer-grid task-composer-grid-secondary">
+                                        <label class="selector-field task-field-wide">
+                                            <span class="selector-label">说明</span>
+                                            <textarea v-model="taskOrchestration.notes" class="task-textarea" rows="3" placeholder="例如：不要重写现有架构，只做增量实现"></textarea>
+                                            <span class="task-field-hint">补边界、禁区、风格要求或验证要求。</span>
+                                        </label>
+                                        <label class="selector-field task-field-wide">
+                                            <span class="selector-label">后续动作（每行一条）</span>
+                                            <textarea v-model="taskOrchestration.followUpsText" class="task-textarea" rows="3" placeholder="例如：\n继续处理 review 评论\n最后补回归测试"></textarea>
+                                        </label>
+                                        <label class="selector-field">
+                                            <span class="selector-label">并发</span>
+                                            <input v-model="taskOrchestration.concurrency" type="number" min="1" max="8">
+                                            <span class="task-field-hint">复杂任务先从 1~2 开始更稳。</span>
+                                        </label>
+                                        <label class="selector-field">
+                                            <span class="selector-label">自动修复</span>
+                                            <input v-model="taskOrchestration.autoFixRounds" type="number" min="0" max="5">
+                                            <span class="task-field-hint">失败后自动再试几轮。</span>
+                                        </label>
+                                        <label class="selector-field task-field-wide">
+                                            <span class="selector-label">Workflow ID（每行一条）</span>
+                                            <textarea v-model="taskOrchestration.workflowIdsText" class="task-textarea" rows="3" placeholder="例如：\ndiagnose-config\nsafe-provider-switch"></textarea>
+                                            <span class="task-field-hint">仅 Workflow 模式需要。当前本地可用 {{ taskOrchestration.workflows.length }} 个。</span>
+                                            <div v-if="taskOrchestration.workflows.length" class="task-workflow-suggestions">
+                                                <button
+                                                    v-for="workflow in taskOrchestration.workflows"
+                                                    :key="workflow.id || workflow.name"
+                                                    type="button"
+                                                    class="task-workflow-chip"
+                                                    @click="appendTaskWorkflowId(workflow.id || workflow.name)">
+                                                    <span>{{ workflow.name || workflow.id }}</span>
+                                                    <small v-if="workflow.stepCount">{{ workflow.stepCount }} 步</small>
+                                                </button>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </details>
                             </div>
 
-                            <div class="task-flow-section task-flow-section-actions">
+                            <div class="task-flow-section task-flow-section-actions task-flow-section-compact">
                                 <div class="task-flow-head">
                                     <div class="task-flow-step">3</div>
                                     <div>
-                                        <div class="task-flow-title">先预览，再执行</div>
-                                        <div class="task-flow-copy">把三个动作的后果讲明白，让用户不需要猜按钮会干什么。</div>
+                                        <div class="task-flow-title">先预览，再决定怎么跑</div>
+                                        <div class="task-flow-copy">按钮只保留三件事，别再让一排动作抢注意力。</div>
                                     </div>
                                 </div>
                                 <div class="task-action-row task-action-row-prominent">
@@ -165,61 +190,34 @@
                                             {{ taskOrchestration.queueAdding ? '加入中...' : '加入队列' }}
                                         </button>
                                         <button type="button" class="btn-tool" @click="startTaskQueueRunner()" :disabled="taskOrchestration.queueStarting">
-                                            {{ taskOrchestration.queueStarting ? '启动中...' : '开始消费队列' }}
+                                            {{ taskOrchestration.queueStarting ? '启动中...' : '开始队列' }}
                                         </button>
                                     </div>
                                 </div>
-                                <div class="task-action-help task-action-help-prominent">
-                                    <div class="task-action-help-item"><strong>预览计划</strong> 只生成 DAG，不启动执行。</div>
-                                    <div class="task-action-help-item"><strong>立即执行</strong> 直接创建并启动这次编排。</div>
-                                    <div class="task-action-help-item"><strong>加入队列</strong> 先排队，适合多个任务一起跑。</div>
-                                </div>
+                                <div class="task-action-caption">预览只生成计划，不会真的开跑。要批量处理时再加入队列。</div>
                             </div>
                         </section>
-
-                        <aside class="selector-section task-sidebar-card">
-                            <div class="task-sidebar-group">
-                                <div class="task-sidebar-title">草稿状态</div>
-                                <div class="task-readiness-card">
-                                    <div class="task-readiness-head">
-                                        <div>
-                                            <div class="task-readiness-title">{{ taskOrchestrationDraftReadiness.title }}</div>
-                                            <div class="task-readiness-copy">{{ taskOrchestrationDraftReadiness.summary }}</div>
-                                        </div>
-                                        <span :class="['pill', taskOrchestrationDraftReadiness.tone]">{{ taskOrchestrationDraftReadiness.title }}</span>
-                                    </div>
-                                    <div class="task-readiness-grid">
-                                        <div v-for="item in taskOrchestrationDraftChecklist" :key="item.key" :class="['task-readiness-item', { done: item.done }]">
-                                            <strong>{{ item.label }}</strong>
-                                            <span>{{ item.detail }}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="task-sidebar-group">
-                                <div class="task-sidebar-title">当前配置</div>
-                                <div class="task-config-strip task-config-strip-vertical">
-                                    <div class="task-config-pill">引擎 · {{ taskOrchestration.selectedEngine === 'workflow' ? 'Workflow' : 'Codex' }}</div>
-                                    <div class="task-config-pill">并发 · {{ taskOrchestration.concurrency }}</div>
-                                    <div class="task-config-pill">自动修复 · {{ taskOrchestration.autoFixRounds }}</div>
-                                    <div class="task-config-pill">写入 · {{ taskOrchestration.allowWrite ? '允许' : '只读' }}</div>
-                                    <div class="task-config-pill">模式 · {{ taskOrchestration.dryRun ? '仅预演' : '真实执行' }}</div>
-                                </div>
-                            </div>
-
-                            <div class="task-sidebar-group">
-                                <div class="task-sidebar-title">使用建议</div>
-                                <div class="task-action-help task-action-help-sidebar">
-                                    <div class="task-action-help-item">先把目标写得像验收标准，不要只写“修一下”。</div>
-                                    <div class="task-action-help-item">Workflow 适合固定流程，Codex 适合开放式分析和实现。</div>
-                                    <div class="task-action-help-item">涉及写入时，先跑一轮预演能少踩很多蠢坑。</div>
-                                </div>
-                            </div>
-                        </aside>
                     </div>
 
-                    <div class="task-layout-grid task-layout-grid-secondary">
+                    <section
+                        v-if="!(taskOrchestration.plan || taskOrchestration.planIssues.length || taskOrchestration.planWarnings.length || taskOrchestration.lastError || taskOrchestration.queue.length || taskOrchestration.runs.length || taskOrchestration.selectedRunId || taskOrchestration.selectedRunError)"
+                        class="selector-section task-stage-card">
+                        <div class="task-stage-empty">
+                            <div>
+                                <div class="selector-title">工作区会在需要时再展开</div>
+                                <div class="skills-panel-note">先把目标写好。点“预览计划”后，下面才会展开计划和执行工作台，避免一上来就铺满整页。</div>
+                            </div>
+                            <div class="task-stage-strip">
+                                <div class="task-stage-pill">先写目标</div>
+                                <div class="task-stage-pill">再预览计划</div>
+                                <div class="task-stage-pill">最后执行或入队</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <div
+                        v-else
+                        class="task-layout-grid task-layout-grid-secondary">
                         <section class="selector-section task-plan-card">
                             <div v-if="taskOrchestration.lastError" class="task-issue-item">{{ taskOrchestration.lastError }}</div>
                             <div class="selector-header task-section-header">
