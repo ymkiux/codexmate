@@ -87,7 +87,7 @@
                                 <div class="usage-card-head">
                                     <div>
                                         <div class="usage-card-title">使用模型</div>
-                                        <div class="usage-card-subtitle">只列出当前范围内真正落盘的 model 名，缺字段的旧记录不硬猜。</div>
+                                        <div class="usage-card-subtitle">只列真实落盘的 model 名。</div>
                                     </div>
                                     <div class="usage-card-kicker">已识别 {{ sessionUsageCharts.modelCoverage.modeledSessions }}/{{ sessionUsageCharts.modelCoverage.totalSessions }}</div>
                                 </div>
@@ -108,18 +108,18 @@
                                 <div v-if="!sessionUsageCharts.usedModels.length" class="usage-diagnostic-empty">
                                     <div class="usage-diagnostic-title">当前范围没读到模型名</div>
                                     <div class="usage-diagnostic-copy">
-                                        已扫描 {{ sessionUsageCharts.modelCoverage.totalSessions }} 个会话，但原始记录里没有可识别的 `model / modelName / modelId` 字段。
+                                        已扫描 {{ sessionUsageCharts.modelCoverage.totalSessions }} 个会话，但原始记录里没有可识别的 model 字段。
                                     </div>
                                     <div v-if="sessionUsageCharts.modelCoverage.providerOnlySessions > 0" class="usage-diagnostic-meta">
-                                        其中 {{ sessionUsageCharts.modelCoverage.providerOnlySessions }} 个旧会话只写了 provider，没写真实 model。
+                                        其中 {{ sessionUsageCharts.modelCoverage.providerOnlySessions }} 个旧会话只写了 provider。
                                     </div>
                                 </div>
                                 <template v-else>
                                     <div v-if="sessionUsageCharts.modelCoverage.providerOnlySessions > 0" class="usage-inline-note">
-                                        另有 {{ sessionUsageCharts.modelCoverage.missingModelSessions }} 个会话没写具体模型名，当前列表只统计真实落盘的 model。
+                                        另有 {{ sessionUsageCharts.modelCoverage.missingModelSessions }} 个会话没写模型名，未计入列表。
                                     </div>
                                     <div v-else-if="sessionUsageCharts.modelCoverage.missingModelSessions > 0" class="usage-inline-note">
-                                        另有 {{ sessionUsageCharts.modelCoverage.missingModelSessions }} 个会话缺少 model 字段，未计入当前列表。
+                                        另有 {{ sessionUsageCharts.modelCoverage.missingModelSessions }} 个会话缺少 model，未计入列表。
                                     </div>
                                     <div v-if="sessionUsageCharts.modelCoverage.missingModelSessionsPreview.length" class="usage-diagnostic-list">
                                         <div class="usage-diagnostic-list-title">仍缺模型名的会话</div>

@@ -1059,6 +1059,57 @@ test('sessionUsageSummaryCards falls back to public catalog pricing when provide
     assert.match(costCard.title, /覆盖 1\/1 个会话/);
 });
 
+test('sessionUsageSummaryCards excludes Claude sessions from estimated cost coverage', () => {
+    const computed = createSessionComputed();
+    const cards = computed.sessionUsageSummaryCards.call({
+        sessionUsageCharts: {
+            summary: {
+                totalSessions: 2,
+                totalMessages: 8,
+                totalTokens: 650000,
+                totalContextWindow: 258400,
+                activeDurationMs: 50 * 60 * 1000,
+                totalDurationMs: 50 * 60 * 1000,
+                activeDays: 1,
+                avgMessagesPerSession: 4,
+                busiestDay: null,
+                busiestHour: null
+            }
+        },
+        sessionsUsageList: [
+            {
+                source: 'codex',
+                provider: 'maxx',
+                model: 'gpt-5.3-codex',
+                totalTokens: 400000,
+                inputTokens: 300000,
+                cachedInputTokens: 100000,
+                outputTokens: 100000,
+                reasoningOutputTokens: 0
+            },
+            {
+                source: 'claude',
+                provider: 'claude',
+                model: 'claude-3-7-sonnet',
+                totalTokens: 250000,
+                inputTokens: 150000,
+                cachedInputTokens: 0,
+                outputTokens: 100000,
+                reasoningOutputTokens: 0
+            }
+        ],
+        providersList: [],
+        currentProvider: 'maxx'
+    });
+
+    const costCard = cards.find((card) => card.key === 'estimated-cost');
+    assert(costCard, 'missing estimated cost summary card');
+    assert.strictEqual(costCard.value, '$1.77');
+    assert.strictEqual(costCard.note, '覆盖 1/1 会话，暂不含 Claude');
+    assert.match(costCard.title, /暂不含 Claude/);
+    assert.match(costCard.title, /覆盖 1\/1 个会话/);
+});
+
 test('sessionUsageSummaryCards respects configured zero-cost pricing instead of falling back to catalog rates', () => {
     const computed = createSessionComputed();
     const cards = computed.sessionUsageSummaryCards.call({

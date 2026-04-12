@@ -79,6 +79,9 @@ function formatUsageEstimateDiagnostic(summary, rangeLabel) {
     const missingTokenSessions = Number.isFinite(Number(summary.missingTokenSessions))
         ? Math.max(0, Math.floor(Number(summary.missingTokenSessions)))
         : 0;
+    const skippedUnsupportedSessions = Number.isFinite(Number(summary.skippedUnsupportedSessions))
+        ? Math.max(0, Math.floor(Number(summary.skippedUnsupportedSessions)))
+        : 0;
     const parts = [];
     if (estimatedSessions > 0 || totalSessions > 0) {
         parts.push(`覆盖 ${estimatedSessions}/${totalSessions} 会话`);
@@ -88,6 +91,9 @@ function formatUsageEstimateDiagnostic(summary, rangeLabel) {
     }
     if (missingTokenSessions > 0) {
         parts.push(`${missingTokenSessions} 个缺少 token 拆分`);
+    }
+    if (skippedUnsupportedSessions > 0) {
+        parts.push('暂不含 Claude');
     }
     return parts.length ? parts.join('，') : '当前范围内暂无可估算会话';
 }
@@ -214,6 +220,22 @@ function resolveUsagePricingForSession(session, pricingIndex, fallbackProvider =
     return null;
 }
 
+function shouldEstimateUsageCostForSession(session) {
+    if (!session || typeof session !== 'object') {
+        return false;
+    }
+    const source = typeof session.source === 'string' ? session.source.trim().toLowerCase() : '';
+    const provider = typeof session.provider === 'string' ? session.provider.trim().toLowerCase() : '';
+    const model = typeof session.model === 'string' ? session.model.trim().toLowerCase() : '';
+    if (source === 'claude' || provider === 'claude') {
+        return false;
+    }
+    if (/^claude(?:[-_]|$)/.test(model)) {
+        return false;
+    }
+    return true;
+}
+
 function estimateUsageCostSummary(sessions, providersList, currentProvider) {
     const list = Array.isArray(sessions) ? sessions : [];
     const pricingIndex = buildUsagePricingIndex(providersList);
@@ -225,9 +247,16 @@ function estimateUsageCostSummary(sessions, providersList, currentProvider) {
     let catalogSessions = 0;
     let missingPricingSessions = 0;
     let missingTokenSessions = 0;
+    let supportedSessions = 0;
+    let skippedUnsupportedSessions = 0;
 
     for (const session of list) {
         if (!session || typeof session !== 'object') continue;
+        if (!shouldEstimateUsageCostForSession(session)) {
+            skippedUnsupportedSessions += 1;
+            continue;
+        }
+        supportedSessions += 1;
         const inputTokens = Number.isFinite(Number(session.inputTokens)) ? Math.max(0, Math.floor(Number(session.inputTokens))) : null;
         const cachedInputTokens = Number.isFinite(Number(session.cachedInputTokens)) ? Math.max(0, Math.floor(Number(session.cachedInputTokens))) : 0;
         const outputTokens = Number.isFinite(Number(session.outputTokens)) ? Math.max(0, Math.floor(Number(session.outputTokens))) : null;
@@ -269,7 +298,7 @@ function estimateUsageCostSummary(sessions, providersList, currentProvider) {
     return {
         totalCostUsd,
         estimatedSessions,
-        totalSessions: list.length,
+        totalSessions: supportedSessions,
         estimatedTokens,
         totalTokens,
         coveragePercent,
@@ -277,7 +306,8 @@ function estimateUsageCostSummary(sessions, providersList, currentProvider) {
         configuredSessions,
         catalogSessions,
         missingPricingSessions,
-        missingTokenSessions
+        missingTokenSessions,
+        skippedUnsupportedSessions
     };
 }
 
@@ -446,10 +476,10 @@ export function createSessionComputed() {
                     value: estimatedCost.hasEstimate ? formatUsageEstimatedCost(estimatedCost.totalCostUsd) : '暂无',
                     note: formatUsageEstimateDiagnostic(estimatedCost, usageRangeLabel),
                     title: estimatedCost.hasEstimate
-                        ? `${estimatedCost.catalogSessions > 0
+                        ? `${estimatedCost.skippedUnsupportedSessions > 0 ? '暂不含 Claude，' : ''}${estimatedCost.catalogSessions > 0
                             ? (estimatedCost.configuredSessions > 0 ? '按已配置单价 + 公开模型目录估算' : '按公开模型目录估算')
                             : '按已配置单价估算'}，估算 ${formatUsageEstimatedCost(estimatedCost.totalCostUsd, { precise: true })}，覆盖 ${estimatedCost.estimatedSessions}/${estimatedCost.totalSessions} 个会话，约 ${estimatedCost.coveragePercent}% token`
-                        : '缺少可匹配的模型单价或 token 拆分。请先补 models.cost，或确认会话已记录 input/output token。'
+                        : `${estimatedCost.skippedUnsupportedSessions > 0 ? '暂不统计 Claude 费用。' : ''}缺少可匹配的模型单价或 token 拆分。请先补 models.cost，或确认会话已记录 input/output token。`
                 },
                 {
                     key: 'active-duration',
