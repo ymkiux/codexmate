@@ -85,9 +85,28 @@ function formatUsageDuration(value, options = {}) {
     return parts.length ? parts.join(' ') : '0分';
 }
 
+const KNOWN_USAGE_MODEL_PRICING = Object.freeze({
+    'gpt-5.4': Object.freeze({ input: 2.5, output: 15, cacheRead: 0.25, cacheWrite: 0 }),
+    'gpt-5.4-mini': Object.freeze({ input: 0.75, output: 4.5, cacheRead: 0.075, cacheWrite: 0 }),
+    'gpt-5.3-codex': Object.freeze({ input: 1.75, output: 14, cacheRead: 0.175, cacheWrite: 0 }),
+    'gpt-5.2-codex': Object.freeze({ input: 1.75, output: 14, cacheRead: 0.175, cacheWrite: 0 })
+});
+
+function createUsagePricingEntry(pricing, source) {
+    const resolvedSource = typeof source === 'string' && source.trim() ? source.trim() : 'provider-config';
+    return {
+        input: readUsageCostNumber(pricing && pricing.input),
+        output: readUsageCostNumber(pricing && pricing.output),
+        cacheRead: readUsageCostNumber(pricing && pricing.cacheRead),
+        cacheWrite: readUsageCostNumber(pricing && pricing.cacheWrite),
+        source: resolvedSource
+    };
+}
+
 function buildUsagePricingIndex(providersList = []) {
     const byProvider = new Map();
     const byModel = new Map();
+    const knownByModel = new Map();
     const list = Array.isArray(providersList) ? providersList : [];
     for (const provider of list) {
         if (!provider || typeof provider !== 'object') continue;
@@ -98,15 +117,12 @@ function buildUsagePricingIndex(providersList = []) {
             if (!model || typeof model !== 'object') continue;
             const modelId = typeof model.id === 'string' ? model.id.trim() : '';
             if (!modelId) continue;
-            const cost = model.cost && typeof model.cost === 'object' && !Array.isArray(model.cost)
-                ? model.cost
-                : null;
-            const pricing = {
-                input: readUsageCostNumber(cost && cost.input),
-                output: readUsageCostNumber(cost && cost.output),
-                cacheRead: readUsageCostNumber(cost && cost.cacheRead),
-                cacheWrite: readUsageCostNumber(cost && cost.cacheWrite)
-            };
+            const pricing = createUsagePricingEntry(
+                model.cost && typeof model.cost === 'object' && !Array.isArray(model.cost)
+                    ? model.cost
+                    : null,
+                'provider-config'
+            );
             const hasKnownRate = Object.values(pricing).some((value) => value !== null && value > 0);
             if (!hasKnownRate) continue;
             providerMap.set(modelId, pricing);
@@ -118,7 +134,14 @@ function buildUsagePricingIndex(providersList = []) {
             byProvider.set(providerName, providerMap);
         }
     }
-    return { byProvider, byModel };
+    for (const [modelId, pricing] of Object.entries(KNOWN_USAGE_MODEL_PRICING)) {
+        const normalizedModelId = typeof modelId === 'string' ? modelId.trim() : '';
+        if (!normalizedModelId || byModel.has(normalizedModelId)) {
+            continue;
+        }
+        knownByModel.set(normalizedModelId, createUsagePricingEntry(pricing, 'public-catalog'));
+    }
+    return { byProvider, byModel, knownByModel };
 }
 
 function resolveUsagePricingForSession(session, pricingIndex, fallbackProvider = '') {
@@ -139,6 +162,10 @@ function resolveUsagePricingForSession(session, pricingIndex, fallbackProvider =
     if (Array.isArray(modelMatches) && modelMatches.length === 1) {
         return modelMatches[0].pricing;
     }
+    const knownPricing = pricingIndex.knownByModel instanceof Map ? pricingIndex.knownByModel.get(model) : null;
+    if (knownPricing) {
+        return knownPricing;
+    }
     return null;
 }
 
@@ -149,6 +176,8 @@ function estimateUsageCostSummary(sessions, providersList, currentProvider) {
     let estimatedSessions = 0;
     let totalTokens = 0;
     let estimatedTokens = 0;
+    let configuredSessions = 0;
+    let catalogSessions = 0;
 
     for (const session of list) {
         if (!session || typeof session !== 'object') continue;
@@ -176,6 +205,11 @@ function estimateUsageCostSummary(sessions, providersList, currentProvider) {
         totalCostUsd += estimatedUsd;
         estimatedSessions += 1;
         estimatedTokens += totalSessionTokens || (billableInputTokens + cachedInputTokens + (outputTokens || 0) + reasoningOutputTokens);
+        if (pricing.source === 'public-catalog') {
+            catalogSessions += 1;
+        } else {
+            configuredSessions += 1;
+        }
     }
 
     const coveragePercent = totalTokens > 0
@@ -188,7 +222,9 @@ function estimateUsageCostSummary(sessions, providersList, currentProvider) {
         estimatedTokens,
         totalTokens,
         coveragePercent,
-        hasEstimate: estimatedSessions > 0
+        hasEstimate: estimatedSessions > 0,
+        configuredSessions,
+        catalogSessions
     };
 }
 
@@ -352,7 +388,9 @@ export function createSessionComputed() {
                     label: '预估费用',
                     value: estimatedCost.hasEstimate ? formatUsageEstimatedCost(estimatedCost.totalCostUsd) : '暂无',
                     title: estimatedCost.hasEstimate
-                        ? `按已知模型单价估算，覆盖 ${estimatedCost.estimatedSessions}/${estimatedCost.totalSessions} 个会话，约 ${estimatedCost.coveragePercent}% token`
+                        ? `${estimatedCost.catalogSessions > 0
+                            ? (estimatedCost.configuredSessions > 0 ? '按 Provider 配置 + 公开模型目录单价估算' : '按公开模型目录单价估算')
+                            : '按 Provider 配置单价估算'}，覆盖 ${estimatedCost.estimatedSessions}/${estimatedCost.totalSessions} 个会话，约 ${estimatedCost.coveragePercent}% token`
                         : '缺少可匹配的模型单价或 token 拆分。请先在 Provider 配置里补 models.cost，或确认 session 已记录 input/output token。'
                 },
                 {

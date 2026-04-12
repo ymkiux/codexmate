@@ -805,6 +805,45 @@ test('sessionUsageSummaryCards estimates usage cost from configured provider pri
     assert.strictEqual(totalDurationCard.value, '3天');
 });
 
+test('sessionUsageSummaryCards falls back to public catalog pricing when provider config omits models.cost', () => {
+    const computed = createSessionComputed();
+    const cards = computed.sessionUsageSummaryCards.call({
+        sessionUsageCharts: {
+            summary: {
+                totalSessions: 1,
+                totalMessages: 4,
+                totalTokens: 400000,
+                totalContextWindow: 258400,
+                activeDurationMs: 30 * 60 * 1000,
+                totalDurationMs: 30 * 60 * 1000,
+                activeDays: 1,
+                avgMessagesPerSession: 4,
+                busiestDay: null,
+                busiestHour: null
+            }
+        },
+        sessionsUsageList: [
+            {
+                provider: 'maxx',
+                model: 'gpt-5.3-codex',
+                totalTokens: 400000,
+                inputTokens: 300000,
+                cachedInputTokens: 100000,
+                outputTokens: 100000,
+                reasoningOutputTokens: 0
+            }
+        ],
+        providersList: [],
+        currentProvider: 'maxx'
+    });
+
+    const costCard = cards.find((card) => card.key === 'estimated-cost');
+    assert(costCard, 'missing estimated cost summary card');
+    assert.strictEqual(costCard.value, '$1.77');
+    assert.match(costCard.title, /公开模型目录单价估算/);
+    assert.match(costCard.title, /覆盖 1\/1 个会话/);
+});
+
 test('activeSessionVisibleMessages falls back to the initial preview batch before priming completes', () => {
     const computed = createSessionComputed();
     const messages = Array.from({ length: 12 }, (_, index) => ({ id: index + 1 }));
