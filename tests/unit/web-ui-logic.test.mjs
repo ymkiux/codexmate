@@ -755,7 +755,8 @@ test('sessionUsageSummaryCards uses compact units for long token and context tot
     assert.strictEqual(contextCard.title, '256,000');
     assert.strictEqual(costCard.value, '暂无');
     assert.strictEqual(costCard.label, '预估费用 · 近 7 天');
-    assert.strictEqual(costCard.note, '当前范围内暂无可估算会话');
+    assert.ok(!costCard.note);
+    assert.match(costCard.title, /缺少可匹配的模型单价或 token 拆分/);
     assert.strictEqual(activeDurationCard.value, '2天3时');
     assert.strictEqual(totalDurationCard.value, '7天5时');
     assert.strictEqual(activeDurationCard.title, '累计会话跨度 2天 3小时');
@@ -959,7 +960,8 @@ test('sessionUsageSummaryCards explains why usage cost is unavailable for the se
     const costCard = cards.find((card) => card.key === 'estimated-cost');
     assert(costCard, 'missing estimated cost summary card');
     assert.strictEqual(costCard.value, '暂无');
-    assert.strictEqual(costCard.note, '覆盖 0/2 会话，1 个缺少模型单价，1 个缺少 token 拆分');
+    assert.ok(!costCard.note);
+    assert.match(costCard.title, /缺少可匹配的模型单价或 token 拆分/);
 });
 
 test('sessionUsageSummaryCards estimates usage cost from configured provider pricing', () => {
@@ -1026,7 +1028,7 @@ test('sessionUsageSummaryCards estimates usage cost from configured provider pri
     assert(totalDurationCard, 'missing total duration summary card');
     assert.strictEqual(costCard.value, '$1.25');
     assert.strictEqual(costCard.label, '预估费用 · 近 7 天');
-    assert.strictEqual(costCard.note, '覆盖 1/2 会话，1 个缺少模型单价');
+    assert.ok(!costCard.note);
     assert.match(costCard.title, /覆盖 1\/2 个会话/);
     assert.match(costCard.title, /约 67% token/);
     assert.strictEqual(activeDurationCard.value, '1时30分');
@@ -1069,7 +1071,7 @@ test('sessionUsageSummaryCards falls back to public catalog pricing when provide
     assert(costCard, 'missing estimated cost summary card');
     assert.strictEqual(costCard.value, '$1.77');
     assert.strictEqual(costCard.label, '预估费用 · 近 7 天');
-    assert.strictEqual(costCard.note, '覆盖 1/1 会话');
+    assert.ok(!costCard.note);
     assert.match(costCard.title, /按公开模型目录估算/);
     assert.match(costCard.title, /覆盖 1\/1 个会话/);
 });
@@ -1120,7 +1122,7 @@ test('sessionUsageSummaryCards excludes Claude sessions from estimated cost cove
     const costCard = cards.find((card) => card.key === 'estimated-cost');
     assert(costCard, 'missing estimated cost summary card');
     assert.strictEqual(costCard.value, '$1.77');
-    assert.strictEqual(costCard.note, '覆盖 1/1 会话，暂不含 Claude');
+    assert.ok(!costCard.note);
     assert.match(costCard.title, /暂不含 Claude/);
     assert.match(costCard.title, /覆盖 1\/1 个会话/);
 });
@@ -1175,7 +1177,7 @@ test('sessionUsageSummaryCards respects configured zero-cost pricing instead of 
     const costCard = cards.find((card) => card.key === 'estimated-cost');
     assert(costCard, 'missing estimated cost summary card');
     assert.strictEqual(costCard.value, '$0.00');
-    assert.strictEqual(costCard.note, '覆盖 1/1 会话');
+    assert.ok(!costCard.note);
     assert.match(costCard.title, /按已配置单价估算/);
 });
 
@@ -1213,7 +1215,7 @@ test('sessionUsageSummaryCards uses fallback token totals when totalTokens is mi
     const costCard = cards.find((card) => card.key === 'estimated-cost');
     assert(costCard, 'missing estimated cost summary card');
     assert.strictEqual(costCard.value, '$1.77');
-    assert.strictEqual(costCard.note, '覆盖 1/1 会话');
+    assert.ok(!costCard.note);
     assert.match(costCard.title, /约 100% token/);
 });
 
@@ -1264,7 +1266,7 @@ test('sessionUsageSummaryCards recalculates estimated cost from the selected usa
     assert(costCard, 'missing estimated cost summary card');
     assert.strictEqual(costCard.value, '$1.77');
     assert.strictEqual(costCard.label, '预估费用 · 近 30 天');
-    assert.strictEqual(costCard.note, '覆盖 1/1 会话');
+    assert.ok(!costCard.note);
     assert.match(costCard.title, /覆盖 1\/1 个会话/);
 });
 
@@ -1315,7 +1317,7 @@ test('sessionUsageSummaryCards shows a distinct all-range estimated cost when ol
     assert(costCard, 'missing estimated cost summary card');
     assert.strictEqual(costCard.value, '$8.07');
     assert.strictEqual(costCard.label, '预估费用 · 全部');
-    assert.strictEqual(costCard.note, '覆盖 2/2 会话');
+    assert.ok(!costCard.note);
     assert.match(costCard.title, /估算 \$8\.07/);
     assert.match(costCard.title, /覆盖 2\/2 个会话/);
 });

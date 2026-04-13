@@ -90,9 +90,9 @@
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
-    gap: 6px;
-    min-height: 112px;
-    padding: 14px 16px;
+    gap: 4px;
+    min-height: 88px;
+    padding: 12px 14px;
     border-radius: 14px;
     background: var(--color-surface-alt);
     border: 1px solid var(--color-border-soft);
@@ -100,18 +100,18 @@
 }
 
 .usage-summary-label {
-    min-height: 18px;
+    min-height: 0;
     font-size: 12px;
-    line-height: 1.45;
+    line-height: 1.4;
     color: var(--color-text-secondary);
     margin-bottom: 0;
 }
 
 .usage-summary-value {
-    min-height: 34px;
+    min-height: 0;
     display: flex;
     align-items: center;
-    font-size: clamp(20px, 2vw, 24px);
+    font-size: clamp(18px, 1.8vw, 22px);
     line-height: 1.15;
     font-weight: 700;
     color: var(--color-text-primary);
@@ -119,11 +119,11 @@
 }
 
 .usage-summary-note {
-    margin-top: auto;
-    min-height: 34px;
+    margin-top: 2px;
+    min-height: 0;
     font-size: 12px;
     color: var(--color-text-secondary);
-    line-height: 1.4;
+    line-height: 1.35;
 }
 
 .usage-chart-grid {

@@ -63,41 +63,6 @@ function formatUsageRangeLabel(range) {
     return '近 7 天';
 }
 
-function formatUsageEstimateDiagnostic(summary, rangeLabel) {
-    if (!summary || typeof summary !== 'object') {
-        return '当前范围内暂无可估算会话';
-    }
-    const totalSessions = Number.isFinite(Number(summary.totalSessions))
-        ? Math.max(0, Math.floor(Number(summary.totalSessions)))
-        : 0;
-    const estimatedSessions = Number.isFinite(Number(summary.estimatedSessions))
-        ? Math.max(0, Math.floor(Number(summary.estimatedSessions)))
-        : 0;
-    const missingPricingSessions = Number.isFinite(Number(summary.missingPricingSessions))
-        ? Math.max(0, Math.floor(Number(summary.missingPricingSessions)))
-        : 0;
-    const missingTokenSessions = Number.isFinite(Number(summary.missingTokenSessions))
-        ? Math.max(0, Math.floor(Number(summary.missingTokenSessions)))
-        : 0;
-    const skippedUnsupportedSessions = Number.isFinite(Number(summary.skippedUnsupportedSessions))
-        ? Math.max(0, Math.floor(Number(summary.skippedUnsupportedSessions)))
-        : 0;
-    const parts = [];
-    if (estimatedSessions > 0 || totalSessions > 0) {
-        parts.push(`覆盖 ${estimatedSessions}/${totalSessions} 会话`);
-    }
-    if (missingPricingSessions > 0) {
-        parts.push(`${missingPricingSessions} 个缺少模型单价`);
-    }
-    if (missingTokenSessions > 0) {
-        parts.push(`${missingTokenSessions} 个缺少 token 拆分`);
-    }
-    if (skippedUnsupportedSessions > 0) {
-        parts.push('暂不含 Claude');
-    }
-    return parts.length ? parts.join('，') : '当前范围内暂无可估算会话';
-}
-
 function formatUsageDuration(value, options = {}) {
     const numeric = Number(value);
     if (!Number.isFinite(numeric) || numeric <= 0) {
@@ -481,7 +446,6 @@ export function createSessionComputed() {
                     key: 'estimated-cost',
                     label: `预估费用 · ${usageRangeLabel}`,
                     value: estimatedCost.hasEstimate ? formatUsageEstimatedCost(estimatedCost.totalCostUsd) : '暂无',
-                    note: formatUsageEstimateDiagnostic(estimatedCost, usageRangeLabel),
                     title: estimatedCost.hasEstimate
                         ? `${estimatedCost.skippedUnsupportedSessions > 0 ? '暂不含 Claude，' : ''}${estimatedCost.catalogSessions > 0
                             ? (estimatedCost.configuredSessions > 0 ? '按已配置单价 + 公开模型目录估算' : '按公开模型目录估算')
