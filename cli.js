@@ -8710,6 +8710,14 @@ function resolveCommandPath(command) {
     }
 }
 
+function resolveSpawnCommand(command) {
+    if (!command) return '';
+    if (process.platform === 'win32') {
+        return command;
+    }
+    return resolveCommandPath(command) || command;
+}
+
 function parseBinaryVersionOutput(text) {
     const raw = typeof text === 'string' ? text : '';
     const line = raw
@@ -12837,8 +12845,9 @@ function readCodexLastMessageFile(filePath) {
 }
 
 async function runCodexExecTaskNode(node, context = {}) {
-    const codexPath = resolveCommandPath('codex') || 'codex';
-    if (!commandExists(codexPath, '--version')) {
+    const codexPath = resolveSpawnCommand('codex');
+    const codexProbeCommand = process.platform === 'win32' ? 'codex' : codexPath;
+    if (!commandExists(codexProbeCommand, '--version')) {
         return {
             success: false,
             error: '未找到 codex CLI，请先安装并确保 PATH 可用',
