@@ -45,7 +45,9 @@ const {
     buildModelProbeSpec,
     buildModelConversationSpecs,
     extractModelResponseText,
-    normalizeWireApi
+    normalizeWireApi,
+    getSupplementalModelsForBaseUrl,
+    mergeModelCatalog
 } = require('./lib/cli-models-utils');
 const {
     probeUrl,
@@ -65,6 +67,12 @@ const {
     validateWorkflowDefinition,
     executeWorkflowDefinition
 } = require('./lib/workflow-engine');
+const {
+    truncateText: truncateTaskText,
+    buildTaskPlan,
+    validateTaskPlan,
+    executeTaskPlan
+} = require('./lib/task-orchestrator');
 const { buildConfigHealthReport: buildConfigHealthReportCore } = require('./cli/config-health');
 const {
     createAuthProfileController
@@ -130,6 +138,10 @@ const CLAUDE_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
 const RECENT_CONFIGS_FILE = path.join(CONFIG_DIR, 'recent-configs.json');
 const WORKFLOW_DEFINITIONS_FILE = path.join(CONFIG_DIR, 'codexmate-workflows.json');
 const WORKFLOW_RUNS_FILE = path.join(CONFIG_DIR, 'codexmate-workflow-runs.jsonl');
+const TASK_QUEUE_FILE = path.join(CONFIG_DIR, 'codexmate-task-queue.json');
+const TASK_RUNS_FILE = path.join(CONFIG_DIR, 'codexmate-task-runs.jsonl');
+const TASK_RUN_DETAILS_DIR = path.join(CONFIG_DIR, 'codexmate-task-runs');
+const TASK_QUEUE_WORKER_FILE = path.join(CONFIG_DIR, 'codexmate-task-queue-worker.json');
 const DEFAULT_CLAUDE_MODEL = 'glm-4.7';
 const DEFAULT_MODEL_CONTEXT_WINDOW = 190000;
 const DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT = 185000;
@@ -155,8 +167,10 @@ const SESSION_SCAN_MIN_FILES = 800;
 const SESSION_BROWSE_SCAN_FACTOR = 2;
 const SESSION_BROWSE_MIN_FILES = 120;
 const SESSION_BROWSE_SUMMARY_READ_BYTES = 64 * 1024;
+const SESSION_USAGE_TAIL_READ_BYTES = 64 * 1024;
 const SESSION_INVENTORY_CACHE_MAX_ENTRIES = 12;
 const MAX_SESSION_PATH_LIST_SIZE = 2000;
+const MAX_SESSION_USAGE_LIST_SIZE = 2000;
 const FAST_SESSION_DETAIL_PREVIEW_FILE_BYTES = 256 * 1024;
 const FAST_SESSION_DETAIL_PREVIEW_CHUNK_BYTES = 64 * 1024;
 const FAST_SESSION_DETAIL_PREVIEW_MAX_BYTES = 1024 * 1024;
@@ -185,6 +199,8 @@ const MAX_SKILLS_ZIP_UNCOMPRESSED_BYTES = 512 * 1024 * 1024;
 const DEFAULT_EXTRACT_SUFFIXES = Object.freeze(['.json']);
 const DOWNLOAD_ARTIFACT_TTL_MS = 10 * 60 * 1000;
 const g_downloadArtifacts = new Map();
+const g_taskRunControllers = new Map();
+let g_taskQueueProcessor = null;
 const BUILTIN_PROXY_PROVIDER_NAME = 'codexmate-proxy';
 const DEFAULT_BUILTIN_PROXY_SETTINGS = Object.freeze({
     enabled: false,
@@ -1283,8 +1299,17 @@ async function fetchModelsFromBaseUrl(baseUrl, apiKey) {
 
     const promise = (async () => {
         const result = await fetchModelsFromBaseUrlCore(baseUrl, apiKey);
-        writeModelsCacheEntry(cacheKey, result);
-        return result;
+        const supplementalModels = getSupplementalModelsForBaseUrl(baseUrl);
+        const mergedModels = mergeModelCatalog(result && Array.isArray(result.models) ? result.models : [], supplementalModels);
+        const finalResult = mergedModels.length > 0
+            ? {
+                models: mergedModels,
+                unlimited: false,
+                source: (result && result.error) ? 'catalog' : (result && result.source ? result.source : 'catalog')
+            }
+            : result;
+        writeModelsCacheEntry(cacheKey, finalResult);
+        return finalResult;
     })();
 
     g_modelsInFlight.set(cacheKey, promise);
@@ -3228,6 +3253,34 @@ function getFileHeadText(filePath, maxBytes = SESSION_SUMMARY_READ_BYTES) {
     }
 }
 
+function getFileTailText(filePath, maxBytes = SESSION_USAGE_TAIL_READ_BYTES) {
+    let fd;
+    try {
+        fd = fs.openSync(filePath, 'r');
+        const stat = fs.fstatSync(fd);
+        const size = Math.min(maxBytes, stat.size);
+        if (size <= 0) {
+            return '';
+        }
+
+        const start = Math.max(0, stat.size - size);
+        const buffer = Buffer.alloc(size);
+        fs.readSync(fd, buffer, 0, size, start);
+        let text = buffer.toString('utf-8');
+        if (start > 0) {
+            const newlineIndex = text.indexOf('\n');
+            text = newlineIndex >= 0 ? text.slice(newlineIndex + 1) : '';
+        }
+        return text;
+    } catch (e) {
+        return '';
+    } finally {
+        if (fd !== undefined) {
+            try { fs.closeSync(fd); } catch (e) {}
+        }
+    }
+}
+
 function parseJsonlContent(content) {
     if (!content) {
         return [];
@@ -3252,6 +3305,15 @@ function parseJsonlHeadRecords(filePath, maxBytes = SESSION_SUMMARY_READ_BYTES) 
     }
 
     return parseJsonlContent(headText);
+}
+
+function parseJsonlTailRecords(filePath, maxBytes = SESSION_USAGE_TAIL_READ_BYTES) {
+    const tailText = getFileTailText(filePath, maxBytes);
+    if (!tailText) {
+        return [];
+    }
+
+    return parseJsonlContent(tailText);
 }
 
 function buildClaudeStoredIndexMessageCount(messageCount) {
@@ -4537,6 +4599,30 @@ function readTotalTokensFromUsage(usage) {
     return (inputTokens || 0) + (outputTokens || 0) + (reasoningOutputTokens || 0);
 }
 
+function readUsageTotalsFromUsage(usage) {
+    if (!usage || typeof usage !== 'object' || Array.isArray(usage)) {
+        return null;
+    }
+    const inputTokens = readNonNegativeInteger(usage.input_tokens ?? usage.inputTokens);
+    const cachedInputTokens = readNonNegativeInteger(usage.cached_input_tokens ?? usage.cachedInputTokens);
+    const outputTokens = readNonNegativeInteger(usage.output_tokens ?? usage.outputTokens);
+    const reasoningOutputTokens = readNonNegativeInteger(usage.reasoning_output_tokens ?? usage.reasoningOutputTokens);
+    const totalTokens = readNonNegativeInteger(usage.total_tokens ?? usage.totalTokens)
+        ?? ((inputTokens === null && cachedInputTokens === null && outputTokens === null && reasoningOutputTokens === null)
+            ? null
+            : ((inputTokens || 0) + (outputTokens || 0) + (reasoningOutputTokens || 0)));
+    if (inputTokens === null && cachedInputTokens === null && outputTokens === null && reasoningOutputTokens === null && totalTokens === null) {
+        return null;
+    }
+    return {
+        inputTokens,
+        cachedInputTokens,
+        outputTokens,
+        reasoningOutputTokens,
+        totalTokens
+    };
+}
+
 function readContextWindowValue(target) {
     if (!target || typeof target !== 'object' || Array.isArray(target)) {
         return null;
@@ -4549,6 +4635,163 @@ function readContextWindowValue(target) {
     );
 }
 
+function applyUsageTotalsToState(state, usageTotals) {
+    if (!state || typeof state !== 'object' || !usageTotals || typeof usageTotals !== 'object' || Array.isArray(usageTotals)) {
+        return;
+    }
+    const pairs = [
+        ['inputTokens', usageTotals.inputTokens],
+        ['cachedInputTokens', usageTotals.cachedInputTokens],
+        ['outputTokens', usageTotals.outputTokens],
+        ['reasoningOutputTokens', usageTotals.reasoningOutputTokens],
+        ['totalTokens', usageTotals.totalTokens]
+    ];
+    for (const [key, value] of pairs) {
+        const normalized = readNonNegativeInteger(value);
+        if (normalized === null) {
+            continue;
+        }
+        state[key] = Math.max(readNonNegativeInteger(state[key]) || 0, normalized);
+    }
+}
+
+function readSessionModelsFromRecord(record) {
+    if (!record || typeof record !== 'object' || Array.isArray(record)) {
+        return [];
+    }
+    const models = [];
+
+    const pushModel = (candidate) => {
+        if (Array.isArray(candidate)) {
+            for (const item of candidate) {
+                pushModel(item);
+            }
+            return;
+        }
+        if (typeof candidate !== 'string') {
+            return;
+        }
+        const normalized = candidate.trim();
+        if (!normalized || models.includes(normalized)) {
+            return;
+        }
+        models.push(normalized);
+    };
+
+    const shouldReadModelKey = (key) => {
+        const normalized = typeof key === 'string'
+            ? key.trim().toLowerCase().replace(/[^a-z0-9]/g, '')
+            : '';
+        if (!normalized || normalized.includes('provider')) {
+            return false;
+        }
+        return normalized === 'model'
+            || normalized === 'models'
+            || normalized.endsWith('model')
+            || normalized.endsWith('models')
+            || normalized.includes('modelname')
+            || normalized.includes('modelid')
+            || normalized.includes('modelslug')
+            || normalized.includes('selectedmodel')
+            || normalized.includes('defaultmodel')
+            || normalized.includes('modelconfig');
+    };
+
+    const pushObjectModelCandidates = (value) => {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) {
+            return;
+        }
+        pushModel(value.model);
+        pushModel(value.models);
+        pushModel(value.name);
+        pushModel(value.id);
+        pushModel(value.slug);
+        pushModel(value.model_name);
+        pushModel(value.model_id);
+        pushModel(value.modelId);
+        pushModel(value.model_slug);
+        pushModel(value.modelSlug);
+        pushModel(value.default_model);
+        pushModel(value.defaultModel);
+        pushModel(value.selected_model);
+        pushModel(value.selectedModel);
+    };
+
+    const seen = new Set();
+    const visit = (value, keyHint = '') => {
+        if (Array.isArray(value)) {
+            if (shouldReadModelKey(keyHint)) {
+                pushModel(value);
+            }
+            for (const item of value) {
+                visit(item, keyHint);
+            }
+            return;
+        }
+        if (!value || typeof value !== 'object') {
+            if (shouldReadModelKey(keyHint)) {
+                pushModel(value);
+            }
+            return;
+        }
+        if (seen.has(value)) {
+            return;
+        }
+        seen.add(value);
+        if (shouldReadModelKey(keyHint)) {
+            pushObjectModelCandidates(value);
+        }
+        for (const [childKey, childValue] of Object.entries(value)) {
+            visit(childValue, childKey);
+        }
+    };
+
+    visit(record);
+    return models;
+}
+
+function readSessionModelFromRecord(record) {
+    const models = readSessionModelsFromRecord(record);
+    return models[0] || '';
+}
+
+function readExplicitSessionProviderFromRecord(record) {
+    if (!record || typeof record !== 'object' || Array.isArray(record)) {
+        return '';
+    }
+    const payload = record.payload && typeof record.payload === 'object' && !Array.isArray(record.payload)
+        ? record.payload
+        : null;
+    const message = record.message && typeof record.message === 'object' && !Array.isArray(record.message)
+        ? record.message
+        : null;
+    const candidates = [
+        payload && payload.model_provider,
+        payload && payload.modelProvider,
+        payload && payload.provider,
+        payload && payload.provider_name,
+        payload && payload.providerName,
+        message && message.provider,
+        record.provider,
+        record.provider_name,
+        record.providerName
+    ];
+    for (const candidate of candidates) {
+        if (typeof candidate === 'string' && candidate.trim()) {
+            return candidate.trim();
+        }
+    }
+    return '';
+}
+
+function readSessionProviderFromRecord(record, source = '') {
+    const provider = readExplicitSessionProviderFromRecord(record);
+    if (provider) {
+        return provider;
+    }
+    return source === 'claude' ? 'claude' : 'codex';
+}
+
 function applySessionUsageSummaryFromRecord(state, record, source) {
     if (!state || typeof state !== 'object' || !record || typeof record !== 'object' || Array.isArray(record)) {
         return;
@@ -4556,6 +4799,7 @@ function applySessionUsageSummaryFromRecord(state, record, source) {
 
     let totalTokens = null;
     let contextWindow = null;
+    let usageTotals = null;
 
     if (source === 'codex') {
         const payload = record.payload && typeof record.payload === 'object' && !Array.isArray(record.payload)
@@ -4564,6 +4808,9 @@ function applySessionUsageSummaryFromRecord(state, record, source) {
         const info = payload && payload.info && typeof payload.info === 'object' && !Array.isArray(payload.info)
             ? payload.info
             : null;
+        usageTotals = readUsageTotalsFromUsage(info && info.total_token_usage)
+            ?? readUsageTotalsFromUsage(payload && payload.total_token_usage)
+            ?? readUsageTotalsFromUsage(payload && payload.usage);
         totalTokens = readTotalTokensFromUsage(info && info.total_token_usage)
             ?? readTotalTokensFromUsage(payload && payload.total_token_usage)
             ?? readTotalTokensFromUsage(payload && payload.usage);
@@ -4576,6 +4823,9 @@ function applySessionUsageSummaryFromRecord(state, record, source) {
         const payload = record.payload && typeof record.payload === 'object' && !Array.isArray(record.payload)
             ? record.payload
             : null;
+        usageTotals = readUsageTotalsFromUsage(record.usage)
+            ?? readUsageTotalsFromUsage(message && message.usage)
+            ?? readUsageTotalsFromUsage(payload && payload.usage);
         totalTokens = readTotalTokensFromUsage(record.usage)
             ?? readTotalTokensFromUsage(message && message.usage)
             ?? readTotalTokensFromUsage(payload && payload.usage);
@@ -4583,6 +4833,8 @@ function applySessionUsageSummaryFromRecord(state, record, source) {
             ?? readContextWindowValue(message)
             ?? readContextWindowValue(payload);
     }
+
+    applyUsageTotalsToState(state, usageTotals);
 
     if (totalTokens !== null) {
         state.totalTokens = Math.max(readNonNegativeInteger(state.totalTokens) || 0, totalTokens);
@@ -4599,7 +4851,10 @@ function applySessionUsageSummaryFromIndexEntry(state, entry) {
     const totalTokens = readNonNegativeInteger(entry.totalTokens)
         ?? readTotalTokensFromUsage(entry.totalTokenUsage)
         ?? readTotalTokensFromUsage(entry.usage);
+    const usageTotals = readUsageTotalsFromUsage(entry.totalTokenUsage)
+        ?? readUsageTotalsFromUsage(entry.usage);
     const contextWindow = readContextWindowValue(entry);
+    applyUsageTotalsToState(state, usageTotals);
     if (totalTokens !== null) {
         state.totalTokens = Math.max(readNonNegativeInteger(state.totalTokens) || 0, totalTokens);
     }
@@ -4635,7 +4890,14 @@ function parseCodexSessionSummary(filePath, options = {}) {
     let messageCount = 0;
     let totalTokens = 0;
     let contextWindow = 0;
-    const usageState = { totalTokens, contextWindow };
+    let inputTokens = 0;
+    let cachedInputTokens = 0;
+    let outputTokens = 0;
+    let reasoningOutputTokens = 0;
+    let provider = 'codex';
+    let model = '';
+    const models = [];
+    const usageState = { totalTokens, contextWindow, inputTokens, cachedInputTokens, outputTokens, reasoningOutputTokens };
     const previewMessages = [];
 
     for (const record of records) {
@@ -4646,13 +4908,25 @@ function parseCodexSessionSummary(filePath, options = {}) {
         applySessionUsageSummaryFromRecord(usageState, record, 'codex');
         totalTokens = usageState.totalTokens || 0;
         contextWindow = usageState.contextWindow || 0;
+        inputTokens = usageState.inputTokens || 0;
+        cachedInputTokens = usageState.cachedInputTokens || 0;
+        outputTokens = usageState.outputTokens || 0;
+        reasoningOutputTokens = usageState.reasoningOutputTokens || 0;
 
         if (record.type === 'session_meta' && record.payload) {
             sessionId = record.payload.id || sessionId;
             cwd = record.payload.cwd || cwd;
             createdAt = toIsoTime(record.payload.timestamp || record.timestamp, createdAt);
+            provider = readSessionProviderFromRecord(record, 'codex') || provider;
             continue;
         }
+        const recordModels = readSessionModelsFromRecord(record);
+        for (const recordModel of recordModels) {
+            if (!models.includes(recordModel)) {
+                models.push(recordModel);
+            }
+        }
+        model = recordModels[0] || model;
 
         if (record.type === 'response_item' && record.payload && record.payload.type === 'message') {
             const role = normalizeRole(record.payload.role);
@@ -4661,6 +4935,25 @@ function parseCodexSessionSummary(filePath, options = {}) {
                 previewMessages.push({ role, text });
             }
         }
+    }
+
+    const tailRecords = parseJsonlTailRecords(filePath, summaryReadBytes);
+    for (const record of tailRecords) {
+        applySessionUsageSummaryFromRecord(usageState, record, 'codex');
+        totalTokens = usageState.totalTokens || 0;
+        contextWindow = usageState.contextWindow || 0;
+        inputTokens = usageState.inputTokens || 0;
+        cachedInputTokens = usageState.cachedInputTokens || 0;
+        outputTokens = usageState.outputTokens || 0;
+        reasoningOutputTokens = usageState.reasoningOutputTokens || 0;
+        provider = readExplicitSessionProviderFromRecord(record) || provider;
+        const recordModels = readSessionModelsFromRecord(record);
+        for (const recordModel of recordModels) {
+            if (!models.includes(recordModel)) {
+                models.push(recordModel);
+            }
+        }
+        model = recordModels[0] || model;
     }
 
     const filteredPreviewMessages = removeLeadingSystemMessage(previewMessages);
@@ -4697,7 +4990,9 @@ function parseCodexSessionSummary(filePath, options = {}) {
     return {
         source: 'codex',
         sourceLabel: 'Codex',
-        provider: 'codex',
+        provider,
+        model,
+        models,
         sessionId,
         title: firstPrompt || sessionId,
         cwd,
@@ -4706,6 +5001,10 @@ function parseCodexSessionSummary(filePath, options = {}) {
         messageCount,
         totalTokens,
         contextWindow,
+        inputTokens,
+        cachedInputTokens,
+        outputTokens,
+        reasoningOutputTokens,
         __messageCountExact: isSessionSummaryMessageCountExact(stat, summaryReadBytes),
         filePath,
         keywords: [],
@@ -4738,7 +5037,14 @@ function parseClaudeSessionSummary(filePath, options = {}) {
     let messageCount = 0;
     let totalTokens = 0;
     let contextWindow = 0;
-    const usageState = { totalTokens, contextWindow };
+    let inputTokens = 0;
+    let cachedInputTokens = 0;
+    let outputTokens = 0;
+    let reasoningOutputTokens = 0;
+    let provider = 'claude';
+    let model = '';
+    const models = [];
+    const usageState = { totalTokens, contextWindow, inputTokens, cachedInputTokens, outputTokens, reasoningOutputTokens };
     const previewMessages = [];
     let createdAt = '';
     let updatedAt = stat.mtime.toISOString();
@@ -4754,10 +5060,23 @@ function parseClaudeSessionSummary(filePath, options = {}) {
         applySessionUsageSummaryFromRecord(usageState, record, 'claude');
         totalTokens = usageState.totalTokens || 0;
         contextWindow = usageState.contextWindow || 0;
+        inputTokens = usageState.inputTokens || 0;
+        cachedInputTokens = usageState.cachedInputTokens || 0;
+        outputTokens = usageState.outputTokens || 0;
+        reasoningOutputTokens = usageState.reasoningOutputTokens || 0;
 
         if (!cwd && record.cwd) {
             cwd = record.cwd;
         }
+
+        provider = readExplicitSessionProviderFromRecord(record) || provider;
+        const recordModels = readSessionModelsFromRecord(record);
+        for (const recordModel of recordModels) {
+            if (!models.includes(recordModel)) {
+                models.push(recordModel);
+            }
+        }
+        model = recordModels[0] || model;
 
         const role = normalizeRole(record.type);
         if (role === 'assistant' || role === 'user' || role === 'system') {
@@ -4767,6 +5086,25 @@ function parseClaudeSessionSummary(filePath, options = {}) {
                 text: extractMessageText(userContent)
             });
         }
+    }
+
+    const tailRecords = parseJsonlTailRecords(filePath, summaryReadBytes);
+    for (const record of tailRecords) {
+        applySessionUsageSummaryFromRecord(usageState, record, 'claude');
+        totalTokens = usageState.totalTokens || 0;
+        contextWindow = usageState.contextWindow || 0;
+        inputTokens = usageState.inputTokens || 0;
+        cachedInputTokens = usageState.cachedInputTokens || 0;
+        outputTokens = usageState.outputTokens || 0;
+        reasoningOutputTokens = usageState.reasoningOutputTokens || 0;
+        provider = readExplicitSessionProviderFromRecord(record) || provider;
+        const recordModels = readSessionModelsFromRecord(record);
+        for (const recordModel of recordModels) {
+            if (!models.includes(recordModel)) {
+                models.push(recordModel);
+            }
+        }
+        model = recordModels[0] || model;
     }
 
     const filteredPreviewMessages = removeLeadingSystemMessage(previewMessages);
@@ -4802,7 +5140,9 @@ function parseClaudeSessionSummary(filePath, options = {}) {
     return {
         source: 'claude',
         sourceLabel: 'Claude Code',
-        provider: 'claude',
+        provider,
+        model,
+        models,
         sessionId,
         title: firstPrompt || sessionId,
         cwd,
@@ -4811,6 +5151,10 @@ function parseClaudeSessionSummary(filePath, options = {}) {
         messageCount,
         totalTokens,
         contextWindow,
+        inputTokens,
+        cachedInputTokens,
+        outputTokens,
+        reasoningOutputTokens,
         __messageCountExact: isSessionSummaryMessageCountExact(stat, summaryReadBytes),
         filePath,
         keywords: [],
@@ -4934,11 +5278,21 @@ function listClaudeSessions(limit, options = {}) {
             let messageCount = Number.isFinite(entry.messageCount) ? Math.max(0, entry.messageCount - 1) : 0;
             let totalTokens = 0;
             let contextWindow = 0;
+            let inputTokens = 0;
+            let cachedInputTokens = 0;
+            let outputTokens = 0;
+            let reasoningOutputTokens = 0;
+            let model = typeof entry.model === 'string' ? entry.model.trim() : '';
+            const models = model ? [model] : [];
 
-            const usageState = { totalTokens, contextWindow };
+            const usageState = { totalTokens, contextWindow, inputTokens, cachedInputTokens, outputTokens, reasoningOutputTokens };
             applySessionUsageSummaryFromIndexEntry(usageState, entry);
             totalTokens = usageState.totalTokens || 0;
             contextWindow = usageState.contextWindow || 0;
+            inputTokens = usageState.inputTokens || 0;
+            cachedInputTokens = usageState.cachedInputTokens || 0;
+            outputTokens = usageState.outputTokens || 0;
+            reasoningOutputTokens = usageState.reasoningOutputTokens || 0;
 
             const quickRecords = parseJsonlHeadRecords(filePath, summaryReadBytes);
             if (quickRecords.length > 0) {
@@ -4950,6 +5304,13 @@ function listClaudeSessions(limit, options = {}) {
                 const quickMessages = [];
                 for (const record of quickRecords) {
                     applySessionUsageSummaryFromRecord(usageState, record, 'claude');
+                    const recordModels = readSessionModelsFromRecord(record);
+                    for (const recordModel of recordModels) {
+                        if (!models.includes(recordModel)) {
+                            models.push(recordModel);
+                        }
+                    }
+                    model = recordModels[0] || model;
                     const role = normalizeRole(record.type);
                     if (role === 'assistant' || role === 'user' || role === 'system') {
                         const content = record.message ? record.message.content : '';
@@ -4958,12 +5319,34 @@ function listClaudeSessions(limit, options = {}) {
                 }
                 totalTokens = usageState.totalTokens || 0;
                 contextWindow = usageState.contextWindow || 0;
+                inputTokens = usageState.inputTokens || 0;
+                cachedInputTokens = usageState.cachedInputTokens || 0;
+                outputTokens = usageState.outputTokens || 0;
+                reasoningOutputTokens = usageState.reasoningOutputTokens || 0;
                 const filteredQuickMessages = removeLeadingSystemMessage(quickMessages);
                 const firstUser = filteredQuickMessages.find(item => item.role === 'user' && item.text);
                 if (firstUser) {
                     title = truncateText(firstUser.text, 120);
                 }
             }
+
+            const tailRecords = parseJsonlTailRecords(filePath, summaryReadBytes);
+            for (const record of tailRecords) {
+                applySessionUsageSummaryFromRecord(usageState, record, 'claude');
+                const recordModels = readSessionModelsFromRecord(record);
+                for (const recordModel of recordModels) {
+                    if (!models.includes(recordModel)) {
+                        models.push(recordModel);
+                    }
+                }
+                model = recordModels[0] || model;
+            }
+            totalTokens = usageState.totalTokens || 0;
+            contextWindow = usageState.contextWindow || 0;
+            inputTokens = usageState.inputTokens || 0;
+            cachedInputTokens = usageState.cachedInputTokens || 0;
+            outputTokens = usageState.outputTokens || 0;
+            reasoningOutputTokens = usageState.reasoningOutputTokens || 0;
 
             const provider = typeof entry.provider === 'string' && entry.provider.trim()
                 ? entry.provider.trim()
@@ -4983,6 +5366,12 @@ function listClaudeSessions(limit, options = {}) {
                 messageCount,
                 totalTokens,
                 contextWindow,
+                inputTokens,
+                cachedInputTokens,
+                outputTokens,
+                reasoningOutputTokens,
+                model,
+                models,
                 __messageCountExact: quickRecords.length > 0 && isSessionSummaryMessageCountExact(fileStat, summaryReadBytes),
                 filePath,
                 keywords,
@@ -5143,13 +5532,147 @@ async function listSessionBrowse(params = {}) {
 }
 
 async function listSessionUsage(params = {}) {
+    function isConcreteSessionModelName(value) {
+        if (typeof value !== 'string') {
+            return false;
+        }
+        const normalized = value.trim();
+        if (!normalized) {
+            return false;
+        }
+        return normalized.toLowerCase() !== '<synthetic>';
+    }
+
+    function normalizeSessionModelList(values = []) {
+        const models = [];
+        for (const value of values) {
+            if (!isConcreteSessionModelName(value)) {
+                continue;
+            }
+            const normalized = value.trim();
+            if (models.includes(normalized)) {
+                continue;
+            }
+            models.push(normalized);
+        }
+        return models;
+    }
+
+    function readSessionModelsFromFile(filePath) {
+        const targetPath = typeof filePath === 'string' ? filePath.trim() : '';
+        if (!targetPath) {
+            return [];
+        }
+
+        const cache = listSessionUsage.__modelsByFileCache instanceof Map
+            ? listSessionUsage.__modelsByFileCache
+            : new Map();
+        listSessionUsage.__modelsByFileCache = cache;
+
+        let stat;
+        try {
+            stat = fs.statSync(targetPath);
+        } catch (e) {
+            return [];
+        }
+
+        const cacheKey = `${targetPath}:${stat.size}:${stat.mtimeMs}`;
+        if (cache.has(cacheKey)) {
+            return [...cache.get(cacheKey)];
+        }
+
+        let content = '';
+        try {
+            content = fs.readFileSync(targetPath, 'utf-8');
+        } catch (e) {
+            return [];
+        }
+
+        const models = [];
+        const pushModel = (value) => {
+            if (!isConcreteSessionModelName(value)) {
+                return;
+            }
+            const normalized = value.trim();
+            if (models.includes(normalized)) {
+                return;
+            }
+            models.push(normalized);
+        };
+
+        for (const line of content.split(/\r?\n/)) {
+            if (!line.trim()) {
+                continue;
+            }
+            let record;
+            try {
+                record = JSON.parse(line);
+            } catch (e) {
+                continue;
+            }
+            if (!record || typeof record !== 'object' || Array.isArray(record)) {
+                continue;
+            }
+            const payload = record.payload && typeof record.payload === 'object' && !Array.isArray(record.payload)
+                ? record.payload
+                : null;
+            const info = payload && payload.info && typeof payload.info === 'object' && !Array.isArray(payload.info)
+                ? payload.info
+                : null;
+            const collaborationMode = payload && payload.collaboration_mode && typeof payload.collaboration_mode === 'object' && !Array.isArray(payload.collaboration_mode)
+                ? payload.collaboration_mode
+                : null;
+            const collaborationSettings = collaborationMode && collaborationMode.settings && typeof collaborationMode.settings === 'object' && !Array.isArray(collaborationMode.settings)
+                ? collaborationMode.settings
+                : null;
+            const message = record.message && typeof record.message === 'object' && !Array.isArray(record.message)
+                ? record.message
+                : null;
+            const candidates = [
+                payload && payload.model,
+                payload && payload.model_name,
+                payload && payload.model_id,
+                payload && payload.modelId,
+                info && info.model,
+                info && info.model_name,
+                info && info.model_id,
+                info && info.modelId,
+                collaborationSettings && collaborationSettings.model,
+                collaborationSettings && collaborationSettings.model_name,
+                collaborationSettings && collaborationSettings.model_id,
+                collaborationSettings && collaborationSettings.modelId,
+                message && message.model,
+                message && message.model_name,
+                message && message.model_id,
+                message && message.modelId,
+                record.model,
+                record.modelName,
+                record.model_name,
+                record.model_id,
+                record.modelId
+            ];
+            for (const candidate of candidates) {
+                pushModel(candidate);
+            }
+        }
+
+        cache.set(cacheKey, models);
+        if (cache.size > 500) {
+            const firstKey = cache.keys().next().value;
+            if (firstKey) {
+                cache.delete(firstKey);
+            }
+        }
+        return [...models];
+    }
+
     const source = params.source === 'codex' || params.source === 'claude'
         ? params.source
         : 'all';
     const rawLimit = Number(params.limit);
     const limit = Number.isFinite(rawLimit)
-        ? Math.max(1, Math.min(rawLimit, MAX_SESSION_LIST_SIZE))
-        : 200;
+        ? Math.max(1, Math.min(rawLimit, MAX_SESSION_USAGE_LIST_SIZE))
+        : MAX_SESSION_USAGE_LIST_SIZE;
     const sessions = await listSessionBrowse({
         source,
         limit,
@@ -5158,12 +5681,65 @@ async function listSessionUsage(params = {}) {
     return Array.isArray(sessions)
         ? sessions.map((item) => {
             if (!item || typeof item !== 'object' || Array.isArray(item)) {
-                return item;
+                return null;
             }
             const normalized = { ...item };
             delete normalized.__messageCountExact;
+            const filePath = typeof normalized.filePath === 'string' ? normalized.filePath.trim() : '';
+            const fullFileModels = filePath ? readSessionModelsFromFile(filePath) : [];
+            const mergedModels = normalizeSessionModelList([
+                ...(Array.isArray(normalized.models) ? normalized.models : []),
+                ...fullFileModels,
+                normalized.model,
+                normalized.modelName,
+                normalized.modelId
+            ]);
+            if (mergedModels.length > 0) {
+                normalized.models = mergedModels;
+                normalized.model = mergedModels[0];
+            }
+            if (mergedModels.length > 0) {
+                return normalized;
+            }
+            if (!filePath) {
+                return null;
+            }
+
+            const summaryOptions = {
+                summaryReadBytes: SESSION_BROWSE_SUMMARY_READ_BYTES,
+                titleReadBytes: SESSION_BROWSE_SUMMARY_READ_BYTES
+            };
+            let summary = null;
+            try {
+                summary = normalized.source === 'claude'
+                    ? parseClaudeSessionSummary(filePath, summaryOptions)
+                    : parseCodexSessionSummary(filePath, summaryOptions);
+            } catch (e) {
+                summary = null;
+            }
+
+            if (!summary || typeof summary !== 'object' || Array.isArray(summary)) {
+                return null;
+            }
+            const summaryModels = Array.isArray(summary.models) ? summary.models : [];
+            const allModels = normalizeSessionModelList([
+                ...summaryModels,
+                ...fullFileModels,
+                summary.model,
+                normalized.model,
+                normalized.modelName,
+                normalized.modelId
+            ]);
+            if (allModels.length === 0) {
+                return null;
+            }
+            normalized.models = allModels;
+            normalized.model = allModels[0];
+            if ((!normalized.provider || !String(normalized.provider).trim()) && typeof summary.provider === 'string' && summary.provider.trim()) {
+                normalized.provider = summary.provider.trim();
+            }
             return normalized;
-        })
+        }).filter(Boolean)
         : [];
 }
 
@@ -8134,6 +8710,14 @@ function resolveCommandPath(command) {
     }
 }
 
+function resolveSpawnCommand(command) {
+    if (!command) return '';
+    if (process.platform === 'win32') {
+        return command;
+    }
+    return resolveCommandPath(command) || command;
+}
+
 function parseBinaryVersionOutput(text) {
     const raw = typeof text === 'string' ? text : '';
     const line = raw
@@ -9056,25 +9640,7 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             result = buildInstallStatusReport();
                             break;
                         case 'list':
-                            const listConfigResult = readConfigOrVirtualDefault();
-                            const listConfig = listConfigResult.config;
-                            const providers = listConfig.model_providers || {};
-                            const current = listConfig.model_provider;
-                            result = {
-                                configReady: !listConfigResult.isVirtual,
-                                configErrorType: listConfigResult.errorType || '',
-                                configNotice: listConfigResult.reason || '',
-                                providers: Object.entries(providers).map(([name, p]) => ({
-                                    name,
-                                    url: p.base_url || '',
-                                    key: maskKey(p.preferred_auth_method || ''),
-                                    hasKey: !!(p.preferred_auth_method && p.preferred_auth_method.trim()),
-                                    current: name === current,
-                                    readOnly: isBuiltinManagedProvider(name),
-                                    nonDeletable: isNonDeletableProvider(name),
-                                    nonEditable: isNonEditableProvider(name)
-                                }))
-                            };
+                            result = buildMcpProviderListPayload();
                             break;
                         case 'models':
                             {
@@ -9424,6 +9990,111 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                                     limit
                                 };
                             }
+                            break;
+                        case 'task-overview':
+                            result = buildTaskOverviewPayload(params || {});
+                            break;
+                        case 'task-plan':
+                            {
+                                const plan = coerceTaskPlanPayload(params || {});
+                                const validation = validatePreparedTaskPlan(plan);
+                                result = {
+                                    ok: validation.ok,
+                                    plan,
+                                    issues: validation.issues || [],
+                                    warnings: validation.warnings || []
+                                };
+                                if (!validation.ok) {
+                                    result.error = validation.error || 'task plan validation failed';
+                                }
+                            }
+                            break;
+                        case 'task-run':
+                            {
+                                const detach = !!(params && params.detach);
+                                if (detach) {
+                                    const plan = coerceTaskPlanPayload(params || {});
+                                    const validation = validatePreparedTaskPlan(plan);
+                                    if (!validation.ok) {
+                                        result = {
+                                            ok: false,
+                                            error: validation.error || 'task plan validation failed',
+                                            issues: validation.issues || [],
+                                            warnings: validation.warnings || []
+                                        };
+                                        break;
+                                    }
+                                    const taskId = typeof params.taskId === 'string' && params.taskId.trim() ? params.taskId.trim() : createTaskId();
+                                    const runId = createTaskRunId();
+                                    runTaskPlanInternal(plan, { taskId, runId }).catch(() => {});
+                                    result = {
+                                        ok: true,
+                                        started: true,
+                                        detached: true,
+                                        taskId,
+                                        runId,
+                                        warnings: validation.warnings || []
+                                    };
+                                } else {
+                                    result = await runTaskNow(params || {});
+                                }
+                            }
+                            break;
+                        case 'task-runs':
+                            {
+                                const rawLimit = params && Number.isFinite(params.limit) ? params.limit : parseInt(params && params.limit, 10);
+                                const limit = Number.isFinite(rawLimit) ? Math.max(1, Math.floor(rawLimit)) : 20;
+                                result = {
+                                    runs: listTaskRunRecords(limit),
+                                    limit
+                                };
+                            }
+                            break;
+                        case 'task-run-detail':
+                            {
+                                const runIdValidation = validateTaskRunId(params && typeof params.runId === 'string' ? params.runId : '');
+                                if (!runIdValidation.ok) {
+                                    result = { error: runIdValidation.error };
+                                    break;
+                                }
+                                const detail = readTaskRunDetail(runIdValidation.runId);
+                                result = detail || { error: `task run not found: ${runIdValidation.runId}` };
+                            }
+                            break;
+                        case 'task-queue-add':
+                            result = addTaskToQueue(params || {});
+                            break;
+                        case 'task-queue-list':
+                            {
+                                const rawLimit = params && Number.isFinite(params.limit) ? params.limit : parseInt(params && params.limit, 10);
+                                const limit = Number.isFinite(rawLimit) ? Math.max(1, Math.floor(rawLimit)) : 50;
+                                result = {
+                                    tasks: listTaskQueueItems({ limit, status: params && params.status }),
+                                    limit
+                                };
+                            }
+                            break;
+                        case 'task-queue-show':
+                            {
+                                const taskId = params && typeof params.taskId === 'string' ? params.taskId.trim() : '';
+                                if (!taskId) {
+                                    result = { error: 'taskId is required' };
+                                    break;
+                                }
+                                result = getTaskQueueItem(taskId) || { error: `task not found: ${taskId}` };
+                            }
+                            break;
+                        case 'task-queue-start':
+                            result = await startTaskQueueProcessing(params || {});
+                            break;
+                        case 'task-retry':
+                            result = await retryTaskRun(params || {});
+                            break;
+                        case 'task-cancel':
+                            result = cancelTaskRunOrQueue(params || {});
+                            break;
+                        case 'task-logs':
+                            result = getTaskLogs(params || {});
                             break;
                         default:
                             result = { error: '未知操作' };
@@ -10119,6 +10790,606 @@ async function cmdWorkflow(args = []) {
     throw new Error(`未知 workflow 子命令: ${subcommand}`);
 }
 
+function printTaskHelp() {
+    console.log('\n用法: codexmate task <plan|run|runs|queue|retry|cancel|logs> [参数]');
+    console.log('  codexmate task plan --target "实现任务编排 Tab" --follow-up "继续处理 review"');
+    console.log('  codexmate task run --target "修复失败测试" --allow-write --concurrency 2');
+    console.log('  codexmate task run --target "检查请求链路" --dry-run --plan-only');
+    console.log('  codexmate task runs --limit 20');
+    console.log('  codexmate task queue add --target "整理 workflow 入口" --allow-write');
+    console.log('  codexmate task queue list');
+    console.log('  codexmate task queue show <taskId>');
+    console.log('  codexmate task queue start [<taskId>] [--detach]');
+    console.log('  codexmate task retry <runId>');
+    console.log('  codexmate task cancel <taskId|runId>');
+    console.log('  codexmate task logs <runId>');
+    console.log('参数:');
+    console.log('  --target <文本>         任务目标文本');
+    console.log('  --title <文本>          任务标题');
+    console.log('  --notes <文本>          附加说明');
+    console.log('  --plan <JSON|@file>     直接提供任务计划对象');
+    console.log('  --workflow-id <ID>      复用现有 workflow（可重复）');
+    console.log('  --follow-up <文本>      追加 follow-up（可重复）');
+    console.log('  --allow-write           允许写入工作区');
+    console.log('  --dry-run               仅计划/预演，不执行写入');
+    console.log('  --plan-only             仅输出计划，不执行');
+    console.log('  --engine <codex|workflow>  选择编排引擎');
+    console.log('  --concurrency <N>       并发度');
+    console.log('  --auto-fix-rounds <N>   自动修复回合数');
+    console.log('  --limit <N>             runs/queue list 数量');
+    console.log('  --task-id <ID>          指定任务 ID');
+    console.log('  --run-id <ID>           指定运行 ID');
+    console.log('  --status <状态>         queue list 状态过滤');
+    console.log('  --detach                后台启动任务或队列');
+    console.log('  --json                  以 JSON 输出');
+    console.log();
+}
+
+function parseTaskCliOptions(args = []) {
+    const options = {
+        title: '',
+        target: '',
+        notes: '',
+        planRaw: '',
+        workflowIds: [],
+        followUps: [],
+        allowWrite: false,
+        dryRun: false,
+        planOnly: false,
+        engine: 'codex',
+        concurrency: 2,
+        autoFixRounds: 1,
+        limit: 20,
+        taskId: '',
+        runId: '',
+        status: '',
+        detach: false,
+        json: false,
+        explicit: {}
+    };
+    const rest = [];
+    const pushValue = (key, value, optionName) => {
+        const text = value === undefined || value === null ? '' : String(value).trim();
+        if (!text) {
+            throw new Error(`${optionName} 需要提供非空内容`);
+        }
+        options[key].push(text);
+    };
+    for (let i = 0; i < args.length; i += 1) {
+        const arg = String(args[i] || '');
+        if (!arg) continue;
+        if (arg === '--allow-write') {
+            options.allowWrite = true;
+            options.explicit.allowWrite = true;
+            continue;
+        }
+        if (arg === '--dry-run') {
+            options.dryRun = true;
+            options.explicit.dryRun = true;
+            continue;
+        }
+        if (arg === '--plan-only') {
+            options.planOnly = true;
+            continue;
+        }
+        if (arg === '--detach') {
+            options.detach = true;
+            continue;
+        }
+        if (arg === '--json') {
+            options.json = true;
+            continue;
+        }
+        if (arg === '--title') {
+            options.title = String(args[i + 1] || '').trim();
+            options.explicit.title = true;
+            i += 1;
+            continue;
+        }
+        if (arg.startsWith('--title=')) {
+            options.title = arg.slice('--title='.length).trim();
+            options.explicit.title = true;
+            continue;
+        }
+        if (arg === '--target') {
+            options.target = String(args[i + 1] || '').trim();
+            options.explicit.target = true;
+            i += 1;
+            continue;
+        }
+        if (arg.startsWith('--target=')) {
+            options.target = arg.slice('--target='.length).trim();
+            options.explicit.target = true;
+            continue;
+        }
+        if (arg === '--notes') {
+            options.notes = String(args[i + 1] || '').trim();
+            options.explicit.notes = true;
+            i += 1;
+            continue;
+        }
+        if (arg.startsWith('--notes=')) {
+            options.notes = arg.slice('--notes='.length).trim();
+            options.explicit.notes = true;
+            continue;
+        }
+        if (arg === '--plan') {
+            options.planRaw = String(args[i + 1] || '').trim();
+            options.explicit.planRaw = true;
+            i += 1;
+            continue;
+        }
+        if (arg.startsWith('--plan=')) {
+            options.planRaw = arg.slice('--plan='.length).trim();
+            options.explicit.planRaw = true;
+            continue;
+        }
+        if (arg === '--workflow-id') {
+            pushValue('workflowIds', args[i + 1], '--workflow-id');
+            options.explicit.workflowIds = true;
+            i += 1;
+            continue;
+        }
+        if (arg.startsWith('--workflow-id=')) {
+            pushValue('workflowIds', arg.slice('--workflow-id='.length), '--workflow-id');
+            options.explicit.workflowIds = true;
+            continue;
+        }
+        if (arg === '--follow-up') {
+            pushValue('followUps', args[i + 1], '--follow-up');
+            options.explicit.followUps = true;
+            i += 1;
+            continue;
+        }
+        if (arg.startsWith('--follow-up=')) {
+            pushValue('followUps', arg.slice('--follow-up='.length), '--follow-up');
+            options.explicit.followUps = true;
+            continue;
+        }
+        if (arg === '--engine') {
+            options.engine = normalizeTaskEngine(args[i + 1]);
+            options.explicit.engine = true;
+            i += 1;
+            continue;
+        }
+        if (arg.startsWith('--engine=')) {
+            options.engine = normalizeTaskEngine(arg.slice('--engine='.length));
+            options.explicit.engine = true;
+            continue;
+        }
+        if (arg === '--concurrency') {
+            const value = parseInt(args[i + 1], 10);
+            if (Number.isFinite(value)) options.concurrency = value;
+            options.explicit.concurrency = true;
+            i += 1;
+            continue;
+        }
+        if (arg.startsWith('--concurrency=')) {
+            const value = parseInt(arg.slice('--concurrency='.length), 10);
+            if (Number.isFinite(value)) options.concurrency = value;
+            options.explicit.concurrency = true;
+            continue;
+        }
+        if (arg === '--auto-fix-rounds') {
+            const value = parseInt(args[i + 1], 10);
+            if (Number.isFinite(value)) options.autoFixRounds = value;
+            options.explicit.autoFixRounds = true;
+            i += 1;
+            continue;
+        }
+        if (arg.startsWith('--auto-fix-rounds=')) {
+            const value = parseInt(arg.slice('--auto-fix-rounds='.length), 10);
+            if (Number.isFinite(value)) options.autoFixRounds = value;
+            options.explicit.autoFixRounds = true;
+            continue;
+        }
+        if (arg === '--limit') {
+            const value = parseInt(args[i + 1], 10);
+            if (Number.isFinite(value)) options.limit = value;
+            i += 1;
+            continue;
+        }
+        if (arg.startsWith('--limit=')) {
+            const value = parseInt(arg.slice('--limit='.length), 10);
+            if (Number.isFinite(value)) options.limit = value;
+            continue;
+        }
+        if (arg === '--task-id') {
+            options.taskId = String(args[i + 1] || '').trim();
+            options.explicit.taskId = true;
+            i += 1;
+            continue;
+        }
+        if (arg.startsWith('--task-id=')) {
+            options.taskId = arg.slice('--task-id='.length).trim();
+            options.explicit.taskId = true;
+            continue;
+        }
+        if (arg === '--run-id') {
+            options.runId = String(args[i + 1] || '').trim();
+            options.explicit.runId = true;
+            i += 1;
+            continue;
+        }
+        if (arg.startsWith('--run-id=')) {
+            options.runId = arg.slice('--run-id='.length).trim();
+            options.explicit.runId = true;
+            continue;
+        }
+        if (arg === '--status') {
+            options.status = String(args[i + 1] || '').trim().toLowerCase();
+            i += 1;
+            continue;
+        }
+        if (arg.startsWith('--status=')) {
+            options.status = arg.slice('--status='.length).trim().toLowerCase();
+            continue;
+        }
+        rest.push(arg);
+    }
+    return { options, rest };
+}
+
+function buildTaskCliPayload(options = {}, rest = []) {
+    const explicit = options && options.explicit && typeof options.explicit === 'object' ? options.explicit : {};
+    const payload = {};
+    if (explicit.title && options.title) payload.title = options.title;
+    if (explicit.target && options.target) payload.target = options.target;
+    if (explicit.notes && options.notes) payload.notes = options.notes;
+    if (explicit.workflowIds && Array.isArray(options.workflowIds)) payload.workflowIds = options.workflowIds.slice();
+    if (explicit.followUps && Array.isArray(options.followUps)) payload.followUps = options.followUps.slice();
+    if (explicit.allowWrite) payload.allowWrite = options.allowWrite === true;
+    if (explicit.dryRun) payload.dryRun = options.dryRun === true;
+    if (explicit.engine) payload.engine = options.engine || 'codex';
+    if (explicit.concurrency) payload.concurrency = options.concurrency;
+    if (explicit.autoFixRounds) payload.autoFixRounds = options.autoFixRounds;
+    if (explicit.taskId && options.taskId) payload.taskId = options.taskId;
+    if (explicit.runId && options.runId) payload.runId = options.runId;
+    if (!payload.target && Array.isArray(rest) && rest.length > 0) {
+        payload.target = rest.join(' ').trim();
+    }
+    if (options.planRaw) {
+        payload.plan = parseWorkflowInputArg(options.planRaw);
+    }
+    return payload;
+}
+
+function printTaskPlanSummary(plan, warnings = []) {
+    console.log(`\n任务计划: ${plan.title || '(untitled)'}`);
+    console.log(`  engine: ${plan.engine || 'codex'}`);
+    console.log(`  allowWrite: ${plan.allowWrite === true ? 'yes' : 'no'}`);
+    console.log(`  dryRun: ${plan.dryRun === true ? 'yes' : 'no'}`);
+    console.log(`  concurrency: ${plan.concurrency || 1}`);
+    if (plan.target) {
+        console.log(`  target: ${truncateTaskText(plan.target, 200)}`);
+    }
+    const waves = Array.isArray(plan.waves) ? plan.waves : [];
+    console.log(`  waves: ${waves.length}`);
+    for (const wave of waves) {
+        const ids = Array.isArray(wave.nodeIds) ? wave.nodeIds.join(', ') : '';
+        console.log(`    - ${wave.label || `Wave ${wave.index + 1}`}: ${ids}`);
+    }
+    const nodes = Array.isArray(plan.nodes) ? plan.nodes : [];
+    for (const node of nodes) {
+        console.log(`  - ${node.id} [${node.kind}] ${node.title || ''}`.trim());
+        if (node.workflowId) {
+            console.log(`    workflowId: ${node.workflowId}`);
+        }
+        if (Array.isArray(node.dependsOn) && node.dependsOn.length > 0) {
+            console.log(`    dependsOn: ${node.dependsOn.join(', ')}`);
+        }
+    }
+    if (Array.isArray(warnings) && warnings.length > 0) {
+        console.log('  warnings:');
+        warnings.forEach((item) => console.log(`    - ${item}`));
+    }
+    console.log();
+}
+
+function printTaskRunSummary(detail = {}) {
+    const run = detail.run && typeof detail.run === 'object' ? detail.run : {};
+    console.log(`\n任务执行 ${run.status === 'success' ? '完成' : '结束'}: ${detail.title || detail.taskId || ''}`.trim());
+    console.log(`  taskId: ${detail.taskId || ''}`);
+    console.log(`  runId: ${detail.runId || ''}`);
+    console.log(`  status: ${run.status || detail.status || 'unknown'}`);
+    console.log(`  duration: ${run.durationMs || 0}ms`);
+    if (run.summary) {
+        console.log(`  summary: ${run.summary}`);
+    }
+    if (run.error) {
+        console.log(`  error: ${run.error}`);
+    }
+    const nodes = Array.isArray(run.nodes) ? run.nodes : [];
+    for (const node of nodes) {
+        console.log(`  - ${node.id}: ${node.status || 'unknown'} attempts=${node.attemptCount || 0}`);
+        if (node.summary) {
+            console.log(`    ${node.summary}`);
+        }
+        if (node.error && node.error !== node.summary) {
+            console.log(`    error: ${node.error}`);
+        }
+    }
+    console.log();
+}
+
+async function cmdTask(args = []) {
+    const argv = Array.isArray(args) ? args : [];
+    if (argv.length === 0 || argv.includes('--help') || argv.includes('-h')) {
+        printTaskHelp();
+        return;
+    }
+    const subcommand = String(argv[0] || '').trim().toLowerCase();
+    const parsed = parseTaskCliOptions(argv.slice(1));
+    const options = parsed.options;
+    const rest = parsed.rest;
+
+    if (subcommand === 'plan') {
+        const payload = buildTaskCliPayload(options, rest);
+        const plan = coerceTaskPlanPayload(payload);
+        const validation = validatePreparedTaskPlan(plan);
+        const result = {
+            ok: validation.ok,
+            plan,
+            issues: validation.issues || [],
+            warnings: validation.warnings || []
+        };
+        if (options.json) {
+            console.log(JSON.stringify(result, null, 2));
+        } else {
+            if (!validation.ok) {
+                throw new Error(validation.error || 'task plan validation failed');
+            }
+            printTaskPlanSummary(plan, validation.warnings || []);
+        }
+        if (!validation.ok) {
+            throw new Error(validation.error || 'task plan validation failed');
+        }
+        return;
+    }
+
+    if (subcommand === 'runs') {
+        const limit = Number.isFinite(options.limit) ? Math.max(1, Math.floor(options.limit)) : 20;
+        const runs = listTaskRunRecords(limit);
+        if (options.json) {
+            console.log(JSON.stringify({ runs, limit }, null, 2));
+            return;
+        }
+        console.log(`\n最近任务运行（${runs.length}/${limit}）:`);
+        for (const item of runs) {
+            console.log(`  - [${item.status || 'unknown'}] ${item.title || item.taskId || ''} runId=${item.runId || ''} duration=${item.durationMs || 0}ms`);
+            if (item.summary) {
+                console.log(`    ${item.summary}`);
+            }
+            if (item.error) {
+                console.log(`    error: ${item.error}`);
+            }
+        }
+        console.log();
+        return;
+    }
+
+    if (subcommand === 'queue') {
+        const queueSubcommand = String(rest[0] || '').trim().toLowerCase();
+        const tail = rest.slice(1);
+        if (!queueSubcommand) {
+            throw new Error('queue 子命令不能为空');
+        }
+        if (queueSubcommand === 'add') {
+            const payload = buildTaskCliPayload(options, tail);
+            const result = addTaskToQueue(payload);
+            if (options.json) {
+                console.log(JSON.stringify(result, null, 2));
+            } else {
+                if (result.error) {
+                    throw new Error(result.error);
+                }
+                console.log(`✓ 已加入队列: ${result.task.taskId}`);
+                console.log(`  ${result.task.title || result.task.target || ''}`);
+                console.log();
+            }
+            if (result.error) {
+                throw new Error(result.error);
+            }
+            return;
+        }
+        if (queueSubcommand === 'list') {
+            const limit = Number.isFinite(options.limit) ? Math.max(1, Math.floor(options.limit)) : 20;
+            const tasks = listTaskQueueItems({ limit, status: options.status || '' });
+            if (options.json) {
+                console.log(JSON.stringify({ tasks, limit }, null, 2));
+                return;
+            }
+            console.log(`\n任务队列（${tasks.length}/${limit}）:`);
+            for (const item of tasks) {
+                console.log(`  - [${item.status}] ${item.taskId} ${item.title || item.target || ''}`.trim());
+                if (item.lastSummary) {
+                    console.log(`    ${item.lastSummary}`);
+                }
+            }
+            console.log();
+            return;
+        }
+        if (queueSubcommand === 'show') {
+            const taskId = options.taskId || String(tail[0] || '').trim();
+            if (!taskId) {
+                throw new Error('taskId is required');
+            }
+            const task = getTaskQueueItem(taskId);
+            if (!task) {
+                throw new Error(`task not found: ${taskId}`);
+            }
+            console.log(JSON.stringify(task, null, 2));
+            return;
+        }
+        if (queueSubcommand === 'start') {
+            const taskId = options.taskId || String(tail[0] || '').trim();
+            const result = await startTaskQueueProcessing({ taskId, detach: options.detach });
+            if (options.json) {
+                console.log(JSON.stringify(result, null, 2));
+            } else if (result.error) {
+                throw new Error(result.error);
+            } else if (result.detached) {
+                console.log('✓ 队列处理已在后台启动');
+                console.log();
+            } else if (result.detail) {
+                printTaskRunSummary(result.detail);
+            } else {
+                console.log('队列中暂无可执行任务');
+                console.log();
+            }
+            if (result.error) {
+                throw new Error(result.error);
+            }
+            return;
+        }
+        throw new Error(`未知 queue 子命令: ${queueSubcommand}`);
+    }
+
+    if (subcommand === 'run') {
+        const payload = buildTaskCliPayload(options, rest);
+        if (options.planOnly) {
+            const plan = coerceTaskPlanPayload(payload);
+            const validation = validatePreparedTaskPlan(plan);
+            const result = {
+                ok: validation.ok,
+                plan,
+                issues: validation.issues || [],
+                warnings: validation.warnings || []
+            };
+            if (options.json) {
+                console.log(JSON.stringify(result, null, 2));
+            } else {
+                if (!validation.ok) {
+                    throw new Error(validation.error || 'task plan validation failed');
+                }
+                printTaskPlanSummary(plan, validation.warnings || []);
+            }
+            if (!validation.ok) {
+                throw new Error(validation.error || 'task plan validation failed');
+            }
+            return;
+        }
+        if (options.detach) {
+            const plan = coerceTaskPlanPayload(payload);
+            const validation = validatePreparedTaskPlan(plan);
+            if (!validation.ok) {
+                throw new Error(validation.error || 'task plan validation failed');
+            }
+            const taskId = options.taskId || createTaskId();
+            const runId = createTaskRunId();
+            spawnDetachedTaskWorker({
+                type: 'run-plan',
+                plan,
+                taskId,
+                runId
+            });
+            const result = { ok: true, detached: true, taskId, runId, warnings: validation.warnings || [] };
+            if (options.json) {
+                console.log(JSON.stringify(result, null, 2));
+            } else {
+                console.log(`✓ 后台任务已启动: taskId=${taskId} runId=${runId}`);
+                console.log();
+            }
+            return;
+        }
+        const detail = await runTaskNow(payload);
+        if (options.json) {
+            console.log(JSON.stringify(detail, null, 2));
+        } else {
+            printTaskRunSummary(detail);
+        }
+        if (detail.error || (detail.run && detail.run.status && detail.run.status !== 'success')) {
+            throw new Error(detail.error || (detail.run && detail.run.error) || 'task run failed');
+        }
+        return;
+    }
+
+    if (subcommand === 'retry') {
+        const runId = options.runId || String(rest[0] || '').trim();
+        if (options.detach) {
+            const detail = readTaskRunDetail(runId);
+            if (!detail || !detail.plan) {
+                throw new Error(`task run not found: ${runId}`);
+            }
+            const nextRunId = createTaskRunId();
+            spawnDetachedTaskWorker({
+                type: 'run-plan',
+                plan: cloneJson(detail.plan, {}),
+                taskId: detail.taskId || createTaskId(),
+                runId: nextRunId
+            });
+            const result = {
+                ok: true,
+                started: true,
+                detached: true,
+                runId: nextRunId,
+                taskId: detail.taskId || ''
+            };
+            if (options.json) {
+                console.log(JSON.stringify(result, null, 2));
+            } else {
+                console.log(`✓ 已后台重试: runId=${result.runId}`);
+                console.log();
+            }
+            return;
+        }
+        const result = await retryTaskRun({ runId, detach: options.detach });
+        if (options.json) {
+            console.log(JSON.stringify(result, null, 2));
+        } else if (result.detached) {
+            console.log(`✓ 已后台重试: runId=${result.runId}`);
+            console.log();
+        } else {
+            printTaskRunSummary(result);
+        }
+        if (result.error) {
+            throw new Error(result.error);
+        }
+        if (!result.detached && result.run && result.run.status === 'failed') {
+            throw new Error(result.run.error || 'task retry failed');
+        }
+        return;
+    }
+
+    if (subcommand === 'cancel') {
+        const result = cancelTaskRunOrQueue({
+            target: String(rest[0] || '').trim(),
+            taskId: options.taskId,
+            runId: options.runId
+        });
+        if (options.json) {
+            console.log(JSON.stringify(result, null, 2));
+        } else {
+            if (result.error) {
+                throw new Error(result.error);
+            }
+            console.log('✓ 已发出取消请求');
+            console.log();
+        }
+        if (result.error) {
+            throw new Error(result.error);
+        }
+        return;
+    }
+
+    if (subcommand === 'logs') {
+        const runId = options.runId || String(rest[0] || '').trim();
+        const result = getTaskLogs({ runId });
+        if (result.error) {
+            throw new Error(result.error);
+        }
+        if (options.json) {
+            console.log(JSON.stringify(result, null, 2));
+        } else {
+            console.log(result.logs || '(no logs)');
+            console.log();
+        }
+        return;
+    }
+
+    throw new Error(`未知 task 子命令: ${subcommand}`);
+}
+
 // #region parseCodexProxyOptions
 function parseCodexProxyOptions(args = []) {
     const options = {
@@ -10613,6 +11884,25 @@ function buildMcpProviderListPayload() {
             url: p.base_url || '',
             key: maskKey(p.preferred_auth_method || ''),
             hasKey: !!(p.preferred_auth_method && p.preferred_auth_method.trim()),
+            models: Array.isArray(p.models)
+                ? p.models
+                    .filter((model) => model && typeof model === 'object' && !Array.isArray(model))
+                    .map((model) => ({
+                        id: typeof model.id === 'string' ? model.id : '',
+                        name: typeof model.name === 'string' ? model.name : '',
+                        cost: model.cost && typeof model.cost === 'object' && !Array.isArray(model.cost)
+                            ? {
+                                input: model.cost.input,
+                                output: model.cost.output,
+                                cacheRead: model.cost.cacheRead,
+                                cacheWrite: model.cost.cacheWrite
+                            }
+                            : null,
+                        contextWindow: model.contextWindow,
+                        maxTokens: model.maxTokens
+                    }))
+                    .filter((model) => model.id)
+                : [],
             current: name === current,
             readOnly: isBuiltinManagedProvider(name),
             nonDeletable: isNonDeletableProvider(name),
@@ -11197,6 +12487,1141 @@ async function runWorkflowById(workflowId, input = {}, options = {}) {
         warnings: definitionResult.warnings || [],
         ...(execution.error ? { error: execution.error } : {})
     };
+}
+
+function createTaskId() {
+    return `task-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+}
+
+function createTaskRunId() {
+    return `tr-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+}
+
+function validateTaskRunId(value) {
+    const runId = typeof value === 'string' ? value.trim() : '';
+    if (!runId) {
+        return { ok: false, error: 'runId is required', runId: '' };
+    }
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(runId)) {
+        return { ok: false, error: 'runId contains unsupported characters', runId: '' };
+    }
+    return { ok: true, error: '', runId };
+}
+
+function normalizeTaskEngine(value) {
+    const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    return normalized === 'workflow' ? 'workflow' : 'codex';
+}
+
+function normalizeTaskFollowUps(input = []) {
+    const seen = new Set();
+    const result = [];
+    for (const item of Array.isArray(input) ? input : []) {
+        const text = typeof item === 'string' ? item.trim() : '';
+        if (!text || seen.has(text)) continue;
+        seen.add(text);
+        result.push(text);
+    }
+    return result;
+}
+
+function buildTaskWorkflowCatalog() {
+    const listed = listWorkflowDefinitions();
+    return {
+        workflows: Array.isArray(listed.workflows)
+            ? listed.workflows.map((item) => ({
+                id: item.id,
+                name: item.name,
+                description: item.description,
+                readOnly: item.readOnly !== false,
+                stepCount: item.stepCount || 0
+            }))
+            : [],
+        warnings: Array.isArray(listed.warnings) ? listed.warnings : []
+    };
+}
+
+function normalizeTaskPlanRequest(params = {}) {
+    const source = params && typeof params === 'object' ? params : {};
+    const rawWorkflowIds = Array.isArray(source.workflowIds)
+        ? source.workflowIds
+        : (typeof source.workflowId === 'string' && source.workflowId.trim() ? [source.workflowId.trim()] : []);
+    const rawFollowUps = Array.isArray(source.followUps)
+        ? source.followUps
+        : (typeof source.followUp === 'string' && source.followUp.trim() ? [source.followUp.trim()] : []);
+    return {
+        id: typeof source.id === 'string' ? source.id.trim() : '',
+        title: typeof source.title === 'string' ? source.title.trim() : '',
+        target: typeof source.target === 'string' ? source.target.trim() : '',
+        notes: typeof source.notes === 'string' ? source.notes.trim() : '',
+        cwd: typeof source.cwd === 'string' ? source.cwd.trim() : process.cwd(),
+        engine: normalizeTaskEngine(source.engine),
+        allowWrite: source.allowWrite === true,
+        dryRun: source.dryRun === true,
+        concurrency: Number.isFinite(source.concurrency) ? source.concurrency : parseInt(source.concurrency, 10),
+        autoFixRounds: Number.isFinite(source.autoFixRounds) ? source.autoFixRounds : parseInt(source.autoFixRounds, 10),
+        workflowIds: rawWorkflowIds,
+        followUps: normalizeTaskFollowUps(rawFollowUps)
+    };
+}
+
+function coerceTaskPlanPayload(params = {}) {
+    if (params && params.plan && typeof params.plan === 'object' && !Array.isArray(params.plan)) {
+        const plan = cloneJson(params.plan, {});
+        const overrideKeys = ['id', 'title', 'target', 'notes', 'cwd', 'engine', 'allowWrite', 'dryRun', 'concurrency', 'autoFixRounds', 'workflowIds', 'followUps'];
+        for (const key of overrideKeys) {
+            if (Object.prototype.hasOwnProperty.call(params, key) && params[key] !== undefined) {
+                plan[key] = cloneJson(params[key], params[key]);
+            }
+        }
+        plan.engine = normalizeTaskEngine(plan.engine);
+        plan.workflowIds = normalizeTaskFollowUps(plan.workflowIds || []).map((id) => normalizeWorkflowId(id)).filter(Boolean);
+        plan.followUps = normalizeTaskFollowUps(plan.followUps || []);
+        plan.waves = computePlanWaves(Array.isArray(plan.nodes) ? plan.nodes : []);
+        return plan;
+    }
+    const request = normalizeTaskPlanRequest(params || {});
+    const catalog = buildTaskWorkflowCatalog();
+    const plan = buildTaskPlan(request, {
+        workflowCatalog: catalog.workflows,
+        cwd: request.cwd || process.cwd()
+    });
+    return {
+        ...plan,
+        engine: normalizeTaskEngine(request.engine || plan.engine)
+    };
+}
+
+function validatePreparedTaskPlan(plan) {
+    const catalog = buildTaskWorkflowCatalog();
+    const validation = validateTaskPlan(plan, {
+        workflowCatalog: catalog.workflows
+    });
+    return {
+        ...validation,
+        warnings: catalog.warnings || []
+    };
+}
+
+function normalizeTaskQueueItem(raw = {}) {
+    const plan = raw.plan && typeof raw.plan === 'object' && !Array.isArray(raw.plan)
+        ? cloneJson(raw.plan, {})
+        : {};
+    const taskId = typeof raw.taskId === 'string' ? raw.taskId.trim() : '';
+    return {
+        taskId: taskId || createTaskId(),
+        title: typeof raw.title === 'string' ? raw.title.trim() : (typeof plan.title === 'string' ? plan.title.trim() : ''),
+        target: typeof raw.target === 'string' ? raw.target.trim() : (typeof plan.target === 'string' ? plan.target.trim() : ''),
+        status: typeof raw.status === 'string' ? raw.status.trim().toLowerCase() : 'queued',
+        createdAt: toIsoTime(raw.createdAt || Date.now(), ''),
+        updatedAt: toIsoTime(raw.updatedAt || raw.createdAt || Date.now(), ''),
+        engine: normalizeTaskEngine(raw.engine || plan.engine),
+        allowWrite: raw.allowWrite === true || plan.allowWrite === true,
+        dryRun: raw.dryRun === true || plan.dryRun === true,
+        concurrency: Number.isFinite(raw.concurrency) ? raw.concurrency : (Number.isFinite(plan.concurrency) ? plan.concurrency : 2),
+        autoFixRounds: Number.isFinite(raw.autoFixRounds) ? raw.autoFixRounds : (Number.isFinite(plan.autoFixRounds) ? plan.autoFixRounds : 1),
+        lastRunId: typeof raw.lastRunId === 'string' ? raw.lastRunId.trim() : '',
+        lastSummary: typeof raw.lastSummary === 'string' ? raw.lastSummary.trim() : '',
+        plan,
+        runStatus: typeof raw.runStatus === 'string' ? raw.runStatus.trim().toLowerCase() : ''
+    };
+}
+
+function readTaskQueueState() {
+    const parsed = readJsonObjectFromFile(TASK_QUEUE_FILE, {});
+    if (!parsed.ok || !parsed.exists) {
+        return {
+            tasks: []
+        };
+    }
+    const source = parsed.data && typeof parsed.data === 'object' ? parsed.data : {};
+    const tasks = Array.isArray(source.tasks) ? source.tasks.map((item) => normalizeTaskQueueItem(item)) : [];
+    return { tasks };
+}
+
+function writeTaskQueueState(state = {}) {
+    ensureDir(path.dirname(TASK_QUEUE_FILE));
+    writeJsonAtomic(TASK_QUEUE_FILE, {
+        tasks: Array.isArray(state.tasks) ? state.tasks.map((item) => normalizeTaskQueueItem(item)) : []
+    });
+}
+
+function upsertTaskQueueItem(item) {
+    const state = readTaskQueueState();
+    const next = normalizeTaskQueueItem(item || {});
+    const index = state.tasks.findIndex((entry) => entry.taskId === next.taskId);
+    if (index >= 0) {
+        state.tasks[index] = next;
+    } else {
+        state.tasks.push(next);
+    }
+    writeTaskQueueState(state);
+    return next;
+}
+
+function getTaskQueueItem(taskId) {
+    const id = typeof taskId === 'string' ? taskId.trim() : '';
+    if (!id) return null;
+    return readTaskQueueState().tasks.find((item) => item.taskId === id) || null;
+}
+
+function listTaskQueueItems(options = {}) {
+    const state = readTaskQueueState();
+    const limit = Number.isFinite(options.limit) ? Math.max(1, Math.floor(options.limit)) : 50;
+    const statusFilter = typeof options.status === 'string' ? options.status.trim().toLowerCase() : '';
+    const statusRank = {
+        running: 0,
+        queued: 1,
+        failed: 2,
+        completed: 3,
+        cancelled: 4
+    };
+    return state.tasks
+        .filter((item) => !statusFilter || item.status === statusFilter)
+        .sort((a, b) => {
+            const rankDiff = (statusRank[a.status] ?? 99) - (statusRank[b.status] ?? 99);
+            if (rankDiff !== 0) return rankDiff;
+            return String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''));
+        })
+        .slice(0, limit);
+}
+
+function appendTaskRunRecord(record) {
+    ensureDir(path.dirname(TASK_RUNS_FILE));
+    fs.appendFileSync(TASK_RUNS_FILE, `${JSON.stringify(record)}\n`, { encoding: 'utf-8', mode: 0o600 });
+}
+
+function listTaskRunRecords(limit = 20) {
+    const max = Number.isFinite(limit) ? Math.max(1, Math.floor(limit)) : 20;
+    if (!fs.existsSync(TASK_RUNS_FILE)) {
+        return [];
+    }
+    let content = '';
+    try {
+        content = fs.readFileSync(TASK_RUNS_FILE, 'utf-8');
+    } catch (_) {
+        return [];
+    }
+    const rows = content
+        .split(/\r?\n/g)
+        .map((line) => line.trim())
+        .filter(Boolean);
+    const parsed = [];
+    for (let i = rows.length - 1; i >= 0; i -= 1) {
+        try {
+            parsed.push(JSON.parse(rows[i]));
+            if (parsed.length >= max) {
+                break;
+            }
+        } catch (_) {}
+    }
+    return parsed;
+}
+
+function getTaskRunDetailPath(runId) {
+    const validation = validateTaskRunId(runId);
+    if (!validation.ok) {
+        return '';
+    }
+    const baseDir = path.resolve(TASK_RUN_DETAILS_DIR);
+    const detailPath = path.resolve(baseDir, `${validation.runId}.json`);
+    if (!(detailPath === baseDir || detailPath.startsWith(`${baseDir}${path.sep}`))) {
+        return '';
+    }
+    return detailPath;
+}
+
+function writeTaskRunDetail(detail = {}) {
+    const detailPath = getTaskRunDetailPath(detail.runId);
+    if (!detailPath) return;
+    ensureDir(path.dirname(detailPath));
+    writeJsonAtomic(detailPath, detail);
+}
+
+function readTaskRunDetail(runId) {
+    const detailPath = getTaskRunDetailPath(runId);
+    if (!detailPath) {
+        return null;
+    }
+    const parsed = readJsonObjectFromFile(detailPath, {});
+    if (!parsed.ok || !parsed.exists) {
+        return null;
+    }
+    return parsed.data && typeof parsed.data === 'object' ? parsed.data : null;
+}
+
+function collectTaskRunSummary(detail = {}) {
+    const run = detail.run && typeof detail.run === 'object' ? detail.run : {};
+    const nodes = Array.isArray(run.nodes) ? run.nodes : [];
+    return {
+        runId: detail.runId || '',
+        taskId: detail.taskId || '',
+        title: detail.title || '',
+        target: detail.target || '',
+        engine: detail.engine || '',
+        allowWrite: detail.allowWrite === true,
+        dryRun: detail.dryRun === true,
+        concurrency: detail.concurrency || 0,
+        status: run.status || detail.status || '',
+        startedAt: run.startedAt || detail.startedAt || '',
+        endedAt: run.endedAt || detail.endedAt || '',
+        durationMs: run.durationMs || 0,
+        summary: run.summary || detail.summary || '',
+        error: run.error || detail.error || '',
+        nodeCount: nodes.length,
+        successCount: nodes.filter((node) => node.status === 'success').length,
+        failedCount: nodes.filter((node) => node.status === 'failed').length,
+        blockedCount: nodes.filter((node) => node.status === 'blocked').length,
+        cancelledCount: nodes.filter((node) => node.status === 'cancelled').length
+    };
+}
+
+function buildTaskOverviewPayload(options = {}) {
+    const queueLimit = Number.isFinite(options.queueLimit) ? Math.max(1, Math.floor(options.queueLimit)) : 20;
+    const runLimit = Number.isFinite(options.runLimit) ? Math.max(1, Math.floor(options.runLimit)) : 20;
+    const workflowCatalog = buildTaskWorkflowCatalog();
+    const queue = listTaskQueueItems({ limit: queueLimit });
+    const runs = listTaskRunRecords(runLimit);
+    return {
+        workflows: workflowCatalog.workflows,
+        warnings: workflowCatalog.warnings,
+        queue,
+        runs,
+        activeRunIds: Array.from(g_taskRunControllers.keys())
+    };
+}
+
+function summarizeTaskLogs(logs = [], limit = 80) {
+    return (Array.isArray(logs) ? logs : [])
+        .slice(0, limit)
+        .map((item) => {
+            if (!item || typeof item !== 'object') {
+                return String(item || '');
+            }
+            const at = item.at ? `[${item.at}] ` : '';
+            const level = item.level ? `${String(item.level).toUpperCase()} ` : '';
+            const message = item.message ? String(item.message) : '';
+            return `${at}${level}${message}`.trim();
+        })
+        .filter(Boolean)
+        .join('\n');
+}
+
+function findCodexSessionId(value, depth = 0) {
+    if (depth > 6 || value === null || value === undefined) {
+        return '';
+    }
+    if (Array.isArray(value)) {
+        for (const item of value) {
+            const found = findCodexSessionId(item, depth + 1);
+            if (found) return found;
+        }
+        return '';
+    }
+    if (typeof value !== 'object') {
+        return '';
+    }
+    const candidateKeys = ['session_id', 'sessionId', 'conversation_id', 'conversationId', 'thread_id', 'threadId'];
+    for (const key of candidateKeys) {
+        const candidate = value[key];
+        if (typeof candidate === 'string' && candidate.trim()) {
+            return candidate.trim();
+        }
+    }
+    for (const item of Object.values(value)) {
+        const found = findCodexSessionId(item, depth + 1);
+        if (found) return found;
+    }
+    return '';
+}
+
+function readCodexLastMessageFile(filePath) {
+    if (!filePath) return '';
+    try {
+        return fs.readFileSync(filePath, 'utf-8').trim();
+    } catch (_) {
+        return '';
+    }
+}
+
+async function runCodexExecTaskNode(node, context = {}) {
+    const codexPath = resolveSpawnCommand('codex');
+    const codexProbeCommand = process.platform === 'win32' ? 'codex' : codexPath;
+    if (!commandExists(codexProbeCommand, '--version')) {
+        return {
+            success: false,
+            error: '未找到 codex CLI，请先安装并确保 PATH 可用',
+            summary: 'codex CLI 不可用',
+            output: null,
+            logs: [{ at: toIsoTime(Date.now()), level: 'error', message: 'codex CLI 不可用' }]
+        };
+    }
+    const allowWrite = context.allowWrite === true && node.write === true;
+    const cwd = typeof context.cwd === 'string' && context.cwd.trim() ? context.cwd.trim() : process.cwd();
+    const dependencyResults = Array.isArray(context.dependencyResults) ? context.dependencyResults : [];
+    const dependencyLines = dependencyResults
+        .map((item) => {
+            const summary = item && (item.summary || item.error) ? String(item.summary || item.error) : '';
+            return summary ? `- ${item.id}: ${summary}` : '';
+        })
+        .filter(Boolean);
+    const previousAttempts = Array.isArray(context.previousAttempts) ? context.previousAttempts : [];
+    const lastAttempt = previousAttempts.length > 0 ? previousAttempts[previousAttempts.length - 1] : null;
+    const attempt = Number.isFinite(context.attempt) ? context.attempt : 1;
+    const promptParts = [String(node.prompt || '').trim()];
+    if (dependencyLines.length > 0) {
+        promptParts.push(`前置节点摘要:\n${dependencyLines.join('\n')}`);
+    }
+    if (attempt > 1 && lastAttempt) {
+        promptParts.push(`上一轮失败摘要:\n${String(lastAttempt.error || lastAttempt.summary || '').trim()}`);
+        promptParts.push('请在保持目标不变的前提下修复上一轮失败并继续完成当前节点。');
+    }
+    const finalPrompt = promptParts.filter(Boolean).join('\n\n');
+    const tempRoot = path.join(TASK_RUN_DETAILS_DIR, 'tmp');
+    ensureDir(tempRoot);
+    const tempDir = fs.mkdtempSync(path.join(tempRoot, 'codex-'));
+    const outputFile = path.join(tempDir, 'last-message.txt');
+    const args = [
+        '-a', 'never',
+        '-s', allowWrite ? 'workspace-write' : 'read-only',
+        '-C', cwd,
+        'exec',
+        '--json',
+        '--skip-git-repo-check',
+        '--output-last-message', outputFile,
+        finalPrompt
+    ];
+    const stdoutLines = [];
+    const stderrLines = [];
+    const parsedEvents = [];
+    let sessionId = '';
+    let stdoutPartial = '';
+    let stderrPartial = '';
+    const processCapturedLine = (bucket, line) => {
+        const normalizedLine = String(line || '').trim();
+        if (!normalizedLine) {
+            return;
+        }
+        if (bucket.length < 120) {
+            bucket.push(truncateTaskText(normalizedLine, 1200));
+        }
+        try {
+            const payload = JSON.parse(normalizedLine);
+            if (parsedEvents.length < 120) {
+                parsedEvents.push(payload);
+            }
+            if (!sessionId) {
+                sessionId = findCodexSessionId(payload);
+            }
+        } catch (_) {}
+    };
+    const captureLines = (bucket, text, stream) => {
+        const currentPartial = stream === 'stderr' ? stderrPartial : stdoutPartial;
+        const merged = `${currentPartial}${String(text || '')}`;
+        const pieces = merged.split(/\r?\n/g);
+        const nextPartial = pieces.pop() || '';
+        if (stream === 'stderr') {
+            stderrPartial = nextPartial;
+        } else {
+            stdoutPartial = nextPartial;
+        }
+        for (const line of pieces) {
+            processCapturedLine(bucket, line);
+        }
+    };
+    const flushCapturedPartial = (bucket, stream) => {
+        const partial = stream === 'stderr' ? stderrPartial : stdoutPartial;
+        if (stream === 'stderr') {
+            stderrPartial = '';
+        } else {
+            stdoutPartial = '';
+        }
+        processCapturedLine(bucket, partial);
+    };
+    const exit = await new Promise((resolve) => {
+        const child = spawn(codexPath, args, {
+            stdio: ['ignore', 'pipe', 'pipe'],
+            windowsHide: true,
+            shell: process.platform === 'win32'
+        });
+        if (typeof context.registerAbort === 'function') {
+            context.registerAbort(() => {
+                try {
+                    child.kill('SIGTERM');
+                } catch (_) {}
+            });
+        }
+        child.stdout.on('data', (chunk) => {
+            captureLines(stdoutLines, chunk, 'stdout');
+        });
+        child.stderr.on('data', (chunk) => {
+            captureLines(stderrLines, chunk, 'stderr');
+        });
+        child.on('error', (error) => {
+            resolve({ code: 1, signal: '', error: error && error.message ? error.message : String(error || 'spawn failed') });
+        });
+        child.on('close', (code, signal) => {
+            flushCapturedPartial(stdoutLines, 'stdout');
+            flushCapturedPartial(stderrLines, 'stderr');
+            resolve({ code: typeof code === 'number' ? code : 1, signal: signal || '', error: '' });
+        });
+    });
+    const lastMessage = readCodexLastMessageFile(outputFile);
+    try {
+        if (fs.rmSync) {
+            fs.rmSync(tempDir, { recursive: true, force: true });
+        } else {
+            fs.rmdirSync(tempDir, { recursive: true });
+        }
+    } catch (_) {}
+    const success = exit.code === 0;
+    const errorMessage = success
+        ? ''
+        : (exit.error || stderrLines[stderrLines.length - 1] || stdoutLines[stdoutLines.length - 1] || `codex exec exited with code ${exit.code}`);
+    const summary = truncateTaskText(lastMessage || (success ? 'Codex 执行完成' : errorMessage), 400);
+    return {
+        success,
+        error: errorMessage,
+        summary,
+        output: {
+            exitCode: exit.code,
+            signal: exit.signal || '',
+            sessionId,
+            lastMessage,
+            events: parsedEvents,
+            stdoutPreview: stdoutLines,
+            stderrPreview: stderrLines
+        },
+        logs: [
+            ...stdoutLines.map((line) => ({ at: toIsoTime(Date.now()), level: 'info', message: line })),
+            ...stderrLines.map((line) => ({ at: toIsoTime(Date.now()), level: 'warn', message: line }))
+        ]
+    };
+}
+
+async function executeTaskNodeAdapter(node, context = {}) {
+    if (node.kind === 'workflow') {
+        const input = {
+            ...(node.input && typeof node.input === 'object' && !Array.isArray(node.input) ? cloneJson(node.input, {}) : {}),
+            task: {
+                title: context.plan && context.plan.title ? context.plan.title : '',
+                target: context.plan && context.plan.target ? context.plan.target : '',
+                dependencyResults: cloneJson(context.dependencyResults || [], [])
+            }
+        };
+        const result = await runWorkflowById(node.workflowId, input, {
+            allowWrite: context.allowWrite === true,
+            dryRun: context.dryRun === true
+        });
+        return {
+            success: result && result.success === true,
+            error: result && result.error ? result.error : '',
+            summary: truncateTaskText(
+                result && result.error
+                    ? result.error
+                    : `${result && result.workflowName ? result.workflowName : node.workflowId} ${result && result.success === true ? '完成' : '失败'}`,
+                400
+            ),
+            output: cloneJson(result, null),
+            logs: Array.isArray(result && result.steps)
+                ? result.steps.map((step) => ({
+                    at: step.startedAt || toIsoTime(Date.now()),
+                    level: step.status === 'failed' ? 'error' : (step.status === 'skipped' ? 'warn' : 'info'),
+                    message: `${step.id || step.tool || 'step'}: ${step.status || 'unknown'}${step.error ? ` (${step.error})` : ''}`
+                }))
+                : []
+        };
+    }
+    return runCodexExecTaskNode(node, context);
+}
+
+async function runTaskPlanInternal(plan, options = {}) {
+    const validation = validatePreparedTaskPlan(plan);
+    if (!validation.ok) {
+        return {
+            error: validation.error || 'task plan validation failed',
+            issues: validation.issues || [],
+            warnings: validation.warnings || []
+        };
+    }
+    const taskId = typeof options.taskId === 'string' && options.taskId.trim() ? options.taskId.trim() : (plan.id || createTaskId());
+    const runId = typeof options.runId === 'string' && options.runId.trim() ? options.runId.trim() : createTaskRunId();
+    const controller = new AbortController();
+    const baseDetail = {
+        runId,
+        taskId,
+        workerPid: process.pid,
+        title: plan.title || '',
+        target: plan.target || '',
+        engine: normalizeTaskEngine(plan.engine),
+        allowWrite: plan.allowWrite === true,
+        dryRun: plan.dryRun === true,
+        concurrency: Number.isFinite(plan.concurrency) ? plan.concurrency : 2,
+        createdAt: toIsoTime(Date.now()),
+        updatedAt: toIsoTime(Date.now()),
+        warnings: validation.warnings || [],
+        plan: cloneJson(plan, {})
+    };
+    writeTaskRunDetail({
+        ...baseDetail,
+        status: 'running',
+        run: {
+            status: 'running',
+            startedAt: toIsoTime(Date.now()),
+            endedAt: '',
+            durationMs: 0,
+            nodes: [],
+            logs: []
+        }
+    });
+    g_taskRunControllers.set(runId, {
+        runId,
+        taskId,
+        controller,
+        abort() {
+            try {
+                controller.abort();
+            } catch (_) {}
+        }
+    });
+    if (options.queueItem) {
+        upsertTaskQueueItem({
+            ...options.queueItem,
+            taskId,
+            status: 'running',
+            runStatus: 'running',
+            lastRunId: runId,
+            lastSummary: '',
+            updatedAt: toIsoTime(Date.now()),
+            plan
+        });
+    }
+    try {
+        const run = await executeTaskPlan(plan, {
+            concurrency: plan.concurrency,
+            signal: controller.signal,
+            executeNode: async (node, nodeContext) => executeTaskNodeAdapter(node, {
+                ...nodeContext,
+                plan,
+                taskId,
+                runId,
+                allowWrite: plan.allowWrite === true,
+                dryRun: plan.dryRun === true,
+                cwd: plan.cwd || process.cwd()
+            }),
+            onUpdate: async (snapshot) => {
+                const nextDetail = {
+                    ...baseDetail,
+                    updatedAt: toIsoTime(Date.now()),
+                    status: snapshot.status || 'running',
+                    run: snapshot
+                };
+                writeTaskRunDetail(nextDetail);
+                if (options.queueItem) {
+                    upsertTaskQueueItem({
+                        ...options.queueItem,
+                        taskId,
+                        status: snapshot.status === 'success'
+                            ? 'completed'
+                            : (snapshot.status === 'failed' ? 'failed' : (snapshot.status === 'cancelled' ? 'cancelled' : 'running')),
+                        runStatus: snapshot.status || 'running',
+                        lastRunId: runId,
+                        lastSummary: snapshot.summary || '',
+                        updatedAt: toIsoTime(Date.now()),
+                        plan
+                    });
+                }
+            }
+        });
+        const detail = {
+            ...baseDetail,
+            updatedAt: toIsoTime(Date.now()),
+            status: run.status || 'failed',
+            run
+        };
+        writeTaskRunDetail(detail);
+        appendTaskRunRecord(collectTaskRunSummary(detail));
+        if (options.queueItem) {
+            upsertTaskQueueItem({
+                ...options.queueItem,
+                taskId,
+                status: run.status === 'success'
+                    ? 'completed'
+                    : (run.status === 'cancelled' ? 'cancelled' : 'failed'),
+                runStatus: run.status || '',
+                lastRunId: runId,
+                lastSummary: run.summary || run.error || '',
+                updatedAt: toIsoTime(Date.now()),
+                plan
+            });
+        }
+        return detail;
+    } finally {
+        g_taskRunControllers.delete(runId);
+    }
+}
+
+function addTaskToQueue(params = {}) {
+    const plan = coerceTaskPlanPayload(params || {});
+    const validation = validatePreparedTaskPlan(plan);
+    if (!validation.ok) {
+        return {
+            error: validation.error || 'task plan validation failed',
+            issues: validation.issues || [],
+            warnings: validation.warnings || []
+        };
+    }
+    const taskId = typeof params.taskId === 'string' && params.taskId.trim() ? params.taskId.trim() : createTaskId();
+    const item = upsertTaskQueueItem({
+        taskId,
+        title: plan.title,
+        target: plan.target,
+        status: 'queued',
+        createdAt: toIsoTime(Date.now()),
+        updatedAt: toIsoTime(Date.now()),
+        engine: plan.engine,
+        allowWrite: plan.allowWrite === true,
+        dryRun: plan.dryRun === true,
+        concurrency: plan.concurrency || 2,
+        autoFixRounds: plan.autoFixRounds || 1,
+        lastRunId: '',
+        lastSummary: '',
+        runStatus: '',
+        plan
+    });
+    return {
+        ok: true,
+        task: item,
+        warnings: validation.warnings || []
+    };
+}
+
+async function runTaskNow(params = {}) {
+    const rawRunId = params && typeof params.runId === 'string' ? params.runId.trim() : '';
+    const runIdValidation = rawRunId
+        ? validateTaskRunId(rawRunId)
+        : { ok: true, runId: createTaskRunId(), error: '' };
+    if (!runIdValidation.ok) {
+        return { error: runIdValidation.error };
+    }
+    const plan = coerceTaskPlanPayload(params || {});
+    const detail = await runTaskPlanInternal(plan, {
+        taskId: typeof params.taskId === 'string' && params.taskId.trim() ? params.taskId.trim() : createTaskId(),
+        runId: runIdValidation.runId
+    });
+    return detail;
+}
+
+async function runTaskQueueProcessingInternal(options = {}) {
+    const taskId = typeof options.taskId === 'string' ? options.taskId.trim() : '';
+    let latestDetail = null;
+    while (true) {
+        const queue = listTaskQueueItems({ limit: 200, status: 'queued' });
+        const nextItem = taskId
+            ? queue.find((item) => item.taskId === taskId)
+            : queue[queue.length - 1];
+        if (!nextItem) {
+            break;
+        }
+        latestDetail = await runTaskPlanInternal(nextItem.plan, {
+            taskId: nextItem.taskId,
+            runId: createTaskRunId(),
+            queueItem: nextItem
+        });
+        if (taskId) {
+            break;
+        }
+    }
+    return latestDetail;
+}
+
+async function startTaskQueueProcessing(options = {}) {
+    const taskId = typeof options.taskId === 'string' ? options.taskId.trim() : '';
+    const detach = options.detach === true;
+    const queueItemById = taskId ? getTaskQueueItem(taskId) : null;
+    if (taskId && !queueItemById) {
+        return { error: `task not found: ${taskId}` };
+    }
+    if (queueItemById && queueItemById.status !== 'queued') {
+        return { error: `task is not queued: ${taskId}` };
+    }
+    const detachedWorker = readTaskQueueWorkerState();
+    const runner = async () => runTaskQueueProcessingInternal({ taskId });
+    if (detach) {
+        if (g_taskQueueProcessor || detachedWorker) {
+            return {
+                ok: true,
+                started: false,
+                alreadyRunning: true
+            };
+        }
+        spawnDetachedTaskWorker({
+            type: 'queue-runner',
+            taskId
+        });
+        return {
+            ok: true,
+            started: true,
+            detached: true
+        };
+    }
+    if (detachedWorker) {
+        return {
+            ok: true,
+            started: false,
+            alreadyRunning: true
+        };
+    }
+    if (g_taskQueueProcessor) {
+        const detail = await g_taskQueueProcessor;
+        return {
+            ok: true,
+            started: false,
+            detached: false,
+            detail,
+            alreadyRunning: true
+        };
+    }
+    g_taskQueueProcessor = runner()
+        .catch(() => null)
+        .finally(() => {
+            g_taskQueueProcessor = null;
+        });
+    const detail = await g_taskQueueProcessor;
+    return {
+        ok: true,
+        started: true,
+        detached: false,
+        detail
+    };
+}
+
+async function retryTaskRun(params = {}) {
+    const runIdValidation = validateTaskRunId(params && typeof params.runId === 'string' ? params.runId : '');
+    if (!runIdValidation.ok) {
+        return { error: runIdValidation.error };
+    }
+    const detail = readTaskRunDetail(runIdValidation.runId);
+    if (!detail || !detail.plan) {
+        return { error: `task run not found: ${runIdValidation.runId}` };
+    }
+    const plan = cloneJson(detail.plan, {});
+    const detach = params.detach === true;
+    const nextRunId = createTaskRunId();
+    if (detach) {
+        spawnDetachedTaskWorker({
+            type: 'run-plan',
+            plan,
+            taskId: detail.taskId || createTaskId(),
+            runId: nextRunId
+        });
+        return {
+            ok: true,
+            started: true,
+            detached: true,
+            runId: nextRunId,
+            taskId: detail.taskId || ''
+        };
+    }
+    return runTaskPlanInternal(plan, {
+        taskId: detail.taskId || createTaskId(),
+        runId: nextRunId
+    });
+}
+
+function cancelTaskRunOrQueue(params = {}) {
+    const rawTarget = typeof params.target === 'string' ? params.target.trim() : '';
+    const runId = typeof params.runId === 'string' ? params.runId.trim() : '';
+    const taskId = typeof params.taskId === 'string' ? params.taskId.trim() : '';
+    const target = rawTarget || runId || taskId;
+    if (!target) {
+        return { error: 'taskId or runId is required' };
+    }
+    const controllerByRun = g_taskRunControllers.get(target)
+        || Array.from(g_taskRunControllers.values()).find((entry) => entry && entry.taskId === target);
+    if (controllerByRun) {
+        controllerByRun.abort();
+        return {
+            ok: true,
+            cancelled: true,
+            runId: controllerByRun.runId,
+            taskId: controllerByRun.taskId,
+            mode: 'running'
+        };
+    }
+    const queueItem = getTaskQueueItem(target);
+    if (queueItem) {
+        if (queueItem.status === 'queued') {
+            const next = upsertTaskQueueItem({
+                ...queueItem,
+                status: 'cancelled',
+                runStatus: 'cancelled',
+                updatedAt: toIsoTime(Date.now()),
+                lastSummary: queueItem.lastSummary || '已取消'
+            });
+            return {
+                ok: true,
+                cancelled: true,
+                task: next,
+                mode: 'queued'
+            };
+        }
+        if (queueItem.lastRunId && g_taskRunControllers.has(queueItem.lastRunId)) {
+            const active = g_taskRunControllers.get(queueItem.lastRunId);
+            active.abort();
+            return {
+                ok: true,
+                cancelled: true,
+                runId: active.runId,
+                taskId: active.taskId,
+                mode: 'running'
+            };
+        }
+        if (queueItem.lastRunId) {
+            const detachedResult = signalDetachedTaskWorker(readTaskRunDetail(queueItem.lastRunId) || {});
+            if (!detachedResult.error) {
+                return detachedResult;
+            }
+        }
+        return {
+            error: `task cannot be cancelled in current status: ${queueItem.status}`
+        };
+    }
+    const detail = readTaskRunDetail(target);
+    if (detail && g_taskRunControllers.has(detail.runId)) {
+        const active = g_taskRunControllers.get(detail.runId);
+        active.abort();
+        return {
+            ok: true,
+            cancelled: true,
+            runId: active.runId,
+            taskId: active.taskId,
+            mode: 'running'
+        };
+    }
+    if (detail) {
+        const detachedResult = signalDetachedTaskWorker(detail);
+        if (!detachedResult.error) {
+            return detachedResult;
+        }
+    }
+    const detailByTaskId = findRunningTaskRunDetailByTaskId(target);
+    if (detailByTaskId) {
+        const detachedResult = signalDetachedTaskWorker(detailByTaskId);
+        if (!detachedResult.error) {
+            return detachedResult;
+        }
+    }
+    return { error: `task/run not found: ${target}` };
+}
+
+function getTaskLogs(params = {}) {
+    const runIdValidation = validateTaskRunId(params && typeof params.runId === 'string' ? params.runId : '');
+    if (!runIdValidation.ok) {
+        return { error: runIdValidation.error };
+    }
+    const detail = readTaskRunDetail(runIdValidation.runId);
+    if (!detail) {
+        return { error: `task run not found: ${runIdValidation.runId}` };
+    }
+    const run = detail.run && typeof detail.run === 'object' ? detail.run : {};
+    const lines = [];
+    for (const node of Array.isArray(run.nodes) ? run.nodes : []) {
+        lines.push(`# ${node.id}${node.title ? ` ${node.title}` : ''}`);
+        const body = summarizeTaskLogs(node.logs || [], 120);
+        if (body) {
+            lines.push(body);
+        } else {
+            lines.push('(no logs)');
+        }
+        lines.push('');
+    }
+    return {
+        runId: runIdValidation.runId,
+        logs: lines.join('\n').trim(),
+        detail
+    };
+}
+
+function writeDetachedTaskWorkerPayload(payload = {}) {
+    const tempRoot = path.join(TASK_RUN_DETAILS_DIR, 'tmp');
+    ensureDir(tempRoot);
+    const payloadPath = path.join(tempRoot, `task-worker-${Date.now()}-${crypto.randomBytes(3).toString('hex')}.json`);
+    writeJsonAtomic(payloadPath, payload);
+    return payloadPath;
+}
+
+function readDetachedTaskWorkerPayload(payloadPath = '') {
+    const filePath = typeof payloadPath === 'string' ? payloadPath.trim() : '';
+    if (!filePath) {
+        return { error: 'task worker payload path is required' };
+    }
+    const parsed = readJsonObjectFromFile(filePath, {});
+    try {
+        fs.unlinkSync(filePath);
+    } catch (_) {}
+    if (!parsed.ok || !parsed.exists) {
+        return { error: parsed.error || 'task worker payload not found' };
+    }
+    return { payload: parsed.data && typeof parsed.data === 'object' ? parsed.data : {} };
+}
+
+function spawnDetachedTaskWorker(payload = {}) {
+    const payloadPath = writeDetachedTaskWorkerPayload(payload);
+    const child = spawn(process.execPath, [__filename, '__task-worker', payloadPath], {
+        stdio: 'ignore',
+        detached: true,
+        windowsHide: true
+    });
+    child.on('error', () => {});
+    if (typeof child.unref === 'function') {
+        child.unref();
+    }
+    return {
+        ok: true,
+        detached: true,
+        pid: child.pid || 0
+    };
+}
+
+function isLiveProcessId(value) {
+    const pid = Number.isFinite(Number(value)) ? Math.floor(Number(value)) : 0;
+    if (!pid) {
+        return false;
+    }
+    try {
+        process.kill(pid, 0);
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+function readTaskQueueWorkerState() {
+    const parsed = readJsonObjectFromFile(TASK_QUEUE_WORKER_FILE, {});
+    if (!parsed.ok || !parsed.exists || !parsed.data || typeof parsed.data !== 'object') {
+        return null;
+    }
+    const state = parsed.data;
+    if (!isLiveProcessId(state.pid)) {
+        try {
+            fs.unlinkSync(TASK_QUEUE_WORKER_FILE);
+        } catch (_) {}
+        return null;
+    }
+    return state;
+}
+
+function writeTaskQueueWorkerState(state = {}) {
+    ensureDir(path.dirname(TASK_QUEUE_WORKER_FILE));
+    writeJsonAtomic(TASK_QUEUE_WORKER_FILE, {
+        pid: process.pid,
+        taskId: typeof state.taskId === 'string' ? state.taskId.trim() : '',
+        startedAt: state.startedAt || toIsoTime(Date.now())
+    });
+}
+
+function clearTaskQueueWorkerState() {
+    try {
+        fs.unlinkSync(TASK_QUEUE_WORKER_FILE);
+    } catch (_) {}
+}
+
+function findRunningTaskRunDetailByTaskId(taskId = '') {
+    const normalizedTaskId = typeof taskId === 'string' ? taskId.trim() : '';
+    if (!normalizedTaskId || !fs.existsSync(TASK_RUN_DETAILS_DIR)) {
+        return null;
+    }
+    let entries = [];
+    try {
+        entries = fs.readdirSync(TASK_RUN_DETAILS_DIR, { withFileTypes: true });
+    } catch (_) {
+        return null;
+    }
+    const candidates = [];
+    for (const entry of entries) {
+        if (!entry || !entry.isFile() || !entry.name.endsWith('.json')) {
+            continue;
+        }
+        const detail = readTaskRunDetail(entry.name.slice(0, -5));
+        if (!detail || detail.taskId !== normalizedTaskId) {
+            continue;
+        }
+        const status = detail.run && detail.run.status ? detail.run.status : detail.status;
+        if (status !== 'running') {
+            continue;
+        }
+        candidates.push(detail);
+    }
+    candidates.sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')));
+    return candidates[0] || null;
+}
+
+function signalDetachedTaskWorker(detail = {}) {
+    const workerPid = Number.isFinite(Number(detail && detail.workerPid)) ? Math.floor(Number(detail.workerPid)) : 0;
+    if (!workerPid) {
+        return { error: 'task worker pid is missing' };
+    }
+    try {
+        process.kill(workerPid, 'SIGTERM');
+        return {
+            ok: true,
+            cancelled: true,
+            runId: detail.runId || '',
+            taskId: detail.taskId || '',
+            workerPid,
+            mode: 'running'
+        };
+    } catch (error) {
+        return {
+            error: error && error.code === 'ESRCH'
+                ? `task worker is not running: ${workerPid}`
+                : (error && error.message ? error.message : 'failed to signal task worker')
+        };
+    }
+}
+
+async function cmdTaskWorker(args = []) {
+    const payloadResult = readDetachedTaskWorkerPayload(args[0] || '');
+    if (payloadResult.error) {
+        throw new Error(payloadResult.error);
+    }
+    const payload = payloadResult.payload || {};
+    if (payload.type === 'run-plan') {
+        const runId = typeof payload.runId === 'string' ? payload.runId.trim() : '';
+        const taskId = typeof payload.taskId === 'string' ? payload.taskId.trim() : '';
+        let cancelRequested = false;
+        const cancelHandler = () => {
+            if (cancelRequested) return;
+            cancelRequested = true;
+            cancelTaskRunOrQueue({ runId, taskId });
+        };
+        process.once('SIGTERM', cancelHandler);
+        process.once('SIGINT', cancelHandler);
+        try {
+            const detail = await runTaskPlanInternal(payload.plan || {}, { taskId, runId });
+            if (detail && detail.error) {
+                throw new Error(detail.error);
+            }
+            if (detail && detail.run && detail.run.status === 'failed') {
+                throw new Error(detail.run.error || 'task run failed');
+            }
+            return;
+        } finally {
+            process.removeListener('SIGTERM', cancelHandler);
+            process.removeListener('SIGINT', cancelHandler);
+        }
+    }
+    if (payload.type === 'queue-runner') {
+        writeTaskQueueWorkerState({ taskId: payload.taskId || '', startedAt: toIsoTime(Date.now()) });
+        try {
+            await runTaskQueueProcessingInternal({ taskId: payload.taskId || '' });
+            return;
+        } finally {
+            clearTaskQueueWorkerState();
+        }
+    }
+    throw new Error(`unknown task worker payload type: ${payload.type || ''}`);
 }
 
 function createMcpTools(options = {}) {
@@ -12034,6 +14459,7 @@ async function main() {
         console.log('  codexmate add-model <模型> 添加模型');
         console.log('  codexmate delete-model <模型> 删除模型');
         console.log('  codexmate workflow <list|get|validate|run|runs>  MCP 工作流中心');
+        console.log('  codexmate task <plan|run|runs|queue|retry|cancel|logs>  本地任务编排');
         console.log('  codexmate run [--host <HOST>] [--no-browser]    启动 Web 界面');
         console.log('  codexmate codex [参数...] [--follow-up <文本>|--queued-follow-up <文本> 可重复]  等同于 codex --yolo');
         console.log('    注: follow-up 自动排队仅支持 linux/android/netbsd/openbsd/darwin/freebsd 且 stdin 必须是 TTY，其他平台会报错');
@@ -12048,6 +14474,7 @@ async function main() {
     }
 
     switch (command) {
+        case '__task-worker': await cmdTaskWorker(args.slice(1)); break;
         case 'status': cmdStatus(); break;
         case 'setup': await cmdSetup(); break;
         case 'list': cmdList(); break;
@@ -12062,6 +14489,7 @@ async function main() {
         case 'auth': cmdAuth(args.slice(1)); break;
         case 'proxy': await cmdProxy(args.slice(1)); break;
         case 'workflow': await cmdWorkflow(args.slice(1)); break;
+        case 'task': await cmdTask(args.slice(1)); break;
         case 'run': cmdStart(parseStartOptions(args.slice(1))); break;
         case 'start':
             console.error('错误: 命令已更名为 "run"，请使用: codexmate run');

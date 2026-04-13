@@ -9,12 +9,19 @@ const logic = await import(pathToFileURL(path.join(__dirname, '..', '..', 'web-u
 const { createSessionComputed } = await import(
     pathToFileURL(path.join(__dirname, '..', '..', 'web-ui', 'modules', 'app.computed.session.mjs'))
 );
+const { createMainTabsComputed } = await import(
+    pathToFileURL(path.join(__dirname, '..', '..', 'web-ui', 'modules', 'app.computed.main-tabs.mjs'))
+);
+const { createTaskOrchestrationMethods } = await import(
+    pathToFileURL(path.join(__dirname, '..', '..', 'web-ui', 'modules', 'app.methods.task-orchestration.mjs'))
+);
 const {
     DEFAULT_SESSION_LIST_FAST_LIMIT,
     DEFAULT_SESSION_LIST_LIMIT,
     normalizeClaudeValue,
     normalizeClaudeConfig,
     normalizeClaudeSettingsEnv,
+    getClaudeModelCatalogForBaseUrl,
     matchClaudeConfigFromSettings,
     findDuplicateClaudeConfigName,
     buildAgentsDiffPreview,
@@ -29,6 +36,7 @@ const {
     normalizeSessionPathFilter,
     buildSessionFilterCacheState,
     buildSessionListParams,
+    buildUsageChartGroups,
     formatSessionTimelineTimestamp,
     buildSessionTimelineNodes,
     runLatestOnlyQueue,
@@ -99,6 +107,21 @@ test('normalizeClaudeSettingsEnv fills missing fields with empty strings', () =>
         useKey: '',
         externalCredentialType: ''
     });
+});
+
+test('getClaudeModelCatalogForBaseUrl returns the built-in Anthropic model catalog', () => {
+    const models = getClaudeModelCatalogForBaseUrl('https://api.anthropic.com');
+    assert(models.includes('claude-opus-4-6'));
+    assert(models.includes('claude-sonnet-4-6'));
+    assert(models.includes('claude-haiku-4-5'));
+    assert(!models.includes('glm-5.1'));
+});
+
+test('getClaudeModelCatalogForBaseUrl appends BigModel extras for Claude-compatible endpoints', () => {
+    const models = getClaudeModelCatalogForBaseUrl('https://open.bigmodel.cn/api/anthropic');
+    assert(models.includes('claude-opus-4-6'));
+    assert(models.includes('glm-5.1'));
+    assert(models.includes('glm-coding'));
 });
 
 test('buildSessionListParams normalizes source and path filter before building request', () => {
@@ -703,22 +726,600 @@ test('sessionUsageSummaryCards uses compact units for long token and context tot
                 totalMessages: 3456,
                 totalTokens: 1234567,
                 totalContextWindow: 256000,
+                activeDurationMs: (2 * 24 * 60 * 60 * 1000) + (3 * 60 * 60 * 1000),
+                totalDurationMs: (7 * 24 * 60 * 60 * 1000) + (5 * 60 * 60 * 1000),
                 activeDays: 7,
                 avgMessagesPerSession: 288,
                 busiestDay: null,
                 busiestHour: null
             }
-        }
+        },
+        sessionsUsageList: [],
+        providersList: [],
+        currentProvider: ''
     });
 
     const tokensCard = cards.find((card) => card.key === 'tokens');
     const contextCard = cards.find((card) => card.key === 'context-window');
+    const costCard = cards.find((card) => card.key === 'estimated-cost');
+    const activeDurationCard = cards.find((card) => card.key === 'active-duration');
+    const totalDurationCard = cards.find((card) => card.key === 'total-duration');
     assert(tokensCard, 'missing tokens summary card');
     assert(contextCard, 'missing context summary card');
+    assert(costCard, 'missing estimated cost summary card');
+    assert(activeDurationCard, 'missing active duration summary card');
+    assert(totalDurationCard, 'missing total duration summary card');
     assert.strictEqual(tokensCard.value, '1.2M');
     assert.strictEqual(tokensCard.title, '1,234,567');
     assert.strictEqual(contextCard.value, '256K');
     assert.strictEqual(contextCard.title, '256,000');
+    assert.strictEqual(costCard.value, '暂无');
+    assert.strictEqual(costCard.label, '预估费用 · 近 7 天');
+    assert.ok(!costCard.note);
+    assert.match(costCard.title, /缺少可匹配的模型单价或 token 拆分/);
+    assert.strictEqual(activeDurationCard.value, '2天3时');
+    assert.strictEqual(totalDurationCard.value, '7天5时');
+    assert.strictEqual(activeDurationCard.title, '累计会话跨度 2天 3小时');
+    assert.strictEqual(totalDurationCard.title, '整体时间跨度 7天 5小时');
+});
+
+test('buildUsageChartGroups keeps all used model names for the selected range and ignores records without concrete models', () => {
+    const result = buildUsageChartGroups([
+        {
+            source: 'codex',
+            modelId: 'gpt-5.3-codex',
+            createdAt: '2026-04-10T07:30:00.000Z',
+            updatedAt: '2026-04-10T08:00:00.000Z',
+            messageCount: 4,
+            totalTokens: 400000,
+            contextWindow: 258400
+        },
+        {
+            source: 'claude',
+            modelName: 'claude-sonnet-4',
+            createdAt: '2026-04-09T07:30:00.000Z',
+            updatedAt: '2026-04-09T08:00:00.000Z',
+            messageCount: 6,
+            totalTokens: 500000,
+            contextWindow: 300000
+        },
+        {
+            source: 'codex',
+            model: 'gpt-5.1-codex-max',
+            createdAt: '2026-04-08T07:30:00.000Z',
+            updatedAt: '2026-04-08T08:00:00.000Z',
+            messageCount: 3,
+            totalTokens: 200000,
+            contextWindow: 128000
+        },
+        {
+            source: 'codex',
+            model: 'legacy-old-model',
+            createdAt: '2026-03-01T07:30:00.000Z',
+            updatedAt: '2026-03-01T08:00:00.000Z',
+            messageCount: 1,
+            totalTokens: 100000,
+            contextWindow: 64000
+        },
+        {
+            source: 'claude',
+            createdAt: '2026-04-11T07:30:00.000Z',
+            updatedAt: '2026-04-11T08:00:00.000Z',
+            messageCount: 2,
+            totalTokens: 90000,
+            contextWindow: 64000
+        },
+        {
+            source: 'codex',
+            model: '<synthetic>',
+            createdAt: '2026-04-11T09:30:00.000Z',
+            updatedAt: '2026-04-11T10:00:00.000Z',
+            messageCount: 8,
+            totalTokens: 120000,
+            contextWindow: 64000
+        }
+    ], {
+        range: '7d',
+        now: Date.UTC(2026, 3, 12, 12, 0, 0)
+    });
+
+    assert.deepStrictEqual(
+        result.usedModels.map((item) => item.model),
+        ['gpt-5.3-codex', 'claude-sonnet-4', 'gpt-5.1-codex-max']
+    );
+    assert.deepStrictEqual(result.usedModels[0].sourceLabels, ['Codex']);
+    assert.deepStrictEqual(result.usedModels[1].sourceLabels, ['Claude Code']);
+    assert.strictEqual(result.modelCoverage.totalSessions, 3);
+    assert.strictEqual(result.modelCoverage.modeledSessions, 3);
+    assert.strictEqual(result.modelCoverage.missingModelSessions, 0);
+    assert.strictEqual(result.modelCoverage.providerOnlySessions, 0);
+    assert.strictEqual(result.modelCoverage.coveragePercent, 100);
+    assert.deepStrictEqual(result.modelCoverage.missingModelSourceTotals, { codex: 0, claude: 0 });
+    assert.deepStrictEqual(result.modelCoverage.missingModelProviders, []);
+    assert.deepStrictEqual(result.modelCoverage.missingModelSessionsPreview, []);
+});
+
+test('buildUsageChartGroups ignores provider-only and <synthetic> records', () => {
+    const result = buildUsageChartGroups([
+        {
+            source: 'codex',
+            provider: 'maxx',
+            createdAt: '2026-02-28T06:49:25.018Z',
+            updatedAt: '2026-02-28T06:49:26.697Z',
+            messageCount: 1,
+            totalTokens: 0,
+            contextWindow: 0
+        },
+        {
+            source: 'claude',
+            model: '<synthetic>',
+            createdAt: '2026-02-28T06:59:25.018Z',
+            updatedAt: '2026-02-28T06:59:26.697Z',
+            messageCount: 2,
+            totalTokens: 10,
+            contextWindow: 20
+        }
+    ], {
+        range: 'all',
+        now: Date.UTC(2026, 3, 12, 12, 0, 0)
+    });
+
+    assert.deepStrictEqual(result.usedModels, []);
+    assert.strictEqual(result.modelCoverage.totalSessions, 0);
+    assert.strictEqual(result.modelCoverage.modeledSessions, 0);
+    assert.strictEqual(result.modelCoverage.missingModelSessions, 0);
+    assert.strictEqual(result.modelCoverage.providerOnlySessions, 0);
+    assert.strictEqual(result.modelCoverage.coveragePercent, 0);
+    assert.deepStrictEqual(result.modelCoverage.missingModelSourceTotals, { codex: 0, claude: 0 });
+    assert.deepStrictEqual(result.modelCoverage.missingModelProviders, []);
+    assert.deepStrictEqual(result.modelCoverage.missingModelSessionsPreview, []);
+});
+
+test('buildUsageChartGroups collects every model name from session model arrays without double-counting coverage', () => {
+    const result = buildUsageChartGroups([
+        {
+            source: 'codex',
+            model: 'gpt-5.3-codex',
+            models: ['gpt-5.3-codex', 'gpt-5.2-codex', 'gpt-5.3-codex'],
+            createdAt: '2026-04-10T07:30:00.000Z',
+            updatedAt: '2026-04-10T08:00:00.000Z',
+            messageCount: 4,
+            totalTokens: 400000,
+            contextWindow: 258400
+        },
+        {
+            source: 'codex',
+            model: 'gpt-5.1-codex-max',
+            createdAt: '2026-04-08T07:30:00.000Z',
+            updatedAt: '2026-04-08T08:00:00.000Z',
+            messageCount: 3,
+            totalTokens: 200000,
+            contextWindow: 128000
+        }
+    ], {
+        range: 'all',
+        now: Date.UTC(2026, 3, 12, 12, 0, 0)
+    });
+
+    assert.deepStrictEqual(
+        result.usedModels.map((item) => item.model),
+        ['gpt-5.3-codex', 'gpt-5.2-codex', 'gpt-5.1-codex-max']
+    );
+    assert.strictEqual(result.modelCoverage.totalSessions, 2);
+    assert.strictEqual(result.modelCoverage.modeledSessions, 2);
+    assert.strictEqual(result.modelCoverage.missingModelSessions, 0);
+    assert.strictEqual(result.modelCoverage.providerOnlySessions, 0);
+    assert.strictEqual(result.modelCoverage.coveragePercent, 100);
+    assert.deepStrictEqual(result.modelCoverage.missingModelSourceTotals, { codex: 0, claude: 0 });
+    assert.deepStrictEqual(result.modelCoverage.missingModelProviders, []);
+    assert.deepStrictEqual(result.modelCoverage.missingModelSessionsPreview, []);
+});
+
+test('sessionUsageSummaryCards explains why usage cost is unavailable for the selected range', () => {
+    const computed = createSessionComputed();
+    const cards = computed.sessionUsageSummaryCards.call({
+        sessionUsageCharts: {
+            summary: {
+                totalSessions: 2,
+                totalMessages: 5,
+                totalTokens: 320000,
+                totalContextWindow: 128000,
+                activeDurationMs: 20 * 60 * 1000,
+                totalDurationMs: 20 * 60 * 1000,
+                activeDays: 1,
+                avgMessagesPerSession: 2.5,
+                busiestDay: null,
+                busiestHour: null
+            }
+        },
+        sessionsUsageList: [
+            {
+                provider: 'maxx',
+                model: 'gpt-5.1-codex-max',
+                totalTokens: 200000,
+                inputTokens: 120000,
+                cachedInputTokens: 0,
+                outputTokens: 80000,
+                reasoningOutputTokens: 0
+            },
+            {
+                provider: 'maxx',
+                model: 'gpt-5.3-codex',
+                totalTokens: 120000,
+                inputTokens: undefined,
+                cachedInputTokens: 0,
+                outputTokens: undefined,
+                reasoningOutputTokens: 0
+            }
+        ],
+        sessionsUsageTimeRange: '7d',
+        providersList: [],
+        currentProvider: 'maxx'
+    });
+
+    const costCard = cards.find((card) => card.key === 'estimated-cost');
+    assert(costCard, 'missing estimated cost summary card');
+    assert.strictEqual(costCard.value, '暂无');
+    assert.ok(!costCard.note);
+    assert.match(costCard.title, /缺少可匹配的模型单价或 token 拆分/);
+});
+
+test('sessionUsageSummaryCards estimates usage cost from configured provider pricing', () => {
+    const computed = createSessionComputed();
+    const cards = computed.sessionUsageSummaryCards.call({
+        sessionUsageCharts: {
+            summary: {
+                totalSessions: 2,
+                totalMessages: 10,
+                totalTokens: 600000,
+                totalContextWindow: 256000,
+                activeDurationMs: 90 * 60 * 1000,
+                totalDurationMs: 3 * 24 * 60 * 60 * 1000,
+                activeDays: 2,
+                avgMessagesPerSession: 5,
+                busiestDay: null,
+                busiestHour: null
+            }
+        },
+        sessionsUsageList: [
+            {
+                provider: 'maxx',
+                model: 'gpt-5.3-codex',
+                totalTokens: 400000,
+                inputTokens: 300000,
+                cachedInputTokens: 100000,
+                outputTokens: 50000,
+                reasoningOutputTokens: 50000
+            },
+            {
+                provider: 'maxx',
+                model: 'unknown-model',
+                totalTokens: 200000,
+                inputTokens: 100000,
+                cachedInputTokens: 0,
+                outputTokens: 100000,
+                reasoningOutputTokens: 0
+            }
+        ],
+        providersList: [
+            {
+                name: 'maxx',
+                models: [
+                    {
+                        id: 'gpt-5.3-codex',
+                        cost: {
+                            input: 2,
+                            output: 8,
+                            cacheRead: 0.5,
+                            cacheWrite: 0
+                        }
+                    }
+                ]
+            }
+        ],
+        currentProvider: 'maxx'
+    });
+
+    const costCard = cards.find((card) => card.key === 'estimated-cost');
+    const activeDurationCard = cards.find((card) => card.key === 'active-duration');
+    const totalDurationCard = cards.find((card) => card.key === 'total-duration');
+    assert(costCard, 'missing estimated cost summary card');
+    assert(activeDurationCard, 'missing active duration summary card');
+    assert(totalDurationCard, 'missing total duration summary card');
+    assert.strictEqual(costCard.value, '$1.25');
+    assert.strictEqual(costCard.label, '预估费用 · 近 7 天');
+    assert.ok(!costCard.note);
+    assert.match(costCard.title, /覆盖 1\/2 个会话/);
+    assert.match(costCard.title, /约 67% token/);
+    assert.strictEqual(activeDurationCard.value, '1时30分');
+    assert.strictEqual(totalDurationCard.value, '3天');
+});
+
+test('sessionUsageSummaryCards falls back to public catalog pricing when provider config omits models.cost', () => {
+    const computed = createSessionComputed();
+    const cards = computed.sessionUsageSummaryCards.call({
+        sessionUsageCharts: {
+            summary: {
+                totalSessions: 1,
+                totalMessages: 4,
+                totalTokens: 400000,
+                totalContextWindow: 258400,
+                activeDurationMs: 30 * 60 * 1000,
+                totalDurationMs: 30 * 60 * 1000,
+                activeDays: 1,
+                avgMessagesPerSession: 4,
+                busiestDay: null,
+                busiestHour: null
+            }
+        },
+        sessionsUsageList: [
+            {
+                provider: 'maxx',
+                model: 'gpt-5.3-codex',
+                totalTokens: 400000,
+                inputTokens: 300000,
+                cachedInputTokens: 100000,
+                outputTokens: 100000,
+                reasoningOutputTokens: 0
+            }
+        ],
+        providersList: [],
+        currentProvider: 'maxx'
+    });
+
+    const costCard = cards.find((card) => card.key === 'estimated-cost');
+    assert(costCard, 'missing estimated cost summary card');
+    assert.strictEqual(costCard.value, '$1.77');
+    assert.strictEqual(costCard.label, '预估费用 · 近 7 天');
+    assert.ok(!costCard.note);
+    assert.match(costCard.title, /按公开模型目录估算/);
+    assert.match(costCard.title, /覆盖 1\/1 个会话/);
+});
+
+test('sessionUsageSummaryCards excludes Claude sessions from estimated cost coverage', () => {
+    const computed = createSessionComputed();
+    const cards = computed.sessionUsageSummaryCards.call({
+        sessionUsageCharts: {
+            summary: {
+                totalSessions: 2,
+                totalMessages: 8,
+                totalTokens: 650000,
+                totalContextWindow: 258400,
+                activeDurationMs: 50 * 60 * 1000,
+                totalDurationMs: 50 * 60 * 1000,
+                activeDays: 1,
+                avgMessagesPerSession: 4,
+                busiestDay: null,
+                busiestHour: null
+            }
+        },
+        sessionsUsageList: [
+            {
+                source: 'codex',
+                provider: 'maxx',
+                model: 'gpt-5.3-codex',
+                totalTokens: 400000,
+                inputTokens: 300000,
+                cachedInputTokens: 100000,
+                outputTokens: 100000,
+                reasoningOutputTokens: 0
+            },
+            {
+                source: 'claude',
+                provider: 'claude',
+                model: 'claude-3-7-sonnet',
+                totalTokens: 250000,
+                inputTokens: 150000,
+                cachedInputTokens: 0,
+                outputTokens: 100000,
+                reasoningOutputTokens: 0
+            }
+        ],
+        providersList: [],
+        currentProvider: 'maxx'
+    });
+
+    const costCard = cards.find((card) => card.key === 'estimated-cost');
+    assert(costCard, 'missing estimated cost summary card');
+    assert.strictEqual(costCard.value, '$1.77');
+    assert.ok(!costCard.note);
+    assert.match(costCard.title, /暂不含 Claude/);
+    assert.match(costCard.title, /覆盖 1\/1 个会话/);
+});
+
+test('sessionUsageSummaryCards respects configured zero-cost pricing instead of falling back to catalog rates', () => {
+    const computed = createSessionComputed();
+    const cards = computed.sessionUsageSummaryCards.call({
+        sessionUsageCharts: {
+            summary: {
+                totalSessions: 1,
+                totalMessages: 4,
+                totalTokens: 400000,
+                totalContextWindow: 258400,
+                activeDurationMs: 30 * 60 * 1000,
+                totalDurationMs: 30 * 60 * 1000,
+                activeDays: 1,
+                avgMessagesPerSession: 4,
+                busiestDay: null,
+                busiestHour: null
+            }
+        },
+        sessionsUsageList: [
+            {
+                provider: 'maxx',
+                model: 'gpt-5.3-codex',
+                totalTokens: 400000,
+                inputTokens: 300000,
+                cachedInputTokens: 100000,
+                outputTokens: 100000,
+                reasoningOutputTokens: 0
+            }
+        ],
+        providersList: [
+            {
+                name: 'maxx',
+                models: [
+                    {
+                        id: 'gpt-5.3-codex',
+                        cost: {
+                            input: 0,
+                            output: 0,
+                            cacheRead: 0,
+                            cacheWrite: 0
+                        }
+                    }
+                ]
+            }
+        ],
+        currentProvider: 'maxx'
+    });
+
+    const costCard = cards.find((card) => card.key === 'estimated-cost');
+    assert(costCard, 'missing estimated cost summary card');
+    assert.strictEqual(costCard.value, '$0.00');
+    assert.ok(!costCard.note);
+    assert.match(costCard.title, /按已配置单价估算/);
+});
+
+test('sessionUsageSummaryCards uses fallback token totals when totalTokens is missing', () => {
+    const computed = createSessionComputed();
+    const cards = computed.sessionUsageSummaryCards.call({
+        sessionUsageCharts: {
+            summary: {
+                totalSessions: 1,
+                totalMessages: 4,
+                totalTokens: 0,
+                totalContextWindow: 258400,
+                activeDurationMs: 30 * 60 * 1000,
+                totalDurationMs: 30 * 60 * 1000,
+                activeDays: 1,
+                avgMessagesPerSession: 4,
+                busiestDay: null,
+                busiestHour: null
+            }
+        },
+        sessionsUsageList: [
+            {
+                provider: 'maxx',
+                model: 'gpt-5.3-codex',
+                inputTokens: 300000,
+                cachedInputTokens: 100000,
+                outputTokens: 100000,
+                reasoningOutputTokens: 0
+            }
+        ],
+        providersList: [],
+        currentProvider: 'maxx'
+    });
+
+    const costCard = cards.find((card) => card.key === 'estimated-cost');
+    assert(costCard, 'missing estimated cost summary card');
+    assert.strictEqual(costCard.value, '$1.77');
+    assert.ok(!costCard.note);
+    assert.match(costCard.title, /约 100% token/);
+});
+
+test('sessionUsageSummaryCards recalculates estimated cost from the selected usage range', () => {
+    const computed = createSessionComputed();
+    const sessions = [
+        {
+            source: 'codex',
+            provider: 'maxx',
+            model: 'gpt-5.3-codex',
+            createdAt: '2026-04-06T07:30:00.000Z',
+            updatedAt: '2026-04-06T08:00:00.000Z',
+            messageCount: 4,
+            totalTokens: 400000,
+            inputTokens: 300000,
+            cachedInputTokens: 100000,
+            outputTokens: 100000,
+            reasoningOutputTokens: 0,
+            contextWindow: 258400
+        },
+        {
+            source: 'codex',
+            provider: 'maxx',
+            model: 'gpt-5.3-codex',
+            createdAt: '2026-02-01T07:30:00.000Z',
+            updatedAt: '2026-02-01T08:00:00.000Z',
+            messageCount: 4,
+            totalTokens: 800000,
+            inputTokens: 400000,
+            cachedInputTokens: 0,
+            outputTokens: 400000,
+            reasoningOutputTokens: 0,
+            contextWindow: 258400
+        }
+    ];
+    const cards = computed.sessionUsageSummaryCards.call({
+        sessionUsageCharts: buildUsageChartGroups(sessions, {
+            range: '30d',
+            now: Date.UTC(2026, 3, 6, 12, 0, 0)
+        }),
+        sessionsUsageList: sessions,
+        sessionsUsageTimeRange: '30d',
+        providersList: [],
+        currentProvider: 'maxx'
+    });
+
+    const costCard = cards.find((card) => card.key === 'estimated-cost');
+    assert(costCard, 'missing estimated cost summary card');
+    assert.strictEqual(costCard.value, '$1.77');
+    assert.strictEqual(costCard.label, '预估费用 · 近 30 天');
+    assert.ok(!costCard.note);
+    assert.match(costCard.title, /覆盖 1\/1 个会话/);
+});
+
+test('sessionUsageSummaryCards shows a distinct all-range estimated cost when older sessions exist', () => {
+    const computed = createSessionComputed();
+    const sessions = [
+        {
+            source: 'codex',
+            provider: 'maxx',
+            model: 'gpt-5.3-codex',
+            createdAt: '2026-04-10T07:30:00.000Z',
+            updatedAt: '2026-04-10T08:00:00.000Z',
+            messageCount: 4,
+            totalTokens: 400000,
+            inputTokens: 300000,
+            cachedInputTokens: 100000,
+            outputTokens: 100000,
+            reasoningOutputTokens: 0,
+            contextWindow: 258400
+        },
+        {
+            source: 'codex',
+            provider: 'maxx',
+            model: 'gpt-5.3-codex',
+            createdAt: '2026-02-01T07:30:00.000Z',
+            updatedAt: '2026-02-01T08:00:00.000Z',
+            messageCount: 4,
+            totalTokens: 800000,
+            inputTokens: 400000,
+            cachedInputTokens: 0,
+            outputTokens: 400000,
+            reasoningOutputTokens: 0,
+            contextWindow: 258400
+        }
+    ];
+    const cards = computed.sessionUsageSummaryCards.call({
+        sessionUsageCharts: buildUsageChartGroups(sessions, {
+            range: 'all',
+            now: Date.UTC(2026, 3, 12, 12, 0, 0)
+        }),
+        sessionsUsageList: sessions,
+        sessionsUsageTimeRange: 'all',
+        providersList: [],
+        currentProvider: 'maxx'
+    });
+
+    const costCard = cards.find((card) => card.key === 'estimated-cost');
+    assert(costCard, 'missing estimated cost summary card');
+    assert.strictEqual(costCard.value, '$8.07');
+    assert.strictEqual(costCard.label, '预估费用 · 全部');
+    assert.ok(!costCard.note);
+    assert.match(costCard.title, /估算 \$8\.07/);
+    assert.match(costCard.title, /覆盖 2\/2 个会话/);
 });
 
 test('activeSessionVisibleMessages falls back to the initial preview batch before priming completes', () => {
@@ -862,4 +1463,246 @@ test('buildSessionTimelineNodes clamps maxMarkers into 1..80 and falls back on n
         assert.strictEqual(last.endIndex, messages.length - 1);
         assert.ok(last.safePercent >= 6 && last.safePercent <= 94);
     }
+});
+
+test('taskOrchestrationDraftReadiness highlights missing workflow ids and preview needs', () => {
+    const computed = createMainTabsComputed();
+    const context = {
+        taskOrchestration: {
+            target: '批量检查配置并整理结果',
+            notes: '',
+            workflowIdsText: '',
+            followUpsText: '整理结论',
+            selectedEngine: 'workflow',
+            allowWrite: true,
+            dryRun: false,
+            plan: null,
+            planIssues: [],
+            planWarnings: []
+        }
+    };
+    context.taskOrchestrationDraftMetrics = computed.taskOrchestrationDraftMetrics.call(context);
+    context.taskOrchestrationDraftChecklist = computed.taskOrchestrationDraftChecklist.call(context);
+    const readiness = computed.taskOrchestrationDraftReadiness.call(context);
+
+    assert.strictEqual(readiness.tone, 'warn');
+    assert.strictEqual(readiness.title, '缺少 Workflow');
+    assert.match(readiness.summary, /还没指定可复用流程/);
+    assert.strictEqual(context.taskOrchestrationDraftChecklist[1].done, false);
+    assert.match(context.taskOrchestrationDraftChecklist[2].detail, /建议补说明/);
+});
+
+test('taskOrchestrationDraftReadiness marks ready plans as executable', () => {
+    const computed = createMainTabsComputed();
+    const context = {
+        taskOrchestration: {
+            target: '修复 review 评论并补回归测试',
+            notes: '不要改无关模块',
+            workflowIdsText: '',
+            followUpsText: '更新 PR 摘要\n继续看新增 review',
+            selectedEngine: 'codex',
+            allowWrite: true,
+            dryRun: false,
+            plan: {
+                nodes: [{ id: 'node-1' }, { id: 'node-2' }]
+            },
+            planIssues: [],
+            planWarnings: []
+        }
+    };
+    context.taskOrchestrationDraftMetrics = computed.taskOrchestrationDraftMetrics.call(context);
+    context.taskOrchestrationDraftChecklist = computed.taskOrchestrationDraftChecklist.call(context);
+    const readiness = computed.taskOrchestrationDraftReadiness.call(context);
+
+    assert.strictEqual(readiness.tone, 'success');
+    assert.strictEqual(readiness.title, '可以执行');
+    assert.strictEqual(context.taskOrchestrationDraftMetrics.followUpCount, 2);
+    assert.strictEqual(context.taskOrchestrationDraftChecklist[3].done, true);
+});
+
+test('appendTaskWorkflowId deduplicates ids and forces workflow engine', () => {
+    const methods = createTaskOrchestrationMethods({ api: async () => ({}) });
+    const context = {
+        taskOrchestration: {
+            workflowIdsText: 'diagnose-config',
+            selectedEngine: 'codex'
+        },
+        ensureTaskOrchestrationState: methods.ensureTaskOrchestrationState
+    };
+
+    methods.appendTaskWorkflowId.call(context, 'safe-provider-switch');
+    methods.appendTaskWorkflowId.call(context, 'diagnose-config');
+
+    assert.strictEqual(context.taskOrchestration.selectedEngine, 'workflow');
+    assert.strictEqual(context.taskOrchestration.workflowIdsText, 'diagnose-config\nsafe-provider-switch');
+});
+
+test('ensureTaskOrchestrationState creates workbench defaults including workspaceTab', () => {
+    const methods = createTaskOrchestrationMethods({ api: async () => ({}) });
+    const context = {};
+    const state = methods.ensureTaskOrchestrationState.call(context);
+
+    assert.strictEqual(state.workspaceTab, 'queue');
+    assert.strictEqual(state.selectedRunError, '');
+    assert.strictEqual(state.detailRequestToken, 0);
+    assert.deepStrictEqual(state.overviewWarnings, []);
+});
+
+test('ensureTaskOrchestrationState backfills missing workbench fields on existing state', () => {
+    const methods = createTaskOrchestrationMethods({ api: async () => ({}) });
+    const context = {
+        taskOrchestration: {
+            target: 'keep-me',
+            workspaceTab: 'runs'
+        }
+    };
+
+    const state = methods.ensureTaskOrchestrationState.call(context);
+
+    assert.strictEqual(state.target, 'keep-me');
+    assert.strictEqual(state.workspaceTab, 'runs');
+    assert.strictEqual(state.selectedRunError, '');
+    assert.strictEqual(state.detailRequestToken, 0);
+    assert.deepStrictEqual(state.overviewWarnings, []);
+});
+
+test('taskOrchestrationSelectedRunNodes prefers top-level detail nodes when present', () => {
+    const computed = createMainTabsComputed();
+    const context = {
+        taskOrchestrationSelectedRun: {
+            run: {
+                nodes: [{ id: 'run-node' }]
+            },
+            nodes: [{ id: 'detail-node' }]
+        }
+    };
+
+    const nodes = computed.taskOrchestrationSelectedRunNodes.call(context);
+
+    assert.deepStrictEqual(nodes, [{ id: 'detail-node' }]);
+});
+
+test('taskOrchestrationQueueStats counts queue statuses in one pass without changing totals', () => {
+    const computed = createMainTabsComputed();
+    const context = {
+        taskOrchestration: {
+            queue: [
+                { status: 'queued' },
+                { status: ' queued ' },
+                { status: 'running' },
+                { status: 'FAILED' },
+                { status: 'ignored' }
+            ]
+        }
+    };
+
+    const stats = computed.taskOrchestrationQueueStats.call(context);
+
+    assert.deepStrictEqual(stats, {
+        queued: 2,
+        running: 1,
+        failed: 1
+    });
+});
+
+test('startTaskQueueRunner surfaces already-running queue state distinctly', async () => {
+    const api = async (name) => {
+        if (name === 'task-queue-start') {
+            return { started: false, alreadyRunning: true };
+        }
+        if (name === 'task-overview') {
+            return { queue: [], runs: [], workflows: [], warnings: [] };
+        }
+        return {};
+    };
+    const methods = createTaskOrchestrationMethods({ api });
+    const messages = [];
+    const context = {
+        ensureTaskOrchestrationState: methods.ensureTaskOrchestrationState,
+        loadTaskOrchestrationOverview: methods.loadTaskOrchestrationOverview,
+        syncTaskOrchestrationPolling() {},
+        showMessage(message, tone) {
+            messages.push({ message, tone });
+        }
+    };
+    context.taskOrchestration = methods.ensureTaskOrchestrationState.call(context);
+
+    await methods.startTaskQueueRunner.call(context);
+
+    assert.deepStrictEqual(messages, [
+        {
+            message: '队列执行器已在运行',
+            tone: 'success'
+        }
+    ]);
+});
+
+test('loadTaskOrchestrationOverview keeps selected run detail when overview slice omits it', async () => {
+    const methods = createTaskOrchestrationMethods({
+        api: async (name) => {
+            if (name === 'task-overview') {
+                return {
+                    runs: [{ runId: 'run-new', status: 'running' }],
+                    queue: [],
+                    workflows: [],
+                    warnings: []
+                };
+            }
+            throw new Error(`unexpected api call: ${name}`);
+        }
+    });
+    const context = {
+        ensureTaskOrchestrationState: methods.ensureTaskOrchestrationState,
+        loadTaskRunDetail: async () => null,
+        isTaskRunActive: () => false,
+        showMessage() {},
+        syncTaskOrchestrationPolling() {}
+    };
+    context.taskOrchestration = methods.ensureTaskOrchestrationState.call(context);
+    context.taskOrchestration.selectedRunId = 'run-old';
+    context.taskOrchestration.selectedRunDetail = { run: { runId: 'run-old', status: 'success' }, nodes: [{ id: 'kept' }] };
+
+    await methods.loadTaskOrchestrationOverview.call(context, { silent: true, includeDetail: false });
+
+    assert.strictEqual(context.taskOrchestration.selectedRunId, 'run-old');
+    assert.strictEqual(context.taskOrchestration.selectedRunDetail.run.runId, 'run-old');
+});
+
+test('selectTaskRun switches workbench to detail and keeps latest detail response only', async () => {
+    const deferred = [];
+    const api = async (name, payload) => {
+        if (name !== 'task-run-detail') {
+            return {};
+        }
+        let resolve;
+        const promise = new Promise((nextResolve) => {
+            resolve = nextResolve;
+        });
+        deferred.push({ payload, resolve });
+        return promise;
+    };
+    const methods = createTaskOrchestrationMethods({ api });
+    const context = {
+        ensureTaskOrchestrationState: methods.ensureTaskOrchestrationState,
+        loadTaskRunDetail: methods.loadTaskRunDetail,
+        selectTaskRun: methods.selectTaskRun,
+        showMessage() {},
+        syncTaskOrchestrationPolling() {}
+    };
+    context.taskOrchestration = methods.ensureTaskOrchestrationState.call(context);
+
+    const firstRequest = methods.selectTaskRun.call(context, 'run-1');
+    const secondRequest = methods.selectTaskRun.call(context, 'run-2');
+
+    assert.strictEqual(context.taskOrchestration.workspaceTab, 'detail');
+    assert.strictEqual(context.taskOrchestration.selectedRunId, 'run-2');
+    assert.strictEqual(deferred.length, 2);
+
+    deferred[1].resolve({ run: { runId: 'run-2', status: 'running' }, nodes: [] });
+    await secondRequest;
+    deferred[0].resolve({ run: { runId: 'run-1', status: 'failed' }, nodes: [{ id: 'stale' }] });
+    await firstRequest;
+
+    assert.strictEqual(context.taskOrchestration.selectedRunDetail.run.runId, 'run-2');
+    assert.strictEqual(context.taskOrchestration.selectedRunError, '');
 });

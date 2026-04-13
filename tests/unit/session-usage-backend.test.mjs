@@ -30,6 +30,25 @@ const setSessionInventoryCacheSrc = extractFunction(cliContent, 'setSessionInven
 const listSessionInventoryBySourceSrc = extractFunction(cliContent, 'listSessionInventoryBySource');
 const listSessionPathsSrc = extractFunction(cliContent, 'listSessionPaths');
 const resolveSessionFilePathSrc = extractFunction(cliContent, 'resolveSessionFilePath');
+const getFileHeadTextSrc = extractFunction(cliContent, 'getFileHeadText');
+const getFileTailTextSrc = extractFunction(cliContent, 'getFileTailText');
+const parseJsonlContentSrc = extractFunction(cliContent, 'parseJsonlContent');
+const parseJsonlHeadRecordsSrc = extractFunction(cliContent, 'parseJsonlHeadRecords');
+const parseJsonlTailRecordsSrc = extractFunction(cliContent, 'parseJsonlTailRecords');
+const isSessionSummaryMessageCountExactSrc = extractFunction(cliContent, 'isSessionSummaryMessageCountExact');
+const removeLeadingSystemMessageSrc = extractFunction(cliContent, 'removeLeadingSystemMessage');
+const readNonNegativeIntegerSrc = extractFunction(cliContent, 'readNonNegativeInteger');
+const readTotalTokensFromUsageSrc = extractFunction(cliContent, 'readTotalTokensFromUsage');
+const readUsageTotalsFromUsageSrc = extractFunction(cliContent, 'readUsageTotalsFromUsage');
+const readContextWindowValueSrc = extractFunction(cliContent, 'readContextWindowValue');
+const applyUsageTotalsToStateSrc = extractFunction(cliContent, 'applyUsageTotalsToState');
+const readSessionModelsFromRecordSrc = extractFunction(cliContent, 'readSessionModelsFromRecord');
+const readSessionModelFromRecordSrc = extractFunction(cliContent, 'readSessionModelFromRecord');
+const readExplicitSessionProviderFromRecordSrc = extractFunction(cliContent, 'readExplicitSessionProviderFromRecord');
+const readSessionProviderFromRecordSrc = extractFunction(cliContent, 'readSessionProviderFromRecord');
+const applySessionUsageSummaryFromRecordSrc = extractFunction(cliContent, 'applySessionUsageSummaryFromRecord');
+const parseCodexSessionSummarySrc = extractFunction(cliContent, 'parseCodexSessionSummary');
+const parseClaudeSessionSummarySrc = extractFunction(cliContent, 'parseClaudeSessionSummary');
 
 function instantiateListSessionUsage(bindings = {}) {
     const bindingNames = Object.keys(bindings);
@@ -111,6 +130,7 @@ test('listSessionUsage uses lightweight session listing without exact hydration'
             {
                 source: 'codex',
                 sessionId: 'sess-1',
+                model: 'gpt-5.3-codex',
                 messageCount: 12,
                 totalTokens: 345,
                 contextWindow: 128000,
@@ -123,9 +143,17 @@ test('listSessionUsage uses lightweight session listing without exact hydration'
         throw new Error('should not call listAllSessionsData');
     };
     const listSessionUsage = instantiateListSessionUsage({
-        MAX_SESSION_LIST_SIZE: 300,
+        fs,
+        MAX_SESSION_USAGE_LIST_SIZE: 2000,
         listSessionBrowse,
-        listAllSessionsData
+        listAllSessionsData,
+        SESSION_BROWSE_SUMMARY_READ_BYTES: 65536,
+        parseCodexSessionSummary() {
+            throw new Error('should not parse codex summary when model is already present');
+        },
+        parseClaudeSessionSummary() {
+            throw new Error('should not parse claude summary when model is not needed');
+        }
     });
 
     const result = await listSessionUsage({
@@ -151,6 +179,8 @@ test('listSessionUsage uses lightweight session listing without exact hydration'
         {
             source: 'codex',
             sessionId: 'sess-1',
+            model: 'gpt-5.3-codex',
+            models: ['gpt-5.3-codex'],
             messageCount: 12,
             totalTokens: 345,
             contextWindow: 128000
@@ -165,8 +195,16 @@ test('listSessionUsage normalizes source and default limit for lightweight usage
         return [];
     };
     const listSessionUsage = instantiateListSessionUsage({
-        MAX_SESSION_LIST_SIZE: 300,
+        fs,
+        MAX_SESSION_USAGE_LIST_SIZE: 2000,
         listSessionBrowse,
+        SESSION_BROWSE_SUMMARY_READ_BYTES: 65536,
+        parseCodexSessionSummary() {
+            return null;
+        },
+        parseClaudeSessionSummary() {
+            return null;
+        },
         listAllSessionsData: async () => {
             throw new Error('should not call listAllSessionsData');
         }
@@ -182,15 +220,434 @@ test('listSessionUsage normalizes source and default limit for lightweight usage
     assert.deepStrictEqual(calls, [
         {
             source: 'all',
-            limit: 300,
+            limit: 2000,
             forceRefresh: true
         },
         {
             source: 'all',
-            limit: 200,
+            limit: 2000,
             forceRefresh: false
         }
     ]);
+});
+
+test('listSessionUsage backfills missing model metadata from parsed session summaries', async () => {
+    const codexParses = [];
+    const claudeParses = [];
+    const listSessionUsage = instantiateListSessionUsage({
+        fs,
+        MAX_SESSION_USAGE_LIST_SIZE: 2000,
+        SESSION_BROWSE_SUMMARY_READ_BYTES: 65536,
+        async listSessionBrowse() {
+            return [
+                {
+                    source: 'codex',
+                    sessionId: 'codex-1',
+                    filePath: '/tmp/codex-1.jsonl',
+                    provider: 'maxx'
+                },
+                {
+                    source: 'claude',
+                    sessionId: 'claude-1',
+                    filePath: '/tmp/claude-1.jsonl'
+                },
+                {
+                    source: 'codex',
+                    sessionId: 'codex-2',
+                    filePath: '/tmp/codex-2.jsonl',
+                    model: 'already-there'
+                }
+            ];
+        },
+        parseCodexSessionSummary(filePath, options) {
+            codexParses.push({ filePath, options });
+            return filePath === '/tmp/codex-1.jsonl'
+                ? { model: 'gpt-5.3-codex', models: ['gpt-5.3-codex', 'gpt-5.2-codex'], provider: 'maxx' }
+                : null;
+        },
+        parseClaudeSessionSummary(filePath, options) {
+            claudeParses.push({ filePath, options });
+            return filePath === '/tmp/claude-1.jsonl'
+                ? { model: 'claude-3-7-sonnet', models: ['claude-3-7-sonnet'], provider: 'claude' }
+                : null;
+        },
+        listAllSessionsData: async () => {
+            throw new Error('should not call listAllSessionsData');
+        }
+    });
+
+    const result = await listSessionUsage({ source: 'all', limit: 50, forceRefresh: true });
+
+    assert.strictEqual(result[0].model, 'gpt-5.3-codex');
+    assert.deepStrictEqual(result[0].models, ['gpt-5.3-codex', 'gpt-5.2-codex']);
+    assert.strictEqual(result[0].provider, 'maxx');
+    assert.strictEqual(result[1].model, 'claude-3-7-sonnet');
+    assert.deepStrictEqual(result[1].models, ['claude-3-7-sonnet']);
+    assert.strictEqual(result[1].provider, 'claude');
+    assert.strictEqual(result[2].model, 'already-there');
+    assert.deepStrictEqual(codexParses, [
+        {
+            filePath: '/tmp/codex-1.jsonl',
+            options: { summaryReadBytes: 65536, titleReadBytes: 65536 }
+        }
+    ]);
+    assert.deepStrictEqual(claudeParses, [
+        {
+            filePath: '/tmp/claude-1.jsonl',
+            options: { summaryReadBytes: 65536, titleReadBytes: 65536 }
+        }
+    ]);
+});
+
+test('listSessionUsage ignores entries without concrete model names or with <synthetic> placeholders', async () => {
+    const parseCodexSessionSummaryCalls = [];
+    const listSessionUsage = instantiateListSessionUsage({
+        fs,
+        MAX_SESSION_USAGE_LIST_SIZE: 2000,
+        SESSION_BROWSE_SUMMARY_READ_BYTES: 65536,
+        async listSessionBrowse() {
+            return [
+                {
+                    source: 'codex',
+                    sessionId: 'missing-model',
+                    filePath: '/tmp/missing-model.jsonl',
+                    provider: 'maxx'
+                },
+                {
+                    source: 'codex',
+                    sessionId: 'synthetic-model',
+                    model: '<synthetic>',
+                    models: ['<synthetic>'],
+                    filePath: '/tmp/synthetic-model.jsonl'
+                },
+                {
+                    source: 'codex',
+                    sessionId: 'real-model',
+                    model: 'gpt-5.3-codex',
+                    filePath: '/tmp/real-model.jsonl'
+                }
+            ];
+        },
+        parseCodexSessionSummary(filePath) {
+            parseCodexSessionSummaryCalls.push(filePath);
+            return null;
+        },
+        parseClaudeSessionSummary() {
+            return null;
+        },
+        listAllSessionsData: async () => {
+            throw new Error('should not call listAllSessionsData');
+        }
+    });
+
+    const result = await listSessionUsage({ source: 'codex', limit: 50, forceRefresh: true });
+
+    assert.deepStrictEqual(result.map((item) => item.sessionId), ['real-model']);
+    assert.deepStrictEqual(parseCodexSessionSummaryCalls, ['/tmp/missing-model.jsonl', '/tmp/synthetic-model.jsonl']);
+});
+
+test('listSessionUsage scans the full session file so middle model names are not dropped', async () => {
+    const tempDir = fs.mkdtempSync(path.join(__dirname, 'tmp-session-model-scan-'));
+    const filePath = path.join(tempDir, 'codex-middle.jsonl');
+    const fillerLine = JSON.stringify({
+        timestamp: '2026-04-12T09:07:40.000Z',
+        type: 'log',
+        payload: { message: 'x'.repeat(256) }
+    });
+    const fillerLines = Array.from({ length: 320 }, () => fillerLine);
+    fs.writeFileSync(filePath, [
+        JSON.stringify({
+            timestamp: '2026-04-12T09:07:24.127Z',
+            type: 'session_meta',
+            payload: { id: 'codex-middle', cwd: '/repo' }
+        }),
+        ...fillerLines,
+        JSON.stringify({
+            timestamp: '2026-04-12T09:08:00.000Z',
+            type: 'turn_context',
+            payload: { model: 'gpt-5.3-codex' }
+        }),
+        JSON.stringify({
+            timestamp: '2026-04-12T09:09:00.000Z',
+            type: 'event_msg',
+            payload: { info: { model_name: 'gpt-5.2-codex' } }
+        })
+    ].join('\n'));
+    assert(fs.statSync(filePath).size > 65536, 'fixture should exceed head-read window');
+
+    const codexParses = [];
+    const listSessionUsage = instantiateListSessionUsage({
+        fs,
+        MAX_SESSION_USAGE_LIST_SIZE: 2000,
+        SESSION_BROWSE_SUMMARY_READ_BYTES: 65536,
+        async listSessionBrowse() {
+            return [
+                {
+                    source: 'codex',
+                    sessionId: 'codex-middle',
+                    filePath,
+                    model: 'gpt-5.3-codex'
+                }
+            ];
+        },
+        parseCodexSessionSummary(...args) {
+            codexParses.push(args);
+            return null;
+        },
+        parseClaudeSessionSummary() {
+            return null;
+        },
+        listAllSessionsData: async () => {
+            throw new Error('should not call listAllSessionsData');
+        }
+    });
+
+    try {
+        const result = await listSessionUsage({ source: 'codex', limit: 50, forceRefresh: true });
+        assert.deepStrictEqual(result[0].models, ['gpt-5.3-codex', 'gpt-5.2-codex']);
+        assert.strictEqual(result[0].model, 'gpt-5.3-codex');
+        assert.deepStrictEqual(codexParses, []);
+    } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+});
+
+test('readSessionModelsFromRecord scans nested model keys without treating provider as model', () => {
+    const readSessionModelsFromRecord = instantiateFunctionBundle(
+        [readSessionModelsFromRecordSrc],
+        'readSessionModelsFromRecord'
+    );
+
+    const result = readSessionModelsFromRecord({
+        payload: {
+            model_provider: 'maxx',
+            info: {
+                selected_model: 'gpt-5.3-codex',
+                nested_models: ['gpt-5.2-codex', 'gpt-5.3-codex']
+            },
+            model_config: {
+                slug: 'gpt-5.1-codex-max'
+            }
+        },
+        message: {
+            model_name: 'gpt-5.3-codex'
+        }
+    });
+
+    assert.deepStrictEqual(result, ['gpt-5.3-codex', 'gpt-5.2-codex', 'gpt-5.1-codex-max']);
+});
+
+test('parseCodexSessionSummary reads token totals and model data from tail records', () => {
+    const parseCodexSessionSummary = instantiateFunctionBundle(
+        [
+            getFileHeadTextSrc,
+            getFileTailTextSrc,
+            parseJsonlContentSrc,
+            parseJsonlHeadRecordsSrc,
+            parseJsonlTailRecordsSrc,
+            isSessionSummaryMessageCountExactSrc,
+            removeLeadingSystemMessageSrc,
+            readNonNegativeIntegerSrc,
+            readTotalTokensFromUsageSrc,
+            readUsageTotalsFromUsageSrc,
+            readContextWindowValueSrc,
+            applyUsageTotalsToStateSrc,
+            readSessionModelsFromRecordSrc,
+            readSessionModelFromRecordSrc,
+            readExplicitSessionProviderFromRecordSrc,
+            readSessionProviderFromRecordSrc,
+            applySessionUsageSummaryFromRecordSrc,
+            parseCodexSessionSummarySrc
+        ],
+        'parseCodexSessionSummary',
+        {
+            fs,
+            path,
+            Buffer,
+            SESSION_SUMMARY_READ_BYTES: 512,
+            SESSION_TITLE_READ_BYTES: 512,
+            SESSION_USAGE_TAIL_READ_BYTES: 256,
+            toIsoTime(value, fallback = '') {
+                const date = new Date(value);
+                if (!Number.isFinite(date.getTime())) return fallback;
+                return date.toISOString();
+            },
+            updateLatestIso(current, next) {
+                const currentMs = Date.parse(current || '');
+                const nextMs = Date.parse(next || '');
+                if (!Number.isFinite(nextMs)) return current || '';
+                if (!Number.isFinite(currentMs) || nextMs > currentMs) return new Date(nextMs).toISOString();
+                return current || '';
+            },
+            normalizeRole(role) {
+                return typeof role === 'string' ? role.trim().toLowerCase() : '';
+            },
+            extractMessageText(content) {
+                if (typeof content === 'string') return content;
+                if (Array.isArray(content)) {
+                    return content.map((item) => item && item.text ? item.text : '').join(' ').trim();
+                }
+                return '';
+            },
+            truncateText(text) {
+                return typeof text === 'string' ? text : '';
+            },
+            isBootstrapLikeText() {
+                return false;
+            }
+        }
+    );
+
+    const tempDir = fs.mkdtempSync(path.join(__dirname, 'tmp-session-usage-'));
+    const filePath = path.join(tempDir, 'codex-tail.jsonl');
+    fs.writeFileSync(filePath, [
+        JSON.stringify({
+            timestamp: '2026-04-12T09:07:26.688Z',
+            type: 'session_meta',
+            payload: {
+                id: 'codex-tail',
+                timestamp: '2026-04-12T09:07:24.127Z',
+                cwd: '/repo',
+                model_provider: 'maxx'
+            }
+        }),
+        JSON.stringify({
+            timestamp: '2026-04-12T09:07:26.690Z',
+            type: 'response_item',
+            payload: {
+                type: 'message',
+                role: 'user',
+                content: [{ type: 'input_text', text: 'hello world' }]
+            }
+        }),
+        JSON.stringify({
+            timestamp: '2026-04-12T09:11:35.573Z',
+            type: 'turn_context',
+            payload: {
+                model: 'gpt-5.2-codex',
+                model_context_window: 258400
+            }
+        }),
+        JSON.stringify({
+            timestamp: '2026-04-12T09:11:35.580Z',
+            type: 'event_msg',
+            payload: {
+                model: 'gpt-5.3-codex'
+            }
+        }),
+        JSON.stringify({
+            timestamp: '2026-04-12T09:11:35.588Z',
+            type: 'event_msg',
+            payload: {
+                type: 'token_count',
+                info: {
+                    total_token_usage: {
+                        input_tokens: 348969,
+                        cached_input_tokens: 305664,
+                        output_tokens: 3032,
+                        reasoning_output_tokens: 1515,
+                        total_tokens: 352001
+                    },
+                    model_context_window: 258400
+                }
+            }
+        })
+    ].join('\n'));
+
+    try {
+        const result = parseCodexSessionSummary(filePath, { summaryReadBytes: 512, titleReadBytes: 512 });
+        assert(result, 'expected codex session summary');
+        assert.strictEqual(result.provider, 'maxx');
+        assert.strictEqual(result.model, 'gpt-5.3-codex');
+        assert.deepStrictEqual(result.models, ['gpt-5.2-codex', 'gpt-5.3-codex']);
+        assert.strictEqual(result.totalTokens, 352001);
+        assert.strictEqual(result.inputTokens, 348969);
+        assert.strictEqual(result.cachedInputTokens, 305664);
+        assert.strictEqual(result.outputTokens, 3032);
+        assert.strictEqual(result.reasoningOutputTokens, 1515);
+        assert.strictEqual(result.contextWindow, 258400);
+    } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+});
+
+test('parseClaudeSessionSummary reads model from session index and tail records', () => {
+    const parseClaudeSessionSummary = instantiateFunctionBundle(
+        [
+            getFileHeadTextSrc,
+            getFileTailTextSrc,
+            parseJsonlContentSrc,
+            parseJsonlHeadRecordsSrc,
+            parseJsonlTailRecordsSrc,
+            isSessionSummaryMessageCountExactSrc,
+            removeLeadingSystemMessageSrc,
+            readNonNegativeIntegerSrc,
+            readTotalTokensFromUsageSrc,
+            readUsageTotalsFromUsageSrc,
+            readContextWindowValueSrc,
+            applyUsageTotalsToStateSrc,
+            readSessionModelsFromRecordSrc,
+            readSessionModelFromRecordSrc,
+            readExplicitSessionProviderFromRecordSrc,
+            readSessionProviderFromRecordSrc,
+            applySessionUsageSummaryFromRecordSrc,
+            parseClaudeSessionSummarySrc
+        ],
+        'parseClaudeSessionSummary',
+        {
+            fs,
+            path,
+            Buffer,
+            SESSION_SUMMARY_READ_BYTES: 512,
+            SESSION_TITLE_READ_BYTES: 512,
+            toIsoTime(value, fallback = '') {
+                const date = new Date(value);
+                if (!Number.isFinite(date.getTime())) return fallback;
+                return date.toISOString();
+            },
+            updateLatestIso(current, next) {
+                const currentMs = Date.parse(current || '');
+                const nextMs = Date.parse(next || '');
+                if (!Number.isFinite(nextMs)) return current || '';
+                if (!Number.isFinite(currentMs) || nextMs > currentMs) return new Date(nextMs).toISOString();
+                return current || '';
+            },
+            normalizeRole(role) {
+                return typeof role === 'string' ? role.trim().toLowerCase() : '';
+            },
+            extractMessageText(content) {
+                if (typeof content === 'string') return content;
+                if (Array.isArray(content)) {
+                    return content.map((item) => item && item.text ? item.text : '').join(' ').trim();
+                }
+                return '';
+            },
+            truncateText(text) {
+                return typeof text === 'string' ? text : '';
+            },
+            isBootstrapLikeText() {
+                return false;
+            }
+        }
+    );
+
+    const tempDir = fs.mkdtempSync(path.join(__dirname, 'tmp-session-usage-claude-'));
+    const filePath = path.join(tempDir, 'claude-tail.jsonl');
+    fs.writeFileSync(filePath, [
+        JSON.stringify({ type: 'user', message: { content: 'hello from claude' }, timestamp: '2026-04-12T09:07:26.690Z' }),
+        JSON.stringify({ type: 'assistant', message: { content: 'hi there', model: 'claude-3-5-sonnet' }, timestamp: '2026-04-12T09:07:27.690Z' }),
+        JSON.stringify({ type: 'assistant', message: { model: 'claude-3-7-sonnet', usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15 } }, timestamp: '2026-04-12T09:11:35.588Z' })
+    ].join('\n'));
+
+    try {
+        const result = parseClaudeSessionSummary(filePath, { summaryReadBytes: 512, titleReadBytes: 512 });
+        assert(result, 'expected claude session summary');
+        assert.strictEqual(result.model, 'claude-3-7-sonnet');
+        assert.deepStrictEqual(result.models, ['claude-3-5-sonnet', 'claude-3-7-sonnet']);
+        assert.strictEqual(result.totalTokens, 15);
+    } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+    }
 });
 
 test('listSessionInventoryBySource reuses cached summaries and registers session lookups', () => {

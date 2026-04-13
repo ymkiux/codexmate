@@ -346,13 +346,51 @@ document.addEventListener('DOMContentLoaded', () => {
                 claudeImportLoading: false,
                 codexImportLoading: false,
                 codexAuthProfiles: [],
-                forceCompactLayout: false
+                forceCompactLayout: false,
+                taskOrchestrationTabEnabled: false,
+                taskOrchestration: {
+                    loading: false,
+                    planning: false,
+                    running: false,
+                    queueAdding: false,
+                    queueStarting: false,
+                    retrying: false,
+                    target: '',
+                    title: '',
+                    notes: '',
+                    followUpsText: '',
+                    workflowIdsText: '',
+                    selectedEngine: 'codex',
+                    allowWrite: false,
+                    dryRun: false,
+                    concurrency: 2,
+                    autoFixRounds: 1,
+                    plan: null,
+                    planIssues: [],
+                    planWarnings: [],
+                    overviewWarnings: [],
+                    workflows: [],
+                    queue: [],
+                    runs: [],
+                    selectedRunId: '',
+                    workspaceTab: 'queue',
+                    selectedRunDetail: null,
+                    selectedRunLoading: false,
+                    selectedRunError: '',
+                    detailRequestToken: 0,
+                    lastLoadedAt: '',
+                    lastError: ''
+                },
+                _taskOrchestrationPollTimer: 0
             };
         },
 
         mounted() {
             this.initSessionStandalone();
             this.updateCompactLayoutMode();
+            if (!this.taskOrchestrationTabEnabled && this.mainTab === 'orchestration') {
+                this.mainTab = 'config';
+            }
             const savedSessionYolo = localStorage.getItem('codexmateSessionResumeYolo');
             if (savedSessionYolo === '0' || savedSessionYolo === 'false') {
                 this.sessionResumeWithYolo = false;
@@ -417,11 +455,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 this.currentOpenclawConfig = this.openclawConfigs['默认配置'] ? '默认配置' : configNames[0];
             }
             const runInitialLoad = () => {
-                const triggerLoad = () => {
+                const triggerLoad = async () => {
                     this._initialLoadTimer = 0;
+                    const startupOk = await this.loadAll();
+                    if (!startupOk) {
+                        return;
+                    }
                     void this.refreshClaudeSelectionFromSettings({ silent: true });
                     void this.syncDefaultOpenclawConfigEntry({ silent: true });
-                    void this.loadAll();
                 };
                 if (typeof requestAnimationFrame === 'function') {
                     this._initialLoadRafId = requestAnimationFrame(() => {
@@ -474,6 +515,7 @@ document.addEventListener('DOMContentLoaded', () => {
             window.removeEventListener('keydown', this.handleGlobalKeydown);
             window.removeEventListener('beforeunload', this.handleBeforeUnload);
             this.applyCompactLayoutClass(false);
+            this.stopTaskOrchestrationPolling();
             this.sessionPreviewScrollEl = null;
             this.sessionPreviewContainerEl = null;
             this.sessionPreviewHeaderEl = null;

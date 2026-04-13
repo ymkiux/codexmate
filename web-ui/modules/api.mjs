@@ -16,6 +16,26 @@ function buildApiResponseContext(action, res, contentType) {
     return `${action} (${res.status} ${res.statusText}, content-type: ${contentType || 'unknown'})`;
 }
 
+function formatUnexpectedApiBodySnippet(body, contentType) {
+    const raw = typeof body === 'string' ? body.trim() : '';
+    if (!raw) {
+        return '';
+    }
+    const normalizedContentType = String(contentType || '').toLowerCase();
+    const looksLikeHtml = normalizedContentType.includes('text/html')
+        || /<!doctype\s+html|<html[\s>]|<head[\s>]|<body[\s>]/i.test(raw);
+    if (looksLikeHtml) {
+        return '';
+    }
+    const singleLine = raw.replace(/\s+/g, ' ').trim();
+    if (!singleLine) {
+        return '';
+    }
+    return singleLine.length > 200
+        ? `${singleLine.slice(0, 197)}...`
+        : singleLine;
+}
+
 function withPayloadTooLargeErrorCode(res, payload) {
     if (res.status !== 413 || (payload && typeof payload === 'object' && payload.errorCode)) {
         return payload;
@@ -29,7 +49,8 @@ export async function api(action, params = {}) {
     if (contentType && !contentType.includes('application/json')) {
         const body = await res.text();
         const errorDetails = buildApiResponseContext(action, res, contentType);
-        const bodyDetails = body ? `: ${body}` : '';
+        const bodySnippet = formatUnexpectedApiBodySnippet(body, contentType);
+        const bodyDetails = bodySnippet ? `: ${bodySnippet}` : '';
         throw new Error(`Unexpected non-JSON API response for ${errorDetails}${bodyDetails}`);
     }
     try {

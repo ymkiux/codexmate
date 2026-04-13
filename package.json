@@ -1,7 +1,7 @@
 ﻿{
   "name": "codexmate",
   "version": "0.0.20",
-  "description": "Codex/Claude Code 配置与会话管理 CLI + Web 工具",
+  "description": "Codex/Claude Code/OpenClaw 配置、会话与任务编排 CLI + Web 工具",
   "main": "cli.js",
   "bin": {
     "codexmate": "./cli.js"
@@ -27,19 +27,19 @@
   "scripts": {
     "dev": "node cli.js run",
     "start": "node cli.js",
-    "reset": "node cmd/reset-main.js",
+    "reset": "node tools/dev/reset-main.js",
     "docs:dev": "node ./node_modules/vitepress/dist/node/cli.js dev site",
     "docs:build": "node ./node_modules/vitepress/dist/node/cli.js build site",
     "docs:preview": "node ./node_modules/vitepress/dist/node/cli.js preview site",
-    "ci:install": "node scripts/run-ci-check.js install",
-    "ci:lint": "node scripts/run-ci-check.js lint",
-    "ci:test": "node scripts/run-ci-check.js test",
-    "lint": "node scripts/lint.js",
+    "ci:install": "node tools/ci/run-check.js install",
+    "ci:lint": "node tools/ci/run-check.js lint",
+    "ci:test": "node tools/ci/run-check.js test",
+    "lint": "node tools/dev/lint.js",
     "test": "npm run test:unit && npm run test:e2e",
-    "test:ci": "node scripts/run-ci-check.js all",
+    "test:ci": "node tools/ci/run-check.js all",
     "test:unit": "node tests/unit/run.mjs",
     "test:e2e": "node tests/e2e/run.js",
-    "pretest": "node scripts/ensure-test-deps.js"
+    "pretest": "node tools/ci/ensure-test-deps.js"
   },
   "dependencies": {
     "@iarna/toml": "^2.2.5",
@@ -54,8 +54,11 @@
     "codex",
     "claude",
     "claude-code",
+    "openclaw",
     "config",
     "session",
+    "task-orchestration",
+    "workflow",
     "web-ui",
     "provider",
     "ai",

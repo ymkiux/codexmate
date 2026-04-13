@@ -7,11 +7,12 @@
                     :aria-labelledby="'tab-usage'">
                     <div class="usage-toolbar">
                         <div class="selector-header" style="padding:0;border:0;background:none;">
-                            <span class="selector-title">本地使用概览</span>
+                            <span class="selector-title">Usage 概览</span>
                         </div>
                         <div class="usage-range-group" role="group" aria-label="Usage 时间范围">
                             <button type="button" class="usage-range-btn" :class="{ active: sessionsUsageTimeRange === '7d' }" @click="sessionsUsageTimeRange = '7d'">近 7 天</button>
                             <button type="button" class="usage-range-btn" :class="{ active: sessionsUsageTimeRange === '30d' }" @click="sessionsUsageTimeRange = '30d'">近 30 天</button>
+                            <button type="button" class="usage-range-btn" :class="{ active: sessionsUsageTimeRange === 'all' }" @click="sessionsUsageTimeRange = 'all'">全部</button>
                             <button type="button" class="usage-range-btn" @click="loadSessionsUsage({ forceRefresh: true })" :disabled="sessionsUsageLoading">{{ sessionsUsageLoading ? '刷新中...' : '刷新统计' }}</button>
                         </div>
                     </div>
@@ -24,6 +25,7 @@
                             <div v-for="card in sessionUsageSummaryCards" :key="card.key" class="usage-summary-card">
                                 <div class="usage-summary-label">{{ card.label }}</div>
                                 <div class="usage-summary-value" :title="card.title || null">{{ card.value }}</div>
+                                <div v-if="card.note" class="usage-summary-note">{{ card.note }}</div>
                             </div>
                         </div>
 
@@ -79,6 +81,72 @@
                                         <div class="usage-list-subvalue">{{ item.value }} 会话 · {{ item.messageTotal }} 消息 · 均值 {{ item.avgMessages }}</div>
                                     </div>
                                 </div>
+                            </section>
+
+                            <section class="usage-card usage-card-models">
+                                <div class="usage-card-head">
+                                    <div>
+                                        <div class="usage-card-title">使用模型</div>
+                                        <div class="usage-card-subtitle">只列真实落盘的 model 名。</div>
+                                    </div>
+                                    <div class="usage-card-kicker">已识别 {{ sessionUsageCharts.modelCoverage.modeledSessions }}/{{ sessionUsageCharts.modelCoverage.totalSessions }}</div>
+                                </div>
+                                <div class="usage-model-coverage-strip">
+                                    <div class="usage-model-coverage-item">
+                                        <strong>{{ sessionUsageCharts.usedModels.length }}</strong>
+                                        <span>模型数</span>
+                                    </div>
+                                    <div class="usage-model-coverage-item">
+                                        <strong>{{ sessionUsageCharts.modelCoverage.coveragePercent }}%</strong>
+                                        <span>会话覆盖率</span>
+                                    </div>
+                                    <div class="usage-model-coverage-item">
+                                        <strong>{{ sessionUsageCharts.modelCoverage.missingModelSessions }}</strong>
+                                        <span>缺 model</span>
+                                    </div>
+                                </div>
+                                <div v-if="!sessionUsageCharts.usedModels.length" class="usage-diagnostic-empty">
+                                    <div class="usage-diagnostic-title">当前范围没读到模型名</div>
+                                    <div class="usage-diagnostic-copy">
+                                        已扫描 {{ sessionUsageCharts.modelCoverage.totalSessions }} 个会话，但原始记录里没有可识别的 model 字段。
+                                    </div>
+                                    <div v-if="sessionUsageCharts.modelCoverage.providerOnlySessions > 0" class="usage-diagnostic-meta">
+                                        其中 {{ sessionUsageCharts.modelCoverage.providerOnlySessions }} 个旧会话只写了 provider。
+                                    </div>
+                                </div>
+                                <template v-else>
+                                    <div v-if="sessionUsageCharts.modelCoverage.providerOnlySessions > 0" class="usage-inline-note">
+                                        另有 {{ sessionUsageCharts.modelCoverage.missingModelSessions }} 个会话没写模型名，未计入列表。
+                                    </div>
+                                    <div v-else-if="sessionUsageCharts.modelCoverage.missingModelSessions > 0" class="usage-inline-note">
+                                        另有 {{ sessionUsageCharts.modelCoverage.missingModelSessions }} 个会话缺少 model，未计入列表。
+                                    </div>
+                                    <div v-if="sessionUsageCharts.modelCoverage.missingModelSessionsPreview.length" class="usage-diagnostic-list">
+                                        <div class="usage-diagnostic-list-title">仍缺模型名的会话</div>
+                                        <div
+                                            v-for="item in sessionUsageCharts.modelCoverage.missingModelSessionsPreview"
+                                            :key="item.key"
+                                            class="usage-diagnostic-row">
+                                            <div class="usage-diagnostic-row-main">
+                                                <div class="usage-diagnostic-row-title">{{ item.title }}</div>
+                                                <div class="usage-diagnostic-row-meta">
+                                                    <span v-if="item.sessionId">{{ item.sessionId }}</span>
+                                                    <span v-else-if="item.updatedAtLabel">{{ item.updatedAtLabel }}</span>
+                                                </div>
+                                            </div>
+                                            <div class="usage-diagnostic-row-side">
+                                                <span v-if="item.provider" class="usage-inline-tag">{{ item.provider }}</span>
+                                                <span class="usage-inline-stat">{{ item.reasonLabel }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="usage-model-list">
+                                        <div v-for="item in sessionUsageCharts.usedModels" :key="item.key" class="usage-model-chip" :title="`${item.model} · ${item.count} 会话 · ${item.messageTotal} 消息${item.tokenTotal ? ` · ${item.tokenTotal} token` : ''}`">
+                                            <div class="usage-model-name">{{ item.model }}</div>
+                                            <div class="usage-model-meta">{{ item.count }} 会话 · {{ item.messageTotal }} 消息<span v-if="item.tokenTotal"> · {{ item.tokenTotal.toLocaleString('en-US') }} token</span></div>
+                                        </div>
+                                    </div>
+                                </template>
                             </section>
 
                             <section class="usage-card">

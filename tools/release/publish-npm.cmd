@@ -9,7 +9,7 @@ if /i "%VERBOSE%"=="1" (
 
 set "REGISTRY=https://registry.npmjs.org/"
 set "PUBLISH_RC=1"
-for %%I in ("%~dp0..") do set "ROOT_DIR=%%~fI"
+for %%I in ("%~dp0..\..") do set "ROOT_DIR=%%~fI"
 set "LOCAL_NPMRC=%ROOT_DIR%\.npmrc"
 
 where npm >nul 2>&1

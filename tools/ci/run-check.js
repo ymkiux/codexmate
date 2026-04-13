@@ -2,7 +2,7 @@
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const root = path.resolve(__dirname, '..');
+const root = path.resolve(__dirname, '..', '..');
 const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const step = process.argv[2] || 'all';
 
