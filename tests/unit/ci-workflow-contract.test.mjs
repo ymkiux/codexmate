@@ -21,11 +21,11 @@ test('ci workflow contract stays aligned with local npm test coverage', () => {
     assert.match(ciWorkflow, /-\s+name:\s+Lint[\s\S]*?run:\s+npm run ci:lint\b/m);
     assert.match(ciWorkflow, /-\s+name:\s+Test[\s\S]*?run:\s+npm run ci:test\b/m);
 
-    assert.strictEqual(pkg.scripts['ci:install'], 'node scripts/run-ci-check.js install');
-    assert.strictEqual(pkg.scripts['ci:lint'], 'node scripts/run-ci-check.js lint');
-    assert.strictEqual(pkg.scripts['ci:test'], 'node scripts/run-ci-check.js test');
+    assert.strictEqual(pkg.scripts['ci:install'], 'node tools/ci/run-check.js install');
+    assert.strictEqual(pkg.scripts['ci:lint'], 'node tools/ci/run-check.js lint');
+    assert.strictEqual(pkg.scripts['ci:test'], 'node tools/ci/run-check.js test');
     assert.strictEqual(pkg.scripts.test, 'npm run test:unit && npm run test:e2e');
-    assert.strictEqual(pkg.scripts['test:ci'], 'node scripts/run-ci-check.js all');
+    assert.strictEqual(pkg.scripts['test:ci'], 'node tools/ci/run-check.js all');
     assert.strictEqual(pkg.scripts['test:unit'], 'node tests/unit/run.mjs');
     assert.strictEqual(pkg.scripts['test:e2e'], 'node tests/e2e/run.js');
 });
