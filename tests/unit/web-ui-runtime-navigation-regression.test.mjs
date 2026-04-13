@@ -337,6 +337,27 @@ test('switchMainTab re-primes session render when a deferred leave is canceled b
     assert.strictEqual(context.fastHidden, false);
 });
 
+test('switchMainTab falls back to config when task orchestration tab is hidden', () => {
+    const methods = createNavigationMethods({
+        configModeSet: new Set(['codex', 'claude', 'openclaw']),
+        switchMainTabHelper(tab) {
+            this.mainTab = tab;
+        },
+        loadMoreSessionMessagesHelper() {}
+    });
+    const context = createNavigationContext(methods, {
+        mainTab: 'market',
+        taskOrchestrationTabEnabled: false,
+        scheduleAfterFrame(task) {
+            task();
+        }
+    });
+
+    context.switchMainTab('orchestration');
+
+    assert.strictEqual(context.mainTab, 'config');
+});
+
 test('prepareSessionTabRender re-enables list before preview and primes preview rendering', () => {
     const methods = createNavigationMethods({
         configModeSet: new Set(['codex', 'claude', 'openclaw']),

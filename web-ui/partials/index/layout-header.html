@@ -53,7 +53,7 @@
                 :class="{ active: isMainTabNavActive('usage') }"
                 @pointerdown="onMainTabPointerDown('usage', $event)"
                 @click="onMainTabClick('usage', $event)">Usage</button>
-            <button class="top-tab"
+            <button v-if="taskOrchestrationTabEnabled" class="top-tab"
                 id="tab-orchestration"
                 role="tab"
                 data-main-tab="orchestration"
@@ -185,7 +185,7 @@
                     </button>
                 </div>
 
-                <div class="side-section" role="navigation" aria-label="任务编排">
+                <div v-if="taskOrchestrationTabEnabled" class="side-section" role="navigation" aria-label="任务编排">
                     <div class="side-section-title">任务</div>
                     <button
                         id="side-tab-orchestration"
@@ -328,7 +328,7 @@
                             <span class="value">{{ sessionUsageSummaryCards[1] ? sessionUsageSummaryCards[1].value : 0 }}</span>
                         </div>
                     </div>
-                    <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'orchestration'">
+                    <div class="status-strip" v-else-if="!sessionStandalone && taskOrchestrationTabEnabled && mainTab === 'orchestration'">
                         <div class="status-chip">
                             <span class="label">引擎</span>
                             <span class="value">{{ taskOrchestration.selectedEngine === 'workflow' ? 'Workflow' : 'Codex' }}</span>

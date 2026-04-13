@@ -330,6 +330,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'openclawPendingAuthProfileUpdates',
         'sessionTrashEnabled',
         'shareCommandPrefix',
+        'taskOrchestrationTabEnabled',
         'taskOrchestration',
         '_taskOrchestrationPollTimer'
     ] : [
@@ -346,6 +347,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'sessionsUsageLoadedOnce',
         'sessionsUsageLoading',
         'sessionsViewMode',
+        'taskOrchestrationTabEnabled',
         'taskOrchestration',
         '_taskOrchestrationPollTimer'
     ];
