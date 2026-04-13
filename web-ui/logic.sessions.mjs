@@ -46,6 +46,17 @@ export function normalizeSessionPathFilter(pathFilter) {
     return typeof pathFilter === 'string' ? pathFilter.trim() : '';
 }
 
+function isConcreteSessionModelName(value) {
+    if (typeof value !== 'string') {
+        return false;
+    }
+    const normalized = value.trim();
+    if (!normalized) {
+        return false;
+    }
+    return normalized.toLowerCase() !== '<synthetic>';
+}
+
 function collectSessionModelNames(session) {
     if (!session || typeof session !== 'object') {
         return [];
@@ -55,11 +66,11 @@ function collectSessionModelNames(session) {
         : [session.model, session.modelName, session.modelId];
     const models = [];
     for (const value of values) {
-        if (typeof value !== 'string') {
+        if (!isConcreteSessionModelName(value)) {
             continue;
         }
         const normalized = value.trim();
-        if (!normalized || models.includes(normalized)) {
+        if (models.includes(normalized)) {
             continue;
         }
         models.push(normalized);
@@ -263,6 +274,8 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
         const stamp = new Date(updatedAtMs);
         const bucket = bucketMap.get(bucketKey);
         if (!bucket) continue;
+        const sessionModels = collectSessionModelNames(session);
+        if (sessionModels.length === 0) continue;
         filteredSessions.push(session);
         const messageCount = Number.isFinite(Number(session.messageCount))
             ? Math.max(0, Math.floor(Number(session.messageCount)))
@@ -313,55 +326,18 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
         const normalizedTitle = typeof session.title === 'string' && session.title.trim()
             ? session.title.trim()
             : (typeof session.sessionId === 'string' && session.sessionId.trim() ? session.sessionId.trim() : '未命名会话');
-        const sessionModels = collectSessionModelNames(session);
-        const explicitProvider = typeof session.provider === 'string' ? session.provider.trim() : '';
-        const normalizedExplicitProvider = explicitProvider.toLowerCase();
-        const hasSpecificProvider = !!explicitProvider
-            && normalizedExplicitProvider !== source
-            && normalizedExplicitProvider !== (source === 'codex' ? 'codex' : 'claude');
-        if (sessionModels.length > 0) {
-            for (const modelId of sessionModels) {
-                const prev = modelMap.get(modelId) || {
-                    count: 0,
-                    messageTotal: 0,
-                    tokenTotal: 0,
-                    sources: new Set()
-                };
-                prev.count += 1;
-                prev.messageTotal += messageCount;
-                prev.tokenTotal += sessionTotalTokens;
-                prev.sources.add(source);
-                modelMap.set(modelId, prev);
-            }
-        } else {
-            missingModelSessions += 1;
-            missingModelSourceTotals[source] += 1;
-            const missingKey = typeof session.sessionId === 'string' && session.sessionId.trim()
-                ? `${source}:${session.sessionId.trim()}`
-                : [source, session.filePath || normalizedTitle, String(updatedAtMs), String(sessionIndex)].join(':');
-            missingModelSessionMap.set(missingKey, {
-                key: missingKey,
-                title: normalizedTitle,
-                sessionId: typeof session.sessionId === 'string' ? session.sessionId.trim() : '',
-                source,
-                sourceLabel,
-                provider: explicitProvider,
-                updatedAt: session.updatedAt || '',
-                updatedAtMs,
-                updatedAtLabel: formatSessionTimelineTimestamp(session.updatedAt || ''),
-                reason: hasSpecificProvider ? 'provider-only' : 'missing-model',
-                reasonLabel: hasSpecificProvider ? '只写 provider，没写真实 model' : '原始记录里没有模型字段'
-            });
-            if (hasSpecificProvider) {
-                providerOnlySessions += 1;
-                const prev = missingModelProviderMap.get(normalizedExplicitProvider) || {
-                    key: normalizedExplicitProvider,
-                    label: explicitProvider,
-                    count: 0
-                };
-                prev.count += 1;
-                missingModelProviderMap.set(normalizedExplicitProvider, prev);
-            }
+        for (const modelId of sessionModels) {
+            const prev = modelMap.get(modelId) || {
+                count: 0,
+                messageTotal: 0,
+                tokenTotal: 0,
+                sources: new Set()
+            };
+            prev.count += 1;
+            prev.messageTotal += messageCount;
+            prev.tokenTotal += sessionTotalTokens;
+            prev.sources.add(source);
+            modelMap.set(modelId, prev);
         }
 
         const sessionEntry = {

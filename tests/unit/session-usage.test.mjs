@@ -10,9 +10,9 @@ const { buildUsageChartGroups } = logic;
 test('buildUsageChartGroups aggregates codex and claude sessions into day buckets', () => {
     const now = Date.UTC(2026, 3, 6, 12, 0, 0);
     const result = buildUsageChartGroups([
-        { source: 'codex', createdAt: '2026-04-06T07:30:00.000Z', updatedAt: '2026-04-06T08:00:00.000Z', messageCount: 5, totalTokens: 120, contextWindow: 32000, cwd: '/a' },
-        { source: 'claude', createdAt: '2026-04-06T08:15:00.000Z', updatedAt: '2026-04-06T09:00:00.000Z', messageCount: 7, totalTokens: 230, contextWindow: 64000, cwd: '/a' },
-        { source: 'codex', createdAt: '2026-04-05T08:00:00.000Z', updatedAt: '2026-04-05T09:00:00.000Z', messageCount: 3, totalTokens: 90, contextWindow: 16000, cwd: '/b' }
+        { source: 'codex', model: 'gpt-5.3-codex', createdAt: '2026-04-06T07:30:00.000Z', updatedAt: '2026-04-06T08:00:00.000Z', messageCount: 5, totalTokens: 120, contextWindow: 32000, cwd: '/a' },
+        { source: 'claude', model: 'claude-sonnet-4', createdAt: '2026-04-06T08:15:00.000Z', updatedAt: '2026-04-06T09:00:00.000Z', messageCount: 7, totalTokens: 230, contextWindow: 64000, cwd: '/a' },
+        { source: 'codex', model: 'gpt-5.2-codex', createdAt: '2026-04-05T08:00:00.000Z', updatedAt: '2026-04-05T09:00:00.000Z', messageCount: 3, totalTokens: 90, contextWindow: 16000, cwd: '/b' }
     ], { range: '7d', now });
 
     assert.strictEqual(result.summary.totalSessions, 3);
@@ -65,9 +65,9 @@ test('buildUsageChartGroups ignores invalid sessions and keeps empty buckets sta
 test('buildUsageChartGroups produces stable unique keys for sessions without ids', () => {
     const now = Date.UTC(2026, 3, 6, 12, 0, 0);
     const result = buildUsageChartGroups([
-        { source: 'codex', updatedAt: '2026-04-06T09:00:00.000Z', messageCount: 4 },
-        { source: 'codex', updatedAt: '2026-04-06T09:00:00.000Z', messageCount: 4 },
-        { source: 'claude', updatedAt: '2026-04-06T09:00:00.000Z', messageCount: 4 }
+        { source: 'codex', model: 'gpt-5.3-codex', updatedAt: '2026-04-06T09:00:00.000Z', messageCount: 4 },
+        { source: 'codex', model: 'gpt-5.2-codex', updatedAt: '2026-04-06T09:00:00.000Z', messageCount: 4 },
+        { source: 'claude', model: 'claude-sonnet-4', updatedAt: '2026-04-06T09:00:00.000Z', messageCount: 4 }
     ], { range: '7d', now });
 
     const recentKeys = result.recentSessions.map((item) => item.key);
@@ -80,8 +80,8 @@ test('buildUsageChartGroups produces stable unique keys for sessions without ids
 test('buildUsageChartGroups supports all range and keeps every valid session in filteredSessions', () => {
     const now = Date.UTC(2026, 3, 6, 12, 0, 0);
     const sessions = [
-        { source: 'codex', createdAt: '2026-04-06T07:30:00.000Z', updatedAt: '2026-04-06T08:00:00.000Z', messageCount: 5, totalTokens: 120, contextWindow: 32000, cwd: '/a' },
-        { source: 'claude', createdAt: '2026-03-01T08:15:00.000Z', updatedAt: '2026-03-01T09:00:00.000Z', messageCount: 7, totalTokens: 230, contextWindow: 64000, cwd: '/b' }
+        { source: 'codex', model: 'gpt-5.3-codex', createdAt: '2026-04-06T07:30:00.000Z', updatedAt: '2026-04-06T08:00:00.000Z', messageCount: 5, totalTokens: 120, contextWindow: 32000, cwd: '/a' },
+        { source: 'claude', model: 'claude-sonnet-4', createdAt: '2026-03-01T08:15:00.000Z', updatedAt: '2026-03-01T09:00:00.000Z', messageCount: 7, totalTokens: 230, contextWindow: 64000, cwd: '/b' }
     ];
     const result = buildUsageChartGroups(sessions, { range: 'all', now });
 

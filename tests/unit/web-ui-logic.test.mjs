@@ -760,7 +760,7 @@ test('sessionUsageSummaryCards uses compact units for long token and context tot
     assert.strictEqual(totalDurationCard.value, '7天 5小时');
 });
 
-test('buildUsageChartGroups keeps all used model names for the selected range', () => {
+test('buildUsageChartGroups keeps all used model names for the selected range and ignores records without concrete models', () => {
     const result = buildUsageChartGroups([
         {
             source: 'codex',
@@ -805,6 +805,15 @@ test('buildUsageChartGroups keeps all used model names for the selected range', 
             messageCount: 2,
             totalTokens: 90000,
             contextWindow: 64000
+        },
+        {
+            source: 'codex',
+            model: '<synthetic>',
+            createdAt: '2026-04-11T09:30:00.000Z',
+            updatedAt: '2026-04-11T10:00:00.000Z',
+            messageCount: 8,
+            totalTokens: 120000,
+            contextWindow: 64000
         }
     ], {
         range: '7d',
@@ -817,18 +826,17 @@ test('buildUsageChartGroups keeps all used model names for the selected range', 
     );
     assert.deepStrictEqual(result.usedModels[0].sourceLabels, ['Codex']);
     assert.deepStrictEqual(result.usedModels[1].sourceLabels, ['Claude Code']);
-    assert.strictEqual(result.modelCoverage.totalSessions, 4);
+    assert.strictEqual(result.modelCoverage.totalSessions, 3);
     assert.strictEqual(result.modelCoverage.modeledSessions, 3);
-    assert.strictEqual(result.modelCoverage.missingModelSessions, 1);
+    assert.strictEqual(result.modelCoverage.missingModelSessions, 0);
     assert.strictEqual(result.modelCoverage.providerOnlySessions, 0);
-    assert.strictEqual(result.modelCoverage.coveragePercent, 75);
-    assert.deepStrictEqual(result.modelCoverage.missingModelSourceTotals, { codex: 0, claude: 1 });
+    assert.strictEqual(result.modelCoverage.coveragePercent, 100);
+    assert.deepStrictEqual(result.modelCoverage.missingModelSourceTotals, { codex: 0, claude: 0 });
     assert.deepStrictEqual(result.modelCoverage.missingModelProviders, []);
-    assert.deepStrictEqual(result.modelCoverage.missingModelSessionsPreview.map((item) => item.reason), ['missing-model']);
-    assert.deepStrictEqual(result.modelCoverage.missingModelSessionsPreview.map((item) => item.sourceLabel), ['Claude Code']);
+    assert.deepStrictEqual(result.modelCoverage.missingModelSessionsPreview, []);
 });
 
-test('buildUsageChartGroups records provider-only sessions when old records miss concrete model names', () => {
+test('buildUsageChartGroups ignores provider-only and <synthetic> records', () => {
     const result = buildUsageChartGroups([
         {
             source: 'codex',
@@ -838,6 +846,15 @@ test('buildUsageChartGroups records provider-only sessions when old records miss
             messageCount: 1,
             totalTokens: 0,
             contextWindow: 0
+        },
+        {
+            source: 'claude',
+            model: '<synthetic>',
+            createdAt: '2026-02-28T06:59:25.018Z',
+            updatedAt: '2026-02-28T06:59:26.697Z',
+            messageCount: 2,
+            totalTokens: 10,
+            contextWindow: 20
         }
     ], {
         range: 'all',
@@ -845,18 +862,14 @@ test('buildUsageChartGroups records provider-only sessions when old records miss
     });
 
     assert.deepStrictEqual(result.usedModels, []);
-    assert.strictEqual(result.modelCoverage.totalSessions, 1);
+    assert.strictEqual(result.modelCoverage.totalSessions, 0);
     assert.strictEqual(result.modelCoverage.modeledSessions, 0);
-    assert.strictEqual(result.modelCoverage.missingModelSessions, 1);
-    assert.strictEqual(result.modelCoverage.providerOnlySessions, 1);
+    assert.strictEqual(result.modelCoverage.missingModelSessions, 0);
+    assert.strictEqual(result.modelCoverage.providerOnlySessions, 0);
     assert.strictEqual(result.modelCoverage.coveragePercent, 0);
-    assert.deepStrictEqual(result.modelCoverage.missingModelSourceTotals, { codex: 1, claude: 0 });
-    assert.deepStrictEqual(result.modelCoverage.missingModelProviders, [{ key: 'maxx', label: 'maxx', count: 1 }]);
-    assert.deepStrictEqual(result.modelCoverage.missingModelSessionsPreview.map((item) => ({
-        source: item.source,
-        provider: item.provider,
-        reason: item.reason
-    })), [{ source: 'codex', provider: 'maxx', reason: 'provider-only' }]);
+    assert.deepStrictEqual(result.modelCoverage.missingModelSourceTotals, { codex: 0, claude: 0 });
+    assert.deepStrictEqual(result.modelCoverage.missingModelProviders, []);
+    assert.deepStrictEqual(result.modelCoverage.missingModelSessionsPreview, []);
 });
 
 test('buildUsageChartGroups collects every model name from session model arrays without double-counting coverage', () => {
