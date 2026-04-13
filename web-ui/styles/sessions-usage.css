@@ -173,7 +173,29 @@
     min-width: 0;
     overflow-x: auto;
     overflow-y: hidden;
-    padding-bottom: 4px;
+    padding: 0 2px 10px;
+    scrollbar-gutter: stable both-edges;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(199, 116, 98, 0.72) rgba(199, 116, 98, 0.08);
+}
+
+.usage-bars::-webkit-scrollbar {
+    height: 10px;
+}
+
+.usage-bars::-webkit-scrollbar-track {
+    background: linear-gradient(90deg, rgba(199, 116, 98, 0.04), rgba(199, 116, 98, 0.1));
+    border-radius: 999px;
+}
+
+.usage-bars::-webkit-scrollbar-thumb {
+    background: linear-gradient(90deg, rgba(199, 116, 98, 0.68), rgba(180, 94, 78, 0.92));
+    border-radius: 999px;
+    border: 2px solid rgba(248, 243, 238, 0.96);
+}
+
+.usage-bars::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(90deg, rgba(199, 116, 98, 0.82), rgba(180, 94, 78, 1));
 }
 
 .usage-bar-group {
