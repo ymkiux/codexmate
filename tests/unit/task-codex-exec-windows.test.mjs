@@ -47,7 +47,7 @@ test('resolveSpawnCommand keeps bare command names on windows', () => {
     assert.strictEqual(resolveSpawnCommand('codex'), 'codex');
 });
 
-test('runCodexExecTaskNode spawns bare codex command on windows', async () => {
+test('runCodexExecTaskNode spawns bare codex command through the windows shell', async () => {
     const source = extractBlockBySignature(cliSource, 'async function runCodexExecTaskNode(node, context = {}) {');
     const spawnCalls = [];
     const runCodexExecTaskNode = instantiateFunction(source, 'runCodexExecTaskNode', {
@@ -113,6 +113,7 @@ test('runCodexExecTaskNode spawns bare codex command on windows', async () => {
     assert.strictEqual(result.success, true);
     assert.strictEqual(spawnCalls.length, 1);
     assert.strictEqual(spawnCalls[0].command, 'codex');
+    assert.strictEqual(spawnCalls[0].options.shell, true);
     assert.deepStrictEqual(spawnCalls[0].args.slice(0, 7), [
         '-a', 'never',
         '-s', 'read-only',
