@@ -8,13 +8,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
 
-const scriptPath = path.join(__dirname, '..', '..', 'cmd', 'reset-main.js');
+const scriptPath = path.join(__dirname, '..', '..', 'tools', 'dev', 'reset-main.js');
 const packageJsonPath = path.join(__dirname, '..', '..', 'package.json');
 const {
     normalizePrNumberInput,
     buildResetPlan,
     resolveArgPrNumber
-} = require(path.join(__dirname, '..', '..', 'cmd', 'reset-main.js'));
+} = require(path.join(__dirname, '..', '..', 'tools', 'dev', 'reset-main.js'));
 
 test('reset-main workflow plans preserve critical git steps without git pull merges', () => {
     assert.ok(fs.existsSync(scriptPath), 'reset-main.js should exist');
@@ -112,7 +112,7 @@ test('resolveArgPrNumber reads the first non-empty CLI arg', () => {
 
 test('package.json exposes reset command for reset-main workflow', () => {
     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8').replace(/^\uFEFF/u, ''));
-    assert.strictEqual(packageJson.scripts.reset, 'node cmd/reset-main.js');
+    assert.strictEqual(packageJson.scripts.reset, 'node tools/dev/reset-main.js');
 });
 
 test('git repository probe stays silent during reset startup', () => {

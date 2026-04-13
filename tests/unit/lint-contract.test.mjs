@@ -14,7 +14,7 @@ function readJson(filePath) {
 test('package exposes a real lint script backed by local checks', () => {
     const pkg = readJson(path.join(projectRoot, 'package.json'));
 
-    assert.strictEqual(pkg.scripts.lint, 'node scripts/lint.js');
-    assert.strictEqual(pkg.scripts['ci:lint'], 'node scripts/run-ci-check.js lint');
-    assert.strictEqual(fs.existsSync(path.join(projectRoot, 'scripts', 'lint.js')), true);
+    assert.strictEqual(pkg.scripts.lint, 'node tools/dev/lint.js');
+    assert.strictEqual(pkg.scripts['ci:lint'], 'node tools/ci/run-check.js lint');
+    assert.strictEqual(fs.existsSync(path.join(projectRoot, 'tools', 'dev', 'lint.js')), true);
 });
