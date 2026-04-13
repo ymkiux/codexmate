@@ -958,11 +958,12 @@ test('loadAll treats provider list fetch failures as startup errors and skips mo
         }
     };
 
-    await loadAll.call(context);
+    const ok = await loadAll.call(context);
 
+    assert.strictEqual(ok, false);
     assert.strictEqual(context.initError, 'list failed');
     assert.deepStrictEqual(context.providersList, ['stale-provider']);
-    assert.deepStrictEqual(calls, ['auth']);
+    assert.deepStrictEqual(calls, []);
 });
 
 test('applyCodexConfigDirect preserves a focused sibling budget draft across the loadAll refresh', async () => {

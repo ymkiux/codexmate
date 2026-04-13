@@ -563,7 +563,7 @@ test('switchConfigMode keeps config and navigation behavior aligned with HEAD', 
     });
 });
 
-test('loadAll keeps success and failure state transitions aligned with HEAD', async () => {
+test('loadAll keeps success transitions aligned with HEAD and stops after startup status failure', async () => {
     const successStatus = {
         provider: 'remote-provider',
         model: 'gpt-4.1',
@@ -635,37 +635,22 @@ test('loadAll keeps success and failure state transitions aligned with HEAD', as
         throw new Error(`Unexpected action: ${action}`);
     }, () => currentMethods.loadAll.call(currentFailureContext));
 
-    const headFailureContext = createLoadAllContext();
-    const headFailure = await runWithFetch(async (action) => {
-        if (action === 'status') {
-            throw new Error('offline');
-        }
-        if (action === 'list') {
-            return successList;
-        }
-        throw new Error(`Unexpected action: ${action}`);
-    }, () => headMethods.loadAll.call(headFailureContext));
-
+    assert.deepStrictEqual(currentFailure.calls.map(({ action }) => action), ['status']);
     assert.deepStrictEqual({
-        calls: currentFailure.calls,
-        snapshot: {
-            loading: currentFailureContext.loading,
-            initError: currentFailureContext.initError,
-            providersList: currentFailureContext.providersList,
-            messages: currentFailureContext.messages,
-            calls: currentFailureContext.calls.filter(([name]) => name !== 'loadModelsForProvider')
-        }
+        loading: currentFailureContext.loading,
+        initError: currentFailureContext.initError,
+        providersList: currentFailureContext.providersList,
+        messages: currentFailureContext.messages,
+        calls: currentFailureContext.calls.filter(([name]) => name !== 'loadModelsForProvider')
     }, {
-        calls: headFailure.calls,
-        snapshot: {
-            loading: headFailureContext.loading,
-            initError: headFailureContext.initError,
-            providersList: headFailureContext.providersList,
-            messages: headFailureContext.messages,
-            calls: headFailureContext.calls.filter(([name]) => name !== 'loadModelsForProvider')
-        }
+        loading: false,
+        initError: '连接失败: offline',
+        providersList: [],
+        messages: [],
+        calls: []
     });
     assert.ok(!currentFailureContext.calls.some(([name]) => name === 'loadModelsForProvider'));
+    assert.ok(!currentFailureContext.calls.some(([name]) => name === 'loadCodexAuthProfiles'));
 });
 
 test('session trash list helpers stay aligned with HEAD for prepend and pagination', () => {
