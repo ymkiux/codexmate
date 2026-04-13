@@ -277,6 +277,9 @@ export function createNavigationMethods(options = {}) {
                 : '';
             const targetTab = normalizedTab || tab;
             if (!targetTab) return;
+            if (targetTab === 'orchestration' && this.taskOrchestrationTabEnabled !== true) {
+                return this.switchMainTab('config');
+            }
             this.cancelTouchNavIntentReset();
             if (targetTab === 'sessions') {
                 this.cancelScheduledSessionTabDeferredTeardown();

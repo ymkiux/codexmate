@@ -639,7 +639,8 @@ test('loadModelsForProvider ignores stale failures after provider selection chan
 test('loadClaudeModels keeps error state but suppresses toast in silent mode', async () => {
     const source = extractMethodAsFunction(appSource, 'loadClaudeModels');
     const loadClaudeModels = instantiateFunction(source, 'loadClaudeModels', {
-        api: async () => ({ error: 'Request failed: 401' })
+        api: async () => ({ error: 'Request failed: 401' }),
+        getClaudeModelCatalogForBaseUrl: () => []
     });
 
     const messages = [];
@@ -676,7 +677,8 @@ test('loadClaudeModels ignores stale responses after Claude config selection cha
     const loadClaudeModels = instantiateFunction(source, 'loadClaudeModels', {
         api: async () => await new Promise((resolve) => {
             resolveApi = resolve;
-        })
+        }),
+        getClaudeModelCatalogForBaseUrl: () => []
     });
 
     const configs = {
@@ -729,7 +731,8 @@ test('loadClaudeModels ignores stale failures after Claude config selection chan
     const loadClaudeModels = instantiateFunction(source, 'loadClaudeModels', {
         api: async () => await new Promise((_, reject) => {
             rejectApi = reject;
-        })
+        }),
+        getClaudeModelCatalogForBaseUrl: () => []
     });
 
     const configs = {
@@ -781,7 +784,8 @@ test('loadClaudeModels skips remote fetch for external-credential config without
     const loadClaudeModels = instantiateFunction(source, 'loadClaudeModels', {
         api: async () => {
             throw new Error('should not request models endpoint for external credential config');
-        }
+        },
+        getClaudeModelCatalogForBaseUrl: () => ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5']
     });
 
     const messages = [];
@@ -799,16 +803,17 @@ test('loadClaudeModels skips remote fetch for external-credential config without
         resetClaudeModelsState: () => {
             throw new Error('should not reset when config exists');
         },
-        updateClaudeModelsCurrent: () => {
-            throw new Error('should not update current when skipping remote fetch');
+        updateClaudeModelsCurrent() {
+            this.claudeModelsHasCurrent = !!this.currentClaudeModel && this.claudeModels.includes(this.currentClaudeModel);
         },
+        currentClaudeModel: 'claude-opus-4-6',
         showMessage: (msg, type) => messages.push({ msg, type })
     };
 
     await loadClaudeModels.call(context);
     assert.strictEqual(context.claudeModelsLoading, false);
-    assert.deepStrictEqual(context.claudeModels, []);
-    assert.strictEqual(context.claudeModelsSource, 'unlimited');
+    assert.deepStrictEqual(context.claudeModels, ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5']);
+    assert.strictEqual(context.claudeModelsSource, 'catalog');
     assert.strictEqual(context.claudeModelsHasCurrent, true);
     assert.deepStrictEqual(messages, []);
 });

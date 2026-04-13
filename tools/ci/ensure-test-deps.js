@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const root = path.resolve(__dirname, '..');
+const root = path.resolve(__dirname, '..', '..');
 const lockfile = path.join(root, 'package-lock.json');
 const packageJson = path.join(root, 'package.json');
 const nodeModules = path.join(root, 'node_modules');

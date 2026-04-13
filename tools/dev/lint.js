@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const root = path.resolve(__dirname, '..');
+const root = path.resolve(__dirname, '..', '..');
 const nodeCmd = process.execPath;
 const sourceExtensions = new Set(['.js', '.mjs', '.cjs']);
 const jsonExtensions = new Set(['.json']);

@@ -87,7 +87,12 @@
 }
 
 .usage-summary-card {
-    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 4px;
+    min-height: 88px;
+    padding: 12px 14px;
     border-radius: 14px;
     background: var(--color-surface-alt);
     border: 1px solid var(--color-border-soft);
@@ -95,15 +100,30 @@
 }
 
 .usage-summary-label {
+    min-height: 0;
     font-size: 12px;
+    line-height: 1.4;
     color: var(--color-text-secondary);
-    margin-bottom: 6px;
+    margin-bottom: 0;
 }
 
 .usage-summary-value {
-    font-size: 24px;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    font-size: clamp(18px, 1.8vw, 22px);
+    line-height: 1.15;
     font-weight: 700;
     color: var(--color-text-primary);
+    word-break: break-word;
+}
+
+.usage-summary-note {
+    margin-top: 2px;
+    min-height: 0;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    line-height: 1.35;
 }
 
 .usage-chart-grid {
@@ -122,11 +142,39 @@
     overflow: hidden;
 }
 
+.usage-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
 .usage-card-title {
     font-size: 14px;
     font-weight: 700;
     color: var(--color-text-primary);
-    margin-bottom: 12px;
+    margin-bottom: 4px;
+}
+
+.usage-card-subtitle {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--color-text-secondary);
+}
+
+.usage-card-kicker {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 0 10px;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-alt);
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
 }
 
 .usage-bars {
@@ -138,7 +186,29 @@
     min-width: 0;
     overflow-x: auto;
     overflow-y: hidden;
-    padding-bottom: 4px;
+    padding: 0 2px 10px;
+    scrollbar-gutter: stable both-edges;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(199, 116, 98, 0.72) rgba(199, 116, 98, 0.08);
+}
+
+.usage-bars::-webkit-scrollbar {
+    height: 10px;
+}
+
+.usage-bars::-webkit-scrollbar-track {
+    background: linear-gradient(90deg, rgba(199, 116, 98, 0.04), rgba(199, 116, 98, 0.1));
+    border-radius: 999px;
+}
+
+.usage-bars::-webkit-scrollbar-thumb {
+    background: linear-gradient(90deg, rgba(199, 116, 98, 0.68), rgba(180, 94, 78, 0.92));
+    border-radius: 999px;
+    border: 2px solid rgba(248, 243, 238, 0.96);
+}
+
+.usage-bars::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(90deg, rgba(199, 116, 98, 0.82), rgba(180, 94, 78, 1));
 }
 
 .usage-bar-group {
@@ -355,6 +425,158 @@
     overflow-wrap: anywhere;
 }
 
+.usage-card-models {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.usage-model-coverage-strip {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.usage-model-coverage-item {
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid var(--color-border-soft);
+    background: var(--color-surface-alt);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.usage-model-coverage-item strong {
+    font-size: 20px;
+    color: var(--color-text-primary);
+}
+
+.usage-model-coverage-item span,
+.usage-inline-note,
+.usage-diagnostic-copy,
+.usage-diagnostic-meta {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--color-text-secondary);
+}
+
+.usage-diagnostic-empty {
+    padding: 14px;
+    border-radius: 14px;
+    border: 1px dashed var(--color-border);
+    background: var(--color-surface-alt);
+}
+
+.usage-diagnostic-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    margin-bottom: 6px;
+}
+
+.usage-inline-note {
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(255, 244, 220, 0.62);
+    color: #7a5110;
+}
+
+.usage-inline-tag {
+    display: inline-flex;
+    align-items: center;
+    margin: 0 6px 0 0;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(122, 81, 16, 0.10);
+    border: 1px solid rgba(122, 81, 16, 0.14);
+    color: inherit;
+    font-weight: 700;
+}
+
+.usage-diagnostic-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.usage-diagnostic-list-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+}
+
+.usage-diagnostic-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid var(--color-border-soft);
+    background: var(--color-surface-alt);
+}
+
+.usage-diagnostic-row-main,
+.usage-diagnostic-row-side {
+    min-width: 0;
+}
+
+.usage-diagnostic-row-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.usage-diagnostic-row-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--color-text-secondary);
+}
+
+.usage-diagnostic-row-side {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.usage-model-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.usage-model-chip {
+    min-width: 0;
+    max-width: 100%;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: var(--color-surface-alt);
+    border: 1px solid var(--color-border-soft);
+}
+
+.usage-model-name {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.usage-model-meta {
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    line-height: 1.4;
+}
+
 .usage-empty {
     padding: 24px 16px;
     border-radius: 16px;
@@ -364,7 +586,8 @@
 }
 
 @media (max-width: 960px) {
-    .usage-chart-grid {
+    .usage-chart-grid,
+    .usage-model-coverage-strip {
         grid-template-columns: 1fr;
     }
 }
@@ -396,6 +619,8 @@
         max-width: 28px;
     }
 
+    .usage-toolbar,
+    .usage-card-head,
     .usage-session-row {
         flex-direction: column;
         align-items: stretch;

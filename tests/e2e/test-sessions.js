@@ -41,8 +41,11 @@ module.exports = async function testSessions(ctx) {
     assert(usageSessions.sessions.some((item) => item.sessionId === claudeSessionId), 'list-sessions-usage missing claude entry');
     assert(usageSessions.sessions.every((item) => !Object.prototype.hasOwnProperty.call(item, '__messageCountExact')), 'list-sessions-usage should not expose exact hydration markers');
     const usageCodexEntry = usageSessions.sessions.find((item) => item.sessionId === sessionId);
+    const usageClaudeEntry = usageSessions.sessions.find((item) => item.sessionId === claudeSessionId);
     assert(usageCodexEntry && usageCodexEntry.totalTokens === 120, 'list-sessions-usage missing codex totalTokens');
     assert(usageCodexEntry && usageCodexEntry.contextWindow === 128000, 'list-sessions-usage missing codex contextWindow');
+    assert(usageCodexEntry && usageCodexEntry.model === 'gpt-5.3-codex', 'list-sessions-usage missing codex model');
+    assert(usageClaudeEntry && usageClaudeEntry.model === 'claude-3-7-sonnet', 'list-sessions-usage missing claude model');
     const defaultUsageSessions = await api('list-sessions-usage');
     assert(Array.isArray(defaultUsageSessions.sessions), 'list-sessions-usage without params should still return sessions');
     assert(defaultUsageSessions.source === 'all', 'list-sessions-usage without params should default source to all');

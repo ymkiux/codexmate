@@ -1,5 +1,65 @@
+const DEFAULT_CLAUDE_MODEL_CATALOG = Object.freeze([
+    'claude-opus-4-6',
+    'claude-opus-4-1',
+    'claude-opus-4',
+    'claude-sonnet-4-6',
+    'claude-sonnet-4-5',
+    'claude-sonnet-4',
+    'claude-haiku-4-5',
+    'claude-3-7-sonnet',
+    'claude-3-5-sonnet',
+    'claude-3-5-haiku',
+    'claude-3-opus',
+    'claude-3-sonnet',
+    'claude-3-haiku'
+]);
+
+const BIGMODEL_CLAUDE_EXTRA_MODELS = Object.freeze([
+    'glm-3-turbo',
+    'glm-4',
+    'glm-4-0520',
+    'glm-4-plus',
+    'glm-4-air',
+    'glm-4-airx',
+    'glm-4-flash',
+    'glm-4-flashx',
+    'glm-4v',
+    'glm-4v-flash',
+    'glm-4v-plus',
+    'glm-4v-plus-0111',
+    'glm-4.5',
+    'glm-4.5-air',
+    'glm-4.5v',
+    'glm-4.6',
+    'glm-4.6v',
+    'glm-4.7',
+    'glm-4.7-flash',
+    'glm-4.7-flashx',
+    'glm-5',
+    'glm-5-turbo',
+    'glm-5.1',
+    'glm-5v',
+    'glm-5v-turbo',
+    'glm-z1',
+    'glm-z1-air',
+    'glm-coding'
+]);
+
 export function normalizeClaudeValue(value) {
     return typeof value === 'string' ? value.trim() : '';
+}
+
+export function getClaudeModelCatalogForBaseUrl(baseUrl) {
+    const normalized = normalizeClaudeValue(baseUrl).toLowerCase().replace(/\/+$/g, '');
+    const models = [...DEFAULT_CLAUDE_MODEL_CATALOG];
+    if (normalized.includes('bigmodel.cn') && normalized.includes('/anthropic')) {
+        for (const model of BIGMODEL_CLAUDE_EXTRA_MODELS) {
+            if (!models.includes(model)) {
+                models.push(model);
+            }
+        }
+    }
+    return models;
 }
 
 export function normalizeClaudeConfig(config) {

@@ -10,15 +10,17 @@ const { buildUsageChartGroups } = logic;
 test('buildUsageChartGroups aggregates codex and claude sessions into day buckets', () => {
     const now = Date.UTC(2026, 3, 6, 12, 0, 0);
     const result = buildUsageChartGroups([
-        { source: 'codex', updatedAt: '2026-04-06T08:00:00.000Z', messageCount: 5, totalTokens: 120, contextWindow: 32000, cwd: '/a' },
-        { source: 'claude', updatedAt: '2026-04-06T09:00:00.000Z', messageCount: 7, totalTokens: 230, contextWindow: 64000, cwd: '/a' },
-        { source: 'codex', updatedAt: '2026-04-05T09:00:00.000Z', messageCount: 3, totalTokens: 90, contextWindow: 16000, cwd: '/b' }
+        { source: 'codex', model: 'gpt-5.3-codex', createdAt: '2026-04-06T07:30:00.000Z', updatedAt: '2026-04-06T08:00:00.000Z', messageCount: 5, totalTokens: 120, contextWindow: 32000, cwd: '/a' },
+        { source: 'claude', model: 'claude-sonnet-4', createdAt: '2026-04-06T08:15:00.000Z', updatedAt: '2026-04-06T09:00:00.000Z', messageCount: 7, totalTokens: 230, contextWindow: 64000, cwd: '/a' },
+        { source: 'codex', model: 'gpt-5.2-codex', createdAt: '2026-04-05T08:00:00.000Z', updatedAt: '2026-04-05T09:00:00.000Z', messageCount: 3, totalTokens: 90, contextWindow: 16000, cwd: '/b' }
     ], { range: '7d', now });
 
     assert.strictEqual(result.summary.totalSessions, 3);
     assert.strictEqual(result.summary.totalMessages, 15);
     assert.strictEqual(result.summary.totalTokens, 440);
     assert.strictEqual(result.summary.totalContextWindow, 112000);
+    assert.strictEqual(result.summary.activeDurationMs, 8100000);
+    assert.strictEqual(result.summary.totalDurationMs, 90000000);
     assert.strictEqual(result.summary.codexTotal, 2);
     assert.strictEqual(result.summary.claudeTotal, 1);
     assert.strictEqual(result.summary.avgMessagesPerSession, 5);
@@ -63,9 +65,9 @@ test('buildUsageChartGroups ignores invalid sessions and keeps empty buckets sta
 test('buildUsageChartGroups produces stable unique keys for sessions without ids', () => {
     const now = Date.UTC(2026, 3, 6, 12, 0, 0);
     const result = buildUsageChartGroups([
-        { source: 'codex', updatedAt: '2026-04-06T09:00:00.000Z', messageCount: 4 },
-        { source: 'codex', updatedAt: '2026-04-06T09:00:00.000Z', messageCount: 4 },
-        { source: 'claude', updatedAt: '2026-04-06T09:00:00.000Z', messageCount: 4 }
+        { source: 'codex', model: 'gpt-5.3-codex', updatedAt: '2026-04-06T09:00:00.000Z', messageCount: 4 },
+        { source: 'codex', model: 'gpt-5.2-codex', updatedAt: '2026-04-06T09:00:00.000Z', messageCount: 4 },
+        { source: 'claude', model: 'claude-sonnet-4', updatedAt: '2026-04-06T09:00:00.000Z', messageCount: 4 }
     ], { range: '7d', now });
 
     const recentKeys = result.recentSessions.map((item) => item.key);
@@ -73,4 +75,19 @@ test('buildUsageChartGroups produces stable unique keys for sessions without ids
 
     assert.strictEqual(new Set(recentKeys).size, recentKeys.length);
     assert.strictEqual(new Set(topKeys).size, topKeys.length);
+});
+
+test('buildUsageChartGroups supports all range and keeps every valid session in filteredSessions', () => {
+    const now = Date.UTC(2026, 3, 6, 12, 0, 0);
+    const sessions = [
+        { source: 'codex', model: 'gpt-5.3-codex', createdAt: '2026-04-06T07:30:00.000Z', updatedAt: '2026-04-06T08:00:00.000Z', messageCount: 5, totalTokens: 120, contextWindow: 32000, cwd: '/a' },
+        { source: 'claude', model: 'claude-sonnet-4', createdAt: '2026-03-01T08:15:00.000Z', updatedAt: '2026-03-01T09:00:00.000Z', messageCount: 7, totalTokens: 230, contextWindow: 64000, cwd: '/b' }
+    ];
+    const result = buildUsageChartGroups(sessions, { range: 'all', now });
+
+    assert.strictEqual(result.range, 'all');
+    assert.strictEqual(result.summary.totalSessions, 2);
+    assert.strictEqual(result.filteredSessions.length, 2);
+    assert.strictEqual(result.buckets[0].key, '2026-03-01');
+    assert.strictEqual(result.buckets[result.buckets.length - 1].key, '2026-04-06');
 });

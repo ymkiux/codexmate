@@ -46,6 +46,38 @@ export function normalizeSessionPathFilter(pathFilter) {
     return typeof pathFilter === 'string' ? pathFilter.trim() : '';
 }
 
+function isConcreteSessionModelName(value) {
+    if (typeof value !== 'string') {
+        return false;
+    }
+    const normalized = value.trim();
+    if (!normalized) {
+        return false;
+    }
+    return normalized.toLowerCase() !== '<synthetic>';
+}
+
+function collectSessionModelNames(session) {
+    if (!session || typeof session !== 'object') {
+        return [];
+    }
+    const values = Array.isArray(session.models)
+        ? [...session.models, session.model, session.modelName, session.modelId]
+        : [session.model, session.modelName, session.modelId];
+    const models = [];
+    for (const value of values) {
+        if (!isConcreteSessionModelName(value)) {
+            continue;
+        }
+        const normalized = value.trim();
+        if (models.includes(normalized)) {
+            continue;
+        }
+        models.push(normalized);
+    }
+    return models;
+}
+
 export function buildSessionFilterCacheState(source, pathFilter) {
     return {
         source: normalizeSessionSource(source, 'all'),
@@ -121,16 +153,54 @@ export function formatSessionTimelineTimestamp(timestamp) {
     return value;
 }
 
-export function buildUsageChartGroups(sessions = [], options = {}) {
-    const list = Array.isArray(sessions) ? sessions : [];
-    const range = typeof options.range === 'string' ? options.range.trim().toLowerCase() : '7d';
+function normalizeUsageRange(range) {
+    const normalized = typeof range === 'string' ? range.trim().toLowerCase() : '7d';
+    if (normalized === '30d' || normalized === 'all') {
+        return normalized;
+    }
+    return '7d';
+}
+
+function toUtcDayStartMs(value) {
+    const stamp = new Date(value);
+    return Date.UTC(stamp.getUTCFullYear(), stamp.getUTCMonth(), stamp.getUTCDate());
+}
+
+function formatUtcDayKey(value) {
+    const stamp = new Date(value);
+    return `${stamp.getUTCFullYear()}-${String(stamp.getUTCMonth() + 1).padStart(2, '0')}-${String(stamp.getUTCDate()).padStart(2, '0')}`;
+}
+
+function buildUsageBuckets(normalizedSessions, options = {}) {
+    const range = normalizeUsageRange(options.range);
     const now = Number.isFinite(Number(options.now)) ? Number(options.now) : Date.now();
     const dayMs = 24 * 60 * 60 * 1000;
-    const rangeDays = range === '30d' ? 30 : 7;
     const buckets = [];
+
+    if (range === 'all') {
+        const validDayStarts = normalizedSessions
+            .map((session) => toUtcDayStartMs(session.updatedAtMs))
+            .filter((value) => Number.isFinite(value));
+        const firstDayStart = validDayStarts.length ? Math.min(...validDayStarts) : toUtcDayStartMs(now);
+        const lastDayStart = validDayStarts.length ? Math.max(...validDayStarts) : toUtcDayStartMs(now);
+        for (let stamp = firstDayStart; stamp <= lastDayStart; stamp += dayMs) {
+            const key = formatUtcDayKey(stamp);
+            buckets.push({
+                key,
+                label: key.slice(5),
+                codex: 0,
+                claude: 0,
+                totalMessages: 0,
+                totalSessions: 0
+            });
+        }
+        return { range, buckets };
+    }
+
+    const rangeDays = range === '30d' ? 30 : 7;
     for (let i = rangeDays - 1; i >= 0; i -= 1) {
         const stamp = new Date(now - (i * dayMs));
-        const key = `${stamp.getUTCFullYear()}-${String(stamp.getUTCMonth() + 1).padStart(2, '0')}-${String(stamp.getUTCDate()).padStart(2, '0')}`;
+        const key = formatUtcDayKey(stamp);
         buckets.push({
             key,
             label: key.slice(5),
@@ -140,14 +210,50 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
             totalSessions: 0
         });
     }
+    return { range, buckets };
+}
+
+export function buildUsageChartGroups(sessions = [], options = {}) {
+    const list = Array.isArray(sessions) ? sessions : [];
+    const normalizedSessions = [];
+    for (const [sessionIndex, session] of list.entries()) {
+        if (!session || typeof session !== 'object') continue;
+        const source = normalizeSessionSource(session.source, '');
+        if (source !== 'codex' && source !== 'claude') continue;
+        const updatedAtMs = Date.parse(session.updatedAt || '');
+        if (!Number.isFinite(updatedAtMs)) continue;
+        const createdAtMs = Date.parse(session.createdAt || '');
+        const sessionStartedAtMs = Number.isFinite(createdAtMs) ? createdAtMs : updatedAtMs;
+        const sessionEndedAtMs = Math.max(updatedAtMs, sessionStartedAtMs);
+        normalizedSessions.push({
+            session,
+            sessionIndex,
+            source,
+            updatedAtMs,
+            createdAtMs,
+            sessionStartedAtMs,
+            sessionEndedAtMs,
+            bucketKey: formatUtcDayKey(updatedAtMs)
+        });
+    }
+    const { range, buckets } = buildUsageBuckets(normalizedSessions, options);
     const bucketMap = new Map(buckets.map((bucket) => [bucket.key, bucket]));
     let codexTotal = 0;
     let claudeTotal = 0;
     let messageTotal = 0;
     let totalTokens = 0;
     let totalContextWindow = 0;
+    let activeDurationMs = 0;
+    let earliestSessionMs = Number.POSITIVE_INFINITY;
+    let latestSessionMs = 0;
     const pathMap = new Map();
+    const modelMap = new Map();
+    const missingModelProviderMap = new Map();
+    const missingModelSessionMap = new Map();
     const sourceMessageTotals = { codex: 0, claude: 0 };
+    const missingModelSourceTotals = { codex: 0, claude: 0 };
+    let missingModelSessions = 0;
+    let providerOnlySessions = 0;
     const hourCounts = Array.from({ length: 24 }, (_, hour) => ({
         key: String(hour).padStart(2, '0'),
         label: String(hour).padStart(2, '0'),
@@ -161,17 +267,16 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
     }));
     const recentSessions = [];
     const topSessionsByMessages = [];
+    const filteredSessions = [];
 
-    for (const [sessionIndex, session] of list.entries()) {
-        if (!session || typeof session !== 'object') continue;
-        const source = normalizeSessionSource(session.source, '');
-        if (source !== 'codex' && source !== 'claude') continue;
-        const updatedAtMs = Date.parse(session.updatedAt || '');
-        if (!Number.isFinite(updatedAtMs)) continue;
+    for (const normalized of normalizedSessions) {
+        const { session, sessionIndex, source, updatedAtMs, sessionStartedAtMs, sessionEndedAtMs, bucketKey } = normalized;
         const stamp = new Date(updatedAtMs);
-        const key = `${stamp.getUTCFullYear()}-${String(stamp.getUTCMonth() + 1).padStart(2, '0')}-${String(stamp.getUTCDate()).padStart(2, '0')}`;
-        const bucket = bucketMap.get(key);
+        const bucket = bucketMap.get(bucketKey);
         if (!bucket) continue;
+        const sessionModels = collectSessionModelNames(session);
+        if (sessionModels.length === 0) continue;
+        filteredSessions.push(session);
         const messageCount = Number.isFinite(Number(session.messageCount))
             ? Math.max(0, Math.floor(Number(session.messageCount)))
             : 0;
@@ -194,6 +299,9 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
         totalTokens += sessionTotalTokens;
         totalContextWindow += sessionContextWindow;
         sourceMessageTotals[source] += messageCount;
+        activeDurationMs += Math.max(0, sessionEndedAtMs - sessionStartedAtMs);
+        earliestSessionMs = Math.min(earliestSessionMs, sessionStartedAtMs);
+        latestSessionMs = Math.max(latestSessionMs, sessionEndedAtMs);
 
         const utcHour = stamp.getUTCHours();
         if (hourCounts[utcHour]) {
@@ -214,9 +322,24 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
             });
         }
 
+        const sourceLabel = source === 'codex' ? 'Codex' : 'Claude Code';
         const normalizedTitle = typeof session.title === 'string' && session.title.trim()
             ? session.title.trim()
             : (typeof session.sessionId === 'string' && session.sessionId.trim() ? session.sessionId.trim() : '未命名会话');
+        for (const modelId of sessionModels) {
+            const prev = modelMap.get(modelId) || {
+                count: 0,
+                messageTotal: 0,
+                tokenTotal: 0,
+                sources: new Set()
+            };
+            prev.count += 1;
+            prev.messageTotal += messageCount;
+            prev.tokenTotal += sessionTotalTokens;
+            prev.sources.add(source);
+            modelMap.set(modelId, prev);
+        }
+
         const sessionEntry = {
             key: [
                 source,
@@ -228,7 +351,7 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
             ].join(':'),
             title: normalizedTitle,
             source,
-            sourceLabel: source === 'codex' ? 'Codex' : 'Claude Code',
+            sourceLabel,
             cwd,
             messageCount,
             updatedAt: session.updatedAt || '',
@@ -262,9 +385,42 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
             updatedAtLabel: meta.updatedAtMs ? formatSessionTimelineTimestamp(new Date(meta.updatedAtMs).toISOString()) : ''
         }));
 
+    const usedModels = [...modelMap.entries()]
+        .sort((a, b) => b[1].count - a[1].count)
+        .map(([modelId, meta]) => {
+            const sourceLabels = [...meta.sources]
+                .sort((a, b) => a.localeCompare(b, 'en-US'))
+                .map((source) => (source === 'codex' ? 'Codex' : 'Claude Code'));
+            return {
+                key: modelId,
+                model: modelId,
+                count: meta.count,
+                messageTotal: meta.messageTotal,
+                tokenTotal: meta.tokenTotal,
+                sourceLabels
+            };
+        });
+
     const sortedRecentSessions = recentSessions
         .sort((a, b) => b.updatedAtMs - a.updatedAtMs || b.messageCount - a.messageCount || a.title.localeCompare(b.title, 'zh-Hans-CN'))
         .slice(0, 6);
+
+    const missingModelProviders = [...missingModelProviderMap.values()]
+        .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'zh-Hans-CN'));
+    const missingModelSessionsPreview = [...missingModelSessionMap.values()]
+        .sort((a, b) => b.updatedAtMs - a.updatedAtMs || a.title.localeCompare(b.title, 'zh-Hans-CN'))
+        .slice(0, 5);
+
+    const modelCoverage = {
+        totalSessions,
+        modeledSessions: Math.max(0, totalSessions - missingModelSessions),
+        missingModelSessions,
+        providerOnlySessions,
+        missingModelSourceTotals,
+        missingModelProviders,
+        missingModelSessionsPreview,
+        coveragePercent: totalSessions > 0 ? Math.round(((totalSessions - missingModelSessions) / totalSessions) * 100) : 0
+    };
 
     const sortedTopSessionsByMessages = topSessionsByMessages
         .sort((a, b) => b.messageCount - a.messageCount || b.updatedAtMs - a.updatedAtMs || a.title.localeCompare(b.title, 'zh-Hans-CN'))
@@ -281,15 +437,21 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
     const activeDays = buckets.filter((item) => item.totalSessions > 0).length;
     const avgMessagesPerSession = totalSessions > 0 ? Math.round((messageTotal / totalSessions) * 10) / 10 : 0;
     const avgSessionsPerActiveDay = activeDays > 0 ? Math.round((totalSessions / activeDays) * 10) / 10 : 0;
+    const totalDurationMs = Number.isFinite(earliestSessionMs) && latestSessionMs > 0
+        ? Math.max(0, latestSessionMs - earliestSessionMs)
+        : 0;
 
     return {
         range,
         buckets,
+        filteredSessions,
         summary: {
             totalSessions,
             totalMessages: messageTotal,
             totalTokens,
             totalContextWindow,
+            activeDurationMs,
+            totalDurationMs,
             codexTotal,
             claudeTotal,
             activeDays,
@@ -312,6 +474,8 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
                 : null
         },
         sourceShare,
+        usedModels,
+        modelCoverage,
         topPaths,
         recentSessions: sortedRecentSessions,
         topSessionsByMessages: sortedTopSessionsByMessages,
