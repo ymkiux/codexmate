@@ -23,59 +23,63 @@ export function createStartupClaudeMethods(options = {}) {
             }
             this.initError = '';
             try {
-                const [statusRes, listRes] = await Promise.all([api('status'), api('list')]);
-
-                if (statusRes.error || (listRes && listRes.error)) {
-                    this.initError = statusRes.error || listRes.error;
+                const statusRes = await api('status');
+                if (statusRes && statusRes.error) {
+                    this.initError = statusRes.error;
                 } else {
-                    startupOk = true;
-                    this.currentProvider = statusRes.provider;
-                    this.currentModel = statusRes.model;
-                    {
-                        const tier = typeof statusRes.serviceTier === 'string'
-                            ? statusRes.serviceTier.trim().toLowerCase()
-                            : '';
-                        this.serviceTier = tier === 'fast' ? 'fast' : (tier ? 'standard' : 'fast');
-                    }
-                    {
-                        const effort = typeof statusRes.modelReasoningEffort === 'string'
-                            ? statusRes.modelReasoningEffort.trim().toLowerCase()
-                            : '';
-                        const allowedReasoningEfforts = new Set(['low', 'medium', 'high', 'xhigh']);
-                        this.modelReasoningEffort = allowedReasoningEfforts.has(effort) ? effort : 'medium';
-                    }
-                    {
-                        const contextWindow = this.normalizePositiveIntegerInput(
-                            statusRes.modelContextWindow,
-                            'model_context_window',
-                            defaultModelContextWindow
-                        );
-                        if (this.editingCodexBudgetField !== 'modelContextWindowInput') {
-                            this.modelContextWindowInput = contextWindow.ok && contextWindow.text
-                                ? contextWindow.text
-                                : String(defaultModelContextWindow);
+                    const listRes = await api('list');
+                    if (listRes && listRes.error) {
+                        this.initError = listRes.error;
+                    } else {
+                        startupOk = true;
+                        this.currentProvider = statusRes.provider;
+                        this.currentModel = statusRes.model;
+                        {
+                            const tier = typeof statusRes.serviceTier === 'string'
+                                ? statusRes.serviceTier.trim().toLowerCase()
+                                : '';
+                            this.serviceTier = tier === 'fast' ? 'fast' : (tier ? 'standard' : 'fast');
                         }
-                    }
-                    {
-                        const autoCompactTokenLimit = this.normalizePositiveIntegerInput(
-                            statusRes.modelAutoCompactTokenLimit,
-                            'model_auto_compact_token_limit',
-                            defaultModelAutoCompactTokenLimit
-                        );
-                        if (this.editingCodexBudgetField !== 'modelAutoCompactTokenLimitInput') {
-                            this.modelAutoCompactTokenLimitInput = autoCompactTokenLimit.ok && autoCompactTokenLimit.text
-                                ? autoCompactTokenLimit.text
-                                : String(defaultModelAutoCompactTokenLimit);
+                        {
+                            const effort = typeof statusRes.modelReasoningEffort === 'string'
+                                ? statusRes.modelReasoningEffort.trim().toLowerCase()
+                                : '';
+                            const allowedReasoningEfforts = new Set(['low', 'medium', 'high', 'xhigh']);
+                            this.modelReasoningEffort = allowedReasoningEfforts.has(effort) ? effort : 'medium';
                         }
+                        {
+                            const contextWindow = this.normalizePositiveIntegerInput(
+                                statusRes.modelContextWindow,
+                                'model_context_window',
+                                defaultModelContextWindow
+                            );
+                            if (this.editingCodexBudgetField !== 'modelContextWindowInput') {
+                                this.modelContextWindowInput = contextWindow.ok && contextWindow.text
+                                    ? contextWindow.text
+                                    : String(defaultModelContextWindow);
+                            }
+                        }
+                        {
+                            const autoCompactTokenLimit = this.normalizePositiveIntegerInput(
+                                statusRes.modelAutoCompactTokenLimit,
+                                'model_auto_compact_token_limit',
+                                defaultModelAutoCompactTokenLimit
+                            );
+                            if (this.editingCodexBudgetField !== 'modelAutoCompactTokenLimitInput') {
+                                this.modelAutoCompactTokenLimitInput = autoCompactTokenLimit.ok && autoCompactTokenLimit.text
+                                    ? autoCompactTokenLimit.text
+                                    : String(defaultModelAutoCompactTokenLimit);
+                            }
+                        }
+                        this.providersList = listRes.providers;
+                        if (statusRes.configReady === false) {
+                            this.showMessage('配置已加载', 'info');
+                        }
+                        if (statusRes.initNotice) {
+                            this.showMessage('配置就绪', 'info');
+                        }
+                        this.maybeShowStarPrompt();
                     }
-                    this.providersList = listRes.providers;
-                    if (statusRes.configReady === false) {
-                        this.showMessage('配置已加载', 'info');
-                    }
-                    if (statusRes.initNotice) {
-                        this.showMessage('配置就绪', 'info');
-                    }
-                    this.maybeShowStarPrompt();
                 }
             } catch (e) {
                 this.initError = '连接失败: ' + e.message;
@@ -89,11 +93,12 @@ export function createStartupClaudeMethods(options = {}) {
                 try {
                     await this.loadModelsForProvider(this.currentProvider);
                 } catch (_) {}
+                try {
+                    await this.loadCodexAuthProfiles();
+                } catch (_) {}
             }
 
-            try {
-                await this.loadCodexAuthProfiles();
-            } catch (_) {}
+            return startupOk;
         },
 
         async loadModelsForProvider(providerName, options = {}) {

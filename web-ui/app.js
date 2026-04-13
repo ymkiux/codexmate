@@ -451,11 +451,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 this.currentOpenclawConfig = this.openclawConfigs['默认配置'] ? '默认配置' : configNames[0];
             }
             const runInitialLoad = () => {
-                const triggerLoad = () => {
+                const triggerLoad = async () => {
                     this._initialLoadTimer = 0;
+                    const startupOk = await this.loadAll();
+                    if (!startupOk) {
+                        return;
+                    }
                     void this.refreshClaudeSelectionFromSettings({ silent: true });
                     void this.syncDefaultOpenclawConfigEntry({ silent: true });
-                    void this.loadAll();
                 };
                 if (typeof requestAnimationFrame === 'function') {
                     this._initialLoadRafId = requestAnimationFrame(() => {

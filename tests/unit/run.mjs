@@ -10,6 +10,7 @@ globalThis.test = (name, fn) => tests.push({ name, fn });
 await import(pathToFileURL(path.join(__dirname, 'web-ui-logic.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'web-ui-runtime-navigation-regression.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'api-module.test.mjs')));
+await import(pathToFileURL(path.join(__dirname, 'web-ui-startup-init.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'reset-main.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'session-query.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'mcp-stdio.test.mjs')));
