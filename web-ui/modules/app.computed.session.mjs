@@ -110,11 +110,18 @@ function formatUsageDuration(value, options = {}) {
     const maxParts = Number.isFinite(Number(options.maxParts))
         ? Math.max(1, Math.floor(Number(options.maxParts)))
         : 2;
-    const units = [
-        { label: '天', value: 24 * 60 },
-        { label: '小时', value: 60 },
-        { label: '分', value: 1 }
-    ];
+    const compact = options.compact !== false;
+    const units = compact
+        ? [
+            { label: '天', value: 24 * 60 },
+            { label: '时', value: 60 },
+            { label: '分', value: 1 }
+        ]
+        : [
+            { label: '天', value: 24 * 60 },
+            { label: '小时', value: 60 },
+            { label: '分', value: 1 }
+        ];
     let remainingMinutes = totalMinutes;
     const parts = [];
     for (const unit of units) {
@@ -131,7 +138,7 @@ function formatUsageDuration(value, options = {}) {
             break;
         }
     }
-    return parts.length ? parts.join(' ') : '0分';
+    return parts.length ? parts.join(compact ? '' : ' ') : '0分';
 }
 
 const KNOWN_USAGE_MODEL_PRICING = Object.freeze({
@@ -484,14 +491,14 @@ export function createSessionComputed() {
                 {
                     key: 'active-duration',
                     label: '活跃时长',
-                    value: formatUsageDuration(summary.activeDurationMs || 0),
-                    title: `累计会话跨度 ${formatUsageDuration(summary.activeDurationMs || 0, { maxParts: 3 })}`
+                    value: formatUsageDuration(summary.activeDurationMs || 0, { compact: true }),
+                    title: `累计会话跨度 ${formatUsageDuration(summary.activeDurationMs || 0, { maxParts: 3, compact: false })}`
                 },
                 {
                     key: 'total-duration',
                     label: '总时长',
-                    value: formatUsageDuration(summary.totalDurationMs || 0),
-                    title: `整体时间跨度 ${formatUsageDuration(summary.totalDurationMs || 0, { maxParts: 3 })}`
+                    value: formatUsageDuration(summary.totalDurationMs || 0, { compact: true }),
+                    title: `整体时间跨度 ${formatUsageDuration(summary.totalDurationMs || 0, { maxParts: 3, compact: false })}`
                 },
                 { key: 'days', label: '活跃天数', value: formatUsageSummaryNumber(summary.activeDays || 0) },
                 { key: 'avg-messages', label: '平均每会话消息', value: summary.avgMessagesPerSession || 0 },
