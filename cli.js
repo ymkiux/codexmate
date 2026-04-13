@@ -12941,7 +12941,8 @@ async function runCodexExecTaskNode(node, context = {}) {
     const exit = await new Promise((resolve) => {
         const child = spawn(codexPath, args, {
             stdio: ['ignore', 'pipe', 'pipe'],
-            windowsHide: true
+            windowsHide: true,
+            shell: process.platform === 'win32'
         });
         if (typeof context.registerAbort === 'function') {
             context.registerAbort(() => {
