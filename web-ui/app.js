@@ -347,6 +347,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 codexImportLoading: false,
                 codexAuthProfiles: [],
                 forceCompactLayout: false,
+                taskOrchestrationTabEnabled: false,
                 taskOrchestration: {
                     loading: false,
                     planning: false,
@@ -387,6 +388,9 @@ document.addEventListener('DOMContentLoaded', () => {
         mounted() {
             this.initSessionStandalone();
             this.updateCompactLayoutMode();
+            if (!this.taskOrchestrationTabEnabled && this.mainTab === 'orchestration') {
+                this.mainTab = 'config';
+            }
             const savedSessionYolo = localStorage.getItem('codexmateSessionResumeYolo');
             if (savedSessionYolo === '0' || savedSessionYolo === 'false') {
                 this.sessionResumeWithYolo = false;

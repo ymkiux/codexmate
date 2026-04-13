@@ -15,6 +15,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     const sessionsPanel = readProjectFile('web-ui/partials/index/panel-sessions.html');
     const usagePanel = readProjectFile('web-ui/partials/index/panel-usage.html');
     const orchestrationPanel = readProjectFile('web-ui/partials/index/panel-orchestration.html');
+    const bundledScript = readBundledWebUiScript();
     const baseTheme = readProjectFile('web-ui/styles/base-theme.css');
     const controlsForms = readProjectFile('web-ui/styles/controls-forms.css');
     const taskOrchestrationStyles = readProjectFile('web-ui/styles/task-orchestration.css');
@@ -60,6 +61,11 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /settingsTab === 'trash'/);
     assert.match(html, /settingsTab === 'device'/);
     assert.match(html, /sessionTrashCount/);
+    assert.match(html, /v-if="taskOrchestrationTabEnabled" class="top-tab"[\s\S]*id="tab-orchestration"/);
+    assert.match(html, /v-if="taskOrchestrationTabEnabled" class="side-section" role="navigation" aria-label="任务编排"/);
+    assert.match(html, /v-if="taskOrchestrationTabEnabled"[\s\S]*id="panel-orchestration"/);
+    assert.match(html, /taskOrchestrationTabEnabled && mainTab === 'orchestration'/);
+    assert.match(bundledScript, /taskOrchestrationTabEnabled:\s*false/);
     assert.match(html, /id="side-tab-orchestration"/);
     assert.match(html, /id="tab-orchestration"/);
     assert.match(html, /data-main-tab="orchestration"/);
