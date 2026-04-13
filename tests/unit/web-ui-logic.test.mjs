@@ -756,8 +756,10 @@ test('sessionUsageSummaryCards uses compact units for long token and context tot
     assert.strictEqual(costCard.value, '暂无');
     assert.strictEqual(costCard.label, '预估费用 · 近 7 天');
     assert.strictEqual(costCard.note, '当前范围内暂无可估算会话');
-    assert.strictEqual(activeDurationCard.value, '2天 3小时');
-    assert.strictEqual(totalDurationCard.value, '7天 5小时');
+    assert.strictEqual(activeDurationCard.value, '2天3时');
+    assert.strictEqual(totalDurationCard.value, '7天5时');
+    assert.strictEqual(activeDurationCard.title, '累计会话跨度 2天 3小时');
+    assert.strictEqual(totalDurationCard.title, '整体时间跨度 7天 5小时');
 });
 
 test('buildUsageChartGroups keeps all used model names for the selected range and ignores records without concrete models', () => {
@@ -1027,7 +1029,7 @@ test('sessionUsageSummaryCards estimates usage cost from configured provider pri
     assert.strictEqual(costCard.note, '覆盖 1/2 会话，1 个缺少模型单价');
     assert.match(costCard.title, /覆盖 1\/2 个会话/);
     assert.match(costCard.title, /约 67% token/);
-    assert.strictEqual(activeDurationCard.value, '1小时 30分');
+    assert.strictEqual(activeDurationCard.value, '1时30分');
     assert.strictEqual(totalDurationCard.value, '3天');
 });
 
