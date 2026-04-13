@@ -79,6 +79,32 @@ test('api surfaces response context for non-json payloads', async () => {
     });
 });
 
+test('api does not leak raw html error pages into startup-visible errors', async () => {
+    const fetch = async () => createResponse({
+        ok: false,
+        status: 502,
+        statusText: 'Bad Gateway',
+        contentType: 'text/html; charset=utf-8',
+        textValue: '<!doctype html><html><body><h1>Bad Gateway</h1><p>Understand this error</p></body></html>'
+    });
+
+    await withFetch(fetch, async () => {
+        await assert.rejects(
+            () => api('status'),
+            (error) => {
+                assert.match(error.message, /status/i);
+                assert.match(error.message, /502/);
+                assert.match(error.message, /Bad Gateway/);
+                assert.match(error.message, /content-type/i);
+                assert.match(error.message, /text\/html/i);
+                assert.doesNotMatch(error.message, /Understand this error/i);
+                assert.doesNotMatch(error.message, /<!doctype html>/i);
+                return true;
+            }
+        );
+    });
+});
+
 test('api surfaces response context for json parse failures', async () => {
     const fetch = async () => createResponse({
         ok: true,
