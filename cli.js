@@ -5532,14 +5532,25 @@ async function listSessionBrowse(params = {}) {
 }
 
 async function listSessionUsage(params = {}) {
+    function isConcreteSessionModelName(value) {
+        if (typeof value !== 'string') {
+            return false;
+        }
+        const normalized = value.trim();
+        if (!normalized) {
+            return false;
+        }
+        return normalized.toLowerCase() !== '<synthetic>';
+    }
+
     function normalizeSessionModelList(values = []) {
         const models = [];
         for (const value of values) {
-            if (typeof value !== 'string') {
+            if (!isConcreteSessionModelName(value)) {
                 continue;
             }
             const normalized = value.trim();
-            if (!normalized || models.includes(normalized)) {
+            if (models.includes(normalized)) {
                 continue;
             }
             models.push(normalized);
@@ -5579,11 +5590,11 @@ async function listSessionUsage(params = {}) {
 
         const models = [];
         const pushModel = (value) => {
-            if (typeof value !== 'string') {
+            if (!isConcreteSessionModelName(value)) {
                 return;
             }
             const normalized = value.trim();
-            if (!normalized || models.includes(normalized)) {
+            if (models.includes(normalized)) {
                 return;
             }
             models.push(normalized);
@@ -5670,7 +5681,7 @@ async function listSessionUsage(params = {}) {
     return Array.isArray(sessions)
         ? sessions.map((item) => {
             if (!item || typeof item !== 'object' || Array.isArray(item)) {
-                return item;
+                return null;
             }
             const normalized = { ...item };
             delete normalized.__messageCountExact;
@@ -5685,19 +5696,13 @@ async function listSessionUsage(params = {}) {
             ]);
             if (mergedModels.length > 0) {
                 normalized.models = mergedModels;
-                if ((!normalized.model || !String(normalized.model).trim())) {
-                    normalized.model = mergedModels[0];
-                }
+                normalized.model = mergedModels[0];
             }
-            const hasModel = [normalized.model, normalized.modelName, normalized.modelId]
-                .some((value) => typeof value === 'string' && value.trim());
-            const hasModels = Array.isArray(normalized.models)
-                && normalized.models.some((value) => typeof value === 'string' && value.trim());
-            if (hasModel || hasModels) {
+            if (mergedModels.length > 0) {
                 return normalized;
             }
             if (!filePath) {
-                return normalized;
+                return null;
             }
 
             const summaryOptions = {
@@ -5714,30 +5719,27 @@ async function listSessionUsage(params = {}) {
             }
 
             if (!summary || typeof summary !== 'object' || Array.isArray(summary)) {
-                return normalized;
-            }
-            if (typeof summary.model === 'string' && summary.model.trim()) {
-                normalized.model = summary.model.trim();
+                return null;
             }
             const summaryModels = Array.isArray(summary.models) ? summary.models : [];
             const allModels = normalizeSessionModelList([
                 ...summaryModels,
                 ...fullFileModels,
+                summary.model,
                 normalized.model,
                 normalized.modelName,
                 normalized.modelId
             ]);
-            if (allModels.length > 0) {
-                normalized.models = allModels;
-                if ((!normalized.model || !String(normalized.model).trim())) {
-                    normalized.model = allModels[0];
-                }
+            if (allModels.length === 0) {
+                return null;
             }
+            normalized.models = allModels;
+            normalized.model = allModels[0];
             if ((!normalized.provider || !String(normalized.provider).trim()) && typeof summary.provider === 'string' && summary.provider.trim()) {
                 normalized.provider = summary.provider.trim();
             }
             return normalized;
-        })
+        }).filter(Boolean)
         : [];
 }
 

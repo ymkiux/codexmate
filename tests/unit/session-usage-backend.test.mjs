@@ -130,6 +130,7 @@ test('listSessionUsage uses lightweight session listing without exact hydration'
             {
                 source: 'codex',
                 sessionId: 'sess-1',
+                model: 'gpt-5.3-codex',
                 messageCount: 12,
                 totalTokens: 345,
                 contextWindow: 128000,
@@ -148,7 +149,7 @@ test('listSessionUsage uses lightweight session listing without exact hydration'
         listAllSessionsData,
         SESSION_BROWSE_SUMMARY_READ_BYTES: 65536,
         parseCodexSessionSummary() {
-            throw new Error('should not parse codex summary when model is not needed');
+            throw new Error('should not parse codex summary when model is already present');
         },
         parseClaudeSessionSummary() {
             throw new Error('should not parse claude summary when model is not needed');
@@ -178,6 +179,8 @@ test('listSessionUsage uses lightweight session listing without exact hydration'
         {
             source: 'codex',
             sessionId: 'sess-1',
+            model: 'gpt-5.3-codex',
+            models: ['gpt-5.3-codex'],
             messageCount: 12,
             totalTokens: 345,
             contextWindow: 128000
@@ -294,6 +297,53 @@ test('listSessionUsage backfills missing model metadata from parsed session summ
             options: { summaryReadBytes: 65536, titleReadBytes: 65536 }
         }
     ]);
+});
+
+test('listSessionUsage ignores entries without concrete model names or with <synthetic> placeholders', async () => {
+    const parseCodexSessionSummaryCalls = [];
+    const listSessionUsage = instantiateListSessionUsage({
+        fs,
+        MAX_SESSION_USAGE_LIST_SIZE: 2000,
+        SESSION_BROWSE_SUMMARY_READ_BYTES: 65536,
+        async listSessionBrowse() {
+            return [
+                {
+                    source: 'codex',
+                    sessionId: 'missing-model',
+                    filePath: '/tmp/missing-model.jsonl',
+                    provider: 'maxx'
+                },
+                {
+                    source: 'codex',
+                    sessionId: 'synthetic-model',
+                    model: '<synthetic>',
+                    models: ['<synthetic>'],
+                    filePath: '/tmp/synthetic-model.jsonl'
+                },
+                {
+                    source: 'codex',
+                    sessionId: 'real-model',
+                    model: 'gpt-5.3-codex',
+                    filePath: '/tmp/real-model.jsonl'
+                }
+            ];
+        },
+        parseCodexSessionSummary(filePath) {
+            parseCodexSessionSummaryCalls.push(filePath);
+            return null;
+        },
+        parseClaudeSessionSummary() {
+            return null;
+        },
+        listAllSessionsData: async () => {
+            throw new Error('should not call listAllSessionsData');
+        }
+    });
+
+    const result = await listSessionUsage({ source: 'codex', limit: 50, forceRefresh: true });
+
+    assert.deepStrictEqual(result.map((item) => item.sessionId), ['real-model']);
+    assert.deepStrictEqual(parseCodexSessionSummaryCalls, ['/tmp/missing-model.jsonl', '/tmp/synthetic-model.jsonl']);
 });
 
 test('listSessionUsage scans the full session file so middle model names are not dropped', async () => {
