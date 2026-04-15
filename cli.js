@@ -10262,7 +10262,12 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
 
         if (!process.env.CODEXMATE_NO_BROWSER && openBrowser) {
             const url = openUrl;
-            openBrowserAfterReady(url);
+            // npm run dev: delay opening the browser to avoid racing early startup logs / initialization.
+            if (process.env.npm_lifecycle_event === 'dev') {
+                setTimeout(() => openBrowserAfterReady(url), 3000);
+            } else {
+                openBrowserAfterReady(url);
+            }
         }
     });
 
