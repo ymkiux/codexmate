@@ -9,8 +9,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
 
-const cliPath = path.join(__dirname, '..', '..', 'cli.js');
-const cliContent = fs.readFileSync(cliPath, 'utf-8');
+const sessionsPath = path.join(__dirname, '..', '..', 'lib', 'cli-sessions.js');
+const cliContent = fs.readFileSync(sessionsPath, 'utf-8');
 
 function extractFunction(content, funcName) {
     const regex = new RegExp(`(?:async\\s+)?function ${funcName}\\([^)]*\\)\\s*\\{[\\s\\S]*?^\\}`, 'm');
