@@ -10,7 +10,7 @@
 [![Version](https://img.shields.io/npm/v/codexmate?label=version&registry_uri=https%3A%2F%2Fregistry.npmjs.org)](https://www.npmjs.com/package/codexmate)
 [![Downloads](https://img.shields.io/npm/dt/codexmate?label=downloads)](https://www.npmjs.com/package/codexmate)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Node](https://img.shields.io/badge=node-%3E%3D14.0.0-green.svg)](https://nodejs.org)
+[![Node](https://img.shields.io/badge/node-%3E%3D14.0.0-green.svg)](https://nodejs.org/)
 
 [快速开始](#快速开始) · [命令速查](#命令速查) · [Web 界面](#web-界面) · [任务编排](#任务编排) · [MCP](#mcp) · [English](README.en.md)
 
@@ -77,8 +77,6 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 - Zip 压缩/解压（优先系统工具，失败回退 JS 库）
 
 ## 架构总览
-
-把 Codex Mate 当作一个 **“本地配置/会话/技能/任务编排的控制台”**：你通过 CLI / Web UI / MCP 下达操作，它只改动你本机的配置与数据文件，并给出可审计、可回滚的结果。
 
 ### 一图看懂（从“做什么”到“产生什么效果”）
 
