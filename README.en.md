@@ -72,50 +72,60 @@ It works on local files directly and does not require cloud hosting. The skills 
 
 ## Architecture
 
+Think of Codex Mate as a **local control panel** for configuration, sessions, skills, and task orchestration. You operate it via CLI / Web UI / MCP, and it only updates your local files so changes stay auditable and reversible.
+
+### At a glance (what it does → what you get)
+
 ```mermaid
-flowchart TB
-    subgraph Interfaces["Entry Surfaces"]
+flowchart LR
+    subgraph You["You"]
       CLI["CLI"]
       WEB["Web UI"]
-      MCP["MCP Client"]
-      OAI["Codex / OpenAI Client"]
+      MCP["MCP (stdio)"]
     end
 
-    subgraph Runtime["Codex Mate Runtime"]
-      ENTRY["cli.js Entry"]
+    subgraph Mate["Codex Mate (local control panel)"]
       API["Local HTTP API"]
-      MCPS["MCP stdio Server"]
-      PROXY["Built-in Proxy"]
-      SERVICES["Config / Sessions & Usage / Skills Market / Workflow"]
-      CORE["File IO / Network / Diff / Session Utils"]
+      CFG["Config management"]
+      SESS["Sessions & Usage"]
+      SKL["Skills management"]
+      TASK["Task orchestration"]
     end
 
-    subgraph Data["Local Files"]
-      CODEX["~/.codex/config + auth + models"]
+    subgraph Files["Local files only (auditable & reversible)"]
+      CODEX["~/.codex/*"]
       CLAUDE["~/.claude/settings.json"]
       OPENCLAW["~/.openclaw/*.json5 + ~/.openclaw/openclaw.json + workspace/AGENTS.md"]
-      SKILLS["~/.codex/skills / ~/.claude/skills / ~/.agents/skills"]
-      STATE["sessions / usage aggregates / trash / workflow runs / skill exports"]
+      SKILLS["~/.{codex,claude,agents}/skills"]
+      STATE["sessions / usage / trash / runs"]
     end
 
-    CLI --> ENTRY
-    WEB -->|GET / + POST /api| API
-    MCP -->|stdio JSON-RPC| MCPS
-    OAI -->|HTTP /v1| PROXY
+    CLI --> API
+    WEB --> API
+    MCP --> API
 
-    ENTRY --> SERVICES
-    API --> SERVICES
-    MCPS --> SERVICES
-    PROXY --> CORE
+    API --> CFG
+    API --> SESS
+    API --> SKL
+    API --> TASK
 
-    SERVICES --> CORE
-
-    CORE --> CODEX
-    CORE --> CLAUDE
-    CORE --> OPENCLAW
-    CORE --> SKILLS
-    CORE --> STATE
+    CFG --> CODEX
+    CFG --> CLAUDE
+    CFG --> OPENCLAW
+    SKL --> SKILLS
+    SESS --> STATE
+    TASK --> STATE
 ```
+
+### Capability → Local target → Outcome
+
+| Capability | Local target | What you get |
+| --- | --- | --- |
+| Config management (Codex / Claude / OpenClaw) | `~/.codex/*`, `~/.claude/settings.json`, `~/.openclaw/*` | Faster provider/model switching, multi-profile management, safer writes with backups |
+| Sessions & Usage | sessions / usage aggregates / trash | Quickly locate sessions, filter/export, batch cleanup, and view trends |
+| Skills market | `~/.{codex,claude,agents}/skills` | Local install/import/export (ZIP), cross-app reuse |
+| Task orchestration (plan → run/queue) | local runs / logs | Preview plan before execution, replay logs, retry/cancel |
+| MCP (stdio) | local API + file operations | Integrate with external tools under controllable permissions (read-only by default) |
 
 ## Quick Start
 

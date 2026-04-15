@@ -78,46 +78,60 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 
 ## 架构总览
 
+把 Codex Mate 当作一个 **“本地配置/会话/技能/任务编排的控制台”**：你通过 CLI / Web UI / MCP 下达操作，它只改动你本机的配置与数据文件，并给出可审计、可回滚的结果。
+
+### 一图看懂（从“做什么”到“产生什么效果”）
+
 ```mermaid
-flowchart TB
-    subgraph Interfaces["入口"]
-      CLI["CLI"]
+flowchart LR
+    subgraph You["你"]
+      CLI["CLI 命令"]
       WEB["Web UI"]
-      MCP["MCP Client"]
+      MCP["MCP 调用"]
     end
 
-    subgraph Runtime["Codex Mate Runtime"]
-      ENTRY["cli.js Entry"]
-      API["Local HTTP API"]
-      MCPS["MCP stdio Server"]
-      SERVICES["Config / Sessions & Usage / Skills Market / Workflow"]
-      CORE["File IO / Network / Diff / Session Utils"]
+    subgraph Mate["Codex Mate（本地控制台）"]
+      API["本地 HTTP API"]
+      CFG["配置管理"]
+      SESS["会话/Usage 管理"]
+      SKL["Skills 管理"]
+      TASK["任务编排"]
     end
 
-    subgraph State["Local State"]
-      CODEX["~/.codex/config + auth + models"]
+    subgraph Files["只操作你的本地文件（可审计/可回滚）"]
+      CODEX["~/.codex/*"]
       CLAUDE["~/.claude/settings.json"]
       OPENCLAW["~/.openclaw/*.json5 + ~/.openclaw/openclaw.json + workspace/AGENTS.md"]
-      SKILLS["~/.codex/skills / ~/.claude/skills / ~/.agents/skills"]
-      STATE["sessions / usage aggregates / trash / workflow runs / skill exports"]
+      SKILLS["~/.{codex,claude,agents}/skills"]
+      SESSFILES["sessions / usage / trash / runs"]
     end
 
-    CLI --> ENTRY
-    WEB -->|GET / + POST /api| API
-    MCP -->|stdio JSON-RPC| MCPS
+    CLI --> API
+    WEB --> API
+    MCP --> API
 
-    ENTRY --> SERVICES
-    API --> SERVICES
-    MCPS --> SERVICES
+    API --> CFG
+    API --> SESS
+    API --> SKL
+    API --> TASK
 
-    SERVICES --> CORE
-
-    CORE --> CODEX
-    CORE --> CLAUDE
-    CORE --> OPENCLAW
-    CORE --> SKILLS
-    CORE --> STATE
+    CFG --> CODEX
+    CFG --> CLAUDE
+    CFG --> OPENCLAW
+    SKL --> SKILLS
+    SESS --> SESSFILES
+    TASK --> SESSFILES
 ```
+
+### 能力 → 作用对象 → 用户收益（直观对照）
+
+| 能力 | 作用对象（本地） | 你能直接得到什么 |
+| --- | --- | --- |
+| 配置管理（Codex / Claude / OpenClaw） | `~/.codex/*`、`~/.claude/settings.json`、`~/.openclaw/*` | 一键切换 provider/model、管理多套配置、写入前后可控与可回滚 |
+| 会话与 Usage | sessions / usage 聚合 / trash | 更快定位会话、筛选导出、批量清理、查看趋势与占比 |
+| Skills 市场 | `~/.{codex,claude,agents}/skills` | 本地安装/导入/导出/分发（ZIP），跨应用复用更省事 |
+| 任务编排（plan → run/queue） | 本地 runs / logs | 先看计划再执行，留痕、可重试、可取消 |
+| MCP（stdio） | 本地 API / 文件能力 | 让外部工具以“可控权限”调用本地能力（默认只读） |
 
 ## 快速开始
 
