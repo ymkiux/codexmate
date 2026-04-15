@@ -115,12 +115,37 @@
                     <input v-model="newClaudeConfig.name" class="form-input" placeholder="例如: 智谱GLM">
                 </div>
                 <div class="form-group">
+                    <label class="form-label">预设</label>
+                    <select v-model="newClaudeConfig.preset" class="form-input" @change="if (newClaudeConfig.preset === 'aws-bedrock-aksk' || newClaudeConfig.preset === 'aws-bedrock-api-key') { newClaudeConfig.awsRegion = (newClaudeConfig.awsRegion || 'us-west-2').trim() || 'us-west-2'; newClaudeConfig.baseUrl = 'https://bedrock-runtime.' + newClaudeConfig.awsRegion + '.amazonaws.com'; if (!newClaudeConfig.model || newClaudeConfig.model === 'glm-4.7') newClaudeConfig.model = 'global.anthropic.claude-opus-4-6-v1'; if (newClaudeConfig.preset === 'aws-bedrock-aksk') newClaudeConfig.apiKey = ''; }">
+                        <option value="">自定义</option>
+                        <option value="aws-bedrock-aksk">AWS Bedrock (AKSK)</option>
+                        <option value="aws-bedrock-api-key">AWS Bedrock (API Key)</option>
+                    </select>
+                </div>
+                <div class="form-group" v-if="newClaudeConfig.preset === 'aws-bedrock-aksk' || newClaudeConfig.preset === 'aws-bedrock-api-key'">
+                    <label class="form-label">AWS Region</label>
+                    <input v-model="newClaudeConfig.awsRegion" class="form-input" placeholder="us-west-2" @input="if (newClaudeConfig.preset === 'aws-bedrock-aksk' || newClaudeConfig.preset === 'aws-bedrock-api-key') { const region = (newClaudeConfig.awsRegion || 'us-west-2').trim() || 'us-west-2'; newClaudeConfig.awsRegion = region; newClaudeConfig.baseUrl = 'https://bedrock-runtime.' + region + '.amazonaws.com'; }">
+                </div>
+                <div class="form-group" v-if="newClaudeConfig.preset === 'aws-bedrock-aksk'">
+                    <label class="form-label">AWS Access Key ID</label>
+                    <input v-model="newClaudeConfig.awsAccessKeyId" class="form-input" autocomplete="off" spellcheck="false" placeholder="AKIA..." />
+                </div>
+                <div class="form-group" v-if="newClaudeConfig.preset === 'aws-bedrock-aksk'">
+                    <label class="form-label">AWS Secret Access Key</label>
+                    <input v-model="newClaudeConfig.awsSecretAccessKey" class="form-input" autocomplete="off" spellcheck="false" placeholder="your-secret-key" />
+                </div>
+                <div class="form-group" v-if="newClaudeConfig.preset !== 'aws-bedrock-aksk'">
                     <label class="form-label">API Key</label>
                     <input v-model="newClaudeConfig.apiKey" class="form-input" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-...">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Base URL</label>
-                    <input v-model="newClaudeConfig.baseUrl" class="form-input" placeholder="https://open.bigmodel.cn/api/anthropic">
+                    <input
+                        v-model="newClaudeConfig.baseUrl"
+                        class="form-input"
+                        placeholder="https://open.bigmodel.cn/api/anthropic"
+                        :readonly="newClaudeConfig.preset === 'aws-bedrock-aksk' || newClaudeConfig.preset === 'aws-bedrock-api-key'"
+                    >
                 </div>
 
                 <div class="btn-group">
@@ -140,12 +165,37 @@
                     <input v-model="editingConfig.name" class="form-input" placeholder="配置名称" readonly>
                 </div>
                 <div class="form-group">
+                    <label class="form-label">预设</label>
+                    <select v-model="editingConfig.preset" class="form-input" @change="if (editingConfig.preset === 'aws-bedrock-aksk' || editingConfig.preset === 'aws-bedrock-api-key') { editingConfig.awsRegion = (editingConfig.awsRegion || 'us-west-2').trim() || 'us-west-2'; editingConfig.baseUrl = 'https://bedrock-runtime.' + editingConfig.awsRegion + '.amazonaws.com'; if (!editingConfig.model || editingConfig.model === 'glm-4.7') editingConfig.model = 'global.anthropic.claude-opus-4-6-v1'; if (editingConfig.preset === 'aws-bedrock-aksk') editingConfig.apiKey = ''; }">
+                        <option value="">自定义</option>
+                        <option value="aws-bedrock-aksk">AWS Bedrock (AKSK)</option>
+                        <option value="aws-bedrock-api-key">AWS Bedrock (API Key)</option>
+                    </select>
+                </div>
+                <div class="form-group" v-if="editingConfig.preset === 'aws-bedrock-aksk' || editingConfig.preset === 'aws-bedrock-api-key'">
+                    <label class="form-label">AWS Region</label>
+                    <input v-model="editingConfig.awsRegion" class="form-input" placeholder="us-west-2" @input="if (editingConfig.preset === 'aws-bedrock-aksk' || editingConfig.preset === 'aws-bedrock-api-key') { const region = (editingConfig.awsRegion || 'us-west-2').trim() || 'us-west-2'; editingConfig.awsRegion = region; editingConfig.baseUrl = 'https://bedrock-runtime.' + region + '.amazonaws.com'; }">
+                </div>
+                <div class="form-group" v-if="editingConfig.preset === 'aws-bedrock-aksk'">
+                    <label class="form-label">AWS Access Key ID</label>
+                    <input v-model="editingConfig.awsAccessKeyId" class="form-input" autocomplete="off" spellcheck="false" placeholder="AKIA..." />
+                </div>
+                <div class="form-group" v-if="editingConfig.preset === 'aws-bedrock-aksk'">
+                    <label class="form-label">AWS Secret Access Key</label>
+                    <input v-model="editingConfig.awsSecretAccessKey" class="form-input" autocomplete="off" spellcheck="false" placeholder="your-secret-key" />
+                </div>
+                <div class="form-group" v-if="editingConfig.preset !== 'aws-bedrock-aksk'">
                     <label class="form-label">API Key</label>
                     <input v-model="editingConfig.apiKey" class="form-input" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-...">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Base URL</label>
-                    <input v-model="editingConfig.baseUrl" class="form-input" placeholder="https://open.bigmodel.cn/api/anthropic">
+                    <input
+                        v-model="editingConfig.baseUrl"
+                        class="form-input"
+                        placeholder="https://open.bigmodel.cn/api/anthropic"
+                        :readonly="editingConfig.preset === 'aws-bedrock-aksk' || editingConfig.preset === 'aws-bedrock-api-key'"
+                    >
                 </div>
 
                 <div class="btn-group">
