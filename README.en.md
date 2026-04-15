@@ -87,7 +87,6 @@ flowchart LR
       CFG["Config management"]
       SESS["Sessions & Usage"]
       SKL["Skills management"]
-      TASK["Task orchestration"]
     end
 
     subgraph Files["Local files only (auditable & reversible)"]
@@ -105,14 +104,12 @@ flowchart LR
     API --> CFG
     API --> SESS
     API --> SKL
-    API --> TASK
 
     CFG --> CODEX
     CFG --> CLAUDE
     CFG --> OPENCLAW
     SKL --> SKILLS
     SESS --> STATE
-    TASK --> STATE
 ```
 
 ### Capability → Local target → Outcome
@@ -122,7 +119,6 @@ flowchart LR
 | Config management (Codex / Claude / OpenClaw) | `~/.codex/*`, `~/.claude/settings.json`, `~/.openclaw/*` | Faster provider/model switching, multi-profile management, safer writes with backups |
 | Sessions & Usage | sessions / usage aggregates / trash | Quickly locate sessions, filter/export, batch cleanup, and view trends |
 | Skills market | `~/.{codex,claude,agents}/skills` | Local install/import/export (ZIP), cross-app reuse |
-| Task orchestration (plan → run/queue) | local runs / logs | Preview plan before execution, replay logs, retry/cancel |
 | MCP (stdio) | local API + file operations | Integrate with external tools under controllable permissions (read-only by default) |
 
 ## Quick Start
