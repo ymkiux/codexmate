@@ -9502,9 +9502,39 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
         });
         req.end(payload, 'utf-8');
     };
+    const probeWebUiAssetReadiness = (callback) => {
+        const requestOptions = {
+            hostname: openHost,
+            port,
+            path: '/web-ui/app.js',
+            method: 'GET'
+        };
+        let settled = false;
+        const finish = (ready) => {
+            if (settled) return;
+            settled = true;
+            callback(ready);
+        };
+        const req = http.request(requestOptions, (probeRes) => {
+            if (typeof probeRes.resume === 'function') {
+                probeRes.resume();
+            }
+            probeRes.on('end', () => {
+                finish(probeRes.statusCode === 200);
+            });
+        });
+        req.on('error', () => finish(false));
+        req.setTimeout(1000, () => {
+            try { req.destroy(); } catch (_) {}
+            finish(false);
+        });
+        req.end();
+    };
     const openBrowserAfterReady = (url) => {
-        const maxAttempts = 40;
-        const retryDelayMs = 150;
+        // Some environments may start the listener before the bundled web-ui assets
+        // are ready for the first browser hit; wait until both API and assets respond.
+        const maxAttempts = 120;
+        const retryDelayMs = 200;
         let finished = false;
 
         const finish = (ready) => {
@@ -9539,16 +9569,26 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
             }
         };
         const scheduleProbe = (attempt) => {
-            probeWebUiReadiness((ready) => {
-                if (ready) {
-                    finish(true);
+            probeWebUiReadiness((apiReady) => {
+                if (!apiReady) {
+                    if (attempt >= maxAttempts) {
+                        finish(false);
+                        return;
+                    }
+                    setTimeout(() => scheduleProbe(attempt + 1), retryDelayMs);
                     return;
                 }
-                if (attempt >= maxAttempts) {
-                    finish(false);
-                    return;
-                }
-                setTimeout(() => scheduleProbe(attempt + 1), retryDelayMs);
+                probeWebUiAssetReadiness((assetReady) => {
+                    if (assetReady) {
+                        finish(true);
+                        return;
+                    }
+                    if (attempt >= maxAttempts) {
+                        finish(false);
+                        return;
+                    }
+                    setTimeout(() => scheduleProbe(attempt + 1), retryDelayMs);
+                });
             });
         };
 
@@ -10262,12 +10302,7 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
 
         if (!process.env.CODEXMATE_NO_BROWSER && openBrowser) {
             const url = openUrl;
-            // npm run dev: delay opening the browser to avoid racing early startup logs / initialization.
-            if (process.env.npm_lifecycle_event === 'dev') {
-                setTimeout(() => openBrowserAfterReady(url), 3000);
-            } else {
-                openBrowserAfterReady(url);
-            }
+            openBrowserAfterReady(url);
         }
     });
 

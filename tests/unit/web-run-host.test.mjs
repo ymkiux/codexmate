@@ -804,7 +804,9 @@ test('createWebServer returns 500 when fallback bundled html generation throws',
 test('createWebServer waits for api readiness probe before auto-opening the browser', () => {
     let listenCallback = null;
     let probeRequest = null;
+    let assetRequest = null;
     let probeEndHandler = null;
+    let assetEndHandler = null;
     let probePayload = '';
     const spawnCalls = [];
     const createWebServer = instantiateFunction(createWebServerSource, 'createWebServer', {
@@ -827,7 +829,11 @@ test('createWebServer waits for api readiness probe before auto-opening the brow
                 };
             },
             request(options, callback) {
-                probeRequest = { options, callback };
+                if (options && options.method === 'POST') {
+                    probeRequest = { options, callback };
+                } else {
+                    assetRequest = { options, callback };
+                }
                 return {
                     on() {},
                     setTimeout() {},
@@ -921,6 +927,24 @@ test('createWebServer waits for api readiness probe before auto-opening the brow
     assert.deepStrictEqual(spawnCalls, []);
 
     probeEndHandler();
+    assert.ok(assetRequest, 'should probe the web ui assets before auto-open');
+    assert.strictEqual(assetRequest.options.hostname, '127.0.0.1');
+    assert.strictEqual(assetRequest.options.port, 3737);
+    assert.strictEqual(assetRequest.options.path, '/web-ui/app.js');
+    assert.strictEqual(assetRequest.options.method, 'GET');
+
+    assetRequest.callback({
+        statusCode: 200,
+        resume() {},
+        on(event, handler) {
+            if (event === 'end') {
+                assetEndHandler = handler;
+            }
+        }
+    });
+    assert.deepStrictEqual(spawnCalls, []);
+
+    assetEndHandler();
     assert.deepStrictEqual(spawnCalls, [{
         command: 'cmd',
         args: ['/c', 'start', '', 'http://127.0.0.1:3737'],
@@ -1172,7 +1196,8 @@ test('createWebServer retries readiness probe failures before auto-opening the b
         Buffer
     });
 
-    requestOutcomes.push('error', 200);
+    // first api probe fails, second api probe succeeds, asset probe succeeds
+    requestOutcomes.push('error', 200, 200);
     createWebServer({
         htmlPath: '/repo/web-ui/index.html',
         assetsDir: '/repo/res',
@@ -1185,7 +1210,7 @@ test('createWebServer retries readiness probe failures before auto-opening the b
     listenCallback();
     assert.deepStrictEqual(spawnCalls, []);
     assert.strictEqual(timers.length, 1);
-    assert.strictEqual(timers[0].ms, 150);
+    assert.strictEqual(timers[0].ms, 200);
 
     timers[0].callback();
     assert.deepStrictEqual(spawnCalls, [{
