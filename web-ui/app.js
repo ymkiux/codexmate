@@ -246,7 +246,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 newModelName: '',
                 currentClaudeConfig: '',
                 currentClaudeModel: '',
-                editingConfig: { name: '', apiKey: '', baseUrl: '', model: '' },
+                editingConfig: {
+                    name: '',
+                    apiKey: '',
+                    baseUrl: '',
+                    model: '',
+                    preset: '',
+                    awsRegion: 'us-west-2',
+                    awsAccessKeyId: '',
+                    awsSecretAccessKey: ''
+                },
                 claudeConfigs: {
                     '智谱GLM': {
                         apiKey: '',
@@ -259,7 +268,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     name: '',
                     apiKey: '',
                     baseUrl: 'https://open.bigmodel.cn/api/anthropic',
-                    model: 'glm-4.7'
+                    model: 'glm-4.7',
+                    preset: '',
+                    awsRegion: 'us-west-2',
+                    awsAccessKeyId: '',
+                    awsSecretAccessKey: ''
                 },
                 currentOpenclawConfig: '',
                 openclawConfigs: {

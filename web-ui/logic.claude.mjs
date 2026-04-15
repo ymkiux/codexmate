@@ -69,7 +69,7 @@ export function normalizeClaudeConfig(config) {
     const useKey = normalizeClaudeValue(safe.useKey);
     const externalCredentialType = normalizeClaudeValue(safe.externalCredentialType)
         || (apiKey ? '' : (authToken ? 'auth-token' : (useKey ? 'claude-code-use-key' : '')));
-    return {
+    const normalized = {
         apiKey,
         baseUrl: normalizeClaudeValue(safe.baseUrl),
         model: normalizeClaudeValue(safe.model),
@@ -77,6 +77,16 @@ export function normalizeClaudeConfig(config) {
         useKey,
         externalCredentialType
     };
+    // 兼容既有单测与历史数据：仅在字段有值时追加新字段。
+    const preset = normalizeClaudeValue(safe.preset);
+    if (preset) normalized.preset = preset;
+    const awsRegion = normalizeClaudeValue(safe.awsRegion);
+    if (awsRegion) normalized.awsRegion = awsRegion;
+    const awsAccessKeyId = normalizeClaudeValue(safe.awsAccessKeyId);
+    if (awsAccessKeyId) normalized.awsAccessKeyId = awsAccessKeyId;
+    const awsSecretAccessKey = normalizeClaudeValue(safe.awsSecretAccessKey);
+    if (awsSecretAccessKey) normalized.awsSecretAccessKey = awsSecretAccessKey;
+    return normalized;
 }
 
 export function normalizeClaudeSettingsEnv(env) {
@@ -84,7 +94,7 @@ export function normalizeClaudeSettingsEnv(env) {
     const apiKey = normalizeClaudeValue(safe.ANTHROPIC_API_KEY);
     const authToken = normalizeClaudeValue(safe.ANTHROPIC_AUTH_TOKEN);
     const useKey = normalizeClaudeValue(safe.CLAUDE_CODE_USE_KEY);
-    return {
+    const normalized = {
         apiKey,
         baseUrl: normalizeClaudeValue(safe.ANTHROPIC_BASE_URL),
         model: normalizeClaudeValue(safe.ANTHROPIC_MODEL) || 'glm-4.7',
@@ -92,8 +102,19 @@ export function normalizeClaudeSettingsEnv(env) {
         useKey,
         externalCredentialType: apiKey
             ? ''
-            : (authToken ? 'auth-token' : (useKey ? 'claude-code-use-key' : ''))
+            : (authToken ? 'auth-token' : (useKey ? 'claude-code-use-key' : '')),
     };
+    const useBedrock = normalizeClaudeValue(safe.CLAUDE_CODE_USE_BEDROCK);
+    const awsRegion = normalizeClaudeValue(safe.AWS_REGION);
+    const awsAccessKeyId = normalizeClaudeValue(safe.AWS_ACCESS_KEY_ID);
+    const awsSecretAccessKey = normalizeClaudeValue(safe.AWS_SECRET_ACCESS_KEY);
+    if (useBedrock) {
+        normalized.preset = awsAccessKeyId || awsSecretAccessKey ? 'aws-bedrock-aksk' : 'aws-bedrock-api-key';
+    }
+    if (awsRegion) normalized.awsRegion = awsRegion;
+    if (awsAccessKeyId) normalized.awsAccessKeyId = awsAccessKeyId;
+    if (awsSecretAccessKey) normalized.awsSecretAccessKey = awsSecretAccessKey;
+    return normalized;
 }
 
 function normalizeClaudeComparableUrl(value) {
@@ -103,6 +124,12 @@ function normalizeClaudeComparableUrl(value) {
 }
 
 function hasClaudeCredential(config = {}) {
+    if (config.preset === 'aws-bedrock-aksk') {
+        return !!(config.awsRegion && config.awsAccessKeyId && config.awsSecretAccessKey);
+    }
+    if (config.preset === 'aws-bedrock-api-key') {
+        return !!(config.awsRegion && config.apiKey);
+    }
     return !!(config.apiKey || config.authToken || config.useKey);
 }
 
@@ -141,8 +168,9 @@ export function findDuplicateClaudeConfigName(claudeConfigs = {}, config) {
         return '';
     }
     const comparableUrl = normalizeClaudeComparableUrl(normalized.baseUrl);
+    const isBedrock = normalized.preset === 'aws-bedrock-aksk' || normalized.preset === 'aws-bedrock-api-key';
     const isExternal = !normalized.apiKey && !!normalized.externalCredentialType;
-    if (!normalized.apiKey && !isExternal) {
+    if (!normalized.apiKey && !isExternal && !isBedrock) {
         return '';
     }
     const entries = Object.entries(claudeConfigs || {});
@@ -154,6 +182,19 @@ export function findDuplicateClaudeConfigName(claudeConfigs = {}, config) {
         if (normalizeClaudeComparableUrl(normalizedExisting.baseUrl) !== comparableUrl
             || normalizedExisting.model !== normalized.model) {
             continue;
+        }
+        if (isBedrock && normalizedExisting.preset === normalized.preset) {
+            if (normalized.preset === 'aws-bedrock-aksk') {
+                if (normalizedExisting.awsRegion === normalized.awsRegion
+                    && normalizedExisting.awsAccessKeyId === normalized.awsAccessKeyId) {
+                    return name;
+                }
+            } else if (normalized.preset === 'aws-bedrock-api-key') {
+                if (normalizedExisting.awsRegion === normalized.awsRegion
+                    && normalizedExisting.apiKey === normalized.apiKey) {
+                    return name;
+                }
+            }
         }
         if (normalized.apiKey && normalizedExisting.apiKey === normalized.apiKey) {
             return name;

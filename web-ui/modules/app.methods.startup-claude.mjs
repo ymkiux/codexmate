@@ -189,13 +189,39 @@ export function createStartupClaudeMethods(options = {}) {
             const externalCredentialType = next.apiKey
                 ? ''
                 : (next.externalCredentialType || previous.externalCredentialType || '');
-            return {
+
+            const preset = next.preset || '';
+            const isBedrock = preset === 'aws-bedrock-aksk' || preset === 'aws-bedrock-api-key';
+            const awsRegion = next.awsRegion || previous.awsRegion || '';
+            const awsAccessKeyId = next.awsAccessKeyId || previous.awsAccessKeyId || '';
+            const awsSecretAccessKey = next.awsSecretAccessKey || previous.awsSecretAccessKey || '';
+
+            const baseUrl = isBedrock && awsRegion
+                ? `https://bedrock-runtime.${awsRegion}.amazonaws.com`
+                : next.baseUrl;
+
+            const model = next.model
+                || previous.model
+                || (isBedrock ? 'global.anthropic.claude-opus-4-6-v1' : 'glm-4.7');
+
+            const hasKey = !!(
+                next.apiKey
+                || externalCredentialType
+                || (preset === 'aws-bedrock-aksk' && awsRegion && awsAccessKeyId && awsSecretAccessKey)
+            );
+            const merged = {
                 apiKey: next.apiKey,
-                baseUrl: next.baseUrl,
-                model: next.model || previous.model || 'glm-4.7',
-                hasKey: !!(next.apiKey || externalCredentialType),
+                baseUrl,
+                model,
+                hasKey,
                 externalCredentialType
             };
+            // 为兼容历史本地存储与单测：仅在字段有值时写入新字段。
+            if (preset) merged.preset = preset;
+            if (awsRegion) merged.awsRegion = awsRegion;
+            if (awsAccessKeyId) merged.awsAccessKeyId = awsAccessKeyId;
+            if (awsSecretAccessKey) merged.awsSecretAccessKey = awsSecretAccessKey;
+            return merged;
         },
 
         buildClaudeImportedConfigName(baseUrl) {
