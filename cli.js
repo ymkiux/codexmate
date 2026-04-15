@@ -84,6 +84,12 @@ const {
     createBuiltinClaudeProxyRuntimeController
 } = require('./cli/claude-proxy');
 const {
+    createOpenaiBridgeHttpHandler,
+    upsertOpenaiBridgeProvider,
+    readOpenaiBridgeSettings,
+    resolveOpenaiBridgeUpstream
+} = require('./cli/openai-bridge');
+const {
     createOpenclawConfigController
 } = require('./cli/openclaw-config');
 const {
@@ -160,6 +166,7 @@ const CURRENT_MODELS_FILE = path.join(CONFIG_DIR, 'provider-current-models.json'
 const INIT_MARK_FILE = path.join(CONFIG_DIR, 'codexmate-init.json');
 const BUILTIN_PROXY_SETTINGS_FILE = path.join(CONFIG_DIR, 'codexmate-proxy.json');
 const BUILTIN_CLAUDE_PROXY_SETTINGS_FILE = path.join(CONFIG_DIR, 'codexmate-claude-proxy.json');
+const OPENAI_BRIDGE_SETTINGS_FILE = path.join(CONFIG_DIR, 'codexmate-openai-bridge.json');
 const CODEX_SESSIONS_DIR = path.join(CONFIG_DIR, 'sessions');
 const SESSION_TRASH_DIR = path.join(CONFIG_DIR, 'codexmate-session-trash');
 const SESSION_TRASH_FILES_DIR = path.join(SESSION_TRASH_DIR, 'files');
@@ -260,6 +267,14 @@ const CLI_INSTALL_TARGETS = Object.freeze([
 
 const HTTP_KEEP_ALIVE_AGENT = new http.Agent({ keepAlive: true });
 const HTTPS_KEEP_ALIVE_AGENT = new https.Agent({ keepAlive: true });
+
+const openaiBridgeHandler = createOpenaiBridgeHttpHandler({
+    settingsFile: OPENAI_BRIDGE_SETTINGS_FILE,
+    expectedToken: 'codexmate',
+    maxBodySize: MAX_API_BODY_SIZE,
+    httpAgent: HTTP_KEEP_ALIVE_AGENT,
+    httpsAgent: HTTPS_KEEP_ALIVE_AGENT
+});
 
 function resolveWebPort() {
     const raw = process.env.CODEXMATE_PORT;
@@ -1824,6 +1839,7 @@ function addProviderToConfig(params = {}) {
     const name = typeof params.name === 'string' ? params.name.trim() : '';
     const url = typeof params.url === 'string' ? params.url.trim() : '';
     const key = typeof params.key === 'string' ? params.key.trim() : '';
+    const useTransform = !!params.useTransform;
     const allowManaged = !!params.allowManaged;
     const normalizedUrl = normalizeBaseUrl(url);
 
@@ -1876,15 +1892,36 @@ function addProviderToConfig(params = {}) {
 
     const lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
     const safeName = escapeTomlBasicString(name);
-    const safeUrl = escapeTomlBasicString(normalizedUrl);
-    const safeKey = escapeTomlBasicString(key);
+    let baseUrlForConfig = normalizedUrl;
+    let authKeyForConfig = key;
+    const extraLines = [];
+    const requiresOpenaiAuth = useTransform;
+
+    if (useTransform) {
+        const saveRes = upsertOpenaiBridgeProvider(OPENAI_BRIDGE_SETTINGS_FILE, name, normalizedUrl, key);
+        if (saveRes && saveRes.error) {
+            return { error: String(saveRes.error) };
+        }
+        const port = resolveWebPort();
+        // 通过 URL 构造避免出现重复 /（例如 /bridge/openai//v1）
+        baseUrlForConfig = new URL(
+            `/bridge/openai/${encodeURIComponent(name)}/v1`,
+            `http://${DEFAULT_WEB_OPEN_HOST}:${port}`
+        ).toString().replace(/\/+$/g, '');
+        authKeyForConfig = 'codexmate';
+        extraLines.push(`codexmate_bridge = "openai"`);
+    }
+
+    const safeUrl = escapeTomlBasicString(baseUrlForConfig);
+    const safeKey = escapeTomlBasicString(authKeyForConfig);
     const block = [
         buildModelProviderTableHeader(name),
         `name = "${safeName}"`,
         `base_url = "${safeUrl}"`,
         `wire_api = "responses"`,
-        `requires_openai_auth = false`,
+        `requires_openai_auth = ${requiresOpenaiAuth ? 'true' : 'false'}`,
         `preferred_auth_method = "${safeKey}"`,
+        ...extraLines,
         `request_max_retries = 4`,
         `stream_max_retries = 10`,
         `stream_idle_timeout_ms = 300000`
@@ -1907,6 +1944,7 @@ function updateProviderInConfig(params = {}) {
     const key = params.key !== undefined && params.key !== null
         ? String(params.key).trim()
         : undefined;
+    const useTransform = !!params.useTransform;
     const allowManaged = !!params.allowManaged;
 
     if (!name) return { error: '名称不能为空' };
@@ -1921,7 +1959,7 @@ function updateProviderInConfig(params = {}) {
     }
 
     try {
-        cmdUpdate(name, url || undefined, key, true, { allowManaged });
+        cmdUpdate(name, url || undefined, key, true, { allowManaged, useTransform });
         return { success: true };
     } catch (e) {
         return { error: e.message || '更新失败' };
@@ -5924,10 +5962,26 @@ function buildProviderSharePayload(params = {}) {
         return { error: `提供商不存在: ${name}` };
     }
 
-    const baseUrl = typeof provider.base_url === 'string' ? provider.base_url.trim() : '';
-    const apiKey = typeof provider.preferred_auth_method === 'string'
+    const bridgeType = typeof provider.codexmate_bridge === 'string' && provider.codexmate_bridge.trim()
+        ? provider.codexmate_bridge.trim()
+        : '';
+    const isOpenaiBridgeProvider = bridgeType === 'openai'
+        || (typeof provider.base_url === 'string' && provider.base_url.includes('/bridge/openai/'));
+
+    let baseUrl = typeof provider.base_url === 'string' ? provider.base_url.trim() : '';
+    let apiKey = typeof provider.preferred_auth_method === 'string'
         ? provider.preferred_auth_method.trim()
         : '';
+
+    // 对 transform provider：分享出去的应该是“上游 URL/API Key”，而不是本机 bridge URL。
+    // 保持向下兼容：如果无法解析上游配置，则回退为当前 provider.base_url。
+    if (isOpenaiBridgeProvider) {
+        const upstream = resolveOpenaiBridgeUpstream(OPENAI_BRIDGE_SETTINGS_FILE, name);
+        if (!upstream.error) {
+            baseUrl = upstream.baseUrl || baseUrl;
+            apiKey = upstream.apiKey || apiKey;
+        }
+    }
     const currentModels = readCurrentModels();
     const savedModel = currentModels && typeof currentModels[name] === 'string'
         ? currentModels[name].trim()
@@ -5945,7 +5999,8 @@ function buildProviderSharePayload(params = {}) {
             name,
             baseUrl,
             apiKey,
-            model
+            model,
+            bridge: bridgeType || (isOpenaiBridgeProvider ? 'openai' : '')
         }
     };
 }
@@ -6715,15 +6770,18 @@ function cmdUseModel(modelName, silent = false) {
 }
 
 // 添加提供商
-function cmdAdd(name, baseUrl, apiKey, silent = false) {
+function cmdAdd(name, baseUrl, apiKey, silent = false, options = {}) {
     const providerName = typeof name === 'string' ? name.trim() : '';
     const providerBaseUrl = normalizeBaseUrl(baseUrl);
+    const bridgeType = options && typeof options.bridge === 'string' ? options.bridge.trim() : '';
+    const useOpenaiBridge = bridgeType === 'openai';
 
     if (!providerName || !providerBaseUrl) {
         if (!silent) {
-            console.error('用法: codexmate add <名称> <URL> [密钥]');
+            console.error('用法: codexmate add <名称> <URL> [密钥] [--bridge <openai>]');
             console.log('\n示例:');
             console.log('  codexmate add 88code https://api.88code.ai/v1 sk-xxx');
+            console.log('  codexmate add 88code https://api.88code.ai/v1 sk-xxx --bridge openai');
         }
         throw new Error('名称和URL必填');
     }
@@ -6748,6 +6806,32 @@ function cmdAdd(name, baseUrl, apiKey, silent = false) {
     if (config.model_providers && config.model_providers[providerName]) {
         if (!silent) console.error('错误: 提供商已存在:', providerName);
         throw new Error('提供商已存在');
+    }
+
+    // 使用内建转换（可向下兼容：未来新增 bridgeType 仅需在这里扩展分支）
+    if (useOpenaiBridge) {
+        const res = addProviderToConfig({
+            name: providerName,
+            url: providerBaseUrl,
+            key: apiKey || '',
+            useTransform: true
+        });
+        if (res && res.error) {
+            throw new Error(res.error);
+        }
+        // 初始化当前模型（保持与普通 add 行为一致）
+        const currentModels = readCurrentModels();
+        if (!currentModels[providerName]) {
+            currentModels[providerName] = readModels()[0];
+            writeCurrentModels(currentModels);
+        }
+        if (!silent) {
+            console.log('✓ 已添加提供商:', providerName);
+            console.log('  上游 URL:', providerBaseUrl);
+            console.log('  模式: 内建转换 (openai)');
+            console.log();
+        }
+        return;
     }
 
     const safeName = escapeTomlBasicString(providerName);
@@ -6800,6 +6884,7 @@ function cmdDelete(name, silent = false) {
 // 更新提供商
 function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
     const allowManaged = !!(options && options.allowManaged);
+    const forceUseTransform = !!(options && options.useTransform);
     const normalizedBaseUrl = baseUrl === undefined ? undefined : normalizeBaseUrl(baseUrl);
     if (!name) {
         if (!silent) console.error('错误: 提供商名称必填');
@@ -6819,6 +6904,14 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
 
     const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
     const providerConfig = config.model_providers[name];
+    const isTransformProvider = (() => {
+        if (forceUseTransform) return true;
+        if (!providerConfig || typeof providerConfig !== 'object') return false;
+        const bridge = typeof providerConfig.codexmate_bridge === 'string' ? providerConfig.codexmate_bridge.trim() : '';
+        if (bridge === 'openai') return true;
+        const url = typeof providerConfig.base_url === 'string' ? providerConfig.base_url : '';
+        return url.includes('/bridge/openai/');
+    })();
     const providerSegments = providerConfig && Array.isArray(providerConfig.__codexmate_legacy_segments)
         ? providerConfig.__codexmate_legacy_segments
         : null;
@@ -6951,17 +7044,87 @@ function cmdUpdate(name, baseUrl, apiKey, silent = false, options = {}) {
         return next;
     };
 
+    const replaceTomlBooleanField = (block, fieldName, rawValue) => {
+        const boolValue = rawValue ? 'true' : 'false';
+        const escapedFieldName = escapeRegex(fieldName);
+        const multilineRanges = collectTomlMultilineStringRanges(block);
+        const withCommentRegex = new RegExp(`^(\\s*${escapedFieldName}\\s*=\\s*)(true|false)(\\s+#.*)?$`, 'mg');
+        let replaced = false;
+        let next = block.replace(withCommentRegex, (full, prefix, _value, suffix = '', offset) => {
+            if (replaced || isIndexInRanges(offset, multilineRanges)) {
+                return full;
+            }
+            replaced = true;
+            return `${prefix}${boolValue}${suffix}`;
+        });
+        if (!replaced) {
+            const keyIndentMatch = block.match(/^(\s*)[A-Za-z0-9_.-]+\s*=/m);
+            const indent = keyIndentMatch ? keyIndentMatch[1] : '';
+            const lineEnding = block.includes('\r\n') ? '\r\n' : '\n';
+            const tailMatch = block.match(/(\s*)$/);
+            const tail = tailMatch ? tailMatch[1] : '';
+            const body = block.slice(0, block.length - tail.length);
+            const separator = body.endsWith('\n') || body.endsWith('\r') ? '' : lineEnding;
+            next = `${body}${separator}${indent}${fieldName} = ${boolValue}${tail}`;
+        }
+        return next;
+    };
+
+    const computeLocalOpenaiBridgeBaseUrl = () => {
+        const port = resolveWebPort();
+        return new URL(
+            `/bridge/openai/${encodeURIComponent(name)}/v1`,
+            `http://${DEFAULT_WEB_OPEN_HOST}:${port}`
+        ).toString().replace(/\/+$/g, '');
+    };
+
     let newContent = content;
     const sorted = ranges.sort((a, b) => b.start - a.start);
     for (const range of sorted) {
         const providerBlock = newContent.slice(range.start, range.end);
         let updatedBlock = providerBlock;
-        if (normalizedBaseUrl) {
-            updatedBlock = replaceTomlStringField(updatedBlock, 'base_url', normalizedBaseUrl);
+
+        if (isTransformProvider) {
+            // 对 transform provider：UI 的 URL/key 表单代表“上游 OpenAI 兼容服务”，而不是写入 config.toml 的 base_url。
+            // config.toml 仍需保持本地 bridge base_url + 固定 token。
+            const settings = readOpenaiBridgeSettings(OPENAI_BRIDGE_SETTINGS_FILE);
+            const existing = settings && settings.providers ? settings.providers[name] : null;
+            const existingBaseUrl = existing && typeof existing.baseUrl === 'string' ? existing.baseUrl : '';
+            const existingApiKey = existing && typeof existing.apiKey === 'string' ? existing.apiKey : '';
+
+            const upstreamBaseUrl = normalizedBaseUrl !== undefined
+                ? normalizedBaseUrl
+                : normalizeBaseUrl(existingBaseUrl || '');
+            const upstreamApiKey = apiKey !== undefined && apiKey !== ''
+                ? apiKey
+                : existingApiKey;
+
+            if (upstreamBaseUrl) {
+                const saveRes = upsertOpenaiBridgeProvider(OPENAI_BRIDGE_SETTINGS_FILE, name, upstreamBaseUrl, upstreamApiKey);
+                if (saveRes && saveRes.error) {
+                    throw new Error(String(saveRes.error));
+                }
+            } else {
+                // 不提供 URL 且没有已有上游配置时无法更新
+                const resolved = resolveOpenaiBridgeUpstream(OPENAI_BRIDGE_SETTINGS_FILE, name);
+                if (resolved && resolved.error) {
+                    throw new Error(String(resolved.error));
+                }
+            }
+
+            updatedBlock = replaceTomlStringField(updatedBlock, 'base_url', computeLocalOpenaiBridgeBaseUrl());
+            updatedBlock = replaceTomlBooleanField(updatedBlock, 'requires_openai_auth', true);
+            updatedBlock = replaceTomlStringField(updatedBlock, 'preferred_auth_method', 'codexmate');
+            updatedBlock = replaceTomlStringField(updatedBlock, 'codexmate_bridge', 'openai');
+        } else {
+            if (normalizedBaseUrl) {
+                updatedBlock = replaceTomlStringField(updatedBlock, 'base_url', normalizedBaseUrl);
+            }
+            if (apiKey !== undefined) {
+                updatedBlock = replaceTomlStringField(updatedBlock, 'preferred_auth_method', apiKey);
+            }
         }
-        if (apiKey !== undefined) {
-            updatedBlock = replaceTomlStringField(updatedBlock, 'preferred_auth_method', apiKey);
-        }
+
         newContent = newContent.slice(0, range.start) + updatedBlock + newContent.slice(range.end);
     }
 
@@ -8163,6 +8326,9 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
 
     const server = http.createServer((req, res) => {
         const requestPath = (req.url || '/').split('?')[0];
+        if (typeof openaiBridgeHandler === 'function' && openaiBridgeHandler(req, res)) {
+            return;
+        }
         if (requestPath === '/api/import-skills-zip') {
             void handleImportSkillsZipUpload(req, res);
             return;
@@ -8398,6 +8564,21 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                         }
                         case 'provider-chat-check': {
                             result = await runProviderChatCheck(params || {});
+                            break;
+                        }
+                        case 'openai-bridge-get-provider': {
+                            const name = params && typeof params.name === 'string' ? params.name.trim() : '';
+                            if (!name) {
+                                result = { error: 'provider name is required' };
+                                break;
+                            }
+                            const upstream = resolveOpenaiBridgeUpstream(OPENAI_BRIDGE_SETTINGS_FILE, name);
+                            if (upstream.error) {
+                                result = { error: upstream.error };
+                                break;
+                            }
+                            // 不返回 apiKey（敏感信息），仅返回用户填过的上游 URL
+                            result = { baseUrl: upstream.baseUrl, hasApiKey: !!(upstream.apiKey) };
                             break;
                         }
                         case 'list-sessions':
@@ -13051,7 +13232,7 @@ async function main() {
         console.log('  codexmate models           列出所有模型');
         console.log('  codexmate switch <名称>    切换提供商');
         console.log('  codexmate use <模型>       切换模型');
-        console.log('  codexmate add <名称> <URL> [密钥]');
+        console.log('  codexmate add <名称> <URL> [密钥] [--bridge <openai>]');
         console.log('  codexmate delete <名称>    删除提供商');
         console.log('  codexmate claude <BaseURL> <API密钥> [模型]  写入 Claude Code 配置');
         console.log('  codexmate add-model <模型> 添加模型');
@@ -13071,6 +13252,34 @@ async function main() {
         process.exit(0);
     }
 
+    const parseAddCommandArgs = (argv = []) => {
+        const name = argv[0];
+        const url = argv[1];
+        let key = '';
+        let cursor = 2;
+        if (cursor < argv.length && argv[cursor] && !String(argv[cursor]).startsWith('--')) {
+            key = String(argv[cursor]);
+            cursor += 1;
+        }
+        let bridge = '';
+        while (cursor < argv.length) {
+            const token = String(argv[cursor] || '');
+            if (token === '--bridge') {
+                bridge = String(argv[cursor + 1] || '');
+                cursor += 2;
+                continue;
+            }
+            if (token === '--transform') {
+                // legacy alias; equals openai bridge for now
+                bridge = 'openai';
+                cursor += 1;
+                continue;
+            }
+            cursor += 1;
+        }
+        return { name, url, key, bridge };
+    };
+
     switch (command) {
         case '__task-worker': await cmdTaskWorker(args.slice(1)); break;
         case 'status': cmdStatus(); break;
@@ -13079,7 +13288,11 @@ async function main() {
         case 'models': await cmdModels(); break;
         case 'switch': cmdSwitch(args[1]); break;
         case 'use': cmdUseModel(args[1]); break;
-        case 'add': cmdAdd(args[1], args[2], args[3]); break;
+        case 'add': {
+            const parsed = parseAddCommandArgs(args.slice(1));
+            cmdAdd(parsed.name, parsed.url, parsed.key, false, { bridge: parsed.bridge });
+            break;
+        }
         case 'delete': cmdDelete(args[1]); break;
         case 'claude': cmdClaude(args[1], args[2], args[3]); break;
         case 'add-model': cmdAddModel(args[1]); break;

@@ -248,7 +248,7 @@ test('updateProvider keeps existing key when edit key input is blank', async () 
         }
     }]);
     assert.strictEqual(context.showEditModal, false);
-    assert.deepStrictEqual(context.editingProvider, { name: '', url: '', key: '', readOnly: false, nonEditable: false });
+    assert.deepStrictEqual(context.editingProvider, { name: '', url: '', key: '', readOnly: false, nonEditable: false, useTransform: false });
     assert.strictEqual(context.loadAllCalls, 1);
     assert.deepStrictEqual(context.messages, [{
         text: '操作成功',

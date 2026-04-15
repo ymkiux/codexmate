@@ -112,7 +112,9 @@ test('buildProviderSharePayload includes model for shared provider', () => {
         }),
         readCurrentModels: () => ({
             alpha: 'alpha-share-model'
-        })
+        }),
+        resolveOpenaiBridgeUpstream: () => ({ error: 'missing' }),
+        OPENAI_BRIDGE_SETTINGS_FILE: '/tmp/bridge.json'
     });
 
     const result = buildProviderSharePayload({ name: 'alpha' });
@@ -137,12 +139,47 @@ test('buildProviderSharePayload falls back to active model when saved model is e
         }),
         readCurrentModels: () => ({
             alpha: '   '
-        })
+        }),
+        resolveOpenaiBridgeUpstream: () => ({ error: 'missing' }),
+        OPENAI_BRIDGE_SETTINGS_FILE: '/tmp/bridge.json'
     });
 
     const result = buildProviderSharePayload({ name: 'alpha' });
     assert(result && result.payload, 'share payload should exist');
     assert.strictEqual(result.payload.model, 'alpha-fallback-model');
+});
+
+test('buildProviderSharePayload exports upstream config for openai bridge providers', () => {
+    const source = extractBlockBySignature(cliSource, 'function buildProviderSharePayload(params = {}) {');
+    const buildProviderSharePayload = instantiateFunction(source, 'buildProviderSharePayload', {
+        readConfigOrVirtualDefault: () => ({
+            config: {
+                model_provider: 'alpha',
+                model: 'alpha-fallback-model',
+                model_providers: {
+                    alpha: {
+                        base_url: 'http://127.0.0.1:31337/bridge/openai/alpha/v1',
+                        preferred_auth_method: 'codexmate',
+                        codexmate_bridge: 'openai'
+                    }
+                }
+            }
+        }),
+        readCurrentModels: () => ({ alpha: 'alpha-share-model' }),
+        resolveOpenaiBridgeUpstream: (_file, name) => ({
+            error: '',
+            provider: name,
+            baseUrl: 'https://upstream.example.com/v1',
+            apiKey: 'sk-upstream'
+        }),
+        OPENAI_BRIDGE_SETTINGS_FILE: '/tmp/bridge.json'
+    });
+
+    const result = buildProviderSharePayload({ name: 'alpha' });
+    assert(result && result.payload, 'share payload should exist');
+    assert.strictEqual(result.payload.baseUrl, 'https://upstream.example.com/v1');
+    assert.strictEqual(result.payload.apiKey, 'sk-upstream');
+    assert.strictEqual(result.payload.bridge, 'openai');
 });
 
 test('buildProviderShareCommand appends model switch command when model exists', () => {
@@ -151,7 +188,8 @@ test('buildProviderShareCommand appends model switch command when model exists',
         name: 'alpha',
         baseUrl: 'https://api.example.com/v1',
         apiKey: 'sk-alpha',
-        model: 'alpha-share-model'
+        model: 'alpha-share-model',
+        bridge: ''
     });
 
     assert.strictEqual(
@@ -166,7 +204,8 @@ test('buildProviderShareCommand keeps legacy command when payload model is empty
         name: 'alpha',
         baseUrl: 'https://api.example.com/v1',
         apiKey: 'sk-alpha',
-        model: ''
+        model: '',
+        bridge: ''
     });
 
     assert.strictEqual(command, "npm start add alpha 'https://api.example.com/v1' sk-alpha && npm start switch alpha");
@@ -178,12 +217,29 @@ test('buildProviderShareCommand supports codexmate prefix', () => {
         name: 'alpha',
         baseUrl: 'https://api.example.com/v1',
         apiKey: 'sk-alpha',
-        model: 'alpha-share-model'
+        model: 'alpha-share-model',
+        bridge: ''
     });
 
     assert.strictEqual(
         command,
         "codexmate add alpha 'https://api.example.com/v1' sk-alpha && codexmate switch alpha && codexmate use alpha-share-model"
+    );
+});
+
+test('buildProviderShareCommand adds bridge flag when present', () => {
+    const buildProviderShareCommand = createProviderShareCommandBuilder(appSource, 'codexmate');
+    const command = buildProviderShareCommand({
+        name: 'alpha',
+        baseUrl: 'https://api.example.com/v1',
+        apiKey: 'sk-alpha',
+        model: '',
+        bridge: 'openai'
+    });
+
+    assert.strictEqual(
+        command,
+        "codexmate add alpha 'https://api.example.com/v1' sk-alpha --bridge openai && codexmate switch alpha"
     );
 });
 

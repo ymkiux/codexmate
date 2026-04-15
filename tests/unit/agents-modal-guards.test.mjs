@@ -245,7 +245,11 @@ test('openHealthCheckDialog opens unlocked selector by default and locks when pr
         healthCheckDialogSelectedProvider: '',
         healthCheckDialogPrompt: '',
         healthCheckDialogMessages: [{ id: 'stale' }],
-        healthCheckDialogLastResult: { ok: false }
+        healthCheckDialogLastResult: { ok: false },
+        shownMessages: [],
+        showMessage(message, type) {
+            this.shownMessages.push({ message, type });
+        }
     };
 
     methods.openHealthCheckDialog.call(context);
@@ -255,8 +259,12 @@ test('openHealthCheckDialog opens unlocked selector by default and locks when pr
     assert.deepStrictEqual(context.healthCheckDialogMessages, []);
 
     methods.openHealthCheckDialog.call(context, { providerName: 'beta', locked: true });
-    assert.strictEqual(context.healthCheckDialogLockedProvider, 'beta');
-    assert.strictEqual(context.healthCheckDialogSelectedProvider, 'beta');
+    assert.strictEqual(context.healthCheckDialogLockedProvider, '');
+    assert.strictEqual(context.healthCheckDialogSelectedProvider, 'alpha');
+    assert.deepStrictEqual(context.shownMessages, [{
+        message: '请先切换到该提供商再进行健康聊天测试',
+        type: 'info'
+    }]);
 });
 
 test('sendHealthCheckDialogMessage appends transcript and clears prompt after success', async () => {

@@ -11,7 +11,7 @@ function createContext(overrides = {}, apiImpl = async () => ({ success: true })
         showAddModal: true,
         showEditModal: false,
         resetConfigLoading: false,
-        newProvider: { name: '', url: '', key: '' },
+        newProvider: { name: '', url: '', key: '', useTransform: false },
         editingProvider: { name: '', url: '', key: '', readOnly: false, nonEditable: false },
         claudeConfigs: {},
         showMessage(text, type) {
@@ -78,7 +78,7 @@ test('addProvider normalizes trimmed values and submits sanitized payload', asyn
         }
     }]);
     assert.strictEqual(context.showAddModal, false);
-    assert.deepStrictEqual(context.newProvider, { name: '', url: '', key: '' });
+    assert.deepStrictEqual(context.newProvider, { name: '', url: '', key: '', useTransform: false });
     assert.deepStrictEqual(loadAllCalls, ['loadAll']);
     assert.strictEqual(messages.length, 1);
     assert.deepStrictEqual(messages[0], {

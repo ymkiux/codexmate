@@ -145,15 +145,6 @@
 
                 </template>
 
-                <div class="selector-section">
-                    <div class="selector-header">
-                        <span class="selector-title">健康检测</span>
-                    </div>
-                    <button class="btn-tool" @click="openHealthCheckDialog()" :disabled="loading || !!initError">
-                        检测对话
-                    </button>
-                </div>
-
                 <div v-if="!loading && !initError" class="card-list">
                     <div v-for="provider in displayProvidersList" :key="provider.name"
                          :class="['card', { active: displayCurrentProvider === provider.name }]"
@@ -183,7 +174,13 @@
                                 {{ formatLatency(speedResults[provider.name]) }}
                             </span>
                             <div class="card-actions" @click.stop>
-                                <button class="card-action-btn" @click="openHealthCheckDialog({ providerName: provider.name, locked: true })" :aria-label="`Open health dialog for ${provider.name}`" title="检测对话">
+                                <button
+                                    class="card-action-btn"
+                                    @click="openHealthCheckDialog({ providerName: provider.name, locked: true })"
+                                    :disabled="displayCurrentProvider !== provider.name"
+                                    :aria-label="`Open health dialog for ${provider.name}`"
+                                    :title="displayCurrentProvider === provider.name ? '健康聊天测试' : '请先切换到该提供商'"
+                                >
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                                         <path d="M8 9h8"/>
