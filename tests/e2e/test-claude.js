@@ -64,25 +64,6 @@ module.exports = async function testClaude(ctx) {
     assert(claudeSettingsAfter.baseUrl === mockProviderUrl, 'get-claude-settings baseUrl not updated');
     assert(claudeSettingsAfter.model === 'new-model', 'get-claude-settings model not updated');
 
-    // ========== Apply Claude Bedrock Preset (AKSK) ==========
-    const applyBedrock = await api('apply-claude-config', {
-        config: {
-            preset: 'aws-bedrock-aksk',
-            awsRegion: 'us-west-2',
-            awsAccessKeyId: 'AKIA_TEST',
-            awsSecretAccessKey: 'SECRET_TEST',
-            model: 'global.anthropic.claude-opus-4-6-v1'
-        }
-    });
-    assert(applyBedrock.success === true, 'apply-claude-config(bedrock aksk) failed');
-
-    const claudeBedrockSettings = await api('get-claude-settings');
-    assert(claudeBedrockSettings.apiKey === '', 'bedrock settings should clear apiKey');
-    assert(claudeBedrockSettings.env && claudeBedrockSettings.env.CLAUDE_CODE_USE_BEDROCK === '1', 'bedrock env flag missing');
-    assert(claudeBedrockSettings.env.AWS_REGION === 'us-west-2', 'bedrock env AWS_REGION mismatch');
-    assert(claudeBedrockSettings.env.AWS_ACCESS_KEY_ID === 'AKIA_TEST', 'bedrock env AWS_ACCESS_KEY_ID mismatch');
-    assert(claudeBedrockSettings.env.AWS_SECRET_ACCESS_KEY === 'SECRET_TEST', 'bedrock env AWS_SECRET_ACCESS_KEY mismatch');
-
     // ========== Restore Original Settings ==========
     const restoreClaude = await api('apply-claude-config', {
         config: { baseUrl: mockProviderUrl, apiKey: 'sk-claude', model: claudeModel }

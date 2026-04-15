@@ -18,6 +18,32 @@
 
                 <div class="selector-section">
                     <div class="selector-header">
+                        <span class="selector-title">预设供应商</span>
+                    </div>
+                    <div class="btn-group" style="flex-wrap: wrap; gap: 8px;">
+                        <button type="button" class="btn-mini" @click="closeClaudeConfigModal(); showClaudeConfigModal = true">自定义配置</button>
+                        <button type="button" class="btn-mini" @click="newClaudeConfig.name = 'Claude Official'; newClaudeConfig.apiKey = ''; newClaudeConfig.baseUrl = 'https://api.anthropic.com'; newClaudeConfig.model = 'claude-sonnet-4'; showClaudeConfigModal = true">Claude Official</button>
+                        <button type="button" class="btn-mini" @click="newClaudeConfig.name = 'DeepSeek'; newClaudeConfig.apiKey = ''; newClaudeConfig.baseUrl = 'https://api.deepseek.com/anthropic'; newClaudeConfig.model = 'DeepSeek-V3.2'; showClaudeConfigModal = true">DeepSeek</button>
+                        <button type="button" class="btn-mini" @click="newClaudeConfig.name = 'Zhipu GLM'; newClaudeConfig.apiKey = ''; newClaudeConfig.baseUrl = 'https://open.bigmodel.cn/api/anthropic'; newClaudeConfig.model = 'glm-5'; showClaudeConfigModal = true">Zhipu GLM</button>
+                        <button type="button" class="btn-mini" @click="newClaudeConfig.name = 'Z.ai GLM'; newClaudeConfig.apiKey = ''; newClaudeConfig.baseUrl = 'https://api.z.ai/api/anthropic'; newClaudeConfig.model = 'glm-5'; showClaudeConfigModal = true">Z.ai GLM</button>
+                        <button type="button" class="btn-mini" @click="newClaudeConfig.name = 'Qwen Coder'; newClaudeConfig.apiKey = ''; newClaudeConfig.baseUrl = 'https://coding.dashscope.aliyuncs.com/apps/anthropic'; newClaudeConfig.model = 'qwen3-coder'; showClaudeConfigModal = true">Qwen Coder</button>
+                        <button type="button" class="btn-mini" @click="newClaudeConfig.name = 'Kimi k2'; newClaudeConfig.apiKey = ''; newClaudeConfig.baseUrl = 'https://api.moonshot.cn/anthropic'; newClaudeConfig.model = 'kimi-k2.5'; showClaudeConfigModal = true">Kimi k2</button>
+                        <button type="button" class="btn-mini" @click="newClaudeConfig.name = 'Kimi For Coding'; newClaudeConfig.apiKey = ''; newClaudeConfig.baseUrl = 'https://api.kimi.com/coding/'; newClaudeConfig.model = 'kimi-k2.5'; showClaudeConfigModal = true">Kimi For Coding</button>
+                        <button type="button" class="btn-mini" @click="newClaudeConfig.name = 'KAT-Coder'; newClaudeConfig.apiKey = ''; newClaudeConfig.baseUrl = 'https://vanchin.streamlake.ai/api/gateway/v1/endpoints/${ENDPOINT_ID}/claude-code-proxy'; newClaudeConfig.model = 'KAT-Coder-Pro V1'; showClaudeConfigModal = true">KAT-Coder</button>
+                        <button type="button" class="btn-mini" @click="newClaudeConfig.name = 'Longcat'; newClaudeConfig.apiKey = ''; newClaudeConfig.baseUrl = 'https://api.longcat.chat/anthropic'; newClaudeConfig.model = 'LongCat-Flash-Chat'; showClaudeConfigModal = true">Longcat</button>
+                        <button type="button" class="btn-mini" @click="newClaudeConfig.name = 'MiniMax'; newClaudeConfig.apiKey = ''; newClaudeConfig.baseUrl = 'https://api.minimaxi.com/anthropic'; newClaudeConfig.model = 'MiniMax-M2.7'; showClaudeConfigModal = true">MiniMax</button>
+                        <button type="button" class="btn-mini" @click="newClaudeConfig.name = 'MiniMax en'; newClaudeConfig.apiKey = ''; newClaudeConfig.baseUrl = 'https://api.minimax.io/anthropic'; newClaudeConfig.model = 'MiniMax-M2.7'; showClaudeConfigModal = true">MiniMax en</button>
+                        <button type="button" class="btn-mini" @click="newClaudeConfig.name = 'DouBaoSeed'; newClaudeConfig.apiKey = ''; newClaudeConfig.baseUrl = 'https://ark.cn-beijing.volces.com/api/coding'; newClaudeConfig.model = 'doubao-seed-2-0-code-preview-latest'; showClaudeConfigModal = true">DouBaoSeed</button>
+                        <button type="button" class="btn-mini" @click="newClaudeConfig.name = 'BaiLing'; newClaudeConfig.apiKey = ''; newClaudeConfig.baseUrl = 'https://api.tbox.cn/api/anthropic'; newClaudeConfig.model = 'Ling-2.5-1T'; showClaudeConfigModal = true">BaiLing</button>
+                        <button type="button" class="btn-mini" @click="newClaudeConfig.name = 'ModelScope'; newClaudeConfig.apiKey = ''; newClaudeConfig.baseUrl = 'https://api-inference.modelscope.cn'; newClaudeConfig.model = 'ZhipuAI/GLM-5'; showClaudeConfigModal = true">ModelScope</button>
+                        <button type="button" class="btn-mini" @click="newClaudeConfig.name = 'AiHubMix'; newClaudeConfig.apiKey = ''; newClaudeConfig.baseUrl = 'https://aihubmix.com'; newClaudeConfig.model = 'glm-4.7'; showClaudeConfigModal = true">AiHubMix</button>
+                        <button type="button" class="btn-mini" @click="newClaudeConfig.name = 'DMXAPI'; newClaudeConfig.apiKey = ''; newClaudeConfig.baseUrl = 'https://www.dmxapi.cn'; newClaudeConfig.model = 'glm-4.7'; showClaudeConfigModal = true">DMXAPI</button>
+                        <button type="button" class="btn-mini" @click="newClaudeConfig.name = 'PackyCode'; newClaudeConfig.apiKey = ''; newClaudeConfig.baseUrl = 'https://www.packyapi.com'; newClaudeConfig.model = 'glm-4.7'; showClaudeConfigModal = true">PackyCode</button>
+                    </div>
+                </div>
+
+                <div class="selector-section">
+                    <div class="selector-header">
                         <span class="selector-title">模型</span>
                     </div>
                     <select

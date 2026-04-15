@@ -8436,42 +8436,13 @@ function maskKey(key) {
 // 应用到 Claude Code settings.json（跨平台）
 function applyToClaudeSettings(config = {}) {
     try {
-        const preset = typeof config.preset === 'string' ? config.preset.trim().toLowerCase() : '';
         const apiKey = (config.apiKey || '').trim();
-
-        const awsRegion = (config.awsRegion || '').trim()
-            || (config.env && typeof config.env === 'object' ? String(config.env.AWS_REGION || '').trim() : '');
-        const awsAccessKeyId = (config.awsAccessKeyId || '').trim()
-            || (config.env && typeof config.env === 'object' ? String(config.env.AWS_ACCESS_KEY_ID || '').trim() : '');
-        const awsSecretAccessKey = (config.awsSecretAccessKey || '').trim()
-            || (config.env && typeof config.env === 'object' ? String(config.env.AWS_SECRET_ACCESS_KEY || '').trim() : '');
-
-        const isBedrockAksk = preset === 'aws-bedrock-aksk';
-        const isBedrock = isBedrockAksk || preset === 'aws-bedrock-api-key';
-
-        if (isBedrockAksk) {
-            if (!awsRegion) {
-                return { success: false, mode: 'settings-file', error: '请先输入 AWS Region' };
-            }
-            if (!awsAccessKeyId || !awsSecretAccessKey) {
-                return { success: false, mode: 'settings-file', error: '请先输入 AWS Access Key/Secret Key' };
-            }
-        } else if (!apiKey) {
+        if (!apiKey) {
             return { success: false, mode: 'settings-file', error: '请先输入 API Key' };
         }
 
-        const defaultBaseUrl = isBedrock && awsRegion
-            ? `https://bedrock-runtime.${awsRegion}.amazonaws.com`
-            : 'https://open.bigmodel.cn/api/anthropic';
-        const baseUrl = (config.baseUrl || defaultBaseUrl).trim()
-            .replace(/\$\{AWS_REGION\}/g, awsRegion || '');
-
-        const defaultModel = isBedrock ? 'global.anthropic.claude-opus-4-6-v1' : DEFAULT_CLAUDE_MODEL;
-        const model = (config.model || defaultModel).trim();
-
-        const extraEnv = (config.env && typeof config.env === 'object' && !Array.isArray(config.env))
-            ? config.env
-            : {};
+        const baseUrl = (config.baseUrl || 'https://open.bigmodel.cn/api/anthropic').trim();
+        const model = (config.model || DEFAULT_CLAUDE_MODEL).trim();
         const readResult = readJsonObjectFromFile(CLAUDE_SETTINGS_FILE, {});
         if (!readResult.ok) {
             return { success: false, mode: 'settings-file', error: readResult.error };
@@ -8484,41 +8455,12 @@ function applyToClaudeSettings(config = {}) {
 
         const nextEnv = {
             ...currentEnv,
-            ...extraEnv,
+            ANTHROPIC_API_KEY: apiKey,
             ANTHROPIC_BASE_URL: baseUrl,
             ANTHROPIC_MODEL: model
         };
-
-        if (isBedrock) {
-            // Claude Code Bedrock 模式：依赖 AWS 凭据/Region，不使用 Anthropic API Key。
-            nextEnv.CLAUDE_CODE_USE_BEDROCK = '1';
-            if (awsRegion) nextEnv.AWS_REGION = awsRegion;
-            if (isBedrockAksk) {
-                nextEnv.AWS_ACCESS_KEY_ID = awsAccessKeyId;
-                nextEnv.AWS_SECRET_ACCESS_KEY = awsSecretAccessKey;
-            }
-            // Claude Code 在切换常用命令时会使用这些默认模型槽位。
-            nextEnv.ANTHROPIC_DEFAULT_HAIKU_MODEL = nextEnv.ANTHROPIC_DEFAULT_HAIKU_MODEL
-                || 'global.anthropic.claude-haiku-4-5-20251001-v1:0';
-            nextEnv.ANTHROPIC_DEFAULT_SONNET_MODEL = nextEnv.ANTHROPIC_DEFAULT_SONNET_MODEL
-                || 'global.anthropic.claude-sonnet-4-6';
-            nextEnv.ANTHROPIC_DEFAULT_OPUS_MODEL = nextEnv.ANTHROPIC_DEFAULT_OPUS_MODEL
-                || 'global.anthropic.claude-opus-4-6-v1';
-
-            delete nextEnv.ANTHROPIC_API_KEY;
-            delete nextEnv.ANTHROPIC_AUTH_TOKEN;
-            delete nextEnv.CLAUDE_CODE_USE_KEY;
-        } else {
-            nextEnv.ANTHROPIC_API_KEY = apiKey;
-            delete nextEnv.ANTHROPIC_AUTH_TOKEN;
-            delete nextEnv.CLAUDE_CODE_USE_KEY;
-
-            // 切回常规 API Key 模式时，清理 Bedrock 专用变量，避免残留影响。
-            delete nextEnv.CLAUDE_CODE_USE_BEDROCK;
-            delete nextEnv.AWS_ACCESS_KEY_ID;
-            delete nextEnv.AWS_SECRET_ACCESS_KEY;
-            delete nextEnv.AWS_REGION;
-        }
+        delete nextEnv.ANTHROPIC_AUTH_TOKEN;
+        delete nextEnv.CLAUDE_CODE_USE_KEY;
 
         const nextSettings = {
             ...currentSettings,
@@ -8534,23 +8476,11 @@ function applyToClaudeSettings(config = {}) {
             mode: 'settings-file',
             targetPath: CLAUDE_SETTINGS_FILE,
             updatedKeys: [
+                'env.ANTHROPIC_API_KEY',
                 'env.ANTHROPIC_BASE_URL',
                 'env.ANTHROPIC_MODEL'
             ]
         };
-        if (!isBedrock) {
-            result.updatedKeys.unshift('env.ANTHROPIC_API_KEY');
-        } else {
-            result.updatedKeys.push('env.CLAUDE_CODE_USE_BEDROCK', 'env.AWS_REGION');
-            if (isBedrockAksk) {
-                result.updatedKeys.push('env.AWS_ACCESS_KEY_ID', 'env.AWS_SECRET_ACCESS_KEY');
-            }
-            result.updatedKeys.push(
-                'env.ANTHROPIC_DEFAULT_HAIKU_MODEL',
-                'env.ANTHROPIC_DEFAULT_SONNET_MODEL',
-                'env.ANTHROPIC_DEFAULT_OPUS_MODEL'
-            );
-        }
         if (backupPath) {
             result.backupPath = backupPath;
         }

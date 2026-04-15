@@ -1,33 +1,6 @@
 export function createClaudeConfigMethods(options = {}) {
     const { api } = options;
 
-    const normalizePresetDraft = (draft) => {
-        const target = draft && typeof draft === 'object' ? draft : null;
-        if (!target) return;
-        const preset = typeof target.preset === 'string' ? target.preset.trim().toLowerCase() : '';
-        const isBedrock = preset === 'aws-bedrock-aksk' || preset === 'aws-bedrock-api-key';
-
-        if (isBedrock) {
-            const region = (target.awsRegion || '').trim() || 'us-west-2';
-            target.awsRegion = region;
-            target.baseUrl = `https://bedrock-runtime.${region}.amazonaws.com`;
-            if (!target.model || target.model.trim() === '' || target.model === 'glm-4.7') {
-                target.model = 'global.anthropic.claude-opus-4-6-v1';
-            }
-            if (preset === 'aws-bedrock-aksk') {
-                target.apiKey = '';
-            }
-            return;
-        }
-
-        if (!target.baseUrl || !target.baseUrl.trim()) {
-            target.baseUrl = 'https://open.bigmodel.cn/api/anthropic';
-        }
-        if (!target.model || !target.model.trim()) {
-            target.model = 'glm-4.7';
-        }
-    };
-
     return {
         switchClaudeConfig(name) {
             this.currentClaudeConfig = name;
@@ -50,18 +23,9 @@ export function createClaudeConfigMethods(options = {}) {
             this.claudeConfigs[name] = this.mergeClaudeConfig(existing, { model });
             this.saveClaudeConfigs();
             this.updateClaudeModelsCurrent();
-            {
-                const config = this.claudeConfigs[name];
-                const preset = typeof config.preset === 'string' ? config.preset.trim() : '';
-                if (preset === 'aws-bedrock-aksk') {
-                    if (!config.hasKey) {
-                        this.showMessage('请先补全 AWS Region / Access Key / Secret Key', 'error');
-                        return;
-                    }
-                } else if (!config.apiKey && !config.externalCredentialType) {
-                    this.showMessage('请先配置 API Key', 'error');
-                    return;
-                }
+            if (!this.claudeConfigs[name].apiKey && !this.claudeConfigs[name].externalCredentialType) {
+                this.showMessage('请先配置 API Key', 'error');
+                return;
             }
             this.applyClaudeConfig(name);
         },
@@ -76,11 +40,7 @@ export function createClaudeConfigMethods(options = {}) {
                 name: name,
                 apiKey: config.apiKey || '',
                 baseUrl: config.baseUrl || '',
-                model: config.model || '',
-                preset: config.preset || '',
-                awsRegion: config.awsRegion || 'us-west-2',
-                awsAccessKeyId: config.awsAccessKeyId || '',
-                awsSecretAccessKey: config.awsSecretAccessKey || ''
+                model: config.model || ''
             };
             this.showEditConfigModal = true;
         },
@@ -98,35 +58,21 @@ export function createClaudeConfigMethods(options = {}) {
 
         closeEditConfigModal() {
             this.showEditConfigModal = false;
-            this.editingConfig = {
-                name: '',
-                apiKey: '',
-                baseUrl: '',
-                model: '',
-                preset: '',
-                awsRegion: 'us-west-2',
-                awsAccessKeyId: '',
-                awsSecretAccessKey: ''
-            };
+            this.editingConfig = { name: '', apiKey: '', baseUrl: '', model: '' };
         },
 
         async saveAndApplyConfig() {
             const name = this.editingConfig.name;
-            normalizePresetDraft(this.editingConfig);
             this.claudeConfigs[name] = this.mergeClaudeConfig(this.claudeConfigs[name], this.editingConfig);
             this.saveClaudeConfigs();
 
             const config = this.claudeConfigs[name];
-            if (!config.apiKey && config.preset !== 'aws-bedrock-aksk') {
+            if (!config.apiKey) {
                 this.showMessage('已保存，未应用', 'info');
                 this.closeEditConfigModal();
                 if (name === this.currentClaudeConfig) {
                     this.refreshClaudeModelContext();
                 }
-                return;
-            }
-            if (config.preset === 'aws-bedrock-aksk' && !config.hasKey) {
-                this.showMessage('请先补全 AWS Region / Access Key / Secret Key', 'error');
                 return;
             }
 
@@ -154,7 +100,6 @@ export function createClaudeConfigMethods(options = {}) {
             if (this.claudeConfigs[name]) {
                 return this.showMessage('名称已存在', 'error');
             }
-            normalizePresetDraft(this.newClaudeConfig);
             const duplicateName = this.findDuplicateClaudeConfigName(this.newClaudeConfig);
             if (duplicateName) {
                 return this.showMessage('配置已存在', 'info');
@@ -196,10 +141,7 @@ export function createClaudeConfigMethods(options = {}) {
             this.refreshClaudeModelContext();
             const config = this.claudeConfigs[name];
 
-            if (config.preset === 'aws-bedrock-aksk' && !config.hasKey) {
-                return this.showMessage('请先补全 AWS Region / Access Key / Secret Key', 'error');
-            }
-            if (!config.apiKey && config.preset !== 'aws-bedrock-aksk') {
+            if (!config.apiKey) {
                 if (config.externalCredentialType) {
                     return this.showMessage('检测到外部 Claude 认证状态；当前仅支持展示，若需由 codexmate 接管请补充 API Key', 'info');
                 }
@@ -225,11 +167,7 @@ export function createClaudeConfigMethods(options = {}) {
                 name: '',
                 apiKey: '',
                 baseUrl: 'https://open.bigmodel.cn/api/anthropic',
-                model: 'glm-4.7',
-                preset: '',
-                awsRegion: 'us-west-2',
-                awsAccessKeyId: '',
-                awsSecretAccessKey: ''
+                model: 'glm-4.7'
             };
         }
     };
