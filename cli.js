@@ -243,13 +243,6 @@ const DEFAULT_BUILTIN_CLAUDE_PROXY_SETTINGS = Object.freeze({
     authSource: 'provider',
     timeoutMs: 30000
 });
-const BOOTSTRAP_TEXT_MARKERS = [
-    'agents.md instructions',
-    '<instructions>',
-    '<environment_context>',
-    'you are a coding agent',
-    'codex cli'
-];
 const CLI_INSTALL_TARGETS = Object.freeze([
     {
         id: 'claude',
