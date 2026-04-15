@@ -8963,13 +8963,17 @@ function cmdStart(options = {}) {
     const host = resolveWebHost(options);
     releaseRunPortIfNeeded(port, host);
 
+    const isDev = process.env.NODE_ENV === 'development'
+        || process.env.CODEXMATE_DEV === '1'
+        || process.env.CODEXMATE_DEV === 'true';
+
     let serverHandle = createWebServer({
         htmlPath,
         assetsDir,
         webDir,
         host,
         port,
-        openBrowser: !options.noBrowser
+        openBrowser: !options.noBrowser && !isDev
     });
 
     const requestWebUiRestart = createSerializedWebUiRestartHandler(async (info) => {
