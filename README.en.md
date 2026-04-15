@@ -10,7 +10,7 @@
 [![Version](https://img.shields.io/npm/v/codexmate?label=version&registry_uri=https%3A%2F%2Fregistry.npmjs.org)](https://www.npmjs.com/package/codexmate)
 [![Downloads](https://img.shields.io/npm/dt/codexmate?label=downloads)](https://www.npmjs.com/package/codexmate)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Node](https://img.shields.io/badge=node-%3E%3D14.0.0-green.svg)](https://nodejs.org)
+[![Node](https://img.shields.io/badge=node-%3E%3D14.0.0-green.svg)](https://nodejs.org/)
 
 [Quick Start](#quick-start) · [Commands](#command-reference) · [Web UI](#web-ui) · [MCP](#mcp) · [中文](README.md)
 
@@ -71,8 +71,6 @@ It works on local files directly and does not require cloud hosting. The skills 
 - Zip/unzip utilities
 
 ## Architecture
-
-Think of Codex Mate as a **local control panel** for configuration, sessions, skills, and task orchestration. You operate it via CLI / Web UI / MCP, and it only updates your local files so changes stay auditable and reversible.
 
 ### At a glance (what it does → what you get)
 
