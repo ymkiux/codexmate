@@ -8361,7 +8361,7 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             result = applyOpenclawWorkspaceFile(params || {});
                             break;
                         case 'get-crush-config':
-                            result = getCrushConfig();
+                            result = getCrushConfig(params || {});
                             break;
                         case 'apply-crush-config':
                             result = applyCrushConfig(params || {});

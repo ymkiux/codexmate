@@ -281,7 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 crushConfigExists: false,
                 crushConfigLoading: false,
                 crushConfigDraft: '',
-                crushConfigIncludeKeys: false,
+                crushConfigScope: 'global',
                 openclawWorkspaceFileName: 'SOUL.md',
                 agentsWorkspaceFileName: '',
                 openclawStructured: {

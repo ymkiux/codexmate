@@ -11,7 +11,7 @@ export function createCrushConfigMethods({ api }) {
         async loadCrushConfig() {
             this.crushConfigLoading = true;
             try {
-                const res = await api('get-crush-config', {});
+                const res = await api('get-crush-config', { scope: this.crushConfigScope });
                 if (res && res.error) {
                     this.toastError(res.error);
                 }
@@ -31,7 +31,7 @@ export function createCrushConfigMethods({ api }) {
             if (!raw.trim()) return;
             this.crushConfigLoading = true;
             try {
-                const res = await api('apply-crush-config', { raw });
+                const res = await api('apply-crush-config', { raw, scope: this.crushConfigScope });
                 if (res && res.error) {
                     this.toastError(res.error);
                     return;
@@ -47,18 +47,25 @@ export function createCrushConfigMethods({ api }) {
         async initCrushConfig() {
             this.crushConfigLoading = true;
             try {
-                const res = await api('init-crush-config', { includeKeys: this.crushConfigIncludeKeys === true });
+                const res = await api('init-crush-config', { scope: this.crushConfigScope, dryRun: true });
                 if (res && res.error) {
                     this.toastError(res.error);
                     return;
                 }
-                this.toastSuccess(`Initialized (providers: ${(res && res.providerCount) || 0})`);
-                await this.loadCrushConfig();
+                if (res && typeof res.raw === 'string' && res.raw.trim()) {
+                    this.crushConfigDraft = res.raw;
+                    this.toastSuccess(`Generated template (providers: ${(res && res.providerCount) || 0})`);
+                } else {
+                    this.toastError('Failed to generate template');
+                }
             } catch (e) {
                 this.toastError(e && e.message ? e.message : String(e));
             } finally {
                 this.crushConfigLoading = false;
             }
+        },
+        async onCrushConfigScopeChange() {
+            await this.loadCrushConfig();
         },
         formatCrushConfig() {
             const raw = typeof this.crushConfigDraft === 'string' ? this.crushConfigDraft : '';
@@ -85,4 +92,3 @@ export function createCrushConfigMethods({ api }) {
         }
     };
 }
-

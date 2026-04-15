@@ -6,7 +6,21 @@
     role="tabpanel"
     :aria-labelledby="'tab-config-crush'">
     <div class="config-template-hint">
-        读写 <code>crush.json</code>（全局配置），遵循 <a href="https://github.com/charmbracelet/crush" target="_blank" rel="noopener">charmbracelet/crush</a> 默认路径。
+        读写 <code>crush.json</code>（Crush 配置文件）。参考：<a href="https://github.com/charmbracelet/crush" target="_blank" rel="noopener">charmbracelet/crush</a>。
+    </div>
+
+    <div class="selector-section">
+        <div class="selector-header">
+            <span class="selector-title">配置范围</span>
+        </div>
+        <select class="model-select" v-model="crushConfigScope" @change="onCrushConfigScopeChange" :disabled="crushConfigLoading">
+            <option value="project-dot">.crush.json（项目）</option>
+            <option value="project">crush.json（项目）</option>
+            <option value="global">crush.json（全局）</option>
+        </select>
+        <div class="config-template-hint">
+            提示：Crush 加载优先级是 <code>.crush.json</code> &gt; <code>crush.json</code> &gt; 全局配置。
+        </div>
     </div>
 
     <div class="selector-section">
@@ -44,15 +58,14 @@
 
     <div class="selector-section">
         <div class="selector-header">
-            <span class="selector-title">快速初始化</span>
+            <span class="selector-title">模板与引导</span>
         </div>
         <button class="btn-tool" @click="initCrushConfig" :disabled="crushConfigLoading">
-            {{ crushConfigLoading ? '处理中...' : '从 Codex providers 生成' }}
+            {{ crushConfigLoading ? '生成中...' : '生成 providers 模板（不写入）' }}
         </button>
-        <label class="health-remote-toggle">
-            <input type="checkbox" v-model="crushConfigIncludeKeys" :disabled="crushConfigLoading">
-            <span>include keys（把 key 一并写入 crush.json）</span>
-        </label>
+        <div class="config-template-hint">
+            不会写入真实密钥；默认用 <code>$PROVIDER_API_KEY</code> 形式占位，你确认无误后再点“保存”。
+        </div>
     </div>
 
     <div class="selector-section">

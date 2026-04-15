@@ -1,5 +1,5 @@
 const {
-    resolveCrushConfigPath,
+    resolveCrushConfigPathForScope,
     safeReadJsonFile,
     buildDefaultCrushConfig,
     buildCrushProvidersFromCodexProviders,
@@ -7,10 +7,10 @@ const {
 } = require('../lib/crush-config');
 
 function createCrushController({ readConfigOrVirtualDefault }) {
-    const getConfigPath = () => resolveCrushConfigPath();
+    const getConfigPath = (params = {}) => resolveCrushConfigPathForScope(params);
 
-    const getCrushConfig = () => {
-        const filePath = getConfigPath();
+    const getCrushConfig = (params = {}) => {
+        const filePath = getConfigPath(params);
         const read = safeReadJsonFile(filePath);
         return {
             path: filePath,
@@ -22,7 +22,7 @@ function createCrushController({ readConfigOrVirtualDefault }) {
     };
 
     const applyCrushConfig = (params = {}) => {
-        const filePath = getConfigPath();
+        const filePath = getConfigPath(params);
         const raw = typeof params.raw === 'string' ? params.raw : '';
         if (!raw.trim()) return { error: 'Empty config content' };
         let parsed;
@@ -39,14 +39,17 @@ function createCrushController({ readConfigOrVirtualDefault }) {
     };
 
     const initCrushConfig = (params = {}) => {
-        const filePath = getConfigPath();
-        const includeKeys = params.includeKeys === true;
+        const filePath = getConfigPath(params);
+        const dryRun = params.dryRun === true;
         const base = buildDefaultCrushConfig();
         const codex = readConfigOrVirtualDefault ? readConfigOrVirtualDefault() : null;
-        const providers = codex && codex.config ? buildCrushProvidersFromCodexProviders(codex.config.model_providers, { includeKeys }) : {};
+        const providers = codex && codex.config ? buildCrushProvidersFromCodexProviders(codex.config.model_providers, {}) : {};
         base.providers = providers;
-        writeCrushConfigFile(filePath, base, { pretty: true });
-        return { success: true, path: filePath, providerCount: Object.keys(providers).length };
+        const raw = JSON.stringify(base, null, 2) + '\n';
+        if (!dryRun) {
+            writeCrushConfigFile(filePath, base, { pretty: true });
+        }
+        return { success: true, path: filePath, providerCount: Object.keys(providers).length, raw };
     };
 
     const cmdCrush = (args = []) => {
@@ -64,8 +67,7 @@ function createCrushController({ readConfigOrVirtualDefault }) {
             return;
         }
         if (sub === 'init') {
-            const includeKeys = args.includes('--include-keys');
-            const res = initCrushConfig({ includeKeys });
+            const res = initCrushConfig({});
             if (res.error) {
                 console.error('Error:', res.error);
                 process.exitCode = 1;
@@ -74,7 +76,7 @@ function createCrushController({ readConfigOrVirtualDefault }) {
             console.log(`✓ Wrote ${res.path} (providers: ${res.providerCount})`);
             return;
         }
-        console.log('Usage: codexmate crush <path|get|init> [--include-keys]');
+        console.log('Usage: codexmate crush <path|get|init>');
     };
 
     return {
@@ -86,4 +88,3 @@ function createCrushController({ readConfigOrVirtualDefault }) {
 }
 
 module.exports = { createCrushController };
-
