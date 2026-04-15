@@ -1,0 +1,60 @@
+<section class="panel panel-config"
+    id="panel-config-crush"
+    role="tabpanel"
+    v-show="mainTab === 'config' && configMode === 'crush'"
+    :aria-labelledby="'tab-config-crush'">
+    <div class="panel-inner">
+        <div class="panel-section">
+            <div class="panel-section-title">Crush</div>
+            <div class="panel-section-subtitle">
+                Manage <code>crush.json</code> used by <a href="https://github.com/charmbracelet/crush" target="_blank" rel="noopener">charmbracelet/crush</a>.
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <div class="panel-section-row">
+                <div class="panel-section-label">Config path</div>
+                <div class="panel-section-value">
+                    <code class="mono">{{ crushConfigPath || '(unknown)' }}</code>
+                </div>
+            </div>
+
+            <div class="panel-actions">
+                <button class="btn btn-secondary" @click="loadCrushConfig" :disabled="crushConfigLoading">
+                    {{ crushConfigLoading ? 'Loading...' : 'Load' }}
+                </button>
+                <button class="btn btn-secondary" @click="formatCrushConfig" :disabled="crushConfigLoading || !crushConfigDraft">
+                    Format
+                </button>
+                <button class="btn btn-secondary" @click="validateCrushConfig" :disabled="crushConfigLoading || !crushConfigDraft">
+                    Validate
+                </button>
+                <button class="btn btn-confirm" @click="saveCrushConfig" :disabled="crushConfigLoading || !crushConfigDraft">
+                    Save
+                </button>
+            </div>
+
+            <div class="panel-actions panel-actions-muted">
+                <button class="btn btn-secondary" @click="initCrushConfig" :disabled="crushConfigLoading">
+                    Init from Codex providers
+                </button>
+                <label class="inline-checkbox">
+                    <input type="checkbox" v-model="crushConfigIncludeKeys" :disabled="crushConfigLoading">
+                    include keys
+                </label>
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <textarea class="form-textarea mono"
+                v-model="crushConfigDraft"
+                rows="18"
+                spellcheck="false"
+                placeholder="{\n  \"$schema\": \"https://charm.land/crush.json\",\n  \"providers\": {}\n}"></textarea>
+            <div class="panel-section-hint">
+                Tip: this editor writes the global config file. Project-local configs like <code>.crush.json</code> still take priority.
+            </div>
+        </div>
+    </div>
+</section>
+

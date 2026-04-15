@@ -34,6 +34,17 @@
                 @pointerdown="onConfigTabPointerDown('openclaw', $event)"
                 @click="onConfigTabClick('openclaw', $event)">OpenClaw</button>
             <button class="top-tab"
+                id="tab-config-crush"
+                role="tab"
+                data-main-tab="config"
+                data-config-mode="crush"
+                :tabindex="mainTab === 'config' && configMode === 'crush' ? 0 : -1"
+                :aria-selected="mainTab === 'config' && configMode === 'crush'"
+                aria-controls="panel-config-crush"
+                :class="{ active: isConfigModeNavActive('crush') }"
+                @pointerdown="onConfigTabPointerDown('crush', $event)"
+                @click="onConfigTabClick('crush', $event)">Crush</button>
+            <button class="top-tab"
                 id="tab-sessions"
                 role="tab"
                 data-main-tab="sessions"
@@ -151,6 +162,20 @@
                         <div class="side-item-meta">
                             <span>JSON5 / AGENTS</span>
                             <span v-if="currentOpenclawConfig">当前 {{ currentOpenclawConfig }}</span>
+                        </div>
+                    </button>
+                    <button
+                        id="side-tab-config-crush"
+                        data-main-tab="config"
+                        data-config-mode="crush"
+                        :aria-current="mainTab === 'config' && configMode === 'crush' ? 'page' : null"
+                        :class="['side-item', { active: isConfigModeNavActive('crush') }]"
+                        @pointerdown="onConfigTabPointerDown('crush', $event)"
+                        @click="onConfigTabClick('crush', $event)">
+                        <div class="side-item-title">Crush</div>
+                        <div class="side-item-meta">
+                            <span>crush.json</span>
+                            <span v-if="crushConfigExists">已配置</span>
                         </div>
                     </button>
                 </div>

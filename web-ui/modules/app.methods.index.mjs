@@ -13,6 +13,7 @@ import {
 import { createAgentsMethods } from './app.methods.agents.mjs';
 import { createClaudeConfigMethods } from './app.methods.claude-config.mjs';
 import { createCodexConfigMethods } from './app.methods.codex-config.mjs';
+import { createCrushConfigMethods } from './app.methods.crush-config.mjs';
 import { createInstallMethods } from './app.methods.install.mjs';
 import { createNavigationMethods } from './app.methods.navigation.mjs';
 import { createOpenclawCoreMethods } from './app.methods.openclaw-core.mjs';
@@ -75,6 +76,7 @@ export function createAppMethods() {
         ...createAgentsMethods({ api, apiWithMeta }),
         ...createProvidersMethods({ api }),
         ...createClaudeConfigMethods({ api }),
+        ...createCrushConfigMethods({ api }),
         ...createOpenclawCoreMethods(),
         ...createOpenclawEditingMethods(),
         ...createOpenclawPersistMethods({

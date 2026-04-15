@@ -26,8 +26,8 @@ test('config template keeps expected config tabs in top and side navigation', ()
     const sideTabModes = [...html.matchAll(/id="side-tab-config-([a-z]+)"/g)]
         .map((match) => match[1]);
 
-    assert.deepStrictEqual(topTabModes, ['codex', 'claude', 'openclaw']);
-    assert.deepStrictEqual(sideTabModes, ['codex', 'claude', 'openclaw']);
+    assert.deepStrictEqual(topTabModes, ['codex', 'claude', 'openclaw', 'crush']);
+    assert.deepStrictEqual(sideTabModes, ['codex', 'claude', 'openclaw', 'crush']);
     assert.match(html, /activeProviderBridgeHint/);
     assert.match(html, /isProviderConfigMode/);
     assert.match(html, /provider-fast-switch-select/);
