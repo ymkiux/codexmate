@@ -1,6 +1,6 @@
 ﻿{
   "name": "codexmate",
-  "version": "0.0.20",
+  "version": "0.0.21",
   "description": "Codex/Claude Code/OpenClaw 配置、会话与任务编排 CLI + Web 工具",
   "main": "cli.js",
   "bin": {
@@ -28,6 +28,7 @@
     "dev": "node cli.js run",
     "start": "node cli.js",
     "reset": "node tools/dev/reset-main.js",
+    "release:npm": "node tools/release/publish-npm.js",
     "docs:dev": "node ./node_modules/vitepress/dist/node/cli.js dev site",
     "docs:build": "node ./node_modules/vitepress/dist/node/cli.js build site",
     "docs:preview": "node ./node_modules/vitepress/dist/node/cli.js preview site",
