@@ -1,60 +1,69 @@
-<section class="panel panel-config"
+<!-- Crush 配置模式 -->
+<div
+    v-show="mainTab === 'config' && configMode === 'crush'"
+    class="mode-content mode-cards"
     id="panel-config-crush"
     role="tabpanel"
-    v-show="mainTab === 'config' && configMode === 'crush'"
     :aria-labelledby="'tab-config-crush'">
-    <div class="panel-inner">
-        <div class="panel-section">
-            <div class="panel-section-title">Crush</div>
-            <div class="panel-section-subtitle">
-                Manage <code>crush.json</code> used by <a href="https://github.com/charmbracelet/crush" target="_blank" rel="noopener">charmbracelet/crush</a>.
-            </div>
+    <div class="config-template-hint">
+        读写 <code>crush.json</code>（全局配置），遵循 <a href="https://github.com/charmbracelet/crush" target="_blank" rel="noopener">charmbracelet/crush</a> 默认路径。
+    </div>
+
+    <div class="selector-section">
+        <div class="selector-header">
+            <span class="selector-title">配置路径</span>
         </div>
-
-        <div class="panel-section">
-            <div class="panel-section-row">
-                <div class="panel-section-label">Config path</div>
-                <div class="panel-section-value">
-                    <code class="mono">{{ crushConfigPath || '(unknown)' }}</code>
-                </div>
-            </div>
-
-            <div class="panel-actions">
-                <button class="btn btn-secondary" @click="loadCrushConfig" :disabled="crushConfigLoading">
-                    {{ crushConfigLoading ? 'Loading...' : 'Load' }}
-                </button>
-                <button class="btn btn-secondary" @click="formatCrushConfig" :disabled="crushConfigLoading || !crushConfigDraft">
-                    Format
-                </button>
-                <button class="btn btn-secondary" @click="validateCrushConfig" :disabled="crushConfigLoading || !crushConfigDraft">
-                    Validate
-                </button>
-                <button class="btn btn-confirm" @click="saveCrushConfig" :disabled="crushConfigLoading || !crushConfigDraft">
-                    Save
-                </button>
-            </div>
-
-            <div class="panel-actions panel-actions-muted">
-                <button class="btn btn-secondary" @click="initCrushConfig" :disabled="crushConfigLoading">
-                    Init from Codex providers
-                </button>
-                <label class="inline-checkbox">
-                    <input type="checkbox" v-model="crushConfigIncludeKeys" :disabled="crushConfigLoading">
-                    include keys
-                </label>
-            </div>
-        </div>
-
-        <div class="panel-section">
-            <textarea class="form-textarea mono"
-                v-model="crushConfigDraft"
-                rows="18"
-                spellcheck="false"
-                placeholder="{\n  \"$schema\": \"https://charm.land/crush.json\",\n  \"providers\": {}\n}"></textarea>
-            <div class="panel-section-hint">
-                Tip: this editor writes the global config file. Project-local configs like <code>.crush.json</code> still take priority.
-            </div>
+        <div class="config-template-hint">
+            <code>{{ crushConfigPath || '未知' }}</code>
+            <span v-if="crushConfigExists">（已存在）</span>
+            <span v-else>（未创建）</span>
         </div>
     </div>
-</section>
 
+    <div class="selector-section">
+        <div class="selector-header settings-tab-header">
+            <div class="settings-tab-actions">
+                <button class="btn-tool btn-tool-compact" @click="loadCrushConfig" :disabled="crushConfigLoading">
+                    {{ crushConfigLoading ? '加载中...' : '加载' }}
+                </button>
+                <button class="btn-tool btn-tool-compact" @click="formatCrushConfig" :disabled="crushConfigLoading || !crushConfigDraft">
+                    格式化
+                </button>
+                <button class="btn-tool btn-tool-compact" @click="validateCrushConfig" :disabled="crushConfigLoading || !crushConfigDraft">
+                    校验
+                </button>
+                <button class="btn-tool btn-tool-compact" @click="saveCrushConfig" :disabled="crushConfigLoading || !crushConfigDraft">
+                    保存
+                </button>
+            </div>
+        </div>
+        <div class="config-template-hint">
+            编辑器保存的是全局 crush 配置；项目内 <code>.crush.json</code> / <code>crush.json</code> 仍优先生效。
+        </div>
+    </div>
+
+    <div class="selector-section">
+        <div class="selector-header">
+            <span class="selector-title">快速初始化</span>
+        </div>
+        <button class="btn-tool" @click="initCrushConfig" :disabled="crushConfigLoading">
+            {{ crushConfigLoading ? '处理中...' : '从 Codex providers 生成' }}
+        </button>
+        <label class="health-remote-toggle">
+            <input type="checkbox" v-model="crushConfigIncludeKeys" :disabled="crushConfigLoading">
+            <span>include keys（把 key 一并写入 crush.json）</span>
+        </label>
+    </div>
+
+    <div class="selector-section">
+        <div class="selector-header">
+            <span class="selector-title">crush.json</span>
+        </div>
+        <textarea
+            v-model="crushConfigDraft"
+            class="form-input template-editor"
+            spellcheck="false"
+            :readonly="crushConfigLoading"
+            placeholder="{\n  \"$schema\": \"https://charm.land/crush.json\",\n  \"providers\": {}\n}"></textarea>
+    </div>
+</div>
