@@ -316,7 +316,10 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.doesNotMatch(html, /<span class="selector-title">local 本地端口<\/span>/);
     assert.match(html, /<button class="btn-icon" @click="showModelModal = true" aria-label="Add model" title="添加模型" v-if="modelsSource === 'legacy'">\+<\/button>/);
     assert.match(html, /<button class="btn-icon" @click="showModelListModal = true" aria-label="Manage models" title="管理模型" v-if="modelsSource === 'legacy'">≡<\/button>/);
-    assert.match(html, /<button class="card-action-btn"[^>]*@click="openHealthCheckDialog\(\{ providerName: provider\.name, locked: true \}\)"[^>]*:aria-label="`Open health dialog for \$\{provider\.name\}`"[^>]*title="检测对话">/);
+    assert.match(
+        html,
+        /<button[\s\S]*class="card-action-btn"[\s\S]*@click="openHealthCheckDialog\(\{ providerName: provider\.name, locked: true \}\)"[\s\S]*:disabled="displayCurrentProvider !== provider\.name"[\s\S]*:aria-label="`Open health dialog for \$\{provider\.name\}`"[\s\S]*:title="displayCurrentProvider === provider\.name \? '健康聊天测试' : '请先切换到该提供商'"/
+    );
     assert.match(html, /<button[\s\S]*?@click="openEditModal\(provider\)"[\s\S]*?:aria-label="`Edit provider \$\{provider\.name\}`"[\s\S]*?:title="shouldShowProviderEdit\(provider\) \? '编辑' : '不可编辑'">/);
     assert.match(html, /<button[\s\S]*?@click="deleteProvider\(provider\.name\)"[\s\S]*?:aria-label="`Delete provider \$\{provider\.name\}`"[\s\S]*?:title="shouldShowProviderDelete\(provider\) \? '删除' : '不可删除'">/);
     assert.match(html, /<button class="card-action-btn"[^>]*@click="openEditConfigModal\(name\)"[^>]*:aria-label="`Edit Claude config \$\{name\}`"[^>]*title="编辑">/);

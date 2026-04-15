@@ -29,6 +29,15 @@
                     <label class="form-label">认证密钥</label>
                     <input v-model="newProvider.key" class="form-input" type="password" placeholder="sk-...">
                 </div>
+                <div class="form-group">
+                    <label class="form-label">
+                        <input type="checkbox" v-model="newProvider.useTransform">
+                        使用内建转换（兼容 OpenAI 格式）
+                    </label>
+                    <div class="form-hint">
+                        开启后：写入的 <code>base_url</code> 会指向 Codex Mate 内建转换服务；Codex 使用的令牌固定为 <code>codexmate</code>。
+                    </div>
+                </div>
 
                 <div class="btn-group">
                     <button class="btn btn-cancel" @click="closeAddModal">取消</button>

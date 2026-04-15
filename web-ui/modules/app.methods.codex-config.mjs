@@ -329,7 +329,7 @@ export function createCodexConfigMethods(options = {}) {
         },
 
         buildDefaultHealthCheckPrompt() {
-            return '请简短回复：当前提供商连接正常。';
+            return '请简短回复：连接正常。';
         },
 
         openHealthCheckDialog(options = {}) {
@@ -337,6 +337,12 @@ export function createCodexConfigMethods(options = {}) {
                 ? options.providerName.trim()
                 : '';
             const locked = !!options.locked && !!providerName;
+            if (locked && providerName && providerName !== String(this.currentProvider || '').trim()) {
+                if (typeof this.showMessage === 'function') {
+                    this.showMessage('请先切换到该提供商再进行健康聊天测试', 'info');
+                }
+                return;
+            }
             const nextProvider = providerName
                 || String(this.healthCheckDialogSelectedProvider || '').trim()
                 || String(this.currentProvider || '').trim()
@@ -376,7 +382,7 @@ export function createCodexConfigMethods(options = {}) {
                 return;
             }
             if (!prompt) {
-                this.showMessage('请输入对话内容', 'error');
+                this.showMessage('请输入消息内容', 'error');
                 return;
             }
 
@@ -396,7 +402,7 @@ export function createCodexConfigMethods(options = {}) {
                 this.healthCheckDialogLastResult = res;
 
                 if (hasResponseError(res) || res.ok === false) {
-                    const message = getResponseMessage(res, '健康检测失败');
+                    const message = getResponseMessage(res, '健康聊天测试失败');
                     this.healthCheckDialogMessages.push({
                         id: `assistant-${Date.now()}`,
                         role: 'assistant',
@@ -413,7 +419,7 @@ export function createCodexConfigMethods(options = {}) {
 
                 const reply = typeof res.reply === 'string' && res.reply.trim()
                     ? res.reply.trim()
-                    : '已收到响应，但未解析到可展示文本。';
+                    : '已收到回复，但未解析到可展示文本。';
                 this.healthCheckDialogMessages.push({
                     id: `assistant-${Date.now()}`,
                     role: 'assistant',
@@ -426,7 +432,7 @@ export function createCodexConfigMethods(options = {}) {
                 });
                 this.healthCheckDialogPrompt = '';
             } catch (e) {
-                const message = e && e.message ? e.message : '健康检测失败';
+                const message = e && e.message ? e.message : '健康聊天测试失败';
                 this.healthCheckDialogMessages.push({
                     id: `assistant-${Date.now()}`,
                     role: 'assistant',
