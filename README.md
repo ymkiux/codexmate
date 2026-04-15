@@ -67,7 +67,7 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 - 支持跨应用导入、ZIP 导入 / 导出、批量删除
 
 **任务编排（规划中，未开放）**
-- 当前版本暂未开放，功能与文档可能调整
+- 当前版本暂未开放
 
 **工程能力**
 - MCP stdio 能力（tools/resources/prompts）
