@@ -4,16 +4,15 @@
 
 # Codex Mate
 
-**Codex / Claude Code / OpenClaw 的本地配置、会话与任务编排工具**
+**Codex / Claude Code / OpenClaw 的本地配置与会话管理工具**
 
 [![Build](https://img.shields.io/github/actions/workflow/status/SakuraByteCore/codexmate/release.yml?label=build)](https://github.com/SakuraByteCore/codexmate/actions/workflows/release.yml)
 [![Version](https://img.shields.io/npm/v/codexmate?label=version&registry_uri=https%3A%2F%2Fregistry.npmjs.org)](https://www.npmjs.com/package/codexmate)
 [![Downloads](https://img.shields.io/npm/dt/codexmate?label=downloads)](https://www.npmjs.com/package/codexmate)
-[![Task Orchestration](https://img.shields.io/badge/task-orchestration-local%20ready-8b5cf6)](#任务编排)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/node-%3E%3D14.0.0-green.svg)](https://nodejs.org)
+[![Node](https://img.shields.io/badge/node-%3E%3D14.0.0-green.svg)](https://nodejs.org/)
 
-[快速开始](#快速开始) · [命令速查](#命令速查) · [Web 界面](#web-界面) · [任务编排](#任务编排) · [MCP](#mcp) · [English](README.en.md)
+[快速开始](#快速开始) · [命令速查](#命令速查) · [Web 界面](#web-界面) · [MCP](#mcp) · [English](README.en.md)
 
 </div>
 
@@ -28,7 +27,7 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 - OpenClaw JSON5 配置与 Workspace `AGENTS.md`
 - Codex / Claude Code Skills 市场（安装目标切换、本地 skills 管理、跨应用导入、ZIP 分发）
 - Codex / Claude 本地会话浏览、筛选、导出、删除与 Usage 统计概览
-- 本地任务编排：先出计划，再执行或入队，支持运行记录、日志回看、重试与取消
+- 任务编排（规划中，未开放）
 
 项目不依赖云端托管，配置写入你的本地文件，便于审计和回滚。Skills 市场同样坚持本地优先，只操作本地目录，不依赖远程在线市场。
 
@@ -41,7 +40,6 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 | 会话处理 | 支持浏览、筛选、Usage 统计、导出、批量清理 | 需要手动定位和处理文件 |
 | Skills 复用 | 本地 Skills 市场 + 跨应用导入 + ZIP 分发 | 目录手动复制，容易遗漏 |
 | 使用可见性 | 统一查看配置、会话、Usage 与运行状态 | 依赖手工翻文件和零散命令 |
-| 任务编排 | 先预览计划，再执行、入队、回看日志 | 需要手工排步骤和盯执行过程 |
 | 可回滚性 | 首次接管前自动备份 | 易误覆盖、回滚成本高 |
 | 自动化接入 | 提供 MCP stdio（默认只读） | 需自行封装脚本 |
 
@@ -68,10 +66,8 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 - 扫描 `Codex` / `Claude Code` / `Agents` 可导入来源
 - 支持跨应用导入、ZIP 导入 / 导出、批量删除
 
-**任务编排**
-- `task plan / run / runs / queue / retry / cancel / logs`
-- 先生成节点、波次、依赖，再决定立即执行还是加入队列
-- 本地保存运行记录、摘要和节点日志，便于回看与重试
+**任务编排（规划中，未开放）**
+- 当前版本暂未开放
 
 **工程能力**
 - MCP stdio 能力（tools/resources/prompts）
@@ -79,46 +75,54 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 
 ## 架构总览
 
+### 一图看懂（从“做什么”到“产生什么效果”）
+
 ```mermaid
-flowchart TB
-    subgraph Interfaces["入口"]
-      CLI["CLI"]
+flowchart LR
+    subgraph You["你"]
+      CLI["CLI 命令"]
       WEB["Web UI"]
-      MCP["MCP Client"]
+      MCP["MCP 调用"]
     end
 
-    subgraph Runtime["Codex Mate Runtime"]
-      ENTRY["cli.js Entry"]
-      API["Local HTTP API"]
-      MCPS["MCP stdio Server"]
-      SERVICES["Config / Sessions & Usage / Skills Market / Workflow"]
-      CORE["File IO / Network / Diff / Session Utils"]
+    subgraph Mate["Codex Mate（本地控制台）"]
+      API["本地 HTTP API"]
+      CFG["配置管理"]
+      SESS["会话/Usage 管理"]
+      SKL["Skills 管理"]
     end
 
-    subgraph State["Local State"]
-      CODEX["~/.codex/config + auth + models"]
+    subgraph Files["只操作你的本地文件（可审计/可回滚）"]
+      CODEX["~/.codex/*"]
       CLAUDE["~/.claude/settings.json"]
       OPENCLAW["~/.openclaw/*.json5 + ~/.openclaw/openclaw.json + workspace/AGENTS.md"]
-      SKILLS["~/.codex/skills / ~/.claude/skills / ~/.agents/skills"]
-      STATE["sessions / usage aggregates / trash / workflow runs / skill exports"]
+      SKILLS["~/.{codex,claude,agents}/skills"]
+      SESSFILES["sessions / usage / trash / runs"]
     end
 
-    CLI --> ENTRY
-    WEB -->|GET / + POST /api| API
-    MCP -->|stdio JSON-RPC| MCPS
+    CLI --> API
+    WEB --> API
+    MCP --> API
 
-    ENTRY --> SERVICES
-    API --> SERVICES
-    MCPS --> SERVICES
+    API --> CFG
+    API --> SESS
+    API --> SKL
 
-    SERVICES --> CORE
-
-    CORE --> CODEX
-    CORE --> CLAUDE
-    CORE --> OPENCLAW
-    CORE --> SKILLS
-    CORE --> STATE
+    CFG --> CODEX
+    CFG --> CLAUDE
+    CFG --> OPENCLAW
+    SKL --> SKILLS
+    SESS --> SESSFILES
 ```
+
+### 能力 → 作用对象 → 用户收益（直观对照）
+
+| 能力 | 作用对象（本地） | 你能直接得到什么 |
+| --- | --- | --- |
+| 配置管理（Codex / Claude / OpenClaw） | `~/.codex/*`、`~/.claude/settings.json`、`~/.openclaw/*` | 一键切换 provider/model、管理多套配置、写入前后可控与可回滚 |
+| 会话与 Usage | sessions / usage 聚合 / trash | 更快定位会话、筛选导出、批量清理、查看趋势与占比 |
+| Skills 市场 | `~/.{codex,claude,agents}/skills` | 本地安装/导入/导出/分发（ZIP），跨应用复用更省事 |
+| MCP（stdio） | 本地 API / 文件能力 | 让外部工具以“可控权限”调用本地能力（默认只读） |
 
 ## 快速开始
 
@@ -175,7 +179,6 @@ npm run reset 79
 | `codexmate delete <name>` | 删除提供商 |
 | `codexmate claude <BaseURL> <API_KEY> [model]` | 写入 Claude Code 配置 |
 | `codexmate workflow <list\|get\|validate\|run\|runs>` | MCP 工作流管理 |
-| `codexmate task <plan\|run\|runs\|queue\|retry\|cancel\|logs>` | 本地任务编排与运行管理 |
 | `codexmate codex [args...] [--follow-up <文本> 可重复]` | Codex CLI 透传入口（默认补 `--yolo`，可追加 queued follow-up） |
 | `codexmate qwen [args...]` | Qwen CLI 透传入口 |
 | `codexmate run [--host <HOST>] [--no-browser]` | 启动 Web UI |
@@ -218,11 +221,6 @@ codexmate codex --model gpt-5.3-codex --follow-up "步骤1" --follow-up "步骤2
 - Usage 视图提供近 7 天 / 近 30 天会话趋势、消息趋势、来源占比与高频路径统计
 - 费用估算当前只统计可识别模型单价的非 Claude 会话
 
-### 任务编排标签页
-- 用目标、说明、follow-up、workflow ID 生成本地任务计划
-- 预览节点、波次和依赖，再决定立即执行还是加入队列
-- 查看队列、运行记录、节点摘要与日志，支持重试和取消
-
 ### Skills 市场标签页
 - 在 `Codex` 与 `Claude Code` 之间切换 skills 安装目标
 - 展示当前目标的本地 skills 根目录、已安装项和可导入项
@@ -233,27 +231,6 @@ codexmate codex --model gpt-5.3-codex --follow-up "步骤1" --follow-up "步骤2
 - 支持切换分享命令前缀：`npm start` / `codexmate`
 - 影响 Web UI 中复制出来的 provider 分享命令与 Claude 导入命令
 - 选择持久化到浏览器本地缓存，刷新页面后仍保留
-
-## 任务编排
-
-Codex Mate 的任务编排不是“多几个按钮”的装饰层，而是把本地执行过程拆成可回看的结构化对象：目标、计划、波次、队列、运行记录、节点日志。
-
-适合这类场景：
-- 修 PR review 并补回归测试
-- 先排查根因，再决定是否写代码
-- 复用已有 workflow 跑固定检查
-- 把一串本来要手动盯的本地步骤，改成可预览、可入队、可重试的流程
-
-常见命令：
-
-```bash
-codexmate task plan --target "修复当前 PR review 评论" --follow-up "补回归测试"
-codexmate task run --target "修复失败测试" --allow-write --concurrency 2
-codexmate task queue add --target "整理 workflow 入口" --allow-write
-codexmate task queue start
-codexmate task runs --limit 20
-codexmate task logs <runId>
-```
 
 ## MCP
 

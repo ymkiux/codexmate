@@ -10,7 +10,7 @@
 [![Version](https://img.shields.io/npm/v/codexmate?label=version&registry_uri=https%3A%2F%2Fregistry.npmjs.org)](https://www.npmjs.com/package/codexmate)
 [![Downloads](https://img.shields.io/npm/dt/codexmate?label=downloads)](https://www.npmjs.com/package/codexmate)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/node-%3E%3D14.0.0-green.svg)](https://nodejs.org)
+[![Node](https://img.shields.io/badge=node-%3E%3D14.0.0-green.svg)](https://nodejs.org/)
 
 [Quick Start](#quick-start) · [Commands](#command-reference) · [Web UI](#web-ui) · [MCP](#mcp) · [中文](README.md)
 
@@ -72,50 +72,54 @@ It works on local files directly and does not require cloud hosting. The skills 
 
 ## Architecture
 
+### At a glance (what it does → what you get)
+
 ```mermaid
-flowchart TB
-    subgraph Interfaces["Entry Surfaces"]
+flowchart LR
+    subgraph You["You"]
       CLI["CLI"]
       WEB["Web UI"]
-      MCP["MCP Client"]
-      OAI["Codex / OpenAI Client"]
+      MCP["MCP (stdio)"]
     end
 
-    subgraph Runtime["Codex Mate Runtime"]
-      ENTRY["cli.js Entry"]
+    subgraph Mate["Codex Mate (local control panel)"]
       API["Local HTTP API"]
-      MCPS["MCP stdio Server"]
-      PROXY["Built-in Proxy"]
-      SERVICES["Config / Sessions & Usage / Skills Market / Workflow"]
-      CORE["File IO / Network / Diff / Session Utils"]
+      CFG["Config management"]
+      SESS["Sessions & Usage"]
+      SKL["Skills management"]
     end
 
-    subgraph Data["Local Files"]
-      CODEX["~/.codex/config + auth + models"]
+    subgraph Files["Local files only (auditable & reversible)"]
+      CODEX["~/.codex/*"]
       CLAUDE["~/.claude/settings.json"]
       OPENCLAW["~/.openclaw/*.json5 + ~/.openclaw/openclaw.json + workspace/AGENTS.md"]
-      SKILLS["~/.codex/skills / ~/.claude/skills / ~/.agents/skills"]
-      STATE["sessions / usage aggregates / trash / workflow runs / skill exports"]
+      SKILLS["~/.{codex,claude,agents}/skills"]
+      STATE["sessions / usage / trash / runs"]
     end
 
-    CLI --> ENTRY
-    WEB -->|GET / + POST /api| API
-    MCP -->|stdio JSON-RPC| MCPS
-    OAI -->|HTTP /v1| PROXY
+    CLI --> API
+    WEB --> API
+    MCP --> API
 
-    ENTRY --> SERVICES
-    API --> SERVICES
-    MCPS --> SERVICES
-    PROXY --> CORE
+    API --> CFG
+    API --> SESS
+    API --> SKL
 
-    SERVICES --> CORE
-
-    CORE --> CODEX
-    CORE --> CLAUDE
-    CORE --> OPENCLAW
-    CORE --> SKILLS
-    CORE --> STATE
+    CFG --> CODEX
+    CFG --> CLAUDE
+    CFG --> OPENCLAW
+    SKL --> SKILLS
+    SESS --> STATE
 ```
+
+### Capability → Local target → Outcome
+
+| Capability | Local target | What you get |
+| --- | --- | --- |
+| Config management (Codex / Claude / OpenClaw) | `~/.codex/*`, `~/.claude/settings.json`, `~/.openclaw/*` | Faster provider/model switching, multi-profile management, safer writes with backups |
+| Sessions & Usage | sessions / usage aggregates / trash | Quickly locate sessions, filter/export, batch cleanup, and view trends |
+| Skills market | `~/.{codex,claude,agents}/skills` | Local install/import/export (ZIP), cross-app reuse |
+| MCP (stdio) | local API + file operations | Integrate with external tools under controllable permissions (read-only by default) |
 
 ## Quick Start
 
@@ -197,6 +201,79 @@ codexmate codex --model gpt-5.3-codex --follow-up "step1" --follow-up "step2"
 - Provider/model switching
 - Model list management
 - `~/.codex/AGENTS.md` editing
+
+### Claude Code Mode
+- Multi-profile management
+- Default write to `~/.claude/settings.json`
+- Shareable import command copy
+
+### OpenClaw Mode
+- JSON5 multi-profile management
+- Apply to `~/.openclaw/openclaw.json`
+- Manage `~/.openclaw/workspace/AGENTS.md`
+
+### Sessions Mode
+- Unified Codex + Claude sessions
+- Browser / Usage subview switching
+- Local pin/unpin with persistent storage and pinned-first ordering
+- Search, filter, export, delete, batch cleanup
+- Usage view includes 7d / 30d session trends, message trends, source share, and top paths
+
+### Skills Market Tab
+- Switch the skills install target between `Codex` and `Claude Code`
+- Show the current local skills root, installed items, and importable items
+- Scan importable sources under `Codex` / `Claude Code` / `Agents`
+- Support cross-app import, ZIP import/export, and batch delete
+
+## MCP
+
+> Transport: `stdio`
+
+- Default: read-only tools
+- Enable writes: `--allow-write` or `CODEXMATE_MCP_ALLOW_WRITE=1`
+- Domains: `tools`, `resources`, `prompts`
+
+Examples:
+
+```bash
+codexmate mcp serve --read-only
+codexmate mcp serve --allow-write
+```
+
+## Config Files
+
+- `~/.codex/config.toml`
+- `~/.codex/auth.json`
+- `~/.codex/models.json`
+- `~/.codex/provider-current-models.json`
+- `~/.claude/settings.json`
+- `~/.openclaw/openclaw.json`
+- `~/.openclaw/workspace/AGENTS.md`
+
+## Environment Variables
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `CODEXMATE_PORT` | `3737` | Web server port |
+| `CODEXMATE_HOST` | `0.0.0.0` | Web listen host (set `127.0.0.1` for local-only access) |
+| `CODEXMATE_NO_BROWSER` | unset | Set `1` to disable browser auto-open |
+| `CODEXMATE_MCP_ALLOW_WRITE` | unset | Set `1` to allow MCP write tools by default |
+| `CODEXMATE_FORCE_RESET_EXISTING_CONFIG` | `0` | Set `1` to force bootstrap reset of existing config |
+
+## Tech Stack
+
+- Node.js
+- Vue.js 3 (Web UI)
+- Native HTTP server
+- `@iarna/toml`, `json5`
+
+## Contributing
+
+Issues and pull requests are accepted.
+
+## License
+
+Apache-2.0
 
 ### Claude Code Mode
 - Multi-profile management

@@ -10,6 +10,8 @@ const fs = require('fs');
 
 const cliPath = path.join(__dirname, '..', '..', 'cli.js');
 const cliContent = fs.readFileSync(cliPath, 'utf-8');
+const skillsPath = path.join(__dirname, '..', '..', 'cli', 'skills.js');
+const skillsContent = fs.readFileSync(skillsPath, 'utf-8');
 
 function findMatchingBrace(source, startIndex) {
     let depth = 0;
@@ -435,12 +437,12 @@ test('cmdStart releases the resolved port before creating the web server', () =>
 });
 
 const getCodexSkillsDirSource = extractFunctionBySignature(
-    cliContent,
+    skillsContent,
     'function getCodexSkillsDir() {',
     'getCodexSkillsDir'
 );
 const getClaudeSkillsDirSource = extractFunctionBySignature(
-    cliContent,
+    skillsContent,
     'function getClaudeSkillsDir() {',
     'getClaudeSkillsDir'
 );
@@ -526,9 +528,9 @@ test('getClaudeSkillsDir resolves concrete skills directories instead of parent 
 });
 
 test('skills target tables use env-aware skills dir resolvers', () => {
-    assert.match(cliContent, /dir:\s*getCodexSkillsDir\(\)/);
-    assert.match(cliContent, /dir:\s*getClaudeSkillsDir\(\)/);
-    assert.match(cliContent, /Object\.freeze\(\{\s*app:\s*'agents',\s*label:\s*'Agents',\s*dir:\s*AGENTS_SKILLS_DIR\s*\}\)/s);
+    assert.match(skillsContent, /dir:\s*getCodexSkillsDir\(\)/);
+    assert.match(skillsContent, /dir:\s*getClaudeSkillsDir\(\)/);
+    assert.match(skillsContent, /Object\.freeze\(\{\s*app:\s*'agents',\s*label:\s*'Agents',\s*dir:\s*AGENTS_SKILLS_DIR\s*\}\)/s);
 });
 
 const SKILL_TARGETS = [
@@ -536,7 +538,7 @@ const SKILL_TARGETS = [
     { app: 'claude', label: 'Claude', dir: '/tmp/claude-skills' }
 ];
 const normalizeSkillTargetAppSource = extractFunctionBySignature(
-    cliContent,
+    skillsContent,
     'function normalizeSkillTargetApp(app) {',
     'normalizeSkillTargetApp'
 );
@@ -544,7 +546,7 @@ const normalizeSkillTargetApp = instantiateFunction(normalizeSkillTargetAppSourc
     SKILL_TARGETS
 });
 const getSkillTargetByAppSource = extractFunctionBySignature(
-    cliContent,
+    skillsContent,
     'function getSkillTargetByApp(app) {',
     'getSkillTargetByApp'
 );
@@ -553,7 +555,7 @@ const getSkillTargetByApp = instantiateFunction(getSkillTargetByAppSource, 'getS
     normalizeSkillTargetApp
 });
 const resolveSkillTargetSource = extractFunctionBySignature(
-    cliContent,
+    skillsContent,
     'function resolveSkillTarget(params = {}, defaultApp = \'codex\') {',
     'resolveSkillTarget'
 );
@@ -581,22 +583,22 @@ const resolveCopyTargetRootSource = extractFunctionBySignature(
     'resolveCopyTargetRoot'
 );
 const importSkillsSource = extractFunctionBySignature(
-    cliContent,
+    skillsContent,
     'function importSkills(params = {}) {',
     'importSkills'
 );
 const importSkillsFromZipFileSource = extractFunctionBySignature(
-    cliContent,
+    skillsContent,
     'async function importSkillsFromZipFile(zipPath, options = {}) {',
     'importSkillsFromZipFile'
 );
 const scanUnmanagedSkillsSource = extractFunctionBySignature(
-    cliContent,
+    skillsContent,
     'function scanUnmanagedSkills(params = {}) {',
     'scanUnmanagedSkills'
 );
 const importSkillsFromZipSource = extractFunctionBySignature(
-    cliContent,
+    skillsContent,
     'async function importSkillsFromZip(payload = {}) {',
     'importSkillsFromZip'
 );
@@ -804,7 +806,9 @@ test('createWebServer returns 500 when fallback bundled html generation throws',
 test('createWebServer waits for api readiness probe before auto-opening the browser', () => {
     let listenCallback = null;
     let probeRequest = null;
+    let assetRequest = null;
     let probeEndHandler = null;
+    let assetEndHandler = null;
     let probePayload = '';
     const spawnCalls = [];
     const createWebServer = instantiateFunction(createWebServerSource, 'createWebServer', {
@@ -827,7 +831,11 @@ test('createWebServer waits for api readiness probe before auto-opening the brow
                 };
             },
             request(options, callback) {
-                probeRequest = { options, callback };
+                if (options && options.method === 'POST') {
+                    probeRequest = { options, callback };
+                } else {
+                    assetRequest = { options, callback };
+                }
                 return {
                     on() {},
                     setTimeout() {},
@@ -921,6 +929,24 @@ test('createWebServer waits for api readiness probe before auto-opening the brow
     assert.deepStrictEqual(spawnCalls, []);
 
     probeEndHandler();
+    assert.ok(assetRequest, 'should probe the web ui assets before auto-open');
+    assert.strictEqual(assetRequest.options.hostname, '127.0.0.1');
+    assert.strictEqual(assetRequest.options.port, 3737);
+    assert.strictEqual(assetRequest.options.path, '/web-ui/app.js');
+    assert.strictEqual(assetRequest.options.method, 'GET');
+
+    assetRequest.callback({
+        statusCode: 200,
+        resume() {},
+        on(event, handler) {
+            if (event === 'end') {
+                assetEndHandler = handler;
+            }
+        }
+    });
+    assert.deepStrictEqual(spawnCalls, []);
+
+    assetEndHandler();
     assert.deepStrictEqual(spawnCalls, [{
         command: 'cmd',
         args: ['/c', 'start', '', 'http://127.0.0.1:3737'],
@@ -1172,7 +1198,8 @@ test('createWebServer retries readiness probe failures before auto-opening the b
         Buffer
     });
 
-    requestOutcomes.push('error', 200);
+    // first api probe fails, second api probe succeeds, asset probe succeeds
+    requestOutcomes.push('error', 200, 200);
     createWebServer({
         htmlPath: '/repo/web-ui/index.html',
         assetsDir: '/repo/res',
@@ -1185,7 +1212,7 @@ test('createWebServer retries readiness probe failures before auto-opening the b
     listenCallback();
     assert.deepStrictEqual(spawnCalls, []);
     assert.strictEqual(timers.length, 1);
-    assert.strictEqual(timers[0].ms, 150);
+    assert.strictEqual(timers[0].ms, 200);
 
     timers[0].callback();
     assert.deepStrictEqual(spawnCalls, [{
