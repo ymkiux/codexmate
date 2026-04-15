@@ -10,6 +10,8 @@ const fs = require('fs');
 
 const cliPath = path.join(__dirname, '..', '..', 'cli.js');
 const cliContent = fs.readFileSync(cliPath, 'utf-8');
+const sessionsPath = path.join(__dirname, '..', '..', 'lib', 'cli-sessions.js');
+const sessionsContent = fs.readFileSync(sessionsPath, 'utf-8');
 
 function extractFunction(content, funcName) {
     const regex = new RegExp(`(?:async\\s+)?function ${funcName}\\([^)]*\\)\\s*\\{[\\s\\S]*?^\\}`, 'm');
@@ -36,7 +38,7 @@ const parseJsonlContentSrc = extractFunction(cliContent, 'parseJsonlContent');
 const parseJsonlHeadRecordsSrc = extractFunction(cliContent, 'parseJsonlHeadRecords');
 const parseJsonlTailRecordsSrc = extractFunction(cliContent, 'parseJsonlTailRecords');
 const isSessionSummaryMessageCountExactSrc = extractFunction(cliContent, 'isSessionSummaryMessageCountExact');
-const removeLeadingSystemMessageSrc = extractFunction(cliContent, 'removeLeadingSystemMessage');
+const removeLeadingSystemMessageSrc = extractFunction(sessionsContent, 'removeLeadingSystemMessage');
 const readNonNegativeIntegerSrc = extractFunction(cliContent, 'readNonNegativeInteger');
 const readTotalTokensFromUsageSrc = extractFunction(cliContent, 'readTotalTokensFromUsage');
 const readUsageTotalsFromUsageSrc = extractFunction(cliContent, 'readUsageTotalsFromUsage');
