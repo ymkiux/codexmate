@@ -10,6 +10,8 @@ const fs = require('fs');
 
 const cliPath = path.join(__dirname, '..', '..', 'cli.js');
 const cliContent = fs.readFileSync(cliPath, 'utf-8');
+const skillsPath = path.join(__dirname, '..', '..', 'cli', 'skills.js');
+const skillsContent = fs.readFileSync(skillsPath, 'utf-8');
 
 function findMatchingBrace(source, startIndex) {
     let depth = 0;
@@ -435,12 +437,12 @@ test('cmdStart releases the resolved port before creating the web server', () =>
 });
 
 const getCodexSkillsDirSource = extractFunctionBySignature(
-    cliContent,
+    skillsContent,
     'function getCodexSkillsDir() {',
     'getCodexSkillsDir'
 );
 const getClaudeSkillsDirSource = extractFunctionBySignature(
-    cliContent,
+    skillsContent,
     'function getClaudeSkillsDir() {',
     'getClaudeSkillsDir'
 );
@@ -526,9 +528,9 @@ test('getClaudeSkillsDir resolves concrete skills directories instead of parent 
 });
 
 test('skills target tables use env-aware skills dir resolvers', () => {
-    assert.match(cliContent, /dir:\s*getCodexSkillsDir\(\)/);
-    assert.match(cliContent, /dir:\s*getClaudeSkillsDir\(\)/);
-    assert.match(cliContent, /Object\.freeze\(\{\s*app:\s*'agents',\s*label:\s*'Agents',\s*dir:\s*AGENTS_SKILLS_DIR\s*\}\)/s);
+    assert.match(skillsContent, /dir:\s*getCodexSkillsDir\(\)/);
+    assert.match(skillsContent, /dir:\s*getClaudeSkillsDir\(\)/);
+    assert.match(skillsContent, /Object\.freeze\(\{\s*app:\s*'agents',\s*label:\s*'Agents',\s*dir:\s*AGENTS_SKILLS_DIR\s*\}\)/s);
 });
 
 const SKILL_TARGETS = [
@@ -536,7 +538,7 @@ const SKILL_TARGETS = [
     { app: 'claude', label: 'Claude', dir: '/tmp/claude-skills' }
 ];
 const normalizeSkillTargetAppSource = extractFunctionBySignature(
-    cliContent,
+    skillsContent,
     'function normalizeSkillTargetApp(app) {',
     'normalizeSkillTargetApp'
 );
@@ -544,7 +546,7 @@ const normalizeSkillTargetApp = instantiateFunction(normalizeSkillTargetAppSourc
     SKILL_TARGETS
 });
 const getSkillTargetByAppSource = extractFunctionBySignature(
-    cliContent,
+    skillsContent,
     'function getSkillTargetByApp(app) {',
     'getSkillTargetByApp'
 );
@@ -553,7 +555,7 @@ const getSkillTargetByApp = instantiateFunction(getSkillTargetByAppSource, 'getS
     normalizeSkillTargetApp
 });
 const resolveSkillTargetSource = extractFunctionBySignature(
-    cliContent,
+    skillsContent,
     'function resolveSkillTarget(params = {}, defaultApp = \'codex\') {',
     'resolveSkillTarget'
 );
@@ -581,22 +583,22 @@ const resolveCopyTargetRootSource = extractFunctionBySignature(
     'resolveCopyTargetRoot'
 );
 const importSkillsSource = extractFunctionBySignature(
-    cliContent,
+    skillsContent,
     'function importSkills(params = {}) {',
     'importSkills'
 );
 const importSkillsFromZipFileSource = extractFunctionBySignature(
-    cliContent,
+    skillsContent,
     'async function importSkillsFromZipFile(zipPath, options = {}) {',
     'importSkillsFromZipFile'
 );
 const scanUnmanagedSkillsSource = extractFunctionBySignature(
-    cliContent,
+    skillsContent,
     'function scanUnmanagedSkills(params = {}) {',
     'scanUnmanagedSkills'
 );
 const importSkillsFromZipSource = extractFunctionBySignature(
-    cliContent,
+    skillsContent,
     'async function importSkillsFromZip(payload = {}) {',
     'importSkillsFromZip'
 );
