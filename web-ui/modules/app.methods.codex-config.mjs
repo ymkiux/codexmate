@@ -106,12 +106,9 @@ export function createCodexConfigMethods(options = {}) {
             this.currentProvider = name;
             await this.loadModelsForProvider(name);
             if (this.modelsSource === 'error') {
-                this.currentProvider = previousProvider;
-                this.currentModel = previousModel;
-                this.models = previousModels;
-                this.modelsSource = previousModelsSource;
-                this.modelsHasCurrent = previousModelsHasCurrent;
-                return;
+                // 允许切换到模型列表获取失败的提供商：有些 OpenAI 兼容服务不实现 /models，
+                // 或 /models 需要不同的鉴权。此时保持切换结果，让用户仍可手动输入/选择模型。
+                this.showMessage('模型列表获取失败，但已切换提供商；请检查 URL/密钥或手动设置模型', 'error');
             }
             if (this.modelsSource === 'remote' && this.models.length > 0 && !this.models.includes(this.currentModel)) {
                 this.currentModel = this.models[0];
