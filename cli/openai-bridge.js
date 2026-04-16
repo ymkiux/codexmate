@@ -229,6 +229,28 @@ function normalizeResponsesInputToChatMessages(input) {
     for (const item of input) {
         if (!item || typeof item !== 'object') continue;
 
+        // Tool calls (Responses): { type: "function_call", call_id, name, arguments }
+        // Chat Completions equivalent: assistant message with tool_calls
+        if (typeof item.type === 'string' && item.type === 'function_call') {
+            const callId = typeof item.call_id === 'string' ? item.call_id.trim() : '';
+            const name = typeof item.name === 'string' ? item.name.trim() : '';
+            const args = typeof item.arguments === 'string' ? item.arguments : '';
+            if (callId && name) {
+                messages.push({
+                    role: 'assistant',
+                    tool_calls: [{
+                        id: callId,
+                        type: 'function',
+                        function: {
+                            name,
+                            arguments: args || ''
+                        }
+                    }]
+                });
+            }
+            continue;
+        }
+
         // Tool results (Responses): { type: "function_call_output", call_id, output }
         // Chat Completions equivalent: { role: "tool", tool_call_id, content }
         if (typeof item.type === 'string' && item.type === 'function_call_output') {
@@ -288,7 +310,12 @@ function convertResponsesRequestToChatCompletions(payload) {
         return { error: 'responses 请求缺少 model' };
     }
 
-    const messages = normalizeResponsesInputToChatMessages(body.input);
+    const messages = [];
+    // Align with Maxx/CLIProxyAPI style: map "instructions" to a leading system message.
+    if (typeof body.instructions === 'string' && body.instructions.trim()) {
+        messages.push({ role: 'system', content: body.instructions.trim() });
+    }
+    messages.push(...normalizeResponsesInputToChatMessages(body.input));
     if (!messages.length) {
         // codex sometimes sends empty input for probes; tolerate.
         messages.push({ role: 'user', content: '' });
