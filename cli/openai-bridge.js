@@ -384,6 +384,28 @@ function buildResponsesPayloadFromChatResult(model, text, toolCalls, upstreamPay
     return payload;
 }
 
+function extractResponsesOutputText(payload) {
+    if (!payload || typeof payload !== 'object') return '';
+    const output = Array.isArray(payload.output) ? payload.output : [];
+    for (const item of output) {
+        if (!item || typeof item !== 'object') continue;
+        if (item.type !== 'message') continue;
+        const content = Array.isArray(item.content) ? item.content : [];
+        for (const block of content) {
+            if (!block || typeof block !== 'object') continue;
+            if (block.type !== 'output_text') continue;
+            if (typeof block.text === 'string') return block.text;
+        }
+    }
+    if (typeof payload.output_text === 'string') return payload.output_text;
+    return '';
+}
+
+function toUpstreamNonStreamingResponsesPayload(payload) {
+    const body = payload && typeof payload === 'object' ? payload : {};
+    return { ...body, stream: false };
+}
+
 function isLoopbackAddress(address) {
     if (!address) return false;
     const value = String(address);
@@ -579,7 +601,75 @@ function createOpenaiBridgeHttpHandler(options = {}) {
                 return;
             }
 
-            const converted = convertResponsesRequestToChatCompletions(parsed.value);
+            const responsesRequest = parsed.value;
+            const streamRequested = !!(responsesRequest && typeof responsesRequest === 'object' && responsesRequest.stream === true);
+
+            // Maxx-style behavior: prefer upstream /responses if supported.
+            // Fallback to /chat/completions conversion when upstream does not implement /responses (404/405).
+            const upstreamResponsesUrl = joinApiUrl(upstream.baseUrl, 'responses');
+            const upstreamResponsesResult = await proxyRequestJson(upstreamResponsesUrl, {
+                method: 'POST',
+                body: toUpstreamNonStreamingResponsesPayload(responsesRequest),
+                headers: {
+                    ...(authHeader ? { Authorization: authHeader } : {}),
+                    ...upstreamHeaders
+                },
+                httpAgent,
+                httpsAgent
+            });
+
+            if (upstreamResponsesResult.ok && upstreamResponsesResult.status >= 200 && upstreamResponsesResult.status < 300) {
+                const upstreamJson = parseJsonOrError(upstreamResponsesResult.bodyText);
+                if (upstreamJson.error) {
+                    res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ error: `Upstream JSON parse failed: ${upstreamJson.error}` }));
+                    return;
+                }
+                const upstreamPayload = upstreamJson.value;
+                const model = typeof upstreamPayload.model === 'string'
+                    ? upstreamPayload.model
+                    : (responsesRequest && typeof responsesRequest.model === 'string' ? responsesRequest.model : '');
+
+                if (streamRequested) {
+                    const text = extractResponsesOutputText(upstreamPayload);
+                    res.writeHead(200, {
+                        'Content-Type': 'text/event-stream; charset=utf-8',
+                        'Cache-Control': 'no-cache',
+                        'Connection': 'keep-alive',
+                        'X-Accel-Buffering': 'no'
+                    });
+                    writeSse(res, 'response.created', {
+                        type: 'response.created',
+                        response: { id: upstreamPayload.id || `resp_${crypto.randomBytes(10).toString('hex')}`, model }
+                    });
+                    if (text) {
+                        writeSse(res, 'response.output_text.delta', { type: 'response.output_text.delta', delta: text });
+                        writeSse(res, 'response.output_text.done', { type: 'response.output_text.done', text });
+                    }
+                    writeSse(res, 'response.completed', { type: 'response.completed', response: upstreamPayload });
+                    writeSse(res, 'done', '[DONE]');
+                    res.end();
+                    return;
+                }
+
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify(upstreamPayload));
+                return;
+            }
+
+            if (upstreamResponsesResult.ok && upstreamResponsesResult.status >= 400 && upstreamResponsesResult.status !== 404 && upstreamResponsesResult.status !== 405) {
+                res.writeHead(upstreamResponsesResult.status, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(upstreamResponsesResult.bodyText || JSON.stringify({ error: 'Upstream error' }));
+                return;
+            }
+
+            if (!upstreamResponsesResult.ok) {
+                res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ error: `Upstream request failed: ${upstreamResponsesResult.error}` }));
+                return;
+            }
+
+            const converted = convertResponsesRequestToChatCompletions(responsesRequest);
             if (converted.error) {
                 res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
                 res.end(JSON.stringify({ error: converted.error }));
@@ -630,8 +720,10 @@ function createOpenaiBridgeHttpHandler(options = {}) {
                 });
                 // Use SSE "event:" field for better compatibility with OpenAI Responses streaming clients.
                 writeSse(res, 'response.created', { type: 'response.created', response: { id: responsesPayload.id, model } });
-                writeSse(res, 'response.output_text.delta', { type: 'response.output_text.delta', delta: text });
-                writeSse(res, 'response.output_text.done', { type: 'response.output_text.done', text });
+                if (text) {
+                    writeSse(res, 'response.output_text.delta', { type: 'response.output_text.delta', delta: text });
+                    writeSse(res, 'response.output_text.done', { type: 'response.output_text.done', text });
+                }
                 writeSse(res, 'response.completed', { type: 'response.completed', response: responsesPayload });
                 writeSse(res, 'done', '[DONE]');
                 res.end();
