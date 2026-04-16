@@ -406,6 +406,30 @@ function toUpstreamNonStreamingResponsesPayload(payload) {
     return { ...body, stream: false };
 }
 
+function shouldFallbackFromUpstreamResponses(status, bodyText) {
+    if (!Number.isFinite(status)) return false;
+    // Common "unsupported" status codes for a route.
+    if (status === 404 || status === 405 || status === 501) return true;
+
+    // Some OpenAI-compatible gateways respond with 500 + "not implemented" (e.g. convert_request_failed)
+    // instead of 404/405 for unsupported endpoints. In that case we can safely fallback to chat/completions.
+    const text = String(bodyText || '');
+    if (!text) return false;
+    if (/not implemented/i.test(text)) return true;
+    if (/convert_request_failed/i.test(text)) return true;
+
+    // Best-effort parse for structured error codes.
+    try {
+        const parsed = JSON.parse(text);
+        const code = parsed && parsed.error && typeof parsed.error.code === 'string' ? parsed.error.code : '';
+        const msg = parsed && parsed.error && typeof parsed.error.message === 'string' ? parsed.error.message : '';
+        if (code === 'convert_request_failed') return true;
+        if (/not implemented/i.test(msg)) return true;
+    } catch (_) {}
+
+    return false;
+}
+
 function isLoopbackAddress(address) {
     if (!address) return false;
     const value = String(address);
@@ -657,10 +681,13 @@ function createOpenaiBridgeHttpHandler(options = {}) {
                 return;
             }
 
-            if (upstreamResponsesResult.ok && upstreamResponsesResult.status >= 400 && upstreamResponsesResult.status !== 404 && upstreamResponsesResult.status !== 405) {
-                res.writeHead(upstreamResponsesResult.status, { 'Content-Type': 'application/json; charset=utf-8' });
-                res.end(upstreamResponsesResult.bodyText || JSON.stringify({ error: 'Upstream error' }));
-                return;
+            if (upstreamResponsesResult.ok && upstreamResponsesResult.status >= 400) {
+                if (!shouldFallbackFromUpstreamResponses(upstreamResponsesResult.status, upstreamResponsesResult.bodyText)) {
+                    res.writeHead(upstreamResponsesResult.status, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(upstreamResponsesResult.bodyText || JSON.stringify({ error: 'Upstream error' }));
+                    return;
+                }
+                // fallthrough to chat/completions conversion
             }
 
             if (!upstreamResponsesResult.ok) {
