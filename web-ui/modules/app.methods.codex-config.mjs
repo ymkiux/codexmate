@@ -104,19 +104,44 @@ export function createCodexConfigMethods(options = {}) {
             const previousModelsSource = this.modelsSource;
             const previousModelsHasCurrent = this.modelsHasCurrent;
             this.currentProvider = name;
-            await this.loadModelsForProvider(name);
-            if (this.modelsSource === 'error') {
-                // 允许切换到模型列表获取失败的提供商：有些 OpenAI 兼容服务不实现 /models，
-                // 或 /models 需要不同的鉴权。此时保持切换结果，让用户仍可手动输入/选择模型。
-                this.showMessage('模型列表获取失败，但已切换提供商；请检查 URL/密钥或手动设置模型', 'error');
-            }
+            const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+            // 不要把“切换提供商”强绑定到 /models 成功与否：
+            // 部分 OpenAI 兼容服务 /models 不可用或很慢，但用户仍希望一次点击即可完成切换。
+            // 这里做“短等待 + 后台补齐”：
+            // 1) 先启动 models 拉取（静默）
+            // 2) 给一个很短的窗口等待它完成，以便能立即选到第一个模型
+            // 3) 无论 models 是否成功，先应用 provider 切换
+            // 4) models 后续若补齐并发现当前 model 不在列表，则自动切到首个 model 并再应用一次
+            const modelsTask = this.loadModelsForProvider(name, { silentError: true })
+                .catch(() => {});
+
+            await Promise.race([modelsTask, delay(250)]);
+
             if (this.modelsSource === 'remote' && this.models.length > 0 && !this.models.includes(this.currentModel)) {
                 this.currentModel = this.models[0];
                 this.modelsHasCurrent = true;
             }
+
             if (getProviderConfigModeMeta(this.configMode)) {
                 await this.waitForCodexApplyIdle();
                 await this.applyCodexConfigDirect({ silent: true });
+            }
+
+            await modelsTask;
+
+            if (this.currentProvider === name) {
+                if (this.modelsSource === 'error') {
+                    this.showMessage('模型列表获取失败，但已切换提供商；请检查 URL/密钥或手动设置模型', 'error');
+                }
+                if (this.modelsSource === 'remote' && this.models.length > 0 && !this.models.includes(this.currentModel)) {
+                    this.currentModel = this.models[0];
+                    this.modelsHasCurrent = true;
+                    if (getProviderConfigModeMeta(this.configMode)) {
+                        await this.waitForCodexApplyIdle();
+                        await this.applyCodexConfigDirect({ silent: true });
+                    }
+                }
             }
         },
 
