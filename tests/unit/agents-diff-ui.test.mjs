@@ -18,8 +18,8 @@ test('agents modal exposes diff preview hooks in template and script', () => {
     assert.match(template, /快捷键：Esc/);
     assert.match(template, /agentsDiffTruncated/);
     assert.match(template, /@click\.self="!configTemplateApplying && closeConfigTemplateModal\(\)"/);
-    assert.match(template, /:readonly="configTemplateApplying"/);
-    assert.match(template, /<button class="btn btn-cancel" @click="closeConfigTemplateModal" :disabled="configTemplateApplying">取消<\/button>/);
+    assert.match(template, /:readonly="configTemplateApplying \|\| configTemplateDiffLoading"/);
+    assert.match(template, /<button class="btn btn-cancel" @click="closeConfigTemplateModal" :disabled="configTemplateApplying \|\| configTemplateDiffLoading">取消<\/button>/);
     assert.match(template, /:readonly="agentsLoading \|\| agentsSaving"/);
     assert.match(template, /agentsDiffVisible \? '应用'/);
     assert.match(template, /应用中\.\.\./);

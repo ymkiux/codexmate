@@ -9,6 +9,15 @@ export function createDashboardComputed() {
             const removed = Number(stats.removed || 0);
             return added > 0 || removed > 0;
         },
+        configTemplateDiffHasChanges() {
+            const stats = this.configTemplateDiffStats || {};
+            const added = Number(stats.added || 0);
+            const removed = Number(stats.removed || 0);
+            if (this.configTemplateDiffHasChangesValue !== undefined && this.configTemplateDiffHasChangesValue !== null) {
+                return !!this.configTemplateDiffHasChangesValue;
+            }
+            return added > 0 || removed > 0;
+        },
         claudeModelHasList() {
             return this.claudeModelOptions.length > 0;
         },
