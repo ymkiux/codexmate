@@ -201,11 +201,11 @@ function normalizeResponsesInputToChatMessages(input) {
                     content = String(content ?? '');
                 }
             }
-            if (toolCallId && String(content || '').trim()) {
+            if (toolCallId) {
                 messages.push({
                     role: 'tool',
                     tool_call_id: toolCallId,
-                    content: String(content)
+                    content: String(content || '')
                 });
             }
             continue;
