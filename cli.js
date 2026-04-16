@@ -1835,6 +1835,71 @@ function applyConfigTemplate(params = {}) {
     return { success: true };
 }
 
+function buildConfigTemplateDiff(params = {}) {
+    const template = typeof params.template === 'string' ? params.template : '';
+    if (!template.trim()) {
+        return { error: '模板内容不能为空' };
+    }
+
+    // Validate template format (same constraints as apply) but do not write anything.
+    let parsed;
+    try {
+        parsed = toml.parse(template);
+    } catch (e) {
+        return { error: `模板 TOML 解析失败: ${e.message}` };
+    }
+
+    if (
+        Object.prototype.hasOwnProperty.call(parsed, 'model_context_window')
+        && normalizePositiveIntegerParam(parsed.model_context_window) === null
+    ) {
+        return { error: '模板中的 model_context_window 必须是正整数' };
+    }
+
+    if (
+        Object.prototype.hasOwnProperty.call(parsed, 'model_auto_compact_token_limit')
+        && normalizePositiveIntegerParam(parsed.model_auto_compact_token_limit) === null
+    ) {
+        return { error: '模板中的 model_auto_compact_token_limit 必须是正整数' };
+    }
+
+    if (!parsed.model_provider || typeof parsed.model_provider !== 'string') {
+        return { error: '模板缺少 model_provider' };
+    }
+
+    if (!parsed.model || typeof parsed.model !== 'string') {
+        return { error: '模板缺少 model' };
+    }
+
+    if (!parsed.model_providers || typeof parsed.model_providers !== 'object') {
+        return { error: '模板缺少 model_providers 配置块' };
+    }
+
+    const activeProvider = parsed.model_provider;
+    const activeProviderBlock = parsed.model_providers[activeProvider];
+    if (!activeProviderBlock || typeof activeProviderBlock !== 'object') {
+        return { error: `模板中找不到当前 provider: ${activeProvider}` };
+    }
+
+    let beforeText = '';
+    if (fs.existsSync(CONFIG_FILE)) {
+        try {
+            beforeText = fs.readFileSync(CONFIG_FILE, 'utf-8');
+        } catch (e) {
+            return { error: `读取 config.toml 失败: ${e.message}` };
+        }
+    }
+    const afterText = template.trim() + '\n';
+    const diff = buildLineDiff(beforeText, afterText);
+    const hasChanges = (diff.stats.added || 0) + (diff.stats.removed || 0) > 0;
+    return {
+        diff: {
+            ...diff,
+            hasChanges
+        }
+    };
+}
+
 function addProviderToConfig(params = {}) {
     const name = typeof params.name === 'string' ? params.name.trim() : '';
     const url = typeof params.url === 'string' ? params.url.trim() : '';
@@ -8448,6 +8513,9 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             break;
                         case 'apply-config-template':
                             result = applyConfigTemplate(params || {});
+                            break;
+                        case 'preview-config-template-diff':
+                            result = buildConfigTemplateDiff(params || {});
                             break;
                         case 'add-provider':
                             result = addProviderToConfig(params || {});

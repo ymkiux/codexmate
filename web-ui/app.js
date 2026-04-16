@@ -74,6 +74,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 confirmDialogResolver: null,
                 configTemplateContent: '',
                 configTemplateApplying: false,
+                configTemplateDiffVisible: false,
+                configTemplateDiffLoading: false,
+                configTemplateDiffError: '',
+                configTemplateDiffLines: [],
+                configTemplateDiffStats: {
+                    added: 0,
+                    removed: 0,
+                    unchanged: 0
+                },
+                configTemplateDiffHasChangesValue: false,
+                configTemplateDiffFingerprint: '',
+                _configTemplateDiffPreviewRequestToken: null,
                 codexApplying: false,
                 _pendingCodexApplyOptions: null,
                 agentsContent: '',

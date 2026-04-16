@@ -479,6 +479,7 @@ export function createCodexConfigMethods(options = {}) {
         },
 
         async openConfigTemplateEditor(options = {}) {
+            this.resetConfigTemplateDiffState();
             const modelContextWindow = this.normalizePositiveIntegerInput(
                 this.modelContextWindowInput,
                 'model_context_window',
@@ -626,11 +627,104 @@ export function createCodexConfigMethods(options = {}) {
 
         closeConfigTemplateModal(options = {}) {
             const force = !!options.force;
-            if (!force && this.configTemplateApplying) {
+            if (!force && (this.configTemplateApplying || this.configTemplateDiffLoading)) {
                 return;
             }
             this.showConfigTemplateModal = false;
             this.configTemplateContent = '';
+            this.resetConfigTemplateDiffState();
+        },
+
+        resetConfigTemplateDiffState() {
+            this.configTemplateDiffVisible = false;
+            this.configTemplateDiffLoading = false;
+            this.configTemplateDiffError = '';
+            this.configTemplateDiffLines = [];
+            this.configTemplateDiffStats = { added: 0, removed: 0, unchanged: 0 };
+            this.configTemplateDiffHasChangesValue = false;
+            this.configTemplateDiffFingerprint = '';
+            this._configTemplateDiffPreviewRequestToken = null;
+        },
+
+        onConfigTemplateContentInput() {
+            if (this.configTemplateDiffVisible || (this.configTemplateDiffLines && this.configTemplateDiffLines.length)) {
+                this.resetConfigTemplateDiffState();
+            }
+        },
+
+        buildConfigTemplateDiffFingerprint() {
+            const content = typeof this.configTemplateContent === 'string' ? this.configTemplateContent : '';
+            return `${content.length}::${content}`;
+        },
+
+        hasConfigTemplateDiffChanges() {
+            if (this.configTemplateDiffHasChangesValue !== undefined && this.configTemplateDiffHasChangesValue !== null) {
+                return !!this.configTemplateDiffHasChangesValue;
+            }
+            const stats = this.configTemplateDiffStats && typeof this.configTemplateDiffStats === 'object'
+                ? this.configTemplateDiffStats
+                : {};
+            const added = Number(stats.added || 0);
+            const removed = Number(stats.removed || 0);
+            return added > 0 || removed > 0;
+        },
+
+        async prepareConfigTemplateDiff() {
+            const requestFingerprint = this.buildConfigTemplateDiffFingerprint();
+            const requestToken = Symbol('config-template-diff-preview');
+            this._configTemplateDiffPreviewRequestToken = requestToken;
+            this.configTemplateDiffVisible = true;
+            this.configTemplateDiffLoading = true;
+            this.configTemplateDiffError = '';
+            this.configTemplateDiffLines = [];
+            this.configTemplateDiffStats = { added: 0, removed: 0, unchanged: 0 };
+            this.configTemplateDiffHasChangesValue = false;
+            try {
+                const shouldApply = () => (
+                    this.configTemplateDiffVisible
+                    && this._configTemplateDiffPreviewRequestToken === requestToken
+                    && this.buildConfigTemplateDiffFingerprint() === requestFingerprint
+                );
+                const res = await api('preview-config-template-diff', {
+                    template: this.configTemplateContent
+                });
+                if (!shouldApply()) {
+                    return;
+                }
+                if (res.error) {
+                    this.configTemplateDiffError = res.error;
+                    return;
+                }
+                const diff = res.diff && typeof res.diff === 'object' ? res.diff : {};
+                const lines = Array.isArray(diff.lines) ? diff.lines : [];
+                this.configTemplateDiffLines = lines.filter(line => line && line.type);
+                const stats = diff.stats && typeof diff.stats === 'object' ? diff.stats : null;
+                if (stats) {
+                    this.configTemplateDiffStats = {
+                        added: Number(stats.added || 0),
+                        removed: Number(stats.removed || 0),
+                        unchanged: Number(stats.unchanged || 0)
+                    };
+                } else {
+                    const nextStats = { added: 0, removed: 0, unchanged: 0 };
+                    for (const line of this.configTemplateDiffLines) {
+                        if (line && line.type === 'add') nextStats.added += 1;
+                        else if (line && line.type === 'del') nextStats.removed += 1;
+                        else nextStats.unchanged += 1;
+                    }
+                    this.configTemplateDiffStats = nextStats;
+                }
+                this.configTemplateDiffHasChangesValue = !!diff.hasChanges;
+                this.configTemplateDiffFingerprint = requestFingerprint;
+            } catch (_) {
+                if (this._configTemplateDiffPreviewRequestToken === requestToken) {
+                    this.configTemplateDiffError = '生成差异失败';
+                }
+            } finally {
+                if (this._configTemplateDiffPreviewRequestToken === requestToken) {
+                    this.configTemplateDiffLoading = false;
+                }
+            }
         },
 
         async applyConfigTemplate() {
@@ -639,6 +733,27 @@ export function createCodexConfigMethods(options = {}) {
             }
             if (!this.configTemplateContent || !this.configTemplateContent.trim()) {
                 this.showMessage('模板不能为空', 'error');
+                return;
+            }
+
+            if (!this.configTemplateDiffVisible) {
+                await this.prepareConfigTemplateDiff();
+                return;
+            }
+            if (this.configTemplateDiffLoading) {
+                return;
+            }
+            if (this.configTemplateDiffError) {
+                this.showMessage(this.configTemplateDiffError, 'error');
+                return;
+            }
+            const fingerprint = this.buildConfigTemplateDiffFingerprint();
+            if (this.configTemplateDiffFingerprint !== fingerprint) {
+                await this.prepareConfigTemplateDiff();
+                return;
+            }
+            if (!this.hasConfigTemplateDiffChanges()) {
+                this.showMessage('未检测到改动', 'info');
                 return;
             }
 
