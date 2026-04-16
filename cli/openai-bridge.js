@@ -49,10 +49,41 @@ function normalizeUpstreamEntry(entry) {
     }
     const baseUrl = normalizeOpenaiUpstreamBaseUrl(entry.baseUrl || entry.base_url || '');
     const apiKey = normalizeText(entry.apiKey || entry.api_key || entry.key || '');
+    const headersRaw = entry.headers || entry.extraHeaders || entry.extra_headers || null;
+    const headers = normalizeHeadersMap(headersRaw);
     if (!baseUrl || !isValidHttpUrl(baseUrl)) {
         return null;
     }
-    return { baseUrl, apiKey };
+    return { baseUrl, apiKey, headers };
+}
+
+function normalizeHeadersMap(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return {};
+    }
+    const forbidden = new Set([
+        'authorization',
+        'host',
+        'content-length',
+        'connection',
+        'transfer-encoding',
+        'keep-alive',
+        'proxy-authenticate',
+        'proxy-authorization',
+        'te',
+        'trailer',
+        'upgrade'
+    ]);
+    const result = {};
+    for (const [rawKey, rawVal] of Object.entries(value)) {
+        const key = typeof rawKey === 'string' ? rawKey.trim() : '';
+        if (!key) continue;
+        const lower = key.toLowerCase();
+        if (forbidden.has(lower)) continue;
+        if (typeof rawVal !== 'string') continue;
+        result[key] = rawVal;
+    }
+    return result;
 }
 
 function readOpenaiBridgeSettings(filePath) {
@@ -69,10 +100,11 @@ function readOpenaiBridgeSettings(filePath) {
     };
 }
 
-function upsertOpenaiBridgeProvider(filePath, providerName, upstreamBaseUrl, apiKey) {
+function upsertOpenaiBridgeProvider(filePath, providerName, upstreamBaseUrl, apiKey, headers) {
     const name = normalizeProviderName(providerName);
     const baseUrl = normalizeOpenaiUpstreamBaseUrl(upstreamBaseUrl);
     const key = normalizeText(apiKey);
+    const nextHeaders = normalizeHeadersMap(headers);
 
     if (!name) {
         return { error: 'Provider name is required' };
@@ -82,11 +114,19 @@ function upsertOpenaiBridgeProvider(filePath, providerName, upstreamBaseUrl, api
     }
 
     const settings = readOpenaiBridgeSettings(filePath);
+    const existing = settings && settings.providers ? settings.providers[name] : null;
+    const existingHeaders = existing && typeof existing === 'object' && !Array.isArray(existing)
+        ? normalizeHeadersMap(existing.headers || existing.extraHeaders || existing.extra_headers || null)
+        : {};
     const next = {
         version: SETTINGS_VERSION,
         providers: {
             ...(settings.providers || {}),
-            [name]: { baseUrl, apiKey: key }
+            [name]: {
+                baseUrl,
+                apiKey: key,
+                headers: Object.keys(nextHeaders).length ? nextHeaders : existingHeaders
+            }
         }
     };
     writeJsonAtomic(filePath, next);
@@ -456,6 +496,9 @@ function createOpenaiBridgeHttpHandler(options = {}) {
             const authHeader = upstream.apiKey
                 ? (/^bearer\s+/i.test(upstream.apiKey) ? upstream.apiKey : `Bearer ${upstream.apiKey}`)
                 : '';
+            const upstreamHeaders = upstream && upstream.headers && typeof upstream.headers === 'object' && !Array.isArray(upstream.headers)
+                ? upstream.headers
+                : {};
 
             if (!normalizedSuffix || normalizedSuffix === 'models') {
                 if ((req.method || 'GET').toUpperCase() !== 'GET') {
@@ -467,7 +510,10 @@ function createOpenaiBridgeHttpHandler(options = {}) {
                 const url = joinApiUrl(upstream.baseUrl, 'models');
                 const result = await proxyRequestJson(url, {
                     method: 'GET',
-                    headers: authHeader ? { Authorization: authHeader } : {},
+                    headers: {
+                        ...(authHeader ? { Authorization: authHeader } : {}),
+                        ...upstreamHeaders
+                    },
                     httpAgent,
                     httpsAgent
                 });
@@ -517,7 +563,10 @@ function createOpenaiBridgeHttpHandler(options = {}) {
             const upstreamResult = await proxyRequestJson(upstreamUrl, {
                 method: 'POST',
                 body: converted.chat,
-                headers: authHeader ? { Authorization: authHeader } : {},
+                headers: {
+                    ...(authHeader ? { Authorization: authHeader } : {}),
+                    ...upstreamHeaders
+                },
                 httpAgent,
                 httpsAgent
             });
