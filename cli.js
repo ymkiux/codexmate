@@ -6776,6 +6776,12 @@ function cmdAdd(name, baseUrl, apiKey, silent = false, options = {}) {
     const bridgeType = options && typeof options.bridge === 'string' ? options.bridge.trim() : '';
     const useOpenaiBridge = bridgeType === 'openai';
 
+    if (bridgeType && bridgeType !== 'openai') {
+        const msg = `错误: 不支持的 --bridge 值: ${bridgeType}（仅支持: openai）`;
+        if (!silent) console.error(msg);
+        throw new Error(msg);
+    }
+
     if (!providerName || !providerBaseUrl) {
         if (!silent) {
             console.error('用法: codexmate add <名称> <URL> [密钥] [--bridge <openai>]');
@@ -13265,7 +13271,11 @@ async function main() {
         while (cursor < argv.length) {
             const token = String(argv[cursor] || '');
             if (token === '--bridge') {
-                bridge = String(argv[cursor + 1] || '');
+                const nextValue = String(argv[cursor + 1] || '');
+                if (!nextValue || nextValue.startsWith('--')) {
+                    throw new Error('错误: --bridge 需要一个值（例如: --bridge openai）');
+                }
+                bridge = nextValue;
                 cursor += 2;
                 continue;
             }
