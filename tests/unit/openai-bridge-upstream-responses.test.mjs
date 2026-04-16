@@ -102,6 +102,8 @@ test('openai-bridge prefers upstream /responses and rewraps SSE when stream requ
     });
     assert.equal(sse.status, 200);
     assert.match(sse.headers['content-type'], /text\/event-stream/i);
+    assert.match(sse.text, /response\.output_item\.added/);
+    assert.match(sse.text, /response\.output_text\.delta/);
     assert.match(sse.text, /event: response\.completed/);
     assert.match(sse.text, /data: \[DONE\]/);
 

@@ -360,29 +360,159 @@ function buildResponsesPayloadFromChatResult(model, text, toolCalls, upstreamPay
     const usage = upstreamPayload && upstreamPayload.usage && typeof upstreamPayload.usage === 'object'
         ? upstreamPayload.usage
         : null;
-    const messageItem = {
-        type: 'message',
-        role: 'assistant',
-        content: [{ type: 'output_text', text }]
-    };
-    if (Array.isArray(toolCalls) && toolCalls.length) {
-        messageItem.tool_calls = toolCalls;
+    const createdAt = Math.floor(Date.now() / 1000);
+    const output = [];
+    const trimmedText = typeof text === 'string' ? text : '';
+    if (trimmedText) {
+        output.push({
+            id: `msg_${crypto.randomBytes(8).toString('hex')}`,
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'output_text', text: trimmedText }]
+        });
     }
-    const output = [messageItem];
+
+    // Convert chat.completions tool_calls into Responses-style function_call output items.
+    // This is important for Codex, which appends function_call + function_call_output back into `input`.
+    if (Array.isArray(toolCalls)) {
+        for (const call of toolCalls) {
+            if (!call || typeof call !== 'object') continue;
+            const callId = typeof call.id === 'string' && call.id.trim() ? call.id.trim() : `call_${crypto.randomBytes(8).toString('hex')}`;
+            const fn = call.function && typeof call.function === 'object' ? call.function : {};
+            const name = typeof fn.name === 'string' ? fn.name : '';
+            const args = typeof fn.arguments === 'string' ? fn.arguments : '';
+            if (!name) continue;
+            output.push({
+                type: 'function_call',
+                call_id: callId,
+                name,
+                arguments: args
+            });
+        }
+    }
 
     const payload = {
         id: responseId,
         object: 'response',
         model,
-        output
+        created_at: createdAt,
+        status: 'completed',
+        output,
+        output_text: trimmedText
     };
 
     if (usage) {
-        payload.usage = usage;
+        // Map chat.completions usage -> responses usage shape when possible.
+        const promptTokens = Number.isFinite(usage.prompt_tokens) ? Number(usage.prompt_tokens) : null;
+        const completionTokens = Number.isFinite(usage.completion_tokens) ? Number(usage.completion_tokens) : null;
+        const totalTokens = Number.isFinite(usage.total_tokens) ? Number(usage.total_tokens) : null;
+        if (promptTokens !== null || completionTokens !== null || totalTokens !== null) {
+            payload.usage = {
+                input_tokens: promptTokens ?? undefined,
+                output_tokens: completionTokens ?? undefined,
+                total_tokens: totalTokens ?? undefined
+            };
+            Object.keys(payload.usage).forEach((key) => payload.usage[key] === undefined && delete payload.usage[key]);
+        } else {
+            payload.usage = usage;
+        }
     }
 
     return payload;
 }
+
+function ensureResponseMetadata(response) {
+    const payload = response && typeof response === 'object' ? response : {};
+    if (typeof payload.created_at !== 'number') {
+        payload.created_at = Math.floor(Date.now() / 1000);
+    }
+    if (typeof payload.status !== 'string' || !payload.status.trim()) {
+        payload.status = 'completed';
+    }
+    if (!Array.isArray(payload.output)) {
+        payload.output = [];
+    }
+    return payload;
+}
+
+function sendResponsesSse(res, responsePayload) {
+    const response = ensureResponseMetadata(responsePayload);
+    const responseId = typeof response.id === 'string' && response.id.trim()
+        ? response.id.trim()
+        : `resp_${crypto.randomBytes(10).toString('hex')}`;
+    const model = typeof response.model === 'string' ? response.model : '';
+
+    let sequence = 0;
+    const nextSeq = () => {
+        sequence += 1;
+        return sequence;
+    };
+
+    writeSse(res, 'response.created', {
+        type: 'response.created',
+        response: {
+            id: responseId,
+            model,
+            created_at: response.created_at
+        }
+    });
+
+    const output = Array.isArray(response.output) ? response.output : [];
+    for (let outputIndex = 0; outputIndex < output.length; outputIndex += 1) {
+        const item = output[outputIndex];
+        if (!item || typeof item !== 'object') continue;
+        const itemType = typeof item.type === 'string' ? item.type : '';
+        const itemId = typeof item.id === 'string' && item.id.trim()
+            ? item.id.trim()
+            : (typeof item.call_id === 'string' && item.call_id.trim() ? item.call_id.trim() : `item_${crypto.randomBytes(8).toString('hex')}`);
+
+        // Emit item added so Codex can anchor subsequent deltas by output_index/content_index/item_id.
+        writeSse(res, 'response.output_item.added', {
+            type: 'response.output_item.added',
+            output_index: outputIndex,
+            item: { ...item, id: itemId }
+        });
+
+        if (itemType === 'message') {
+            const content = Array.isArray(item.content) ? item.content : [];
+            for (let contentIndex = 0; contentIndex < content.length; contentIndex += 1) {
+                const block = content[contentIndex];
+                if (!block || typeof block !== 'object') continue;
+                if (block.type !== 'output_text') continue;
+                const text = typeof block.text === 'string' ? block.text : '';
+                if (text) {
+                    writeSse(res, 'response.output_text.delta', {
+                        type: 'response.output_text.delta',
+                        item_id: itemId,
+                        output_index: outputIndex,
+                        content_index: contentIndex,
+                        delta: text,
+                        sequence_number: nextSeq()
+                    });
+                }
+                writeSse(res, 'response.output_text.done', {
+                    type: 'response.output_text.done',
+                    item_id: itemId,
+                    output_index: outputIndex,
+                    content_index: contentIndex,
+                    text,
+                    sequence_number: nextSeq()
+                });
+            }
+        }
+
+        // Emit item done for all item types (message/function_call/etc).
+        writeSse(res, 'response.output_item.done', {
+            type: 'response.output_item.done',
+            output_index: outputIndex,
+            item: { ...item, id: itemId },
+            sequence_number: nextSeq()
+        });
+    }
+
+    writeSse(res, 'response.completed', { type: 'response.completed', response });
+    writeSse(res, 'done', '[DONE]');
+ }
 
 function extractResponsesOutputText(payload) {
     if (!payload || typeof payload !== 'object') return '';
@@ -650,34 +780,20 @@ function createOpenaiBridgeHttpHandler(options = {}) {
                     return;
                 }
                 const upstreamPayload = upstreamJson.value;
-                const model = typeof upstreamPayload.model === 'string'
-                    ? upstreamPayload.model
-                    : (responsesRequest && typeof responsesRequest.model === 'string' ? responsesRequest.model : '');
-
                 if (streamRequested) {
-                    const text = extractResponsesOutputText(upstreamPayload);
                     res.writeHead(200, {
                         'Content-Type': 'text/event-stream; charset=utf-8',
                         'Cache-Control': 'no-cache',
                         'Connection': 'keep-alive',
                         'X-Accel-Buffering': 'no'
                     });
-                    writeSse(res, 'response.created', {
-                        type: 'response.created',
-                        response: { id: upstreamPayload.id || `resp_${crypto.randomBytes(10).toString('hex')}`, model }
-                    });
-                    if (text) {
-                        writeSse(res, 'response.output_text.delta', { type: 'response.output_text.delta', delta: text });
-                        writeSse(res, 'response.output_text.done', { type: 'response.output_text.done', text });
-                    }
-                    writeSse(res, 'response.completed', { type: 'response.completed', response: upstreamPayload });
-                    writeSse(res, 'done', '[DONE]');
+                    sendResponsesSse(res, upstreamPayload);
                     res.end();
                     return;
                 }
 
                 res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-                res.end(JSON.stringify(upstreamPayload));
+                res.end(JSON.stringify(ensureResponseMetadata(upstreamPayload)));
                 return;
             }
 
@@ -745,20 +861,13 @@ function createOpenaiBridgeHttpHandler(options = {}) {
                     'Connection': 'keep-alive',
                     'X-Accel-Buffering': 'no'
                 });
-                // Use SSE "event:" field for better compatibility with OpenAI Responses streaming clients.
-                writeSse(res, 'response.created', { type: 'response.created', response: { id: responsesPayload.id, model } });
-                if (text) {
-                    writeSse(res, 'response.output_text.delta', { type: 'response.output_text.delta', delta: text });
-                    writeSse(res, 'response.output_text.done', { type: 'response.output_text.done', text });
-                }
-                writeSse(res, 'response.completed', { type: 'response.completed', response: responsesPayload });
-                writeSse(res, 'done', '[DONE]');
+                sendResponsesSse(res, responsesPayload);
                 res.end();
                 return;
             }
 
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-            res.end(JSON.stringify(responsesPayload));
+            res.end(JSON.stringify(ensureResponseMetadata(responsesPayload)));
             } catch (e) {
                 res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
                 res.end(JSON.stringify({ error: e && e.message ? e.message : 'Internal Error' }));
