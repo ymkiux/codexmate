@@ -27,6 +27,7 @@ import { createSessionTimelineMethods } from './app.methods.session-timeline.mjs
 import { createSessionTrashMethods } from './app.methods.session-trash.mjs';
 import { createStartupClaudeMethods } from './app.methods.startup-claude.mjs';
 import { createSkillsMethods } from './skills.methods.mjs';
+import { createPluginsMethods } from './plugins.methods.mjs';
 import {
     CONFIG_MODE_SET,
     getProviderConfigModeMeta
@@ -72,6 +73,7 @@ export function createAppMethods() {
             getProviderConfigModeMeta
         }),
         ...createSkillsMethods({ api }),
+        ...createPluginsMethods(),
         ...createAgentsMethods({ api, apiWithMeta }),
         ...createProvidersMethods({ api }),
         ...createClaudeConfigMethods({ api }),
