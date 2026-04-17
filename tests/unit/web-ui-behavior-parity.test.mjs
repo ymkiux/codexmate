@@ -361,6 +361,16 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'sessionListLoadStep',
         'sessionListVisibleCount'
     ];
+    allowedExtraCurrentKeys.push(
+        'configTemplateDiffVisible',
+        'configTemplateDiffLoading',
+        'configTemplateDiffError',
+        'configTemplateDiffLines',
+        'configTemplateDiffStats',
+        'configTemplateDiffHasChangesValue',
+        'configTemplateDiffFingerprint',
+        '_configTemplateDiffPreviewRequestToken'
+    );
     if (parityAgainstHead) {
         const allowedExtraKeySet = new Set(allowedExtraCurrentKeys);
         const allowedMissingKeySet = new Set(allowedMissingCurrentKeys);
@@ -432,6 +442,13 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'resetTaskOrchestrationDraft',
         'appendTaskWorkflowId'
     ];
+    allowedExtraCurrentMethodKeys.push(
+        'resetConfigTemplateDiffState',
+        'onConfigTemplateContentInput',
+        'buildConfigTemplateDiffFingerprint',
+        'prepareConfigTemplateDiff',
+        'hasConfigTemplateDiffChanges'
+    );
     const allowedMissingCurrentMethodKeys = [
         'closeInstallModal',
         'getFirstNonLocalProviderName',
@@ -476,6 +493,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'mainTabKicker',
         'mainTabTitle',
         'mainTabSubtitle',
+        'configTemplateDiffHasChanges',
         'taskOrchestrationSelectedRun',
         'taskOrchestrationSelectedRunNodes',
         'taskOrchestrationQueueStats',

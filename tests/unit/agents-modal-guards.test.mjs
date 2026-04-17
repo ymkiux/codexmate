@@ -35,7 +35,18 @@ test('closeConfigTemplateModal ignores user close attempts while template apply 
 test('applyConfigTemplate force closes the modal after a successful apply', async () => {
     let loadAllCalls = 0;
     const methods = createCodexConfigMethods({
-        api: async () => ({ success: true }),
+        api: async (action) => {
+            if (action === 'preview-config-template-diff') {
+                return {
+                    diff: {
+                        lines: [{ type: 'add', value: 'model = "qwen-plus"' }],
+                        stats: { added: 1, removed: 0, unchanged: 0 },
+                        hasChanges: true
+                    }
+                };
+            }
+            return { success: true };
+        },
         getProviderConfigModeMeta() {
             return null;
         }
@@ -56,6 +67,13 @@ test('applyConfigTemplate force closes the modal after a successful apply', asyn
 
     await methods.applyConfigTemplate.call(context);
 
+    assert.strictEqual(context.showConfigTemplateModal, true);
+    assert.strictEqual(context.configTemplateDiffVisible, true);
+    assert.strictEqual(context.configTemplateApplying, false);
+    assert.strictEqual(loadAllCalls, 0);
+
+    await methods.applyConfigTemplate.call(context);
+
     assert.strictEqual(context.showConfigTemplateModal, false);
     assert.strictEqual(context.configTemplateContent, '');
     assert.strictEqual(context.configTemplateApplying, false);
@@ -68,7 +86,18 @@ test('applyConfigTemplate force closes the modal after a successful apply', asyn
 
 test('applyConfigTemplate keeps the successful apply result when only the refresh fails', async () => {
     const methods = createCodexConfigMethods({
-        api: async () => ({ success: true }),
+        api: async (action) => {
+            if (action === 'preview-config-template-diff') {
+                return {
+                    diff: {
+                        lines: [{ type: 'add', value: 'model = "qwen-plus"' }],
+                        stats: { added: 1, removed: 0, unchanged: 0 },
+                        hasChanges: true
+                    }
+                };
+            }
+            return { success: true };
+        },
         getProviderConfigModeMeta() {
             return null;
         }
@@ -86,6 +115,11 @@ test('applyConfigTemplate keeps the successful apply result when only the refres
             throw new Error('refresh failed');
         }
     };
+
+    await methods.applyConfigTemplate.call(context);
+
+    assert.strictEqual(context.showConfigTemplateModal, true);
+    assert.strictEqual(context.configTemplateDiffVisible, true);
 
     await methods.applyConfigTemplate.call(context);
 
@@ -245,7 +279,11 @@ test('openHealthCheckDialog opens unlocked selector by default and locks when pr
         healthCheckDialogSelectedProvider: '',
         healthCheckDialogPrompt: '',
         healthCheckDialogMessages: [{ id: 'stale' }],
-        healthCheckDialogLastResult: { ok: false }
+        healthCheckDialogLastResult: { ok: false },
+        shownMessages: [],
+        showMessage(message, type) {
+            this.shownMessages.push({ message, type });
+        }
     };
 
     methods.openHealthCheckDialog.call(context);
@@ -255,8 +293,12 @@ test('openHealthCheckDialog opens unlocked selector by default and locks when pr
     assert.deepStrictEqual(context.healthCheckDialogMessages, []);
 
     methods.openHealthCheckDialog.call(context, { providerName: 'beta', locked: true });
-    assert.strictEqual(context.healthCheckDialogLockedProvider, 'beta');
-    assert.strictEqual(context.healthCheckDialogSelectedProvider, 'beta');
+    assert.strictEqual(context.healthCheckDialogLockedProvider, '');
+    assert.strictEqual(context.healthCheckDialogSelectedProvider, 'alpha');
+    assert.deepStrictEqual(context.shownMessages, [{
+        message: '请先切换到该提供商再进行健康聊天测试',
+        type: 'info'
+    }]);
 });
 
 test('sendHealthCheckDialogMessage appends transcript and clears prompt after success', async () => {

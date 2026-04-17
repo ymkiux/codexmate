@@ -2,8 +2,8 @@
             <div class="modal modal-wide health-check-dialog" role="dialog" aria-modal="true" aria-labelledby="health-check-dialog-title">
                 <div class="modal-header">
                     <div>
-                        <div class="modal-title" id="health-check-dialog-title">健康检测对话</div>
-                        <div class="health-check-dialog-subtitle">发一轮真实对话，直看可用性。</div>
+                        <div class="modal-title" id="health-check-dialog-title">健康聊天测试</div>
+                        <div class="health-check-dialog-subtitle">发一轮真实对话，快速确认可用性。</div>
                     </div>
                     <div v-if="healthCheckDialogLockedProvider" class="health-check-dialog-lock">
                         已锁定：{{ healthCheckDialogLockedProvider }}
@@ -59,13 +59,13 @@
                         :disabled="healthCheckDialogSending"
                         placeholder="例如：请回复“连接正常”。"
                         @keydown.ctrl.enter.prevent="sendHealthCheckDialogMessage"></textarea>
-                    <div class="form-hint">真实接口，单轮发送，不带历史。</div>
+                    <div class="form-hint">真实接口，单轮发送，不带历史上下文。</div>
                 </div>
 
                 <div class="btn-group">
                     <button class="btn btn-cancel" @click="closeHealthCheckDialog()" :disabled="healthCheckDialogSending">关闭</button>
                     <button class="btn btn-confirm" @click="sendHealthCheckDialogMessage" :disabled="healthCheckDialogSending">
-                        {{ healthCheckDialogSending ? '发送中...' : '发送检测' }}
+                        {{ healthCheckDialogSending ? '发送中...' : '发送测试' }}
                     </button>
                 </div>
             </div>

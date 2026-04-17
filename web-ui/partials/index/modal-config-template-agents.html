@@ -4,21 +4,63 @@
 
                 <div class="form-group">
                     <label class="form-label">config.toml 模板</label>
+                    <div v-if="configTemplateDiffVisible" class="agents-diff-container">
+                        <div class="agents-diff-header">
+                            <div class="agents-diff-title">
+                                差异预览（config.toml）
+                                <span v-if="configTemplateDiffLoading" class="agents-diff-subtitle">生成中...</span>
+                                <span v-else-if="configTemplateDiffError" class="agents-diff-subtitle">生成失败</span>
+                                <span v-else-if="!configTemplateDiffHasChanges" class="agents-diff-subtitle">未检测到改动</span>
+                            </div>
+                            <div class="agents-diff-stats">
+                                <span class="agents-diff-stat add">+{{ configTemplateDiffStats.added || 0 }}</span>
+                                <span class="agents-diff-stat del">-{{ configTemplateDiffStats.removed || 0 }}</span>
+                                <span class="agents-diff-stat">={{ configTemplateDiffStats.unchanged || 0 }}</span>
+                            </div>
+                        </div>
+                        <div v-if="configTemplateDiffError" class="agents-diff-error">
+                            {{ configTemplateDiffError }}
+                        </div>
+                        <div v-else class="agents-diff-lines">
+                            <div
+                                v-for="(line, index) in configTemplateDiffLines"
+                                :key="line.key || (line.type + '-' + index)"
+                                :class="['agents-diff-line', line.type]">
+                                <span class="agents-diff-line-sign">
+                                    {{ line.type === 'add' ? '+' : (line.type === 'del' ? '-' : ' ') }}
+                                </span>
+                                <span class="agents-diff-line-text">{{ line.value }}</span>
+                            </div>
+                        </div>
+                    </div>
                     <textarea
+                        v-else
                         v-model="configTemplateContent"
                         class="form-input template-editor"
                         spellcheck="false"
-                        :readonly="configTemplateApplying"
+                        :readonly="configTemplateApplying || configTemplateDiffLoading"
+                        @input="onConfigTemplateContentInput"
                         placeholder="在这里编辑 config.toml 模板内容"></textarea>
                     <div class="template-editor-warning">
-                        工具不会自动改动 `config.toml`。只有点击“确认应用模板”后才写入。
+                        工具不会自动改动 `config.toml`。保存需两步：先点“确认”预览差异，再点“应用”写入。
+                        <div v-if="configTemplateDiffVisible && (configTemplateDiffLoading || configTemplateApplying)" class="agents-diff-hint">正在生成差异或应用中，操作暂不可用。</div>
+                        <div v-else-if="configTemplateDiffVisible && configTemplateDiffError" class="agents-diff-hint">差异预览失败，请返回编辑后重试。</div>
+                        <div v-else-if="configTemplateDiffVisible && !configTemplateDiffHasChanges" class="agents-diff-hint">未检测到改动，可返回编辑继续修改或取消退出。</div>
+                        <div v-else-if="configTemplateDiffVisible" class="agents-diff-hint">当前为预览模式，可点击“应用”写入或“返回编辑”继续修改。</div>
                     </div>
                 </div>
 
                 <div class="btn-group">
-                    <button class="btn btn-cancel" @click="closeConfigTemplateModal" :disabled="configTemplateApplying">取消</button>
-                    <button class="btn btn-confirm" @click="applyConfigTemplate" :disabled="configTemplateApplying">
-                        {{ configTemplateApplying ? '应用中...' : '确认应用模板' }}
+                    <button class="btn btn-cancel" @click="closeConfigTemplateModal" :disabled="configTemplateApplying || configTemplateDiffLoading">取消</button>
+                    <button
+                        v-if="configTemplateDiffVisible"
+                        class="btn"
+                        @click="resetConfigTemplateDiffState"
+                        :disabled="configTemplateApplying || configTemplateDiffLoading">
+                        返回编辑
+                    </button>
+                    <button class="btn btn-confirm" @click="applyConfigTemplate" :disabled="configTemplateApplying || configTemplateDiffLoading || (configTemplateDiffVisible && !configTemplateDiffHasChanges)">
+                        {{ configTemplateApplying ? (configTemplateDiffVisible ? '应用中...' : '确认中...') : (configTemplateDiffVisible ? '应用' : '确认') }}
                     </button>
                 </div>
             </div>

@@ -294,6 +294,7 @@ export function createSessionActionMethods(options = {}) {
             const baseUrl = typeof payload.baseUrl === 'string' ? payload.baseUrl.trim() : '';
             const apiKey = typeof payload.apiKey === 'string' ? payload.apiKey : '';
             const model = typeof payload.model === 'string' ? payload.model.trim() : '';
+            const bridge = typeof payload.bridge === 'string' ? payload.bridge.trim() : '';
             if (!name || !baseUrl) return '';
 
             const cli = this.getShareCommandPrefixInvocation();
@@ -301,9 +302,10 @@ export function createSessionActionMethods(options = {}) {
             const urlArg = this.quoteShellArg(baseUrl);
             const keyArg = apiKey ? this.quoteShellArg(apiKey) : '';
             const switchCmd = `${cli} switch ${nameArg}`;
+            const bridgeArgs = bridge ? ` --bridge ${this.quoteShellArg(bridge)}` : '';
             const addCmd = apiKey
-                ? `${cli} add ${nameArg} ${urlArg} ${keyArg}`
-                : `${cli} add ${nameArg} ${urlArg}`;
+                ? `${cli} add ${nameArg} ${urlArg} ${keyArg}${bridgeArgs}`
+                : `${cli} add ${nameArg} ${urlArg}${bridgeArgs}`;
             const modelCmd = model ? ` && ${cli} use ${this.quoteShellArg(model)}` : '';
             return `${addCmd} && ${switchCmd}${modelCmd}`;
         },

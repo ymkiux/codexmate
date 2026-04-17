@@ -206,7 +206,7 @@ test('switchProvider reflects the first clicked target immediately while waiting
     assert.strictEqual(context.providerSwitchDisplayTarget, '');
 });
 
-test('performProviderSwitch skips config reapply when provider models fail to load', async () => {
+test('performProviderSwitch keeps provider when provider models fail to load', async () => {
     const context = createProviderSwitchContext();
     context.loadModelsForProvider = async function loadModelsForProvider(name) {
         context.calls.push(['loadModelsForProvider', name]);
@@ -218,14 +218,19 @@ test('performProviderSwitch skips config reapply when provider models fail to lo
 
     await currentMethods.performProviderSwitch.call(context, 'beta');
 
-    assert.strictEqual(context.currentProvider, 'alpha');
+    assert.strictEqual(context.currentProvider, 'beta');
     assert.strictEqual(context.currentModel, 'alpha-model');
-    assert.deepStrictEqual(context.models, ['alpha-model']);
-    assert.strictEqual(context.modelsSource, 'remote');
+    assert.deepStrictEqual(context.models, []);
+    assert.strictEqual(context.modelsSource, 'error');
     assert.strictEqual(context.modelsHasCurrent, true);
     assert.deepStrictEqual(context.calls, [
-        ['loadModelsForProvider', 'beta']
+        ['loadModelsForProvider', 'beta'],
+        ['applyCodexConfigDirect', { silent: true }]
     ]);
+    assert.deepStrictEqual(context.messages, [{
+        text: '模型列表获取失败，但已切换提供商；请检查 URL/密钥或手动设置模型',
+        type: 'error'
+    }]);
 });
 
 test('updateProvider keeps existing key when edit key input is blank', async () => {
@@ -248,7 +253,7 @@ test('updateProvider keeps existing key when edit key input is blank', async () 
         }
     }]);
     assert.strictEqual(context.showEditModal, false);
-    assert.deepStrictEqual(context.editingProvider, { name: '', url: '', key: '', readOnly: false, nonEditable: false });
+    assert.deepStrictEqual(context.editingProvider, { name: '', url: '', key: '', readOnly: false, nonEditable: false, useTransform: false });
     assert.strictEqual(context.loadAllCalls, 1);
     assert.deepStrictEqual(context.messages, [{
         text: '操作成功',
