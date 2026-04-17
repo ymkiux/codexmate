@@ -369,7 +369,8 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'configTemplateDiffStats',
         'configTemplateDiffHasChangesValue',
         'configTemplateDiffFingerprint',
-        '_configTemplateDiffPreviewRequestToken'
+        '_configTemplateDiffPreviewRequestToken',
+        'configTemplateDiffConfirmEnabled'
     );
     if (parityAgainstHead) {
         const allowedExtraKeySet = new Set(allowedExtraCurrentKeys);
@@ -447,7 +448,9 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'onConfigTemplateContentInput',
         'buildConfigTemplateDiffFingerprint',
         'prepareConfigTemplateDiff',
-        'hasConfigTemplateDiffChanges'
+        'hasConfigTemplateDiffChanges',
+        'normalizeConfigTemplateDiffConfirmEnabled',
+        'setConfigTemplateDiffConfirmEnabled'
     );
     const allowedMissingCurrentMethodKeys = [
         'closeInstallModal',

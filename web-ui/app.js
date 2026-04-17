@@ -6,6 +6,7 @@ import {
 } from './modules/app.constants.mjs';
 import { createAppComputed } from './modules/app.computed.index.mjs';
 import { createAppMethods } from './modules/app.methods.index.mjs';
+import { loadConfigTemplateDiffConfirmEnabledFromStorage } from './modules/config-template-confirm-pref.mjs';
 
 document.addEventListener('DOMContentLoaded', () => {
     if (typeof Vue === 'undefined') {
@@ -86,9 +87,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 configTemplateDiffHasChangesValue: false,
                 configTemplateDiffFingerprint: '',
                 _configTemplateDiffPreviewRequestToken: null,
+                configTemplateDiffConfirmEnabled: true,
                 codexApplying: false,
                 _pendingCodexApplyOptions: null,
                 agentsContent: '',
+                agentsPath: '',
                 agentsPath: '',
                 agentsExists: false,
                 agentsLineEnding: '\n',
@@ -413,6 +416,7 @@ document.addEventListener('DOMContentLoaded', () => {
             this.restoreSessionPinnedMap();
             this.shareCommandPrefix = this.normalizeShareCommandPrefix(localStorage.getItem('codexmateShareCommandPrefix'));
             this.sessionTrashEnabled = this.normalizeSessionTrashEnabled(localStorage.getItem('codexmateSessionTrashEnabled'));
+            this.configTemplateDiffConfirmEnabled = loadConfigTemplateDiffConfirmEnabledFromStorage(localStorage);
             window.addEventListener('resize', this.onWindowResize);
             window.addEventListener('keydown', this.handleGlobalKeydown);
             window.addEventListener('beforeunload', this.handleBeforeUnload);
