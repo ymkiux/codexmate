@@ -42,7 +42,12 @@
                         @input="onConfigTemplateContentInput"
                         placeholder="在这里编辑 config.toml 模板内容"></textarea>
                     <div class="template-editor-warning">
-                        工具不会自动改动 `config.toml`。保存需两步：先点“确认”预览差异，再点“应用”写入。
+                        <template v-if="configTemplateDiffConfirmEnabled">
+                            工具不会自动改动 `config.toml`。保存需两步：先点“确认”预览差异，再点“应用”写入。
+                        </template>
+                        <template v-else>
+                            已关闭两步确认。点击“应用”将直接写入 `config.toml`（可在“设置 → 设备”重新开启两步确认）。
+                        </template>
                         <div v-if="configTemplateDiffVisible && (configTemplateDiffLoading || configTemplateApplying)" class="agents-diff-hint">正在生成差异或应用中，操作暂不可用。</div>
                         <div v-else-if="configTemplateDiffVisible && configTemplateDiffError" class="agents-diff-hint">差异预览失败，请返回编辑后重试。</div>
                         <div v-else-if="configTemplateDiffVisible && !configTemplateDiffHasChanges" class="agents-diff-hint">未检测到改动，可返回编辑继续修改或取消退出。</div>
@@ -60,7 +65,10 @@
                         返回编辑
                     </button>
                     <button class="btn btn-confirm" @click="applyConfigTemplate" :disabled="configTemplateApplying || configTemplateDiffLoading || (configTemplateDiffVisible && !configTemplateDiffHasChanges)">
-                        {{ configTemplateApplying ? (configTemplateDiffVisible ? '应用中...' : '确认中...') : (configTemplateDiffVisible ? '应用' : '确认') }}
+                        {{ configTemplateApplying
+                            ? (configTemplateDiffVisible || !configTemplateDiffConfirmEnabled ? '应用中...' : '确认中...')
+                            : (configTemplateDiffVisible || !configTemplateDiffConfirmEnabled ? '应用' : '确认')
+                        }}
                     </button>
                 </div>
             </div>
