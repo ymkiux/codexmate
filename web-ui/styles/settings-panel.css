@@ -1,0 +1,166 @@
+/* ============================================
+   Settings Panel (refined layout)
+   - Keep existing warm-neutral theme
+   - Add clearer hierarchy, grid rhythm, and card affordance
+   ============================================ */
+
+.settings-layout {
+    padding: 4px 0 0;
+}
+
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.settings-card {
+    grid-column: span 6;
+    border-radius: var(--radius-xl);
+    border: 1px solid rgba(216, 201, 184, 0.42);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 253, 252, 0.88) 100%);
+    box-shadow: var(--shadow-card);
+    padding: 14px 14px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+    position: relative;
+    overflow: hidden;
+}
+
+.settings-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(900px 240px at 10% 0%, rgba(199, 116, 98, 0.12) 0%, rgba(199, 116, 98, 0) 55%),
+        radial-gradient(700px 240px at 90% 10%, rgba(199, 116, 98, 0.07) 0%, rgba(199, 116, 98, 0) 60%);
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.settings-card > * {
+    position: relative;
+    z-index: 1;
+}
+
+.settings-card--wide {
+    grid-column: 1 / -1;
+}
+
+.settings-card--danger {
+    border-color: rgba(196, 69, 54, 0.28);
+}
+
+.settings-card--danger::before {
+    background:
+        radial-gradient(980px 260px at 10% 0%, rgba(196, 69, 54, 0.13) 0%, rgba(196, 69, 54, 0) 55%),
+        radial-gradient(740px 240px at 90% 10%, rgba(199, 116, 98, 0.08) 0%, rgba(199, 116, 98, 0) 60%);
+}
+
+.settings-card-header {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.settings-card-header-row {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.settings-card-title {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--color-text-primary);
+}
+
+.settings-card-meta {
+    font-size: 11px;
+    color: var(--color-text-tertiary);
+    line-height: 1.35;
+}
+
+.settings-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+}
+
+.settings-card-hint {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+    line-height: 1.45;
+}
+
+.settings-card-hint code {
+    font-family: var(--font-family-mono);
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    background: rgba(248, 243, 238, 0.7);
+    color: var(--color-text-secondary);
+}
+
+.settings-field-row {
+    display: grid;
+    grid-template-columns: 88px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+}
+
+.settings-field-label {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.settings-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.settings-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: flex-end;
+    margin-top: 2px;
+}
+
+.settings-toggle {
+    padding: 8px 10px;
+    border-radius: 12px;
+    border: 1px solid rgba(216, 201, 184, 0.4);
+    background: rgba(248, 243, 238, 0.6);
+}
+
+/* Re-balance action buttons inside cards */
+.settings-card .btn-tool {
+    width: auto;
+    max-width: 100%;
+}
+
+/* Mobile / narrow */
+@media (max-width: 860px) {
+    .settings-card {
+        grid-column: 1 / -1;
+    }
+    .settings-field-row {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+}
+

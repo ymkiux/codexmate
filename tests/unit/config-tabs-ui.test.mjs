@@ -219,18 +219,18 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /<div[\s\S]*v-show="settingsTab === 'backup'"[\s\S]*id="settings-panel-backup"[\s\S]*aria-labelledby="settings-tab-backup">/);
     assert.match(html, /<div[\s\S]*v-show="settingsTab === 'trash'"[\s\S]*id="settings-panel-trash"[\s\S]*aria-labelledby="settings-tab-trash">/);
     assert.match(html, /<div[\s\S]*v-show="settingsTab === 'device'"[\s\S]*id="settings-panel-device"[\s\S]*aria-labelledby="settings-tab-device">/);
-    assert.match(html, /id="settings-panel-backup"[\s\S]*?<span class="selector-title">分享命令前缀<\/span>/);
-    assert.match(html, /<select class="model-select" :value="shareCommandPrefix" @change="setShareCommandPrefix\(\$event\.target\.value\)">/);
+    assert.match(html, /id="settings-panel-backup"[\s\S]*?<div class="settings-card-title">分享命令前缀<\/div>/);
+    assert.match(html, /id="settings-share-prefix"[\s\S]*class="model-select"[\s\S]*:value="shareCommandPrefix"[\s\S]*@change="setShareCommandPrefix\(\$event\.target\.value\)"/);
     assert.match(html, /<option value="npm start">npm start<\/option>/);
     assert.match(html, /<option value="codexmate">codexmate<\/option>/);
-    assert.match(html, /id="settings-panel-device"[\s\S]*?<span class="selector-title">配置重置<\/span>/);
+    assert.match(html, /id="settings-panel-device"[\s\S]*?<div class="settings-card-title">配置重置<\/div>/);
     assert.match(html, /id="settings-panel-device"[\s\S]*?@click="resetConfig"/);
     assert.doesNotMatch(
         html.match(/id="panel-config-provider"[\s\S]*?<\/template>/)?.[0] || '',
         /<span class="selector-title">配置重置<\/span>/
     );
-    assert.match(html, /class="settings-tab-actions trash-header-actions"/);
-    assert.match(html, /<span class="selector-title">会话删除行为<\/span>/);
+    assert.match(html, /class="settings-card-actions"/);
+    assert.match(html, /<div class="settings-card-title">会话删除行为<\/div>/);
     assert.match(html, /<input type="checkbox" :checked="sessionTrashEnabled" @change="setSessionTrashEnabled\(\$event\.target\.checked\)">/);
     assert.match(html, /默认开启。关闭后，会话浏览里的删除会直接永久删除，不再进入回收站。/);
     assert.match(html, /<button class="btn-tool btn-tool-compact" @click="loadSessionTrash\(\{ forceRefresh: true \}\)"/);
