@@ -179,6 +179,7 @@ const OPENCLAW_AUTH_PROFILES_FILE_NAME = 'auth-profiles.json';
 const OPENCLAW_AUTH_STATE_FILE_NAME = 'auth-state.json';
 const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 const CLAUDE_SETTINGS_FILE = path.join(CLAUDE_DIR, 'settings.json');
+const CLAUDE_MD_FILE_NAME = 'CLAUDE.md';
 const CLAUDE_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
 const RECENT_CONFIGS_FILE = path.join(CONFIG_DIR, 'recent-configs.json');
 const WORKFLOW_DEFINITIONS_FILE = path.join(CONFIG_DIR, 'codexmate-workflows.json');
@@ -1425,6 +1426,9 @@ async function fetchProviderModels(providerName, overrides = {}) {
 const {
     resolveAgentsFilePath,
     validateAgentsBaseDir,
+    resolveClaudeMdFilePath,
+    readClaudeMdFile,
+    applyClaudeMdFile,
     readAgentsFile,
     applyAgentsFile,
     normalizeDiffText,
@@ -1433,6 +1437,7 @@ const {
     fs,
     path,
     os,
+    ensureDir,
     stripUtf8Bom,
     detectLineEnding,
     normalizeLineEnding,
@@ -1440,6 +1445,8 @@ const {
     buildLineDiff,
     CONFIG_DIR,
     AGENTS_FILE_NAME,
+    CLAUDE_DIR,
+    CLAUDE_MD_FILE_NAME,
     readOpenclawAgentsFile() {
         return readOpenclawAgentsFile(...arguments);
     },
@@ -8537,6 +8544,12 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             break;
                         case 'apply-agents-file':
                             result = applyAgentsFile(params || {});
+                            break;
+                        case 'get-claude-md-file':
+                            result = readClaudeMdFile(params || {});
+                            break;
+                        case 'apply-claude-md-file':
+                            result = applyClaudeMdFile(params || {});
                             break;
                         case 'preview-agents-diff':
                             result = buildAgentsDiff(params || {});
