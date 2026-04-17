@@ -24,6 +24,7 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 
 - Codex 的 provider / model 切换与配置写入
 - Claude Code 配置方案（写入 `~/.claude/settings.json`）
+- Claude Code `CLAUDE.md` 编辑（写入 `~/.claude/CLAUDE.md`）
 - OpenClaw JSON5 配置与 Workspace `AGENTS.md`
 - Codex / Claude Code Skills 市场（安装目标切换、本地 skills 管理、跨应用导入、ZIP 分发）
 - Codex / Claude 本地会话浏览、筛选、导出、删除与 Usage 统计概览
@@ -49,6 +50,7 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 - provider / model 切换（`switch` / `use`）
 - Codex `config.toml` 模板确认后写入
 - Claude Code 多配置方案管理与一键应用
+- Claude Code `CLAUDE.md` 编辑（写入 `~/.claude/CLAUDE.md`）
 - 分享命令前缀切换（`npm start` / `codexmate`），用于复制 provider / Claude 导入命令，选择持久化到浏览器本地缓存
 - OpenClaw JSON5 配置方案管理
 
@@ -94,7 +96,7 @@ flowchart LR
 
     subgraph Files["只操作你的本地文件（可审计/可回滚）"]
       CODEX["~/.codex/*"]
-      CLAUDE["~/.claude/settings.json"]
+      CLAUDE["~/.claude/settings.json + CLAUDE.md"]
       OPENCLAW["~/.openclaw/*.json5 + ~/.openclaw/openclaw.json + workspace/AGENTS.md"]
       SKILLS["~/.{codex,claude,agents}/skills"]
       SESSFILES["sessions / usage / trash / runs"]
@@ -119,7 +121,7 @@ flowchart LR
 
 | 能力 | 作用对象（本地） | 你能直接得到什么 |
 | --- | --- | --- |
-| 配置管理（Codex / Claude / OpenClaw） | `~/.codex/*`、`~/.claude/settings.json`、`~/.openclaw/*` | 一键切换 provider/model、管理多套配置、写入前后可控与可回滚 |
+| 配置管理（Codex / Claude / OpenClaw） | `~/.codex/*`、`~/.claude/settings.json`、`~/.claude/CLAUDE.md`、`~/.openclaw/*` | 一键切换 provider/model、管理多套配置、写入前后可控与可回滚 |
 | 会话与 Usage | sessions / usage 聚合 / trash | 更快定位会话、筛选导出、批量清理、查看趋势与占比 |
 | Skills 市场 | `~/.{codex,claude,agents}/skills` | 本地安装/导入/导出/分发（ZIP），跨应用复用更省事 |
 | MCP（stdio） | 本地 API / 文件能力 | 让外部工具以“可控权限”调用本地能力（默认只读） |
@@ -206,6 +208,7 @@ codexmate codex --model gpt-5.3-codex --follow-up "步骤1" --follow-up "步骤2
 ### Claude Code 配置模式
 - 多配置方案管理
 - 默认写入 `~/.claude/settings.json`
+- `~/.claude/CLAUDE.md` 编辑
 - 支持复制分享导入命令
 
 ### OpenClaw 配置模式
@@ -255,6 +258,7 @@ codexmate mcp serve --allow-write
 - `~/.codex/models.json`
 - `~/.codex/provider-current-models.json`
 - `~/.claude/settings.json`
+- `~/.claude/CLAUDE.md`
 - `~/.openclaw/openclaw.json`
 - `~/.openclaw/workspace/AGENTS.md`
 

@@ -76,6 +76,18 @@
                     </button>
                 </div>
 
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">CLAUDE.md</span>
+                    </div>
+                    <button class="btn-tool" @click="openClaudeMdEditor" :disabled="loading || !!initError || agentsLoading">
+                        {{ agentsLoading ? '加载中...' : '打开 CLAUDE.md' }}
+                    </button>
+                    <div class="config-template-hint">
+                        读写 <code>~/.claude/CLAUDE.md</code>。
+                    </div>
+                </div>
+
                 <div class="card-list">
                     <div v-for="(config, name) in claudeConfigs" :key="name"
                          :class="['card', { active: currentClaudeConfig === name }]"

@@ -3,6 +3,7 @@ function createAgentsFileController(deps = {}) {
         fs,
         path,
         os,
+        ensureDir,
         stripUtf8Bom,
         detectLineEnding,
         normalizeLineEnding,
@@ -10,6 +11,8 @@ function createAgentsFileController(deps = {}) {
         buildLineDiff,
         CONFIG_DIR,
         AGENTS_FILE_NAME,
+        CLAUDE_DIR,
+        CLAUDE_MD_FILE_NAME,
         readOpenclawAgentsFile,
         readOpenclawWorkspaceFile
     } = deps;
@@ -17,6 +20,7 @@ function createAgentsFileController(deps = {}) {
     if (!fs) throw new Error('createAgentsFileController 缺少 fs');
     if (!path) throw new Error('createAgentsFileController 缺少 path');
     if (!os) throw new Error('createAgentsFileController 缺少 os');
+    if (typeof ensureDir !== 'function') throw new Error('createAgentsFileController 缺少 ensureDir');
     if (typeof stripUtf8Bom !== 'function') throw new Error('createAgentsFileController 缺少 stripUtf8Bom');
     if (typeof detectLineEnding !== 'function') throw new Error('createAgentsFileController 缺少 detectLineEnding');
     if (typeof normalizeLineEnding !== 'function') throw new Error('createAgentsFileController 缺少 normalizeLineEnding');
@@ -24,6 +28,8 @@ function createAgentsFileController(deps = {}) {
     if (typeof buildLineDiff !== 'function') throw new Error('createAgentsFileController 缺少 buildLineDiff');
     if (typeof CONFIG_DIR !== 'string' || !CONFIG_DIR) throw new Error('createAgentsFileController 缺少 CONFIG_DIR');
     if (typeof AGENTS_FILE_NAME !== 'string' || !AGENTS_FILE_NAME) throw new Error('createAgentsFileController 缺少 AGENTS_FILE_NAME');
+    if (typeof CLAUDE_DIR !== 'string' || !CLAUDE_DIR) throw new Error('createAgentsFileController 缺少 CLAUDE_DIR');
+    if (typeof CLAUDE_MD_FILE_NAME !== 'string' || !CLAUDE_MD_FILE_NAME) throw new Error('createAgentsFileController 缺少 CLAUDE_MD_FILE_NAME');
     if (typeof readOpenclawAgentsFile !== 'function') throw new Error('createAgentsFileController 缺少 readOpenclawAgentsFile');
     if (typeof readOpenclawWorkspaceFile !== 'function') throw new Error('createAgentsFileController 缺少 readOpenclawWorkspaceFile');
 
@@ -45,6 +51,57 @@ function createAgentsFileController(deps = {}) {
             return { error: `目标目录不存在: ${dirPath}` };
         }
         return { ok: true, dirPath };
+    }
+
+    function resolveClaudeMdFilePath() {
+        return path.join(CLAUDE_DIR, CLAUDE_MD_FILE_NAME);
+    }
+
+    function readClaudeMdFile(params = {}) {
+        const filePath = resolveClaudeMdFilePath();
+        const lineEndingFallback = os.EOL === '\r\n' ? '\r\n' : '\n';
+        if (!fs.existsSync(filePath)) {
+            return {
+                exists: false,
+                path: filePath,
+                content: '',
+                lineEnding: lineEndingFallback
+            };
+        }
+        if (params.metaOnly) {
+            return {
+                exists: true,
+                path: filePath,
+                content: '',
+                lineEnding: lineEndingFallback
+            };
+        }
+        try {
+            const raw = fs.readFileSync(filePath, 'utf-8');
+            return {
+                exists: true,
+                path: filePath,
+                content: stripUtf8Bom(raw),
+                lineEnding: detectLineEnding(raw)
+            };
+        } catch (e) {
+            return { error: `读取 CLAUDE.md 失败: ${e.message}` };
+        }
+    }
+
+    function applyClaudeMdFile(params = {}) {
+        const filePath = resolveClaudeMdFilePath();
+        const content = typeof params.content === 'string' ? params.content : '';
+        const lineEnding = params.lineEnding === '\r\n' ? '\r\n' : '\n';
+        const normalized = normalizeLineEnding(content, lineEnding);
+        const finalContent = ensureUtf8Bom(normalized);
+        try {
+            ensureDir(CLAUDE_DIR);
+            fs.writeFileSync(filePath, finalContent, 'utf-8');
+            return { success: true, path: filePath };
+        } catch (e) {
+            return { error: `写入 CLAUDE.md 失败: ${e.message}` };
+        }
     }
 
     function readAgentsFile(params = {}) {
@@ -116,7 +173,9 @@ function createAgentsFileController(deps = {}) {
         const context = contextRaw || 'codex';
         const metaOnly = hasBaseContent;
         let readResult;
-        if (context === 'openclaw') {
+        if (context === 'claude-md') {
+            readResult = readClaudeMdFile({ metaOnly });
+        } else if (context === 'openclaw') {
             readResult = readOpenclawAgentsFile({ metaOnly });
         } else if (context === 'openclaw-workspace') {
             readResult = readOpenclawWorkspaceFile({ ...params, metaOnly });
@@ -150,6 +209,9 @@ function createAgentsFileController(deps = {}) {
     return {
         resolveAgentsFilePath,
         validateAgentsBaseDir,
+        resolveClaudeMdFilePath,
+        readClaudeMdFile,
+        applyClaudeMdFile,
         readAgentsFile,
         applyAgentsFile,
         normalizeDiffText,
