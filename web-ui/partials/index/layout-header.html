@@ -74,6 +74,16 @@
                 @pointerdown="onMainTabPointerDown('market', $event)"
                 @click="onMainTabClick('market', $event)">Skills</button>
             <button class="top-tab"
+                id="tab-plugins"
+                role="tab"
+                data-main-tab="plugins"
+                :tabindex="mainTab === 'plugins' ? 0 : -1"
+                :aria-selected="mainTab === 'plugins'"
+                aria-controls="panel-plugins"
+                :class="{ active: isMainTabNavActive('plugins') }"
+                @pointerdown="onMainTabPointerDown('plugins', $event)"
+                @click="onMainTabClick('plugins', $event)">Plugins</button>
+            <button class="top-tab"
                 id="tab-docs"
                 role="tab"
                 data-main-tab="docs"
@@ -215,6 +225,23 @@
                         <div class="side-item-meta">
                             <span>{{ skillsTargetLabel }} / 本地 Skills</span>
                             <span>已装 {{ skillsList.length }} · 可导入 {{ skillsImportList.length }}</span>
+                        </div>
+                    </button>
+                </div>
+
+                <div class="side-section" role="navigation" aria-label="Plugins">
+                    <div class="side-section-title">Plugins</div>
+                    <button
+                        id="side-tab-plugins"
+                        data-main-tab="plugins"
+                        :aria-current="mainTab === 'plugins' ? 'page' : null"
+                        :class="['side-item', { active: isMainTabNavActive('plugins') }]"
+                        @pointerdown="onMainTabPointerDown('plugins', $event)"
+                        @click="onMainTabClick('plugins', $event)">
+                        <div class="side-item-title">Prompt Tools</div>
+                        <div class="side-item-meta">
+                            <span>Templates / Variables</span>
+                            <span>{{ promptTemplatesList.length }} templates</span>
                         </div>
                     </button>
                 </div>

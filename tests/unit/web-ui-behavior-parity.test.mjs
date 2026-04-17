@@ -370,7 +370,15 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'configTemplateDiffHasChangesValue',
         'configTemplateDiffFingerprint',
         '_configTemplateDiffPreviewRequestToken',
-        'configTemplateDiffConfirmEnabled'
+        'configTemplateDiffConfirmEnabled',
+        'pluginsActiveId',
+        'pluginsLoading',
+        'promptTemplatesListRaw',
+        'promptTemplatesLoadedOnce',
+        'promptTemplatesKeyword',
+        'promptTemplateSelectedId',
+        'promptTemplateDraftRaw',
+        'promptTemplateVarValuesRaw'
     );
     if (parityAgainstHead) {
         const allowedExtraKeySet = new Set(allowedExtraCurrentKeys);
@@ -451,7 +459,20 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'prepareConfigTemplateDiff',
         'hasConfigTemplateDiffChanges',
         'normalizeConfigTemplateDiffConfirmEnabled',
-        'setConfigTemplateDiffConfirmEnabled'
+        'setConfigTemplateDiffConfirmEnabled',
+        'loadPluginsOverview',
+        'selectPlugin',
+        'createPromptTemplate',
+        'selectPromptTemplate',
+        'resetPromptVariableValues',
+        'setPromptVariableValue',
+        'copyRenderedPrompt',
+        'savePromptTemplate',
+        'duplicatePromptTemplate',
+        'deletePromptTemplate',
+        'exportPromptTemplates',
+        'triggerPromptTemplatesImport',
+        'handlePromptTemplatesImportChange'
     );
     const allowedMissingCurrentMethodKeys = [
         'closeInstallModal',
@@ -498,6 +519,13 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'mainTabTitle',
         'mainTabSubtitle',
         'configTemplateDiffHasChanges',
+        'pluginsCatalog',
+        'promptTemplatesList',
+        'filteredPromptTemplates',
+        'promptTemplateDraft',
+        'promptTemplateVars',
+        'promptTemplateVarValues',
+        'renderedPrompt',
         'sessionUsageDaily',
         'sessionUsageDailyTableRows',
         'taskOrchestrationSelectedRun',

@@ -137,6 +137,7 @@ export function createMainTabsComputed() {
             if (this.mainTab === 'usage') return 'Usage';
             if (this.mainTab === 'orchestration') return 'Tasks';
             if (this.mainTab === 'market') return 'Skills';
+            if (this.mainTab === 'plugins') return 'Plugins';
             if (this.mainTab === 'docs') return 'Docs';
             return 'Settings';
         },
@@ -146,6 +147,7 @@ export function createMainTabsComputed() {
             if (this.mainTab === 'usage') return '本地用量与趋势';
             if (this.mainTab === 'orchestration') return '任务编排';
             if (this.mainTab === 'market') return 'Skills 安装与同步';
+            if (this.mainTab === 'plugins') return '插件与模板';
             if (this.mainTab === 'docs') return 'CLI 安装与文档';
             return '系统与数据设置';
         },
@@ -155,6 +157,7 @@ export function createMainTabsComputed() {
             if (this.mainTab === 'usage') return '查看近 7 / 30 天用量。';
             if (this.mainTab === 'orchestration') return '规划、排队、执行与回看本地任务。';
             if (this.mainTab === 'market') return '管理本地 Skills。';
+            if (this.mainTab === 'plugins') return '管理模板化 prompt 与可复用插件。';
             if (this.mainTab === 'docs') return '查看 CLI 安装命令与排障。';
             return '管理下载、目录与回收站。';
         },

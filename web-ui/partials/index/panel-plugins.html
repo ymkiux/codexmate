@@ -1,0 +1,152 @@
+                <div
+                    v-show="mainTab === 'plugins'"
+                    class="mode-content"
+                    id="panel-plugins"
+                    role="tabpanel"
+                    aria-labelledby="tab-plugins">
+                    <div class="plugins-layout">
+                        <aside class="plugins-sidebar" aria-label="Plugin list">
+                            <div class="selector-header plugins-sidebar-header">
+                                <div>
+                                    <span class="selector-title">Plugins</span>
+                                    <div class="plugins-panel-note">Reusable, standardized utilities. Future custom plugins should follow the same structure.</div>
+                                </div>
+                                <div class="settings-tab-actions">
+                                    <button type="button" class="btn-tool btn-tool-compact" @click="loadPluginsOverview({ forceRefresh: true, silent: false })" :disabled="loading || !!initError || pluginsLoading">
+                                        {{ pluginsLoading ? 'Refreshing...' : 'Refresh' }}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="plugins-list" role="list">
+                                <button
+                                    v-for="plugin in pluginsCatalog"
+                                    :key="'plugin-' + plugin.id"
+                                    type="button"
+                                    :class="['plugins-item', { active: pluginsActiveId === plugin.id }]"
+                                    :aria-current="pluginsActiveId === plugin.id ? 'page' : null"
+                                    :disabled="loading || !!initError || pluginsLoading"
+                                    @click="selectPlugin(plugin.id)">
+                                    <div class="plugins-item-main">
+                                        <div class="plugins-item-title">{{ plugin.title }}</div>
+                                        <div class="plugins-item-meta">{{ plugin.description }}</div>
+                                    </div>
+                                    <span :class="['pill', plugin.tone]">{{ plugin.statusLabel }}</span>
+                                </button>
+                            </div>
+                        </aside>
+
+                        <section class="plugins-main" aria-label="Plugin workspace">
+                            <div v-if="pluginsActiveId === 'prompt-templates'" class="plugins-panel">
+                                <div class="plugins-panel-head">
+                                    <div class="plugins-panel-title">Prompt Templates</div>
+                                    <div class="plugins-panel-subtitle">Create, parameterize, and copy prompts with <code>{{'{{var}}'}}</code> placeholders.</div>
+                                </div>
+
+                                <div class="prompt-templates-grid">
+                                    <div class="prompt-templates-pane prompt-templates-pane-list">
+                                        <div class="prompt-templates-toolbar">
+                                            <input
+                                                class="form-input"
+                                                type="text"
+                                                v-model.trim="promptTemplatesKeyword"
+                                                aria-label="Search templates"
+                                                placeholder="Search templates">
+                                            <button type="button" class="btn-mini" @click="createPromptTemplate" :disabled="pluginsLoading">New</button>
+                                            <button type="button" class="btn-mini" @click="exportPromptTemplates" :disabled="pluginsLoading || !promptTemplatesList.length">Export</button>
+                                            <button type="button" class="btn-mini" @click="triggerPromptTemplatesImport" :disabled="pluginsLoading">Import</button>
+                                        </div>
+
+                                        <div v-if="pluginsLoading && !promptTemplatesLoadedOnce" class="skills-empty-state">Loading templates...</div>
+                                        <div v-else-if="!filteredPromptTemplates.length" class="skills-empty-state">No templates found.</div>
+                                        <div v-else class="prompt-templates-list" role="list">
+                                            <button
+                                                v-for="tpl in filteredPromptTemplates"
+                                                :key="'prompt-template-' + tpl.id"
+                                                type="button"
+                                                :class="['prompt-template-item', { active: promptTemplateSelectedId === tpl.id }]"
+                                                :aria-current="promptTemplateSelectedId === tpl.id ? 'page' : null"
+                                                @click="selectPromptTemplate(tpl.id)">
+                                                <div class="prompt-template-item-main">
+                                                    <div class="prompt-template-item-title">{{ tpl.name }}</div>
+                                                    <div class="prompt-template-item-meta">
+                                                        <span class="mono">{{ tpl.varCount }} vars</span>
+                                                        <span>·</span>
+                                                        <span class="mono">{{ tpl.updatedLabel }}</span>
+                                                    </div>
+                                                </div>
+                                                <span :class="['pill', tpl.isBuiltin ? 'configured' : 'source']">{{ tpl.isBuiltin ? 'built-in' : 'custom' }}</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="prompt-templates-pane prompt-templates-pane-editor">
+                                        <div v-if="!promptTemplateDraft" class="skills-empty-state">Select a template to edit.</div>
+                                        <template v-else>
+                                            <div class="prompt-editor-head">
+                                                <div class="prompt-editor-title-row">
+                                                    <input class="form-input prompt-editor-name" type="text" v-model.trim="promptTemplateDraft.name" placeholder="Template name" aria-label="Template name">
+                                                    <div class="prompt-editor-actions">
+                                                        <button type="button" class="btn-mini" @click="duplicatePromptTemplate" :disabled="pluginsLoading">Duplicate</button>
+                                                        <button type="button" class="btn-mini delete" @click="deletePromptTemplate" :disabled="pluginsLoading || promptTemplateDraft.isBuiltin">Delete</button>
+                                                        <button type="button" class="btn-mini" @click="savePromptTemplate" :disabled="pluginsLoading">Save</button>
+                                                    </div>
+                                                </div>
+                                                <input class="form-input" type="text" v-model.trim="promptTemplateDraft.description" placeholder="Description (optional)" aria-label="Template description">
+                                            </div>
+
+                                            <div class="prompt-editor-body">
+                                                <label class="form-label">Template</label>
+                                                <textarea
+                                                    class="form-input prompt-editor-textarea"
+                                                    v-model="promptTemplateDraft.template"
+                                                    rows="10"
+                                                    spellcheck="false"
+                                                    aria-label="Template body"
+                                                    placeholder="Write your prompt template here. Use {{'{{var}}'}} placeholders."></textarea>
+
+                                                <div class="prompt-vars-block">
+                                                    <div class="prompt-vars-head">
+                                                        <div>
+                                                            <div class="prompt-vars-title">Variables</div>
+                                                            <div class="plugins-panel-note">Detected from the template. Fill them to render the final prompt.</div>
+                                                        </div>
+                                                        <button type="button" class="btn-mini" @click="resetPromptVariableValues" :disabled="pluginsLoading">Reset</button>
+                                                    </div>
+
+                                                    <div v-if="!promptTemplateVars.length" class="prompt-vars-empty">No variables detected.</div>
+                                                    <div v-else class="prompt-vars-grid">
+                                                        <label v-for="name in promptTemplateVars" :key="'prompt-var-' + name" class="prompt-var-row">
+                                                            <span class="prompt-var-label mono">{{ name }}</span>
+                                                            <input class="form-input prompt-var-input" type="text" :value="promptTemplateVarValues[name] || ''" @input="setPromptVariableValue(name, $event.target.value)" :placeholder="`Value for ${name}`">
+                                                        </label>
+                                                    </div>
+                                                </div>
+
+                                                <div class="prompt-preview-block">
+                                                    <div class="prompt-vars-head">
+                                                        <div>
+                                                            <div class="prompt-vars-title">Preview</div>
+                                                            <div class="plugins-panel-note">Rendered output (safe replacement: missing vars become empty).</div>
+                                                        </div>
+                                                        <button type="button" class="btn-mini" @click="copyRenderedPrompt" :disabled="pluginsLoading">Copy</button>
+                                                    </div>
+                                                    <textarea class="form-input prompt-preview-textarea" :value="renderedPrompt" rows="10" readonly spellcheck="false" aria-label="Rendered prompt"></textarea>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div v-else class="skills-empty-state">Select a plugin from the left panel.</div>
+                        </section>
+                    </div>
+                </div>
+
+                <input
+                    ref="promptTemplatesImportInput"
+                    type="file"
+                    accept=".json,application/json"
+                    style="display:none"
+                    @change="handlePromptTemplatesImportChange">
