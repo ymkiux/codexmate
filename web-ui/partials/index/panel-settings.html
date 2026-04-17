@@ -179,17 +179,17 @@
                         aria-labelledby="settings-tab-device">
                         <div class="selector-section">
                             <div class="selector-header">
-                                <span class="selector-title">配置模板应用确认</span>
+                                <span class="selector-title">配置模板二次确认</span>
                             </div>
                             <label class="health-remote-toggle">
                                 <input
                                     type="checkbox"
                                     :checked="configTemplateDiffConfirmEnabled"
                                     @change="setConfigTemplateDiffConfirmEnabled($event.target.checked)">
-                                <span>应用 config.toml 模板前需要两步确认（预览差异 → 应用写入）</span>
+                                <span>应用模板前先预览差异（两步：确认 → 应用）</span>
                             </label>
                             <div class="config-template-hint">
-                                默认开启。关闭后，“Config 模板编辑器”里的应用将直接写入 config.toml，不再强制预览差异（更快但更容易误操作）。
+                                开启后：先展示差异预览，再确认写入。
                             </div>
                         </div>
                         <div class="selector-section">
