@@ -5,7 +5,7 @@
                     id="panel-settings"
                     role="tabpanel"
                     :aria-labelledby="'tab-settings'">
-                    <div class="config-subtabs settings-subtabs" role="tablist" aria-label="设置子标签">
+                    <div class="config-subtabs settings-subtabs" role="tablist" aria-label="Settings tabs">
                         <button
                             id="settings-tab-backup"
                             role="tab"
@@ -14,7 +14,7 @@
                             :tabindex="settingsTab === 'backup' ? 0 : -1"
                             :class="['config-subtab', { active: settingsTab === 'backup' }]"
                             @click="onSettingsTabClick('backup')">
-                            备份与导入
+                            Backup & Import
                         </button>
                         <button
                             id="settings-tab-trash"
@@ -24,7 +24,7 @@
                             :tabindex="settingsTab === 'trash' ? 0 : -1"
                             :class="['config-subtab', { active: settingsTab === 'trash' }]"
                             @click="onSettingsTabClick('trash')">
-                            回收站
+                            Trash
                             <span class="settings-tab-badge">{{ sessionTrashCount }}</span>
                         </button>
                         <button
@@ -35,7 +35,7 @@
                             :tabindex="settingsTab === 'device' ? 0 : -1"
                             :class="['config-subtab', { active: settingsTab === 'device' }]"
                             @click="onSettingsTabClick('device')">
-                            设备
+                            Device
                         </button>
                     </div>
 
@@ -44,51 +44,77 @@
                         id="settings-panel-backup"
                         role="tabpanel"
                         aria-labelledby="settings-tab-backup">
-                        <div class="selector-section">
-                            <div class="selector-header">
-                                <span class="selector-title">分享命令前缀</span>
+                        <div class="settings-layout">
+                            <div class="settings-grid">
+                                <section class="settings-card settings-card--wide" aria-label="分享命令前缀">
+                                    <div class="settings-card-header">
+                                        <div class="settings-card-title">分享命令前缀</div>
+                                        <div class="settings-card-meta">影响 Web UI 里“复制分享命令”的前缀</div>
+                                    </div>
+                                    <div class="settings-card-body">
+                                        <div class="settings-field-row">
+                                            <label class="settings-field-label" for="settings-share-prefix">前缀</label>
+                                            <select
+                                                id="settings-share-prefix"
+                                                class="model-select"
+                                                :value="shareCommandPrefix"
+                                                @change="setShareCommandPrefix($event.target.value)">
+                                                <option value="npm start">npm start</option>
+                                                <option value="codexmate">codexmate</option>
+                                            </select>
+                                        </div>
+                                        <div class="settings-card-hint">
+                                            默认走项目内 <code>npm start</code>，也可切到全局 <code>codexmate</code>。该设置会缓存到浏览器本地。
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <section class="settings-card" aria-label="Claude 配置备份与导入">
+                                    <div class="settings-card-header">
+                                        <div class="settings-card-title">Claude 配置</div>
+                                        <div class="settings-card-meta">备份 / 导入 <code>~/.claude</code></div>
+                                    </div>
+                                    <div class="settings-card-body">
+                                        <div class="settings-actions">
+                                            <button class="btn-tool" @click="downloadClaudeDirectory" :disabled="claudeDownloadLoading">
+                                                {{ claudeDownloadLoading ? ('备份中 ' + claudeDownloadProgress + '%') : '一键备份 ~/.claude' }}
+                                            </button>
+                                            <button class="btn-tool" @click="triggerClaudeImport" :disabled="claudeImportLoading">
+                                                {{ claudeImportLoading ? '导入中...' : '导入 ~/.claude 备份' }}
+                                            </button>
+                                        </div>
+                                        <input
+                                            ref="claudeImportInput"
+                                            class="sr-only"
+                                            type="file"
+                                            accept=".zip"
+                                            @change="handleClaudeImportChange">
+                                    </div>
+                                </section>
+
+                                <section class="settings-card" aria-label="Codex 配置备份与导入">
+                                    <div class="settings-card-header">
+                                        <div class="settings-card-title">Codex 配置</div>
+                                        <div class="settings-card-meta">备份 / 导入 <code>~/.codex</code></div>
+                                    </div>
+                                    <div class="settings-card-body">
+                                        <div class="settings-actions">
+                                            <button class="btn-tool" @click="downloadCodexDirectory" :disabled="codexDownloadLoading">
+                                                {{ codexDownloadLoading ? ('备份中 ' + codexDownloadProgress + '%') : '一键备份 ~/.codex' }}
+                                            </button>
+                                            <button class="btn-tool" @click="triggerCodexImport" :disabled="codexImportLoading">
+                                                {{ codexImportLoading ? '导入中...' : '导入 ~/.codex 备份' }}
+                                            </button>
+                                        </div>
+                                        <input
+                                            ref="codexImportInput"
+                                            class="sr-only"
+                                            type="file"
+                                            accept=".zip"
+                                            @change="handleCodexImportChange">
+                                    </div>
+                                </section>
                             </div>
-                            <select class="model-select" :value="shareCommandPrefix" @change="setShareCommandPrefix($event.target.value)">
-                                <option value="npm start">npm start</option>
-                                <option value="codexmate">codexmate</option>
-                            </select>
-                            <div class="config-template-hint">
-                                默认走项目内 <code>npm start</code>，也可切到全局 <code>codexmate</code>。该设置会缓存到浏览器本地。
-                            </div>
-                        </div>
-                        <div class="selector-section">
-                            <div class="selector-header">
-                                <span class="selector-title">Claude 配置</span>
-                            </div>
-                            <button class="btn-tool" @click="downloadClaudeDirectory" :disabled="claudeDownloadLoading">
-                                {{ claudeDownloadLoading ? ('备份中 ' + claudeDownloadProgress + '%') : '一键备份 ~/.claude' }}
-                            </button>
-                            <button class="btn-tool" @click="triggerClaudeImport" :disabled="claudeImportLoading">
-                                {{ claudeImportLoading ? '导入中...' : '导入 ~/.claude 备份' }}
-                            </button>
-                            <input
-                                ref="claudeImportInput"
-                                class="sr-only"
-                                type="file"
-                                accept=".zip"
-                                @change="handleClaudeImportChange">
-                        </div>
-                        <div class="selector-section">
-                            <div class="selector-header">
-                                <span class="selector-title">Codex 配置</span>
-                            </div>
-                            <button class="btn-tool" @click="downloadCodexDirectory" :disabled="codexDownloadLoading">
-                                {{ codexDownloadLoading ? ('备份中 ' + codexDownloadProgress + '%') : '一键备份 ~/.codex' }}
-                            </button>
-                            <button class="btn-tool" @click="triggerCodexImport" :disabled="codexImportLoading">
-                                {{ codexImportLoading ? '导入中...' : '导入 ~/.codex 备份' }}
-                            </button>
-                            <input
-                                ref="codexImportInput"
-                                class="sr-only"
-                                type="file"
-                                accept=".zip"
-                                @change="handleCodexImportChange">
                         </div>
                     </div>
 
@@ -97,77 +123,91 @@
                         id="settings-panel-trash"
                         role="tabpanel"
                         aria-labelledby="settings-tab-trash">
-                        <div class="selector-section">
-                            <div class="selector-header">
-                                <span class="selector-title">会话删除行为</span>
-                            </div>
-                            <label class="health-remote-toggle">
-                                <input type="checkbox" :checked="sessionTrashEnabled" @change="setSessionTrashEnabled($event.target.checked)">
-                                <span>删除会话时先移入回收站</span>
-                            </label>
-                            <div class="config-template-hint">
-                                默认开启。关闭后，会话浏览里的删除会直接永久删除，不再进入回收站。
-                            </div>
-                        </div>
-                        <div class="selector-section">
-                            <div class="selector-header settings-tab-header">
-                                <div class="settings-tab-actions trash-header-actions">
-                                    <button class="btn-tool btn-tool-compact" @click="loadSessionTrash({ forceRefresh: true })" :disabled="sessionTrashLoading || sessionTrashClearing">
-                                        {{ sessionTrashLoading ? '刷新中...' : '刷新列表' }}
-                                    </button>
-                                    <button class="btn-tool btn-tool-compact" @click="clearSessionTrash" :disabled="sessionTrashClearing || sessionTrashLoading || !(Number(sessionTrashCount) > 0)">
-                                        {{ sessionTrashClearing ? '清空中...' : '清空回收站' }}
-                                    </button>
-                                </div>
-                            </div>
+                        <div class="settings-layout">
+                            <div class="settings-grid">
+                                <section class="settings-card settings-card--wide" aria-label="会话删除行为">
+                                    <div class="settings-card-header">
+                                        <div class="settings-card-title">会话删除行为</div>
+                                        <div class="settings-card-meta">决定“删除”是否先进入回收站</div>
+                                    </div>
+                                    <div class="settings-card-body">
+                                        <label class="health-remote-toggle settings-toggle">
+                                            <input type="checkbox" :checked="sessionTrashEnabled" @change="setSessionTrashEnabled($event.target.checked)">
+                                            <span>删除会话时先移入回收站</span>
+                                        </label>
+                                        <div class="settings-card-hint">
+                                            默认开启。关闭后，会话浏览里的删除会直接永久删除，不再进入回收站。
+                                        </div>
+                                    </div>
+                                </section>
 
-                            <div v-if="getSessionTrashViewState() === 'loading'" class="session-empty">
-                                正在加载回收站...
-                            </div>
-                            <div v-else-if="getSessionTrashViewState() === 'empty'" class="session-empty">
-                                回收站为空
-                            </div>
-                            <div v-else-if="getSessionTrashViewState() === 'retry'" class="session-empty">
-                                回收站列表加载失败，请刷新重试
-                            </div>
-                            <div v-else class="trash-list">
-                                <div v-for="item in visibleSessionTrashItems" :key="item.trashId" class="trash-item session-item session-card">
-                                    <div class="trash-item-header session-item-header">
-                                        <div class="trash-item-main">
-                                            <div class="trash-item-mainline">
-                                                <div class="trash-item-title">{{ item.title || item.sessionId }}</div>
-                                                <span class="session-count-badge">{{ item.messageCount ?? 0 }}</span>
-                                            </div>
-                                            <div class="trash-item-meta session-item-meta">
-                                                <span class="session-source">{{ item.sourceLabel }}</span>
-                                            </div>
+                                <section class="settings-card settings-card--wide" aria-label="回收站列表">
+                                    <div class="settings-card-header settings-card-header-row">
+                                        <div>
+                                            <div class="settings-card-title">回收站</div>
+                                            <div class="settings-card-meta">已删除会话（可恢复/彻底删除）</div>
                                         </div>
-                                        <div class="trash-item-side">
-                                            <div class="trash-item-actions session-item-actions">
-                                                <button class="btn-mini" @click="restoreSessionTrash(item)" :disabled="sessionTrashLoading || sessionTrashClearing || isSessionTrashActionBusy(item)">
-                                                    {{ sessionTrashRestoring[getSessionTrashActionKey(item)] ? '恢复中...' : '恢复' }}
-                                                </button>
-                                                <button class="btn-mini delete" @click="purgeSessionTrash(item)" :disabled="sessionTrashLoading || sessionTrashClearing || isSessionTrashActionBusy(item)">
-                                                    {{ sessionTrashPurging[getSessionTrashActionKey(item)] ? '删除中...' : '彻底删除' }}
-                                                </button>
-                                            </div>
-                                            <div class="trash-item-time session-item-time">{{ item.deletedAt || item.updatedAt || 'unknown time' }}</div>
+                                        <div class="settings-card-actions">
+                                            <button class="btn-tool btn-tool-compact" @click="loadSessionTrash({ forceRefresh: true })" :disabled="sessionTrashLoading || sessionTrashClearing">
+                                                {{ sessionTrashLoading ? '刷新中...' : '刷新列表' }}
+                                            </button>
+                                            <button class="btn-tool btn-tool-compact" @click="clearSessionTrash" :disabled="sessionTrashClearing || sessionTrashLoading || !(Number(sessionTrashCount) > 0)">
+                                                {{ sessionTrashClearing ? '清空中...' : '清空回收站' }}
+                                            </button>
                                         </div>
                                     </div>
-                                    <div v-if="item.cwd" class="trash-item-path session-item-sub session-item-wrap">
-                                        <span class="trash-item-label">工作区</span>
-                                        <span>{{ item.cwd }}</span>
+
+                                    <div class="settings-card-body">
+                                        <div v-if="getSessionTrashViewState() === 'loading'" class="session-empty">
+                                            正在加载回收站...
+                                        </div>
+                                        <div v-else-if="getSessionTrashViewState() === 'empty'" class="session-empty">
+                                            回收站为空
+                                        </div>
+                                        <div v-else-if="getSessionTrashViewState() === 'retry'" class="session-empty">
+                                            回收站列表加载失败，请刷新重试
+                                        </div>
+                                        <div v-else class="trash-list">
+                                            <div v-for="item in visibleSessionTrashItems" :key="item.trashId" class="trash-item session-item session-card">
+                                                <div class="trash-item-header session-item-header">
+                                                    <div class="trash-item-main">
+                                                        <div class="trash-item-mainline">
+                                                            <div class="trash-item-title">{{ item.title || item.sessionId }}</div>
+                                                            <span class="session-count-badge">{{ item.messageCount ?? 0 }}</span>
+                                                        </div>
+                                                        <div class="trash-item-meta session-item-meta">
+                                                            <span class="session-source">{{ item.sourceLabel }}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="trash-item-side">
+                                                        <div class="trash-item-actions session-item-actions">
+                                                            <button class="btn-mini" @click="restoreSessionTrash(item)" :disabled="sessionTrashLoading || sessionTrashClearing || isSessionTrashActionBusy(item)">
+                                                                {{ sessionTrashRestoring[getSessionTrashActionKey(item)] ? '恢复中...' : '恢复' }}
+                                                            </button>
+                                                            <button class="btn-mini delete" @click="purgeSessionTrash(item)" :disabled="sessionTrashLoading || sessionTrashClearing || isSessionTrashActionBusy(item)">
+                                                                {{ sessionTrashPurging[getSessionTrashActionKey(item)] ? '删除中...' : '彻底删除' }}
+                                                            </button>
+                                                        </div>
+                                                        <div class="trash-item-time session-item-time">{{ item.deletedAt || item.updatedAt || 'unknown time' }}</div>
+                                                    </div>
+                                                </div>
+                                                <div v-if="item.cwd" class="trash-item-path session-item-sub session-item-wrap">
+                                                    <span class="trash-item-label">工作区</span>
+                                                    <span>{{ item.cwd }}</span>
+                                                </div>
+                                                <div class="trash-item-path session-item-sub session-item-wrap">
+                                                    <span class="trash-item-label">原文件</span>
+                                                    <span>{{ item.originalFilePath }}</span>
+                                                </div>
+                                            </div>
+                                            <div v-if="sessionTrashHasMoreItems" class="trash-list-footer">
+                                                <button class="btn-tool btn-tool-compact" @click="loadMoreSessionTrashItems" :disabled="sessionTrashLoading || sessionTrashClearing">
+                                                    加载更多（剩余 {{ sessionTrashHiddenCount }} 项）
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="trash-item-path session-item-sub session-item-wrap">
-                                        <span class="trash-item-label">原文件</span>
-                                        <span>{{ item.originalFilePath }}</span>
-                                    </div>
-                                </div>
-                                <div v-if="sessionTrashHasMoreItems" class="trash-list-footer">
-                                    <button class="btn-tool btn-tool-compact" @click="loadMoreSessionTrashItems" :disabled="sessionTrashLoading || sessionTrashClearing">
-                                        加载更多（剩余 {{ sessionTrashHiddenCount }} 项）
-                                    </button>
-                                </div>
+                                </section>
                             </div>
                         </div>
                     </div>
@@ -177,29 +217,42 @@
                         id="settings-panel-device"
                         role="tabpanel"
                         aria-labelledby="settings-tab-device">
-                        <div class="selector-section">
-                            <div class="selector-header">
-                                <span class="selector-title">配置模板二次确认</span>
+                        <div class="settings-layout">
+                            <div class="settings-grid">
+                                <section class="settings-card settings-card--wide" aria-label="配置模板二次确认">
+                                    <div class="settings-card-header">
+                                        <div class="settings-card-title">配置模板二次确认</div>
+                                        <div class="settings-card-meta">降低误写入风险</div>
+                                    </div>
+                                    <div class="settings-card-body">
+                                        <label class="health-remote-toggle settings-toggle">
+                                            <input
+                                                type="checkbox"
+                                                :checked="configTemplateDiffConfirmEnabled"
+                                                @change="setConfigTemplateDiffConfirmEnabled($event.target.checked)">
+                                            <span>应用模板前先预览差异（两步：确认 → 应用）</span>
+                                        </label>
+                                        <div class="settings-card-hint">
+                                            开启后：先展示差异预览，再确认写入。
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <section class="settings-card settings-card--wide settings-card--danger" aria-label="配置重置">
+                                    <div class="settings-card-header">
+                                        <div class="settings-card-title">配置重置</div>
+                                        <div class="settings-card-meta">谨慎操作</div>
+                                    </div>
+                                    <div class="settings-card-body">
+                                        <div class="settings-card-hint">会先备份 config.toml，再写入默认配置。</div>
+                                        <div class="settings-actions">
+                                            <button class="btn-tool" @click="resetConfig" :disabled="resetConfigLoading || loading || !!initError">
+                                                {{ resetConfigLoading ? '重装中...' : '重装配置' }}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </section>
                             </div>
-                            <label class="health-remote-toggle">
-                                <input
-                                    type="checkbox"
-                                    :checked="configTemplateDiffConfirmEnabled"
-                                    @change="setConfigTemplateDiffConfirmEnabled($event.target.checked)">
-                                <span>应用模板前先预览差异（两步：确认 → 应用）</span>
-                            </label>
-                            <div class="config-template-hint">
-                                开启后：先展示差异预览，再确认写入。
-                            </div>
-                        </div>
-                        <div class="selector-section">
-                            <div class="selector-header">
-                                <span class="selector-title">配置重置</span>
-                            </div>
-                            <div class="config-template-hint">先备份 config.toml，再写默认配置。</div>
-                            <button class="btn-tool" @click="resetConfig" :disabled="resetConfigLoading || loading || !!initError">
-                                {{ resetConfigLoading ? '重装中...' : '重装配置' }}
-                            </button>
                         </div>
                     </div>
                 </div>

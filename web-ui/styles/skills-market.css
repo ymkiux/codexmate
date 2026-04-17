@@ -61,7 +61,7 @@
 }
 
 .skills-modal {
-    width: min(96vw, 920px);
+    width: min(96vw, 1100px);
 }
 
 .skills-modal-header {
@@ -81,6 +81,54 @@
     flex-direction: row;
     align-items: center;
     gap: 8px;
+}
+
+/* =========================
+   Skills manager two-column layout
+   ========================= */
+
+.skills-manager-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.85fr);
+    gap: var(--spacing-sm);
+    align-items: start;
+}
+
+.skills-manager-col {
+    min-width: 0;
+}
+
+.skills-actions-panel {
+    margin-bottom: 0;
+}
+
+.skills-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.skills-actions-grid .btn {
+    margin-top: 0;
+    min-height: 44px;
+    padding: 12px 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.1;
+}
+
+.skills-actions-grid .skills-close-btn {
+    grid-column: 1 / -1;
+}
+
+@media (max-width: 980px) {
+    .skills-manager-grid {
+        grid-template-columns: 1fr;
+    }
+    .skills-actions-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .skills-root-box {
@@ -332,4 +380,3 @@
     width: 210px;
     flex: 0 0 auto;
 }
-

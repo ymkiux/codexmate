@@ -229,39 +229,21 @@ function estimateUsageCostSummary(sessions, providersList, currentProvider) {
             continue;
         }
         supportedSessions += 1;
-        const inputTokens = Number.isFinite(Number(session.inputTokens)) ? Math.max(0, Math.floor(Number(session.inputTokens))) : null;
-        const cachedInputTokens = Number.isFinite(Number(session.cachedInputTokens)) ? Math.max(0, Math.floor(Number(session.cachedInputTokens))) : 0;
-        const outputTokens = Number.isFinite(Number(session.outputTokens)) ? Math.max(0, Math.floor(Number(session.outputTokens))) : null;
-        const reasoningOutputTokens = Number.isFinite(Number(session.reasoningOutputTokens)) ? Math.max(0, Math.floor(Number(session.reasoningOutputTokens))) : 0;
-        const billableInputTokens = Math.max(0, (inputTokens || 0) - cachedInputTokens);
-        const fallbackSessionTokens = billableInputTokens + cachedInputTokens + (outputTokens || 0) + reasoningOutputTokens;
-        const totalSessionTokens = Number.isFinite(Number(session.totalTokens))
-            ? Math.max(0, Math.floor(Number(session.totalTokens)))
-            : fallbackSessionTokens;
-        totalTokens += totalSessionTokens;
-        const pricing = resolveUsagePricingForSession(session, pricingIndex, currentProvider);
-        if (!pricing) {
+        const cost = estimateUsageCostForSession(session, pricingIndex, currentProvider);
+        totalTokens += cost.totalSessionTokens;
+        if (!cost.pricing) {
             missingPricingSessions += 1;
             continue;
         }
-        if (inputTokens === null && outputTokens === null && reasoningOutputTokens === 0) {
+        if (!cost.hasTokenBreakdown) {
             missingTokenSessions += 1;
             continue;
         }
-        const estimatedUsd = (
-            ((pricing.input || 0) * billableInputTokens)
-            + ((pricing.cacheRead || 0) * cachedInputTokens)
-            + (((pricing.reasoningOutput ?? pricing.output) || 0) * reasoningOutputTokens)
-            + ((pricing.output || 0) * (outputTokens || 0))
-        ) / 1000000;
-        totalCostUsd += estimatedUsd;
+        totalCostUsd += cost.estimatedUsd;
         estimatedSessions += 1;
-        estimatedTokens += totalSessionTokens;
-        if (pricing.source === 'public-catalog') {
-            catalogSessions += 1;
-        } else {
-            configuredSessions += 1;
-        }
+        estimatedTokens += cost.totalSessionTokens;
+        if (cost.pricing.source === 'public-catalog') catalogSessions += 1;
+        else configuredSessions += 1;
     }
 
     const coveragePercent = totalTokens > 0
@@ -280,6 +262,34 @@ function estimateUsageCostSummary(sessions, providersList, currentProvider) {
         missingPricingSessions,
         missingTokenSessions,
         skippedUnsupportedSessions
+    };
+}
+
+function estimateUsageCostForSession(session, pricingIndex, currentProvider) {
+    const inputTokens = Number.isFinite(Number(session.inputTokens)) ? Math.max(0, Math.floor(Number(session.inputTokens))) : null;
+    const cachedInputTokens = Number.isFinite(Number(session.cachedInputTokens)) ? Math.max(0, Math.floor(Number(session.cachedInputTokens))) : 0;
+    const outputTokens = Number.isFinite(Number(session.outputTokens)) ? Math.max(0, Math.floor(Number(session.outputTokens))) : null;
+    const reasoningOutputTokens = Number.isFinite(Number(session.reasoningOutputTokens)) ? Math.max(0, Math.floor(Number(session.reasoningOutputTokens))) : 0;
+    const billableInputTokens = Math.max(0, (inputTokens || 0) - cachedInputTokens);
+    const fallbackSessionTokens = billableInputTokens + cachedInputTokens + (outputTokens || 0) + reasoningOutputTokens;
+    const totalSessionTokens = Number.isFinite(Number(session.totalTokens))
+        ? Math.max(0, Math.floor(Number(session.totalTokens)))
+        : fallbackSessionTokens;
+    const pricing = resolveUsagePricingForSession(session, pricingIndex, currentProvider);
+    const hasTokenBreakdown = !(inputTokens === null && outputTokens === null && reasoningOutputTokens === 0);
+    const estimatedUsd = pricing && hasTokenBreakdown
+        ? (
+            ((pricing.input || 0) * billableInputTokens)
+            + ((pricing.cacheRead || 0) * cachedInputTokens)
+            + (((pricing.reasoningOutput ?? pricing.output) || 0) * reasoningOutputTokens)
+            + ((pricing.output || 0) * (outputTokens || 0))
+        ) / 1000000
+        : 0;
+    return {
+        pricing,
+        hasTokenBreakdown,
+        totalSessionTokens,
+        estimatedUsd
     };
 }
 
@@ -482,6 +492,85 @@ export function createSessionComputed() {
                 }
             ];
         },
+
+        sessionUsageDaily() {
+            const baseBuckets = this.sessionUsageCharts && Array.isArray(this.sessionUsageCharts.buckets)
+                ? this.sessionUsageCharts.buckets
+                : [];
+            const sessions = this.sessionUsageCharts && Array.isArray(this.sessionUsageCharts.filteredSessions)
+                ? this.sessionUsageCharts.filteredSessions
+                : this.sessionsUsageList;
+            const pricingIndex = buildUsagePricingIndex(this.providersList);
+            const byDay = new Map();
+
+            for (const bucket of baseBuckets) {
+                if (!bucket || !bucket.key) continue;
+                byDay.set(bucket.key, {
+                    key: bucket.key,
+                    label: bucket.label || bucket.key.slice(5),
+                    sessionCount: 0,
+                    messageCount: 0,
+                    tokenTotal: 0,
+                    estimatedCostUsd: 0,
+                    estimatedSessions: 0,
+                    hasCostEstimate: false
+                });
+            }
+
+            for (const session of (Array.isArray(sessions) ? sessions : [])) {
+                if (!session || typeof session !== 'object') continue;
+                const updatedAtMs = Date.parse(session.updatedAt || '');
+                if (!Number.isFinite(updatedAtMs)) continue;
+                const dayKey = new Date(updatedAtMs).toISOString().slice(0, 10);
+                const row = byDay.get(dayKey);
+                if (!row) continue;
+
+                const messageCount = Number.isFinite(Number(session.messageCount))
+                    ? Math.max(0, Math.floor(Number(session.messageCount)))
+                    : 0;
+                const tokenTotal = Number.isFinite(Number(session.totalTokens))
+                    ? Math.max(0, Math.floor(Number(session.totalTokens)))
+                    : 0;
+                row.sessionCount += 1;
+                row.messageCount += messageCount;
+                row.tokenTotal += tokenTotal;
+
+                if (shouldEstimateUsageCostForSession(session)) {
+                    const cost = estimateUsageCostForSession(session, pricingIndex, this.currentProvider);
+                    if (cost.pricing && cost.hasTokenBreakdown) {
+                        row.estimatedCostUsd += cost.estimatedUsd;
+                        row.estimatedSessions += 1;
+                        row.hasCostEstimate = true;
+                    }
+                }
+            }
+
+            const rows = [...byDay.values()].sort((a, b) => a.key.localeCompare(b.key, 'en-US'));
+            const maxTokens = rows.reduce((max, item) => Math.max(max, item.tokenTotal), 0);
+            const maxCost = rows.reduce((max, item) => Math.max(max, item.estimatedCostUsd), 0);
+
+            return {
+                rows: rows.map((row) => ({
+                    ...row,
+                    tokenLabel: formatCompactUsageSummaryNumber(row.tokenTotal),
+                    tokenTitle: formatUsageSummaryNumber(row.tokenTotal),
+                    tokenPercent: maxTokens > 0 ? Math.round((row.tokenTotal / maxTokens) * 1000) / 10 : 0,
+                    costLabel: row.hasCostEstimate ? formatUsageEstimatedCost(row.estimatedCostUsd) : '暂无',
+                    costTitle: row.hasCostEstimate ? formatUsageEstimatedCost(row.estimatedCostUsd, { precise: true }) : '暂无',
+                    costPercent: maxCost > 0 ? Math.round((row.estimatedCostUsd / maxCost) * 1000) / 10 : 0
+                })),
+                maxTokens,
+                maxCost
+            };
+        },
+
+        sessionUsageDailyTableRows() {
+            const daily = this.sessionUsageDaily && typeof this.sessionUsageDaily === 'object'
+                ? this.sessionUsageDaily
+                : null;
+            return daily && Array.isArray(daily.rows) ? daily.rows : [];
+        },
+
         visibleSessionTrashItems() {
             const items = Array.isArray(this.sessionTrashItems) ? this.sessionTrashItems : [];
             const visibleCount = Number(this.sessionTrashVisibleCount);
