@@ -135,6 +135,55 @@ test('applyConfigTemplate keeps the successful apply result when only the refres
     }]);
 });
 
+test('applyConfigTemplate applies immediately when diff confirm is disabled', async () => {
+    let previewCalls = 0;
+    let applyCalls = 0;
+    const methods = createCodexConfigMethods({
+        api: async (action) => {
+            if (action === 'preview-config-template-diff') {
+                previewCalls += 1;
+                return {
+                    diff: {
+                        lines: [{ type: 'add', value: 'model = "qwen-plus"' }],
+                        stats: { added: 1, removed: 0, unchanged: 0 },
+                        hasChanges: true
+                    }
+                };
+            }
+            if (action === 'apply-config-template') {
+                applyCalls += 1;
+                return { success: true };
+            }
+            return { success: true };
+        },
+        getProviderConfigModeMeta() {
+            return null;
+        }
+    });
+    const context = {
+        ...methods,
+        showConfigTemplateModal: true,
+        configTemplateApplying: false,
+        configTemplateContent: 'draft-template',
+        configTemplateDiffConfirmEnabled: false,
+        shownMessages: [],
+        showMessage(message, type) {
+            this.shownMessages.push({ message, type });
+        },
+        async loadAll() {}
+    };
+
+    await methods.applyConfigTemplate.call(context);
+
+    assert.strictEqual(previewCalls, 0);
+    assert.strictEqual(applyCalls, 1);
+    assert.strictEqual(context.showConfigTemplateModal, false);
+    assert.deepStrictEqual(context.shownMessages, [{
+        message: '模板已应用',
+        type: 'success'
+    }]);
+});
+
 test('runHealthCheck treats backend error payloads as failures', async () => {
     const methods = createCodexConfigMethods({
         api: async () => ({ error: 'health failed' }),

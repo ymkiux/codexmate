@@ -1,3 +1,8 @@
+import {
+    normalizeConfigTemplateDiffConfirmEnabled,
+    persistConfigTemplateDiffConfirmEnabledToStorage
+} from './config-template-confirm-pref.mjs';
+
 export function createSessionActionMethods(options = {}) {
     const {
         api,
@@ -170,12 +175,22 @@ export function createSessionActionMethods(options = {}) {
             return true;
         },
 
+        normalizeConfigTemplateDiffConfirmEnabled(value) {
+            return normalizeConfigTemplateDiffConfirmEnabled(value);
+        },
+
         setSessionTrashEnabled(value) {
             const enabled = this.normalizeSessionTrashEnabled(value);
             this.sessionTrashEnabled = enabled;
             try {
                 localStorage.setItem('codexmateSessionTrashEnabled', enabled ? 'true' : 'false');
             } catch (_) {}
+        },
+
+        setConfigTemplateDiffConfirmEnabled(value) {
+            const enabled = this.normalizeConfigTemplateDiffConfirmEnabled(value);
+            this.configTemplateDiffConfirmEnabled = enabled;
+            persistConfigTemplateDiffConfirmEnabledToStorage(enabled);
         },
 
         getShareCommandPrefixInvocation() {

@@ -179,6 +179,21 @@
                         aria-labelledby="settings-tab-device">
                         <div class="selector-section">
                             <div class="selector-header">
+                                <span class="selector-title">配置模板二次确认</span>
+                            </div>
+                            <label class="health-remote-toggle">
+                                <input
+                                    type="checkbox"
+                                    :checked="configTemplateDiffConfirmEnabled"
+                                    @change="setConfigTemplateDiffConfirmEnabled($event.target.checked)">
+                                <span>应用模板前先预览差异（两步：确认 → 应用）</span>
+                            </label>
+                            <div class="config-template-hint">
+                                开启后：先展示差异预览，再确认写入。
+                            </div>
+                        </div>
+                        <div class="selector-section">
+                            <div class="selector-header">
                                 <span class="selector-title">配置重置</span>
                             </div>
                             <div class="config-template-hint">先备份 config.toml，再写默认配置。</div>

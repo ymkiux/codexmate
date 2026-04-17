@@ -1,4 +1,5 @@
 import { runLatestOnlyQueue } from '../logic.mjs';
+import { normalizeConfigTemplateDiffConfirmEnabled } from './config-template-confirm-pref.mjs';
 
 function hasResponseError(response) {
     if (!response || typeof response !== 'object') {
@@ -736,6 +737,40 @@ export function createCodexConfigMethods(options = {}) {
                 return;
             }
 
+            // Default to two-step confirmation when the setting is unset.
+            // (The normalize helper lives in session-actions; keep a safe fallback here.)
+            const shouldUseTwoStepConfirm = normalizeConfigTemplateDiffConfirmEnabled(this.configTemplateDiffConfirmEnabled);
+
+            const performApply = async () => {
+                this.configTemplateApplying = true;
+                try {
+                    const res = await api('apply-config-template', {
+                        template: this.configTemplateContent
+                    });
+                    if (res.error) {
+                        this.showMessage(res.error, 'error');
+                        return;
+                    }
+                    this.showMessage('模板已应用', 'success');
+                    this.closeConfigTemplateModal({ force: true });
+                    try {
+                        await this.loadAll();
+                    } catch (_) {
+                        this.showMessage('模板已应用，但界面刷新失败，请手动刷新', 'error');
+                    }
+                } catch (e) {
+                    this.showMessage('应用模板失败', 'error');
+                } finally {
+                    this.configTemplateApplying = false;
+                }
+            };
+
+            // One-step mode: apply immediately unless user explicitly entered the diff preview state.
+            if (!shouldUseTwoStepConfirm && !this.configTemplateDiffVisible) {
+                await performApply();
+                return;
+            }
+
             if (!this.configTemplateDiffVisible) {
                 await this.prepareConfigTemplateDiff();
                 return;
@@ -757,27 +792,7 @@ export function createCodexConfigMethods(options = {}) {
                 return;
             }
 
-            this.configTemplateApplying = true;
-            try {
-                const res = await api('apply-config-template', {
-                    template: this.configTemplateContent
-                });
-                if (res.error) {
-                    this.showMessage(res.error, 'error');
-                    return;
-                }
-                this.showMessage('模板已应用', 'success');
-                this.closeConfigTemplateModal({ force: true });
-                try {
-                    await this.loadAll();
-                } catch (_) {
-                    this.showMessage('模板已应用，但界面刷新失败，请手动刷新', 'error');
-                }
-            } catch (e) {
-                this.showMessage('应用模板失败', 'error');
-            } finally {
-                this.configTemplateApplying = false;
-            }
+            await performApply();
         }
     };
 }
