@@ -36,6 +36,38 @@ export function createAgentsMethods(options = {}) {
     } = options;
 
     return {
+        async openClaudeMdEditor() {
+            this.setAgentsModalContext('claude-md');
+            const requestToken = issueLatestRequestToken(this, '_agentsOpenRequestToken');
+            this.agentsLoading = true;
+            try {
+                const res = await api('get-claude-md-file');
+                if (!isLatestRequestToken(this, '_agentsOpenRequestToken', requestToken)) {
+                    return;
+                }
+                if (res.error) {
+                    this.showMessage(res.error, 'error');
+                    return;
+                }
+                this.agentsContent = res.content || '';
+                this.agentsOriginalContent = this.agentsContent;
+                this.agentsPath = res.path || '';
+                this.agentsExists = !!res.exists;
+                this.agentsLineEnding = res.lineEnding === '\r\n' ? '\r\n' : '\n';
+                this.resetAgentsDiffState();
+                this.showAgentsModal = true;
+            } catch (e) {
+                if (!isLatestRequestToken(this, '_agentsOpenRequestToken', requestToken)) {
+                    return;
+                }
+                this.showMessage('加载文件失败', 'error');
+            } finally {
+                if (isLatestRequestToken(this, '_agentsOpenRequestToken', requestToken)) {
+                    this.agentsLoading = false;
+                }
+            }
+        },
+
         async openAgentsEditor() {
             this.setAgentsModalContext('codex');
             const requestToken = issueLatestRequestToken(this, '_agentsOpenRequestToken');
@@ -148,6 +180,13 @@ export function createAgentsMethods(options = {}) {
         },
 
         setAgentsModalContext(context, options = {}) {
+            if (context === 'claude-md') {
+                this.agentsContext = 'claude-md';
+                this.agentsWorkspaceFileName = '';
+                this.agentsModalTitle = 'CLAUDE.md 编辑器';
+                this.agentsModalHint = '保存后会写入 ~/.claude/CLAUDE.md。';
+                return;
+            }
             if (context === 'openclaw-workspace') {
                 const fileName = (options.fileName || this.openclawWorkspaceFileName || 'AGENTS.md').trim();
                 this.agentsContext = 'openclaw-workspace';
@@ -467,7 +506,9 @@ export function createAgentsMethods(options = {}) {
                     content: this.agentsContent,
                     lineEnding: this.agentsLineEnding
                 };
-                if (this.agentsContext === 'openclaw') {
+                if (this.agentsContext === 'claude-md') {
+                    action = 'apply-claude-md-file';
+                } else if (this.agentsContext === 'openclaw') {
                     action = 'apply-openclaw-agents-file';
                 } else if (this.agentsContext === 'openclaw-workspace') {
                     action = 'apply-openclaw-workspace-file';
@@ -480,7 +521,9 @@ export function createAgentsMethods(options = {}) {
                 }
                 const successLabel = this.agentsContext === 'openclaw-workspace'
                     ? `工作区文件已保存${this.agentsWorkspaceFileName ? `: ${this.agentsWorkspaceFileName}` : ''}`
-                    : (this.agentsContext === 'openclaw' ? 'OpenClaw AGENTS.md 已保存' : 'AGENTS.md 已保存');
+                    : (this.agentsContext === 'claude-md'
+                        ? 'CLAUDE.md 已保存'
+                        : (this.agentsContext === 'openclaw' ? 'OpenClaw AGENTS.md 已保存' : 'AGENTS.md 已保存'));
                 this.showMessage(successLabel, 'success');
                 this.closeAgentsModal({ force: true });
             } catch (e) {

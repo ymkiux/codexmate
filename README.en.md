@@ -24,6 +24,7 @@ Codex Mate is a local-first CLI + Web UI for unified management of:
 
 - Codex provider/model switching and config writes
 - Claude Code profiles (writes to `~/.claude/settings.json`)
+- Claude Code `CLAUDE.md` editing (writes to `~/.claude/CLAUDE.md`)
 - OpenClaw JSON5 profiles and workspace `AGENTS.md`
 - Local skills market for Codex / Claude Code (target switching, local skills management, cross-app import, ZIP distribution)
 - Local Codex/Claude sessions (list/filter/export/delete) with Usage analytics overview
@@ -48,6 +49,7 @@ It works on local files directly and does not require cloud hosting. The skills 
 - Provider/model switching (`switch`, `use`)
 - Codex `config.toml` template confirmation before write
 - Claude Code profile management and apply
+- Claude Code `CLAUDE.md` editing (writes to `~/.claude/CLAUDE.md`)
 - OpenClaw JSON5 profile management
 
 **Session Management**
@@ -91,7 +93,7 @@ flowchart LR
 
     subgraph Files["Local files only (auditable & reversible)"]
       CODEX["~/.codex/*"]
-      CLAUDE["~/.claude/settings.json"]
+      CLAUDE["~/.claude/settings.json + CLAUDE.md"]
       OPENCLAW["~/.openclaw/*.json5 + ~/.openclaw/openclaw.json + workspace/AGENTS.md"]
       SKILLS["~/.{codex,claude,agents}/skills"]
       STATE["sessions / usage / trash / runs"]
@@ -116,7 +118,7 @@ flowchart LR
 
 | Capability | Local target | What you get |
 | --- | --- | --- |
-| Config management (Codex / Claude / OpenClaw) | `~/.codex/*`, `~/.claude/settings.json`, `~/.openclaw/*` | Faster provider/model switching, multi-profile management, safer writes with backups |
+| Config management (Codex / Claude / OpenClaw) | `~/.codex/*`, `~/.claude/settings.json`, `~/.claude/CLAUDE.md`, `~/.openclaw/*` | Faster provider/model switching, multi-profile management, safer writes with backups |
 | Sessions & Usage | sessions / usage aggregates / trash | Quickly locate sessions, filter/export, batch cleanup, and view trends |
 | Skills market | `~/.{codex,claude,agents}/skills` | Local install/import/export (ZIP), cross-app reuse |
 | MCP (stdio) | local API + file operations | Integrate with external tools under controllable permissions (read-only by default) |
@@ -205,6 +207,7 @@ codexmate codex --model gpt-5.3-codex --follow-up "step1" --follow-up "step2"
 ### Claude Code Mode
 - Multi-profile management
 - Default write to `~/.claude/settings.json`
+- `~/.claude/CLAUDE.md` editing
 - Shareable import command copy
 
 ### OpenClaw Mode
@@ -247,6 +250,7 @@ codexmate mcp serve --allow-write
 - `~/.codex/models.json`
 - `~/.codex/provider-current-models.json`
 - `~/.claude/settings.json`
+- `~/.claude/CLAUDE.md`
 - `~/.openclaw/openclaw.json`
 - `~/.openclaw/workspace/AGENTS.md`
 
@@ -278,6 +282,7 @@ Apache-2.0
 ### Claude Code Mode
 - Multi-profile management
 - Default write to `~/.claude/settings.json`
+- `~/.claude/CLAUDE.md` editing
 - Shareable import command copy
 
 ### OpenClaw Mode
@@ -320,6 +325,7 @@ codexmate mcp serve --allow-write
 - `~/.codex/models.json`
 - `~/.codex/provider-current-models.json`
 - `~/.claude/settings.json`
+- `~/.claude/CLAUDE.md`
 - `~/.openclaw/openclaw.json`
 - `~/.openclaw/workspace/AGENTS.md`
 
