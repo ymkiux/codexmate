@@ -1,4 +1,5 @@
 import { runLatestOnlyQueue } from '../logic.mjs';
+import { normalizeConfigTemplateDiffConfirmEnabled } from './config-template-confirm-pref.mjs';
 
 function hasResponseError(response) {
     if (!response || typeof response !== 'object') {
@@ -738,9 +739,7 @@ export function createCodexConfigMethods(options = {}) {
 
             // Default to two-step confirmation when the setting is unset.
             // (The normalize helper lives in session-actions; keep a safe fallback here.)
-            const shouldUseTwoStepConfirm = typeof this.normalizeConfigTemplateDiffConfirmEnabled === 'function'
-                ? this.normalizeConfigTemplateDiffConfirmEnabled(this.configTemplateDiffConfirmEnabled)
-                : (this.configTemplateDiffConfirmEnabled !== false);
+            const shouldUseTwoStepConfirm = normalizeConfigTemplateDiffConfirmEnabled(this.configTemplateDiffConfirmEnabled);
 
             const performApply = async () => {
                 this.configTemplateApplying = true;
