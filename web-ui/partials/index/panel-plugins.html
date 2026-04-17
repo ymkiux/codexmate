@@ -40,7 +40,7 @@
                             <div v-if="pluginsActiveId === 'prompt-templates'" class="plugins-panel">
                                 <div class="plugins-panel-head">
                                     <div class="plugins-panel-title">Prompt Templates</div>
-                                    <div class="plugins-panel-subtitle">Create, parameterize, and copy prompts with <code>{{'{{var}}'}}</code> placeholders.</div>
+                                    <div class="plugins-panel-subtitle">Create, parameterize, and copy prompts with <code v-pre>{{var}}</code> placeholders.</div>
                                 </div>
 
                                 <div class="prompt-templates-grid">
@@ -103,7 +103,7 @@
                                                     rows="10"
                                                     spellcheck="false"
                                                     aria-label="Template body"
-                                                    placeholder="Write your prompt template here. Use {{'{{var}}'}} placeholders."></textarea>
+                                                    placeholder="Write your prompt template here. Use &#123;&#123;var&#125;&#125; placeholders."></textarea>
 
                                                 <div class="prompt-vars-block">
                                                     <div class="prompt-vars-head">
@@ -118,7 +118,7 @@
                                                     <div v-else class="prompt-vars-grid">
                                                         <label v-for="name in promptTemplateVars" :key="'prompt-var-' + name" class="prompt-var-row">
                                                             <span class="prompt-var-label mono">{{ name }}</span>
-                                                            <input class="form-input prompt-var-input" type="text" :value="promptTemplateVarValues[name] || ''" @input="setPromptVariableValue(name, $event.target.value)" :placeholder="`Value for ${name}`">
+                                                            <input class="form-input prompt-var-input" type="text" :value="promptTemplateVarValues[name] || ''" @input="setPromptVariableValue(name, $event.target.value)" :placeholder="'Value for ' + name">
                                                         </label>
                                                     </div>
                                                 </div>

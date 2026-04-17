@@ -124,7 +124,7 @@
                             <div class="session-item-header">
                                 <div class="session-item-main">
                                     <div class="session-item-title">{{ session.title || session.sessionId }}</div>
-                                    <span class="session-count-badge">{{ session.messageCount ?? 0 }}</span>
+                                    <span class="session-count-badge">{{ session.messageCount == null ? 0 : session.messageCount }}</span>
                                 </div>
                                 <div class="session-item-actions">
                                     <button

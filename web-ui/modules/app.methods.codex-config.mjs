@@ -214,7 +214,7 @@ export function createCodexConfigMethods(options = {}) {
             const fallbackText = fallback === '' ? '' : String(fallback).trim();
             const raw = typeof value === 'string'
                 ? value.trim()
-                : String(value ?? '').trim();
+                : String(value == null ? '' : value).trim();
             const text = raw || fallbackText;
             if (!text) {
                 return { ok: true, value: null, text: '' };

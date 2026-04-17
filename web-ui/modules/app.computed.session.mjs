@@ -118,7 +118,9 @@ function createUsagePricingEntry(pricing, source) {
     return {
         input: readUsageCostNumber(pricing && pricing.input),
         output: readUsageCostNumber(pricing && pricing.output),
-        reasoningOutput: readUsageCostNumber(pricing && (pricing.reasoningOutput ?? pricing.reasoning)),
+        reasoningOutput: readUsageCostNumber(
+            pricing && (pricing.reasoningOutput != null ? pricing.reasoningOutput : pricing.reasoning)
+        ),
         cacheRead: readUsageCostNumber(pricing && pricing.cacheRead),
         cacheWrite: readUsageCostNumber(pricing && pricing.cacheWrite),
         source: resolvedSource
@@ -277,11 +279,14 @@ function estimateUsageCostForSession(session, pricingIndex, currentProvider) {
         : fallbackSessionTokens;
     const pricing = resolveUsagePricingForSession(session, pricingIndex, currentProvider);
     const hasTokenBreakdown = !(inputTokens === null && outputTokens === null && reasoningOutputTokens === 0);
+    const reasoningRate = pricing
+        ? ((pricing.reasoningOutput != null ? pricing.reasoningOutput : pricing.output) || 0)
+        : 0;
     const estimatedUsd = pricing && hasTokenBreakdown
         ? (
             ((pricing.input || 0) * billableInputTokens)
             + ((pricing.cacheRead || 0) * cachedInputTokens)
-            + (((pricing.reasoningOutput ?? pricing.output) || 0) * reasoningOutputTokens)
+            + (reasoningRate * reasoningOutputTokens)
             + ((pricing.output || 0) * (outputTokens || 0))
         ) / 1000000
         : 0;
