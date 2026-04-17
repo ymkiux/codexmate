@@ -60,6 +60,8 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /settingsTab === 'backup'/);
     assert.match(html, /settingsTab === 'trash'/);
     assert.match(html, /settingsTab === 'device'/);
+    assert.match(html, /setConfigTemplateDiffConfirmEnabled/);
+    assert.match(html, /configTemplateDiffConfirmEnabled/);
     assert.match(html, /sessionTrashCount/);
     assert.match(html, /v-if="taskOrchestrationTabEnabled" class="top-tab"[\s\S]*id="tab-orchestration"/);
     assert.match(html, /v-if="taskOrchestrationTabEnabled" class="side-section" role="navigation" aria-label="任务编排"/);

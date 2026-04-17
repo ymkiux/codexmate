@@ -170,11 +170,28 @@ export function createSessionActionMethods(options = {}) {
             return true;
         },
 
+        normalizeConfigTemplateDiffConfirmEnabled(value) {
+            if (value === false) return false;
+            const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+            if (normalized === '0' || normalized === 'false' || normalized === 'off' || normalized === 'no') {
+                return false;
+            }
+            return true;
+        },
+
         setSessionTrashEnabled(value) {
             const enabled = this.normalizeSessionTrashEnabled(value);
             this.sessionTrashEnabled = enabled;
             try {
                 localStorage.setItem('codexmateSessionTrashEnabled', enabled ? 'true' : 'false');
+            } catch (_) {}
+        },
+
+        setConfigTemplateDiffConfirmEnabled(value) {
+            const enabled = this.normalizeConfigTemplateDiffConfirmEnabled(value);
+            this.configTemplateDiffConfirmEnabled = enabled;
+            try {
+                localStorage.setItem('codexmateConfigTemplateDiffConfirmEnabled', enabled ? 'true' : 'false');
             } catch (_) {}
         },
 

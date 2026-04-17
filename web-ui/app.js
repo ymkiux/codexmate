@@ -86,9 +86,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 configTemplateDiffHasChangesValue: false,
                 configTemplateDiffFingerprint: '',
                 _configTemplateDiffPreviewRequestToken: null,
+                configTemplateDiffConfirmEnabled: true,
                 codexApplying: false,
                 _pendingCodexApplyOptions: null,
                 agentsContent: '',
+                agentsPath: '',
                 agentsPath: '',
                 agentsExists: false,
                 agentsLineEnding: '\n',
@@ -413,6 +415,11 @@ document.addEventListener('DOMContentLoaded', () => {
             this.restoreSessionPinnedMap();
             this.shareCommandPrefix = this.normalizeShareCommandPrefix(localStorage.getItem('codexmateShareCommandPrefix'));
             this.sessionTrashEnabled = this.normalizeSessionTrashEnabled(localStorage.getItem('codexmateSessionTrashEnabled'));
+            try {
+                this.configTemplateDiffConfirmEnabled = this.normalizeConfigTemplateDiffConfirmEnabled(
+                    localStorage.getItem('codexmateConfigTemplateDiffConfirmEnabled')
+                );
+            } catch (_) {}
             window.addEventListener('resize', this.onWindowResize);
             window.addEventListener('keydown', this.handleGlobalKeydown);
             window.addEventListener('beforeunload', this.handleBeforeUnload);
