@@ -5,7 +5,7 @@
                     id="panel-settings"
                     role="tabpanel"
                     :aria-labelledby="'tab-settings'">
-                    <div class="config-subtabs settings-subtabs" role="tablist" aria-label="设置子标签">
+                    <div class="config-subtabs settings-subtabs" role="tablist" aria-label="Settings tabs">
                         <button
                             id="settings-tab-backup"
                             role="tab"
@@ -14,7 +14,7 @@
                             :tabindex="settingsTab === 'backup' ? 0 : -1"
                             :class="['config-subtab', { active: settingsTab === 'backup' }]"
                             @click="onSettingsTabClick('backup')">
-                            备份与导入
+                            Backup & Import
                         </button>
                         <button
                             id="settings-tab-trash"
@@ -24,7 +24,7 @@
                             :tabindex="settingsTab === 'trash' ? 0 : -1"
                             :class="['config-subtab', { active: settingsTab === 'trash' }]"
                             @click="onSettingsTabClick('trash')">
-                            回收站
+                            Trash
                             <span class="settings-tab-badge">{{ sessionTrashCount }}</span>
                         </button>
                         <button
@@ -35,7 +35,7 @@
                             :tabindex="settingsTab === 'device' ? 0 : -1"
                             :class="['config-subtab', { active: settingsTab === 'device' }]"
                             @click="onSettingsTabClick('device')">
-                            设备
+                            Device
                         </button>
                     </div>
 

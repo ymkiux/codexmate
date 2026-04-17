@@ -64,7 +64,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /configTemplateDiffConfirmEnabled/);
     assert.match(html, /sessionTrashCount/);
     assert.match(html, /v-if="taskOrchestrationTabEnabled" class="top-tab"[\s\S]*id="tab-orchestration"/);
-    assert.match(html, /v-if="taskOrchestrationTabEnabled" class="side-section" role="navigation" aria-label="任务编排"/);
+    assert.match(html, /v-if="taskOrchestrationTabEnabled" class="side-section" role="navigation" aria-label="Orchestration"/);
     assert.match(html, /v-if="taskOrchestrationTabEnabled"[\s\S]*id="panel-orchestration"/);
     assert.match(html, /taskOrchestrationTabEnabled && mainTab === 'orchestration'/);
     assert.match(bundledScript, /taskOrchestrationTabEnabled:\s*false/);
@@ -180,12 +180,12 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /class="market-target-switch market-target-switch-compact" role="group" aria-label="选择 Skills 管理目标"/);
     assert.doesNotMatch(html, /class="market-target-switch" role="tablist" aria-label="选择 Skills 安装目标"/);
     assert.doesNotMatch(html, /class="market-target-switch market-target-switch-compact" role="tablist" aria-label="选择 Skills 管理目标"/);
-    assert.match(html, /class="side-section" role="navigation" aria-label="配置管理"/);
+    assert.match(html, /class="side-section" role="navigation" aria-label="Config"/);
     assert.match(html, /class="side-section" role="navigation" aria-label="会话管理"/);
-    assert.match(html, /class="side-section" role="navigation" aria-label="任务编排"/);
-    assert.match(html, /class="side-section" role="navigation" aria-label="技能市场"/);
-    assert.match(html, /class="side-section" role="navigation" aria-label="文档"/);
-    assert.match(html, /class="side-section" role="navigation" aria-label="设置"/);
+    assert.match(html, /class="side-section" role="navigation" aria-label="Orchestration"/);
+    assert.match(html, /class="side-section" role="navigation" aria-label="Skills"/);
+    assert.match(html, /class="side-section" role="navigation" aria-label="Docs"/);
+    assert.match(html, /class="side-section" role="navigation" aria-label="Settings"/);
     assert.doesNotMatch(sideRail, /role="tablist"/);
     assert.doesNotMatch(sideRail, /role="tab"/);
     assert.match(sideRail, /id="side-tab-config-codex"[\s\S]*:aria-current="mainTab === 'config' && configMode === 'codex' \? 'page' : null"/);
