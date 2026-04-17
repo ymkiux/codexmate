@@ -19,6 +19,14 @@
     -ms-overflow-style: none;
 }
 
+.skills-manager-grid .skill-list {
+    max-height: min(60vh, 520px);
+}
+
+.skills-manager-grid .skills-import-list {
+    max-height: min(34vh, 320px);
+}
+
 .skill-list::-webkit-scrollbar {
     width: 0;
     height: 0;
@@ -293,4 +301,3 @@
     box-shadow: 0 2px 6px rgba(200, 74, 58, 0.25);
     border-color: transparent;
 }
-
