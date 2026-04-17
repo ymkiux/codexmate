@@ -30,6 +30,58 @@
                         </div>
 
                         <div class="usage-chart-grid">
+                            <section class="usage-card usage-card-wide usage-card-daily">
+                                <div class="usage-card-head">
+                                    <div>
+                                        <div class="usage-card-title">每天消耗</div>
+                                        <div class="usage-card-subtitle">按天汇总 token 与预估费用（费用各自按最大值归一显示）。</div>
+                                    </div>
+                                    <div class="usage-card-kicker">{{ sessionsUsageTimeRange === 'all' ? '全部' : (sessionsUsageTimeRange === '30d' ? '近 30 天' : '近 7 天') }}</div>
+                                </div>
+
+                                <div class="usage-daily-legend">
+                                    <span><span class="usage-legend-dot usage-daily-dot usage-daily-dot-tokens"></span>Token</span>
+                                    <span><span class="usage-legend-dot usage-daily-dot usage-daily-dot-cost"></span>预估费用</span>
+                                </div>
+
+                                <div class="usage-daily-bars usage-bars">
+                                    <div v-for="day in (sessionUsageDaily && sessionUsageDaily.rows ? sessionUsageDaily.rows : [])" :key="day.key" class="usage-bar-group">
+                                        <div class="usage-daily-bar-stack" :title="`${day.key} · ${day.tokenTitle} token · ${day.costTitle}`">
+                                            <div class="usage-daily-bar usage-daily-bar-tokens" :style="{ height: day.tokenPercent + '%' }"></div>
+                                            <div class="usage-daily-bar usage-daily-bar-cost" :style="{ height: day.costPercent + '%' }"></div>
+                                        </div>
+                                        <div class="usage-bar-label">{{ day.label }}</div>
+                                    </div>
+                                </div>
+
+                                <div class="usage-daily-table-wrap">
+                                    <table class="usage-daily-table">
+                                        <thead>
+                                            <tr>
+                                                <th>日期</th>
+                                                <th class="right">会话</th>
+                                                <th class="right">消息</th>
+                                                <th class="right">Token</th>
+                                                <th class="right">预估费用</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-for="day in sessionUsageDailyTableRows" :key="day.key">
+                                                <td class="mono">{{ day.key }}</td>
+                                                <td class="right">{{ day.sessionCount }}</td>
+                                                <td class="right">{{ day.messageCount }}</td>
+                                                <td class="right mono" :title="day.tokenTitle">{{ day.tokenLabel }}</td>
+                                                <td class="right mono" :title="day.costTitle">{{ day.costLabel }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div class="usage-daily-note">
+                                    说明：预估费用默认不含 Claude；仅在可匹配模型单价且会话记录 input/output token 时计算。
+                                </div>
+                            </section>
+
                             <section class="usage-card">
                                 <div class="usage-card-title">会话趋势</div>
                                 <div class="usage-legend">
