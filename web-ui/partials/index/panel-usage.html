@@ -60,6 +60,18 @@
                             </section>
 
                             <section class="usage-card">
+                                <div class="usage-card-title">Token 趋势</div>
+                                <div class="usage-bars">
+                                    <div v-for="bucket in sessionUsageCharts.buckets" :key="bucket.key + '-tokens'" class="usage-bar-group">
+                                        <div class="usage-bar-stack">
+                                            <div class="usage-bar tokens" style="width:100%" :style="{ height: ((bucket.totalTokens / Math.max(sessionUsageCharts.maxTokenBucket, 1)) * 100) + '%' }" :title="`${bucket.totalTokens.toLocaleString('en-US')} token`"></div>
+                                        </div>
+                                        <div class="usage-bar-label">{{ bucket.label }}</div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="usage-card">
                                 <div class="usage-card-title">活跃时段</div>
                                 <div class="usage-mini-bars">
                                     <div v-for="item in sessionUsageCharts.hourActivity" :key="item.key" class="usage-mini-bar-group">

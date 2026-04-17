@@ -9203,7 +9203,7 @@ async function restartWebUiServerAfterFrontendChange({
 // #endregion restartWebUiServerAfterFrontendChange
 
 // 打开 Web UI
-function cmdStart(options = {}) {
+async function cmdStart(options = {}) {
     const webDir = path.join(__dirname, 'web-ui');
     const newHtmlPath = path.join(webDir, 'index.html');
     const legacyHtmlPath = path.join(__dirname, 'web-ui.html');
@@ -9216,6 +9216,78 @@ function cmdStart(options = {}) {
 
     const port = resolveWebPort();
     const host = resolveWebHost(options);
+    const openHost = host === '::'
+        ? '::1'
+        : (host === '0.0.0.0' ? DEFAULT_WEB_OPEN_HOST : host);
+    const openUrl = `http://${formatHostForUrl(openHost)}:${port}`;
+
+    const probeExistingWebUi = async () => {
+        const payload = JSON.stringify({ action: 'health-check', params: {} });
+        const postReady = await new Promise((resolve) => {
+            const requestOptions = {
+                hostname: openHost,
+                port,
+                path: '/api',
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json; charset=utf-8',
+                    'Content-Length': Buffer.byteLength(payload, 'utf-8')
+                }
+            };
+            let settled = false;
+            const finish = (ready) => {
+                if (settled) return;
+                settled = true;
+                resolve(ready);
+            };
+            const req = http.request(requestOptions, (probeRes) => {
+                if (typeof probeRes.resume === 'function') {
+                    probeRes.resume();
+                }
+                probeRes.on('end', () => finish(probeRes.statusCode === 200));
+            });
+            req.on('error', () => finish(false));
+            req.setTimeout(800, () => {
+                try { req.destroy(); } catch (_) {}
+                finish(false);
+            });
+            req.end(payload, 'utf-8');
+        });
+        if (!postReady) return false;
+
+        return await new Promise((resolve) => {
+            const requestOptions = {
+                hostname: openHost,
+                port,
+                path: '/web-ui/app.js',
+                method: 'GET'
+            };
+            let settled = false;
+            const finish = (ready) => {
+                if (settled) return;
+                settled = true;
+                resolve(ready);
+            };
+            const req = http.request(requestOptions, (probeRes) => {
+                if (typeof probeRes.resume === 'function') {
+                    probeRes.resume();
+                }
+                probeRes.on('end', () => finish(probeRes.statusCode === 200));
+            });
+            req.on('error', () => finish(false));
+            req.setTimeout(800, () => {
+                try { req.destroy(); } catch (_) {}
+                finish(false);
+            });
+            req.end();
+        });
+    };
+
+    if (await probeExistingWebUi()) {
+        console.log(`\n✓ Web UI 已在运行: ${openUrl}\n`);
+        return;
+    }
+
     releaseRunPortIfNeeded(port, host);
 
     const isDev = process.env.NODE_ENV === 'development'
@@ -13379,7 +13451,7 @@ async function main() {
         case 'proxy': await cmdProxy(args.slice(1)); break;
         case 'workflow': await cmdWorkflow(args.slice(1)); break;
         case 'task': await cmdTask(args.slice(1)); break;
-        case 'run': cmdStart(parseStartOptions(args.slice(1))); break;
+        case 'run': await cmdStart(parseStartOptions(args.slice(1))); break;
         case 'start':
             console.error('错误: 命令已更名为 "run"，请使用: codexmate run');
             process.exit(1);

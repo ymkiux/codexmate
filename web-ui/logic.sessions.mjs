@@ -190,6 +190,7 @@ function buildUsageBuckets(normalizedSessions, options = {}) {
                 label: key.slice(5),
                 codex: 0,
                 claude: 0,
+                totalTokens: 0,
                 totalMessages: 0,
                 totalSessions: 0
             });
@@ -206,6 +207,7 @@ function buildUsageBuckets(normalizedSessions, options = {}) {
             label: key.slice(5),
             codex: 0,
             claude: 0,
+            totalTokens: 0,
             totalMessages: 0,
             totalSessions: 0
         });
@@ -287,6 +289,7 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
             ? Math.max(0, Math.floor(Number(session.contextWindow)))
             : 0;
         bucket.totalSessions += 1;
+        bucket.totalTokens += sessionTotalTokens;
         bucket.totalMessages += messageCount;
         if (source === 'codex') {
             bucket.codex += 1;
@@ -428,6 +431,7 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
 
     const maxSessionBucket = buckets.reduce((max, item) => Math.max(max, item.totalSessions), 0);
     const maxMessageBucket = buckets.reduce((max, item) => Math.max(max, item.totalMessages), 0);
+    const maxTokenBucket = buckets.reduce((max, item) => Math.max(max, item.totalTokens || 0), 0);
     const maxHourCount = hourCounts.reduce((max, item) => Math.max(max, item.count), 0);
     const maxWeekdayCount = weekdayCounts.reduce((max, item) => Math.max(max, item.count), 0);
     const busiestDay = [...buckets]
@@ -489,6 +493,7 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
         })),
         maxSessionBucket,
         maxMessageBucket,
+        maxTokenBucket,
         maxHourCount,
         maxWeekdayCount
     };

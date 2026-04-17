@@ -40,6 +40,7 @@ test('buildUsageChartGroups aggregates codex and claude sessions into day bucket
     const lastBucket = result.buckets[result.buckets.length - 1];
     assert.strictEqual(lastBucket.codex, 1);
     assert.strictEqual(lastBucket.claude, 1);
+    assert.strictEqual(lastBucket.totalTokens, 350);
     assert.strictEqual(lastBucket.totalMessages, 12);
 });
 
@@ -57,6 +58,7 @@ test('buildUsageChartGroups ignores invalid sessions and keeps empty buckets sta
     assert.strictEqual(result.summary.totalContextWindow, 0);
     assert.strictEqual(result.buckets.length, 7);
     assert.ok(result.buckets.every((item) => item.totalSessions === 0));
+    assert.ok(result.buckets.every((item) => item.totalTokens === 0));
     assert.ok(result.hourActivity.every((item) => item.count === 0));
     assert.ok(result.weekdayActivity.every((item) => item.count === 0));
     assert.deepStrictEqual(result.recentSessions, []);

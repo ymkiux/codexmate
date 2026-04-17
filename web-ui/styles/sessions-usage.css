@@ -243,6 +243,10 @@
     background: #8b6bd6;
 }
 
+.usage-bar.tokens {
+    background: linear-gradient(180deg, rgba(199, 116, 98, 0.84) 0%, rgba(180, 94, 78, 1) 100%);
+}
+
 .usage-bar-label {
     font-size: 11px;
     color: var(--color-text-secondary);
