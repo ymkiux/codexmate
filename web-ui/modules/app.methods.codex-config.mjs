@@ -104,22 +104,44 @@ export function createCodexConfigMethods(options = {}) {
             const previousModelsSource = this.modelsSource;
             const previousModelsHasCurrent = this.modelsHasCurrent;
             this.currentProvider = name;
-            await this.loadModelsForProvider(name);
-            if (this.modelsSource === 'error') {
-                this.currentProvider = previousProvider;
-                this.currentModel = previousModel;
-                this.models = previousModels;
-                this.modelsSource = previousModelsSource;
-                this.modelsHasCurrent = previousModelsHasCurrent;
-                return;
-            }
+            const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+            // 不要把“切换提供商”强绑定到 /models 成功与否：
+            // 部分 OpenAI 兼容服务 /models 不可用或很慢，但用户仍希望一次点击即可完成切换。
+            // 这里做“短等待 + 后台补齐”：
+            // 1) 先启动 models 拉取（静默）
+            // 2) 给一个很短的窗口等待它完成，以便能立即选到第一个模型
+            // 3) 无论 models 是否成功，先应用 provider 切换
+            // 4) models 后续若补齐并发现当前 model 不在列表，则自动切到首个 model 并再应用一次
+            const modelsTask = this.loadModelsForProvider(name, { silentError: true })
+                .catch(() => {});
+
+            await Promise.race([modelsTask, delay(250)]);
+
             if (this.modelsSource === 'remote' && this.models.length > 0 && !this.models.includes(this.currentModel)) {
                 this.currentModel = this.models[0];
                 this.modelsHasCurrent = true;
             }
+
             if (getProviderConfigModeMeta(this.configMode)) {
                 await this.waitForCodexApplyIdle();
                 await this.applyCodexConfigDirect({ silent: true });
+            }
+
+            await modelsTask;
+
+            if (this.currentProvider === name) {
+                if (this.modelsSource === 'error') {
+                    this.showMessage('模型列表获取失败，但已切换提供商；请检查 URL/密钥或手动设置模型', 'error');
+                }
+                if (this.modelsSource === 'remote' && this.models.length > 0 && !this.models.includes(this.currentModel)) {
+                    this.currentModel = this.models[0];
+                    this.modelsHasCurrent = true;
+                    if (getProviderConfigModeMeta(this.configMode)) {
+                        await this.waitForCodexApplyIdle();
+                        await this.applyCodexConfigDirect({ silent: true });
+                    }
+                }
             }
         },
 
@@ -329,7 +351,7 @@ export function createCodexConfigMethods(options = {}) {
         },
 
         buildDefaultHealthCheckPrompt() {
-            return '请简短回复：当前提供商连接正常。';
+            return '请简短回复：连接正常。';
         },
 
         openHealthCheckDialog(options = {}) {
@@ -337,6 +359,12 @@ export function createCodexConfigMethods(options = {}) {
                 ? options.providerName.trim()
                 : '';
             const locked = !!options.locked && !!providerName;
+            if (locked && providerName && providerName !== String(this.currentProvider || '').trim()) {
+                if (typeof this.showMessage === 'function') {
+                    this.showMessage('请先切换到该提供商再进行健康聊天测试', 'info');
+                }
+                return;
+            }
             const nextProvider = providerName
                 || String(this.healthCheckDialogSelectedProvider || '').trim()
                 || String(this.currentProvider || '').trim()
@@ -376,7 +404,7 @@ export function createCodexConfigMethods(options = {}) {
                 return;
             }
             if (!prompt) {
-                this.showMessage('请输入对话内容', 'error');
+                this.showMessage('请输入消息内容', 'error');
                 return;
             }
 
@@ -396,7 +424,7 @@ export function createCodexConfigMethods(options = {}) {
                 this.healthCheckDialogLastResult = res;
 
                 if (hasResponseError(res) || res.ok === false) {
-                    const message = getResponseMessage(res, '健康检测失败');
+                    const message = getResponseMessage(res, '健康聊天测试失败');
                     this.healthCheckDialogMessages.push({
                         id: `assistant-${Date.now()}`,
                         role: 'assistant',
@@ -413,7 +441,7 @@ export function createCodexConfigMethods(options = {}) {
 
                 const reply = typeof res.reply === 'string' && res.reply.trim()
                     ? res.reply.trim()
-                    : '已收到响应，但未解析到可展示文本。';
+                    : '已收到回复，但未解析到可展示文本。';
                 this.healthCheckDialogMessages.push({
                     id: `assistant-${Date.now()}`,
                     role: 'assistant',
@@ -426,7 +454,7 @@ export function createCodexConfigMethods(options = {}) {
                 });
                 this.healthCheckDialogPrompt = '';
             } catch (e) {
-                const message = e && e.message ? e.message : '健康检测失败';
+                const message = e && e.message ? e.message : '健康聊天测试失败';
                 this.healthCheckDialogMessages.push({
                     id: `assistant-${Date.now()}`,
                     role: 'assistant',
@@ -451,6 +479,7 @@ export function createCodexConfigMethods(options = {}) {
         },
 
         async openConfigTemplateEditor(options = {}) {
+            this.resetConfigTemplateDiffState();
             const modelContextWindow = this.normalizePositiveIntegerInput(
                 this.modelContextWindowInput,
                 'model_context_window',
@@ -598,11 +627,104 @@ export function createCodexConfigMethods(options = {}) {
 
         closeConfigTemplateModal(options = {}) {
             const force = !!options.force;
-            if (!force && this.configTemplateApplying) {
+            if (!force && (this.configTemplateApplying || this.configTemplateDiffLoading)) {
                 return;
             }
             this.showConfigTemplateModal = false;
             this.configTemplateContent = '';
+            this.resetConfigTemplateDiffState();
+        },
+
+        resetConfigTemplateDiffState() {
+            this.configTemplateDiffVisible = false;
+            this.configTemplateDiffLoading = false;
+            this.configTemplateDiffError = '';
+            this.configTemplateDiffLines = [];
+            this.configTemplateDiffStats = { added: 0, removed: 0, unchanged: 0 };
+            this.configTemplateDiffHasChangesValue = false;
+            this.configTemplateDiffFingerprint = '';
+            this._configTemplateDiffPreviewRequestToken = null;
+        },
+
+        onConfigTemplateContentInput() {
+            if (this.configTemplateDiffVisible || (this.configTemplateDiffLines && this.configTemplateDiffLines.length)) {
+                this.resetConfigTemplateDiffState();
+            }
+        },
+
+        buildConfigTemplateDiffFingerprint() {
+            const content = typeof this.configTemplateContent === 'string' ? this.configTemplateContent : '';
+            return `${content.length}::${content}`;
+        },
+
+        hasConfigTemplateDiffChanges() {
+            if (this.configTemplateDiffHasChangesValue !== undefined && this.configTemplateDiffHasChangesValue !== null) {
+                return !!this.configTemplateDiffHasChangesValue;
+            }
+            const stats = this.configTemplateDiffStats && typeof this.configTemplateDiffStats === 'object'
+                ? this.configTemplateDiffStats
+                : {};
+            const added = Number(stats.added || 0);
+            const removed = Number(stats.removed || 0);
+            return added > 0 || removed > 0;
+        },
+
+        async prepareConfigTemplateDiff() {
+            const requestFingerprint = this.buildConfigTemplateDiffFingerprint();
+            const requestToken = Symbol('config-template-diff-preview');
+            this._configTemplateDiffPreviewRequestToken = requestToken;
+            this.configTemplateDiffVisible = true;
+            this.configTemplateDiffLoading = true;
+            this.configTemplateDiffError = '';
+            this.configTemplateDiffLines = [];
+            this.configTemplateDiffStats = { added: 0, removed: 0, unchanged: 0 };
+            this.configTemplateDiffHasChangesValue = false;
+            try {
+                const shouldApply = () => (
+                    this.configTemplateDiffVisible
+                    && this._configTemplateDiffPreviewRequestToken === requestToken
+                    && this.buildConfigTemplateDiffFingerprint() === requestFingerprint
+                );
+                const res = await api('preview-config-template-diff', {
+                    template: this.configTemplateContent
+                });
+                if (!shouldApply()) {
+                    return;
+                }
+                if (res.error) {
+                    this.configTemplateDiffError = res.error;
+                    return;
+                }
+                const diff = res.diff && typeof res.diff === 'object' ? res.diff : {};
+                const lines = Array.isArray(diff.lines) ? diff.lines : [];
+                this.configTemplateDiffLines = lines.filter(line => line && line.type);
+                const stats = diff.stats && typeof diff.stats === 'object' ? diff.stats : null;
+                if (stats) {
+                    this.configTemplateDiffStats = {
+                        added: Number(stats.added || 0),
+                        removed: Number(stats.removed || 0),
+                        unchanged: Number(stats.unchanged || 0)
+                    };
+                } else {
+                    const nextStats = { added: 0, removed: 0, unchanged: 0 };
+                    for (const line of this.configTemplateDiffLines) {
+                        if (line && line.type === 'add') nextStats.added += 1;
+                        else if (line && line.type === 'del') nextStats.removed += 1;
+                        else nextStats.unchanged += 1;
+                    }
+                    this.configTemplateDiffStats = nextStats;
+                }
+                this.configTemplateDiffHasChangesValue = !!diff.hasChanges;
+                this.configTemplateDiffFingerprint = requestFingerprint;
+            } catch (_) {
+                if (this._configTemplateDiffPreviewRequestToken === requestToken) {
+                    this.configTemplateDiffError = '生成差异失败';
+                }
+            } finally {
+                if (this._configTemplateDiffPreviewRequestToken === requestToken) {
+                    this.configTemplateDiffLoading = false;
+                }
+            }
         },
 
         async applyConfigTemplate() {
@@ -611,6 +733,27 @@ export function createCodexConfigMethods(options = {}) {
             }
             if (!this.configTemplateContent || !this.configTemplateContent.trim()) {
                 this.showMessage('模板不能为空', 'error');
+                return;
+            }
+
+            if (!this.configTemplateDiffVisible) {
+                await this.prepareConfigTemplateDiff();
+                return;
+            }
+            if (this.configTemplateDiffLoading) {
+                return;
+            }
+            if (this.configTemplateDiffError) {
+                this.showMessage(this.configTemplateDiffError, 'error');
+                return;
+            }
+            const fingerprint = this.buildConfigTemplateDiffFingerprint();
+            if (this.configTemplateDiffFingerprint !== fingerprint) {
+                await this.prepareConfigTemplateDiff();
+                return;
+            }
+            if (!this.hasConfigTemplateDiffChanges()) {
+                this.showMessage('未检测到改动', 'info');
                 return;
             }
 

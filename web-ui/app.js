@@ -74,6 +74,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 confirmDialogResolver: null,
                 configTemplateContent: '',
                 configTemplateApplying: false,
+                configTemplateDiffVisible: false,
+                configTemplateDiffLoading: false,
+                configTemplateDiffError: '',
+                configTemplateDiffLines: [],
+                configTemplateDiffStats: {
+                    added: 0,
+                    removed: 0,
+                    unchanged: 0
+                },
+                configTemplateDiffHasChangesValue: false,
+                configTemplateDiffFingerprint: '',
+                _configTemplateDiffPreviewRequestToken: null,
                 codexApplying: false,
                 _pendingCodexApplyOptions: null,
                 agentsContent: '',
@@ -210,7 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 providerSwitchDisplayTarget: '',
                 healthCheckDialogLockedProvider: '',
                 healthCheckDialogSelectedProvider: '',
-                healthCheckDialogPrompt: '请简短回复：当前提供商连接正常。',
+                healthCheckDialogPrompt: '请简短回复：连接正常。',
                 healthCheckDialogMessages: [],
                 healthCheckDialogSending: false,
                 healthCheckDialogLastResult: null,
@@ -240,7 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         error: ''
                     }
                 ],
-                newProvider: { name: '', url: '', key: '' },
+                newProvider: { name: '', url: '', key: '', useTransform: false },
                 resetConfigLoading: false,
                 editingProvider: { name: '', url: '', key: '', readOnly: false, nonEditable: false },
                 newModelName: '',

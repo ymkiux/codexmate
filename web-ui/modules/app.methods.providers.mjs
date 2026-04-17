@@ -141,11 +141,15 @@ export function createProvidersMethods(options = {}) {
             }
 
             try {
-                const res = await api('add-provider', {
+                const payload = {
                     name: validation.name,
                     url: validation.url,
                     key: this.newProvider.key || ''
-                });
+                };
+                if (this.newProvider && this.newProvider.useTransform) {
+                    payload.useTransform = true;
+                }
+                const res = await api('add-provider', payload);
                 if (res.error) {
                     this.showMessage(res.error, 'error');
                     return;
@@ -236,19 +240,50 @@ export function createProvidersMethods(options = {}) {
             }
         },
 
-        openEditModal(provider) {
+        async openEditModal(provider) {
+            const requestId = Symbol('openEditModal');
+            this._openEditModalRequestId = requestId;
             if (!this.shouldShowProviderEdit(provider)) {
                 this.showMessage('该 provider 为保留项，不可编辑', 'info');
                 return;
             }
+            const isTransformProvider = (() => {
+                if (!provider || typeof provider !== 'object') return false;
+                const bridge = typeof provider.codexmate_bridge === 'string' ? provider.codexmate_bridge.trim() : '';
+                if (bridge === 'openai') return true;
+                const url = String(provider.url || '');
+                return url.includes('/bridge/openai/');
+            })();
             this.editingProvider = {
                 name: provider.name,
                 url: normalizeProviderUrl(provider.url || ''),
                 key: '',
                 readOnly: !!provider.readOnly,
-                nonEditable: this.isNonDeletableProvider(provider)
+                nonEditable: typeof provider.nonEditable === 'boolean'
+                    ? provider.nonEditable
+                    : this.isNonDeletableProvider(provider),
+                useTransform: isTransformProvider
             };
             this.showEditModal = true;
+
+            if (isTransformProvider) {
+                try {
+                    const res = await api('openai-bridge-get-provider', { name: provider.name });
+                    if (
+                        this._openEditModalRequestId === requestId
+                        && this.showEditModal
+                        && this.editingProvider
+                        && this.editingProvider.name === provider.name
+                        && res && !res.error
+                        && typeof res.baseUrl === 'string'
+                        && res.baseUrl.trim()
+                    ) {
+                        this.editingProvider.url = normalizeProviderUrl(res.baseUrl);
+                    }
+                } catch (_) {
+                    // ignore
+                }
+            }
         },
 
         async updateProvider() {
@@ -264,6 +299,9 @@ export function createProvidersMethods(options = {}) {
             }
 
             const params = { name: validation.name, url: validation.url };
+            if (this.editingProvider && this.editingProvider.useTransform) {
+                params.useTransform = true;
+            }
             if (typeof this.editingProvider.key === 'string' && this.editingProvider.key.trim()) {
                 params.key = this.editingProvider.key;
             }
@@ -283,7 +321,7 @@ export function createProvidersMethods(options = {}) {
 
         closeEditModal() {
             this.showEditModal = false;
-            this.editingProvider = { name: '', url: '', key: '', readOnly: false, nonEditable: false };
+            this.editingProvider = { name: '', url: '', key: '', readOnly: false, nonEditable: false, useTransform: false };
         },
 
         async resetConfig() {
@@ -339,7 +377,7 @@ export function createProvidersMethods(options = {}) {
 
         closeAddModal() {
             this.showAddModal = false;
-            this.newProvider = { name: '', url: '', key: '' };
+            this.newProvider = { name: '', url: '', key: '', useTransform: false };
         },
 
         closeModelModal() {
