@@ -4,7 +4,7 @@ const LARGE_DIFF_LINE_LIMIT = 3000;
 const LARGE_DIFF_SYNC_LOOKAHEAD = 64;
 
 function measureUtf8ByteLength(input) {
-    const text = typeof input === 'string' ? input : String(input ?? '');
+    const text = typeof input === 'string' ? input : String(input == null ? '' : input);
     if (typeof TextEncoder === 'function') {
         return new TextEncoder().encode(text).length;
     }

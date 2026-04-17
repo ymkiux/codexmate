@@ -173,7 +173,7 @@
                                                     <div class="trash-item-main">
                                                         <div class="trash-item-mainline">
                                                             <div class="trash-item-title">{{ item.title || item.sessionId }}</div>
-                                                            <span class="session-count-badge">{{ item.messageCount ?? 0 }}</span>
+                                                            <span class="session-count-badge">{{ item.messageCount == null ? 0 : item.messageCount }}</span>
                                                         </div>
                                                         <div class="trash-item-meta session-item-meta">
                                                             <span class="session-source">{{ item.sourceLabel }}</span>
