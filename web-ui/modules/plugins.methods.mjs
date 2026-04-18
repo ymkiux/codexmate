@@ -61,7 +61,8 @@ function ensureBuiltinTemplates(rawList) {
     const list = Array.isArray(rawList) ? rawList.filter(Boolean) : [];
     const builtins = [buildBuiltinMisakaTemplate(), buildBuiltinFrontendDesignTemplate()];
     const builtinIdSet = new Set(builtins.map((tpl) => tpl.id));
-    const rest = list.filter((item) => !(item && item.isBuiltin === true && builtinIdSet.has(item.id)));
+    // Built-ins are fixed and should not be overridden (even if user imports a conflicting id).
+    const rest = list.filter((item) => !(item && builtinIdSet.has(item.id)));
     return [...builtins, ...rest];
 }
 
@@ -357,6 +358,10 @@ export function createPluginsMethods() {
 
         async savePromptTemplate() {
             const draft = normalizePromptTemplateDraft(this.promptTemplateDraftRaw);
+            if (draft.isBuiltin) {
+                this.showMessage('内置模板不可修改，请先 Duplicate 再编辑', 'error');
+                return false;
+            }
             const name = draft.name.trim();
             if (!name) {
                 this.showMessage('Template name is required', 'error');
