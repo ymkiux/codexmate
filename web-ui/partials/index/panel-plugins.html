@@ -215,3 +215,29 @@
                     accept=".json,application/json"
                     style="display:none"
                     @change="handlePromptTemplatesImportChange">
+
+                <!-- 新增变量（Prompt Templates） -->
+                <div v-if="showPromptTemplateVarModal" class="modal-overlay" @click.self="closePromptTemplateVarModal">
+                    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="add-prompt-var-modal-title">
+                        <div class="modal-title" id="add-prompt-var-modal-title">新增变量</div>
+
+                        <div class="form-group">
+                            <label class="form-label">变量名</label>
+                            <input
+                                ref="promptTemplateVarNameInput"
+                                v-model.trim="promptTemplateVarDraftName"
+                                :class="['form-input', { invalid: !!promptTemplateVarDraftError }]"
+                                placeholder="例如: code"
+                                autocomplete="off"
+                                spellcheck="false"
+                                @keydown.enter.prevent="confirmAddPromptTemplateVariable">
+                            <div v-if="promptTemplateVarDraftError" class="form-hint form-error">{{ promptTemplateVarDraftError }}</div>
+                            <div v-else class="form-hint">仅支持字母/数字/下划线/中划线/点，将插入为 <code v-pre>{{var}}</code>。</div>
+                        </div>
+
+                        <div class="btn-group">
+                            <button class="btn btn-cancel" @click="closePromptTemplateVarModal">取消</button>
+                            <button class="btn btn-confirm" @click="confirmAddPromptTemplateVariable">添加</button>
+                        </div>
+                    </div>
+                </div>

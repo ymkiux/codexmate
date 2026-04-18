@@ -359,21 +359,55 @@ export function createPluginsMethods() {
                 this.showMessage('内置模板不可编辑', 'error');
                 return;
             }
-            const name = window.prompt('请输入变量名（仅字母/数字/下划线/中划线/点）', 'var');
-            const key = typeof name === 'string' ? name.trim() : '';
-            if (!key) return;
+            // Use project-style modal (no native prompt).
+            this.promptTemplateVarDraftName = 'var';
+            this.promptTemplateVarDraftError = '';
+            this.showPromptTemplateVarModal = true;
+            if (typeof this.$nextTick === 'function') {
+                this.$nextTick(() => {
+                    const input = this.$refs && this.$refs.promptTemplateVarNameInput
+                        ? this.$refs.promptTemplateVarNameInput
+                        : null;
+                    if (input && typeof input.focus === 'function') input.focus();
+                });
+            }
+        },
+
+        closePromptTemplateVarModal() {
+            this.showPromptTemplateVarModal = false;
+            this.promptTemplateVarDraftError = '';
+        },
+
+        confirmAddPromptTemplateVariable() {
+            const draft = normalizePromptTemplateDraft(this.promptTemplateDraftRaw);
+            if (!draft || !draft.id) return;
+            if (draft.isBuiltin) {
+                this.promptTemplateVarDraftError = '内置模板不可编辑';
+                return;
+            }
+            const key = typeof this.promptTemplateVarDraftName === 'string'
+                ? this.promptTemplateVarDraftName.trim()
+                : '';
+            if (!key) {
+                this.promptTemplateVarDraftError = '请输入变量名';
+                return;
+            }
             if (!/^[a-zA-Z0-9_.-]+$/.test(key)) {
-                this.showMessage('变量名不合法', 'error');
+                this.promptTemplateVarDraftError = '变量名仅支持字母/数字/下划线/中划线/点';
                 return;
             }
             const placeholder = `{{${key}}}`;
             const current = typeof draft.template === 'string' ? draft.template : '';
             if (current.includes(placeholder)) {
-                this.showMessage('变量已存在', 'info');
+                this.promptTemplateVarDraftError = '变量已存在';
                 return;
             }
-            const nextText = current && !current.endsWith('\n') ? `${current}\n${placeholder}\n` : `${current}${placeholder}\n`;
+            const nextText = current && !current.endsWith('\n')
+                ? `${current}\n${placeholder}\n`
+                : `${current}${placeholder}\n`;
             this.promptTemplateDraftRaw = { ...draft, template: nextText };
+            this.showPromptTemplateVarModal = false;
+            this.promptTemplateVarDraftError = '';
             this.showMessage('已添加变量', 'success');
         },
 

@@ -384,7 +384,10 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'promptComposerPickerVisible',
         'promptComposerPickerKeyword',
         'promptComposerSelectedTemplateId',
-        'promptComposerVarValuesRaw'
+        'promptComposerVarValuesRaw',
+        'showPromptTemplateVarModal',
+        'promptTemplateVarDraftName',
+        'promptTemplateVarDraftError'
     );
     if (parityAgainstHead) {
         const allowedExtraKeySet = new Set(allowedExtraCurrentKeys);
@@ -472,6 +475,8 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'selectPromptTemplate',
         'resetPromptVariableValues',
         'addPromptTemplateVariable',
+        'closePromptTemplateVarModal',
+        'confirmAddPromptTemplateVariable',
         'setPromptVariableValue',
         'copyRenderedPrompt',
         'savePromptTemplate',
