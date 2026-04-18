@@ -187,6 +187,10 @@ export function switchMainTab(tab) {
         void Promise.resolve(marketOverviewLoad).catch(() => {});
     }
     if (enteringPluginsTab && typeof this.loadPluginsOverview === 'function') {
+        // Default behavior: always land on Prompt Templates + Compose when entering Plugins.
+        this.pluginsActiveId = 'prompt-templates';
+        this.promptTemplatesMode = 'compose';
+        this.promptComposerPickerVisible = false;
         let pluginsLoad = null;
         try {
             pluginsLoad = this.loadPluginsOverview({ silent: true });
