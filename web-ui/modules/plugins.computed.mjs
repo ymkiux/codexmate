@@ -18,6 +18,8 @@ function normalizePromptTemplateEntry(item) {
     };
 }
 
+const TEMPLATE_PARTS_CACHE = new Map();
+
 function parseTemplateVariables(templateText) {
     const text = typeof templateText === 'string' ? templateText : '';
     const vars = new Set();
@@ -56,6 +58,21 @@ function parseTemplateParts(templateText) {
         if (part.type === 'var') return typeof part.name === 'string' && part.name.trim().length > 0;
         return false;
     });
+}
+
+function getCachedTemplateParts(templateKey, templateText) {
+    const cacheKey = `${templateKey}::${templateText}`;
+    if (TEMPLATE_PARTS_CACHE.has(cacheKey)) {
+        return TEMPLATE_PARTS_CACHE.get(cacheKey);
+    }
+    const parts = parseTemplateParts(templateText);
+    TEMPLATE_PARTS_CACHE.set(cacheKey, parts);
+    // simple cap to avoid unbounded growth
+    if (TEMPLATE_PARTS_CACHE.size > 64) {
+        const firstKey = TEMPLATE_PARTS_CACHE.keys().next().value;
+        TEMPLATE_PARTS_CACHE.delete(firstKey);
+    }
+    return parts;
 }
 
 function formatIsoDateLabel(iso) {
@@ -175,7 +192,8 @@ export function createPluginsComputed() {
         promptComposerParts() {
             const tpl = this.promptComposerActiveTemplate;
             if (!tpl) return [];
-            return parseTemplateParts(tpl.template);
+            const key = tpl.id || tpl.name || 'template';
+            return getCachedTemplateParts(key, tpl.template);
         },
 
         promptComposerRendered() {

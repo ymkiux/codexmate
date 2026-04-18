@@ -28,23 +28,12 @@ function normalizePromptTemplateDraft(draft) {
 function buildBuiltinMisakaTemplate() {
     return {
         id: 'builtin_misaka',
-        name: 'Use Skill: 御坂',
-        description: 'Default template. Replace placeholders and copy the rendered prompt.',
+        name: '代码注释润色',
+        description: '轻微收敛以下代码注释 {{code}}',
         template: [
-            'Use Skill: 御坂',
+            '轻微收敛以下代码注释',
             '',
-            'Goal:',
-            '{{goal}}',
-            '',
-            'Context:',
-            '{{context}}',
-            '',
-            'Requirements:',
-            '- {{requirement_1}}',
-            '- {{requirement_2}}',
-            '',
-            'Output format:',
-            '{{output}}'
+            '{{code}}'
         ].join('\n'),
         createdAt: nowIso(),
         updatedAt: nowIso(),
@@ -54,28 +43,72 @@ function buildBuiltinMisakaTemplate() {
 
 export function createPluginsMethods() {
     return {
+        onPromptComposerInput() {
+            const raw = typeof this.promptComposerCommand === 'string' ? this.promptComposerCommand : '';
+            const text = raw.trimStart();
+            if (!text.startsWith('/')) {
+                if (this.promptComposerPickerVisible) {
+                    this.promptComposerPickerVisible = false;
+                }
+                return;
+            }
+
+            const lower = text.toLowerCase();
+            const isPluginCommand = lower.startsWith('/pl') || lower.startsWith('/plugin') || lower.startsWith('/plugins');
+            if (!isPluginCommand) return;
+
+            // Support "/plugin foo" to prefill search keyword with "foo"
+            const after = text.replace(/^\/plugins?\b/i, '').trim();
+            this.promptComposerPickerKeyword = after;
+            if (!this.promptComposerPickerVisible) {
+                this.openPromptComposerPicker({ keepKeyword: true });
+            }
+        },
+
         onPromptComposerKeydown(event) {
             const e = event || null;
             if (!e || e.key !== 'Enter') return;
             if (e.shiftKey) return;
-            const value = typeof this.promptComposerCommand === 'string' ? this.promptComposerCommand.trim() : '';
-            if (value !== '/plugin' && value !== '/plugins') return;
             e.preventDefault();
-            this.openPromptComposerPicker();
+
+            if (this.promptComposerPickerVisible) {
+                const list = Array.isArray(this.promptComposerPickerList) ? this.promptComposerPickerList : [];
+                if (list.length) {
+                    this.usePromptTemplateInComposer(list[0].id);
+                }
+                return;
+            }
+
+            const value = typeof this.promptComposerCommand === 'string' ? this.promptComposerCommand.trim() : '';
+            const lower = value.toLowerCase();
+            if (lower === '/plugin' || lower === '/plugins' || lower === '/pl') {
+                this.openPromptComposerPicker();
+                return;
+            }
         },
 
         onPromptComposerPickerKeydown(event) {
             const e = event || null;
             if (!e) return;
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                const list = Array.isArray(this.promptComposerPickerList) ? this.promptComposerPickerList : [];
+                if (list.length) {
+                    this.usePromptTemplateInComposer(list[0].id);
+                }
+                return;
+            }
             if (e.key === 'Escape') {
                 e.preventDefault();
                 this.closePromptComposerPicker();
             }
         },
 
-        openPromptComposerPicker() {
+        openPromptComposerPicker(options = {}) {
             this.promptComposerPickerVisible = true;
-            this.promptComposerPickerKeyword = '';
+            if (!(options && options.keepKeyword)) {
+                this.promptComposerPickerKeyword = '';
+            }
             if (typeof this.$nextTick === 'function') {
                 this.$nextTick(() => {
                     const input = this.$refs && this.$refs.promptComposerPickerSearch
@@ -108,7 +141,10 @@ export function createPluginsMethods() {
             this.promptTemplatesMode = 'compose';
             if (typeof this.$nextTick === 'function') {
                 this.$nextTick(() => {
-                    const firstVar = document.querySelector('.prompt-fragment-var');
+                    // Focus the first placeholder field if it exists.
+                    const firstVar = this.$refs && this.$refs.promptComposerFirstVar
+                        ? this.$refs.promptComposerFirstVar
+                        : null;
                     if (firstVar && typeof firstVar.focus === 'function') firstVar.focus();
                 });
             }
@@ -188,6 +224,9 @@ export function createPluginsMethods() {
                 if (!this.promptTemplatesMode) {
                     this.promptTemplatesMode = 'compose';
                 }
+                if (this.promptTemplatesMode !== 'compose' && this.promptTemplatesMode !== 'manage') {
+                    this.promptTemplatesMode = 'compose';
+                }
 
                 const currentSelected = typeof this.promptTemplateSelectedId === 'string'
                     ? this.promptTemplateSelectedId
@@ -200,6 +239,16 @@ export function createPluginsMethods() {
                 }
                 if (!silent && normalized.length === 0) {
                     this.showMessage('Initialized with a built-in template.', 'success');
+                }
+
+                // When entering the Plugins tab, focus the command input by default (better UX).
+                if (this.mainTab === 'plugins' && this.promptTemplatesMode === 'compose' && typeof this.$nextTick === 'function') {
+                    this.$nextTick(() => {
+                        const input = this.$refs && this.$refs.promptComposerCommandInput
+                            ? this.$refs.promptComposerCommandInput
+                            : null;
+                        if (input && typeof input.focus === 'function') input.focus();
+                    });
                 }
                 return true;
             } catch (e) {

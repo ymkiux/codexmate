@@ -65,44 +65,51 @@
                                             class="form-input prompt-compose-command-input"
                                             type="text"
                                             v-model="promptComposerCommand"
+                                            @input="onPromptComposerInput"
                                             @keydown="onPromptComposerKeydown"
                                             aria-label="Prompt composer command"
-                                            placeholder="Type /plugin and press Enter to insert a template">
-                                        <button type="button" class="btn-mini" @click="openPromptComposerPicker" :disabled="pluginsLoading">Templates</button>
-                                        <button type="button" class="btn-mini" @click="copyPromptComposerRendered" :disabled="pluginsLoading || !promptComposerRendered">Copy</button>
-                                        <button type="button" class="btn-mini" @click="resetPromptComposer" :disabled="pluginsLoading || (!promptComposerSelectedTemplateId && !promptComposerCommand)">Reset</button>
+                                            placeholder="输入 /pl 或 /plugin 选择模板（可直接继续输入关键字）">
+                                        <button type="button" class="btn-mini" @click="openPromptComposerPicker" :disabled="pluginsLoading">选择模板</button>
+                                        <button type="button" class="btn-mini" @click="copyPromptComposerRendered" :disabled="pluginsLoading || !promptComposerRendered">复制</button>
+                                        <button type="button" class="btn-mini" @click="resetPromptComposer" :disabled="pluginsLoading || (!promptComposerSelectedTemplateId && !promptComposerCommand)">重置</button>
                                     </div>
 
-                                    <div v-if="promptComposerPickerVisible" class="prompt-compose-picker" role="dialog" aria-label="Template picker">
-                                        <div class="prompt-compose-picker-head">
-                                            <input
-                                                ref="promptComposerPickerSearch"
-                                                class="form-input"
-                                                type="text"
-                                                v-model.trim="promptComposerPickerKeyword"
-                                                @keydown="onPromptComposerPickerKeydown"
-                                                aria-label="Search templates for composer"
-                                                placeholder="Search templates">
-                                            <button type="button" class="btn-mini" @click="closePromptComposerPicker">Close</button>
-                                        </div>
-                                        <div v-if="!promptComposerPickerList.length" class="skills-empty-state">No templates found.</div>
-                                        <div v-else class="prompt-compose-picker-list" role="list">
-                                            <button
-                                                v-for="tpl in promptComposerPickerList"
-                                                :key="'composer-tpl-' + tpl.id"
-                                                type="button"
-                                                class="prompt-compose-picker-item"
-                                                @click="usePromptTemplateInComposer(tpl.id)">
-                                                <div class="prompt-compose-picker-item-main">
-                                                    <div class="prompt-compose-picker-item-title">{{ tpl.name }}</div>
-                                                    <div class="prompt-compose-picker-item-meta">
-                                                        <span class="mono">{{ tpl.varCount }} vars</span>
-                                                        <span>·</span>
-                                                        <span class="mono">{{ tpl.updatedLabel }}</span>
+                                    <div v-if="promptComposerPickerVisible" class="prompt-compose-modal" role="dialog" aria-label="Template picker">
+                                        <div class="prompt-compose-modal-backdrop" @click="closePromptComposerPicker"></div>
+                                        <div class="prompt-compose-modal-dialog">
+                                            <div class="prompt-compose-modal-head">
+                                                <div class="prompt-compose-modal-title">选择模板</div>
+                                                <button type="button" class="btn-mini" @click="closePromptComposerPicker">关闭</button>
+                                            </div>
+                                            <div class="prompt-compose-modal-search">
+                                                <input
+                                                    ref="promptComposerPickerSearch"
+                                                    class="form-input"
+                                                    type="text"
+                                                    v-model.trim="promptComposerPickerKeyword"
+                                                    @keydown="onPromptComposerPickerKeydown"
+                                                    aria-label="Search templates for composer"
+                                                    placeholder="搜索模板（Enter 选择第一项，Esc 关闭）">
+                                            </div>
+                                            <div v-if="!promptComposerPickerList.length" class="skills-empty-state">No templates found.</div>
+                                            <div v-else class="prompt-compose-picker-list" role="list">
+                                                <button
+                                                    v-for="tpl in promptComposerPickerList"
+                                                    :key="'composer-tpl-' + tpl.id"
+                                                    type="button"
+                                                    class="prompt-compose-picker-item"
+                                                    @click="usePromptTemplateInComposer(tpl.id)">
+                                                    <div class="prompt-compose-picker-item-main">
+                                                        <div class="prompt-compose-picker-item-title">{{ tpl.name }}</div>
+                                                        <div class="prompt-compose-picker-item-meta">
+                                                            <span class="mono">{{ tpl.varCount }} vars</span>
+                                                            <span>·</span>
+                                                            <span class="mono">{{ tpl.updatedLabel }}</span>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                                <span :class="['pill', tpl.isBuiltin ? 'configured' : 'source']">{{ tpl.isBuiltin ? 'built-in' : 'custom' }}</span>
-                                            </button>
+                                                    <span :class="['pill', tpl.isBuiltin ? 'configured' : 'source']">{{ tpl.isBuiltin ? 'built-in' : 'custom' }}</span>
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -118,6 +125,7 @@
                                                 <textarea
                                                     v-else
                                                     class="prompt-fragment-var"
+                                                    :ref="idx === 0 ? 'promptComposerFirstVar' : null"
                                                     rows="1"
                                                     spellcheck="false"
                                                     :value="promptComposerVarValues[part.name] || ''"
@@ -132,14 +140,14 @@
                                                     <div class="prompt-vars-title">Preview</div>
                                                     <div class="plugins-panel-note">Only placeholders are editable; everything else is fixed.</div>
                                                 </div>
-                                                <button type="button" class="btn-mini" @click="copyPromptComposerRendered" :disabled="pluginsLoading || !promptComposerRendered">Copy</button>
+                                                <button type="button" class="btn-mini" @click="copyPromptComposerRendered" :disabled="pluginsLoading || !promptComposerRendered">复制</button>
                                             </div>
                                             <textarea class="form-input prompt-preview-textarea" :value="promptComposerRendered" rows="10" readonly spellcheck="false" aria-label="Rendered prompt (composer)"></textarea>
                                         </div>
                                     </div>
 
                                     <div v-else class="skills-empty-state">
-                                        Type <span class="mono">/plugin</span> and press Enter, or click <strong>Templates</strong>.
+                                        在上方输入框里输入 <span class="mono">/pl</span> 或 <span class="mono">/plugin</span> 即可弹出模板列表。
                                     </div>
                                 </div>
 
