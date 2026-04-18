@@ -18,19 +18,48 @@
                     </div>
 
                     <div v-if="sessionsUsageLoading && !sessionsUsageList.length" class="session-empty">正在加载 Usage 统计...</div>
+                    <div v-if="sessionsUsageLoading && !sessionsUsageList.length" class="usage-loading-skeleton" aria-busy="true">
+                        <div class="usage-summary-grid">
+                            <div v-for="n in 8" :key="'usage-skeleton-card-' + n" class="usage-summary-card usage-skeleton-card">
+                                <div class="usage-skeleton-line w-40"></div>
+                                <div class="usage-skeleton-line w-70 h-lg"></div>
+                                <div class="usage-skeleton-line w-55"></div>
+                            </div>
+                        </div>
+                        <div class="usage-chart-grid">
+                            <section class="usage-card usage-card-wide usage-skeleton-block"></section>
+                            <section class="usage-card usage-skeleton-block"></section>
+                            <section class="usage-card usage-skeleton-block"></section>
+                        </div>
+                    </div>
                     <div v-else-if="sessionsUsageError && !sessionsUsageList.length" class="usage-empty">{{ sessionsUsageError }}</div>
                     <div v-else-if="!sessionsUsageList.length" class="usage-empty">暂无可用于统计的会话数据</div>
                     <template v-else>
-                        <div class="usage-summary-grid">
-                            <div v-for="card in sessionUsageSummaryCards" :key="card.key" class="usage-summary-card">
+                        <div class="usage-content" :class="{ 'usage-content-loading': sessionsUsageLoading }">
+                            <div v-if="sessionsUsageLoading" class="usage-content-overlay" aria-live="polite">
+                                <span class="usage-spinner" aria-hidden="true"></span>
+                                正在刷新…
+                            </div>
+
+                            <div class="usage-summary-grid">
+                                <div
+                                    v-for="card in sessionUsageSummaryCards"
+                                    :key="card.key"
+                                    class="usage-summary-card usage-copyable"
+                                    role="button"
+                                    tabindex="0"
+                                    :title="(card.title || card.value) ? `点击复制：${card.title || card.value}` : null"
+                                    @click="(() => { const t = String(card.title || card.value || '').trim(); if (!t) { showMessage('没有可复制内容', 'info'); return; } const ok = typeof fallbackCopyText === 'function' ? fallbackCopyText(t) : false; showMessage(ok ? `已复制：${card.label}` : '复制失败', ok ? 'success' : 'error'); })()"
+                                    @keydown.enter.prevent="(() => { const t = String(card.title || card.value || '').trim(); if (!t) { showMessage('没有可复制内容', 'info'); return; } const ok = typeof fallbackCopyText === 'function' ? fallbackCopyText(t) : false; showMessage(ok ? `已复制：${card.label}` : '复制失败', ok ? 'success' : 'error'); })()"
+                                    @keydown.space.prevent="(() => { const t = String(card.title || card.value || '').trim(); if (!t) { showMessage('没有可复制内容', 'info'); return; } const ok = typeof fallbackCopyText === 'function' ? fallbackCopyText(t) : false; showMessage(ok ? `已复制：${card.label}` : '复制失败', ok ? 'success' : 'error'); })()">
                                 <div class="usage-summary-label">{{ card.label }}</div>
                                 <div class="usage-summary-value" :title="card.title || null">{{ card.value }}</div>
                                 <div v-if="card.note" class="usage-summary-note">{{ card.note }}</div>
+                                </div>
                             </div>
-                        </div>
 
-                        <div class="usage-chart-grid">
-                            <section class="usage-card usage-card-wide usage-card-daily">
+                            <div class="usage-chart-grid">
+                                <section class="usage-card usage-card-wide usage-card-daily">
                                 <div class="usage-card-head">
                                     <div>
                                         <div class="usage-card-title">每天消耗</div>
@@ -70,8 +99,26 @@
                                                 <td class="mono">{{ day.key }}</td>
                                                 <td class="right">{{ day.sessionCount }}</td>
                                                 <td class="right">{{ day.messageCount }}</td>
-                                                <td class="right mono" :title="day.tokenTitle">{{ day.tokenLabel }}</td>
-                                                <td class="right mono" :title="day.costTitle">{{ day.costLabel }}</td>
+                                                <td
+                                                    class="right mono usage-copyable"
+                                                    role="button"
+                                                    tabindex="0"
+                                                    :title="`点击复制：${day.tokenTitle}`"
+                                                    @click="(() => { const t = String(day.tokenTitle || '').trim(); if (!t) { showMessage('没有可复制内容', 'info'); return; } const ok = typeof fallbackCopyText === 'function' ? fallbackCopyText(t) : false; showMessage(ok ? `已复制：Token（${day.key}）` : '复制失败', ok ? 'success' : 'error'); })()"
+                                                    @keydown.enter.prevent="(() => { const t = String(day.tokenTitle || '').trim(); if (!t) { showMessage('没有可复制内容', 'info'); return; } const ok = typeof fallbackCopyText === 'function' ? fallbackCopyText(t) : false; showMessage(ok ? `已复制：Token（${day.key}）` : '复制失败', ok ? 'success' : 'error'); })()"
+                                                    @keydown.space.prevent="(() => { const t = String(day.tokenTitle || '').trim(); if (!t) { showMessage('没有可复制内容', 'info'); return; } const ok = typeof fallbackCopyText === 'function' ? fallbackCopyText(t) : false; showMessage(ok ? `已复制：Token（${day.key}）` : '复制失败', ok ? 'success' : 'error'); })()">
+                                                    {{ day.tokenLabel }}
+                                                </td>
+                                                <td
+                                                    class="right mono usage-copyable"
+                                                    role="button"
+                                                    tabindex="0"
+                                                    :title="`点击复制：${day.costTitle}`"
+                                                    @click="(() => { const t = String(day.costTitle || '').trim(); if (!t || t === '暂无') { showMessage('没有可复制内容', 'info'); return; } const ok = typeof fallbackCopyText === 'function' ? fallbackCopyText(t) : false; showMessage(ok ? `已复制：预估费用（${day.key}）` : '复制失败', ok ? 'success' : 'error'); })()"
+                                                    @keydown.enter.prevent="(() => { const t = String(day.costTitle || '').trim(); if (!t || t === '暂无') { showMessage('没有可复制内容', 'info'); return; } const ok = typeof fallbackCopyText === 'function' ? fallbackCopyText(t) : false; showMessage(ok ? `已复制：预估费用（${day.key}）` : '复制失败', ok ? 'success' : 'error'); })()"
+                                                    @keydown.space.prevent="(() => { const t = String(day.costTitle || '').trim(); if (!t || t === '暂无') { showMessage('没有可复制内容', 'info'); return; } const ok = typeof fallbackCopyText === 'function' ? fallbackCopyText(t) : false; showMessage(ok ? `已复制：预估费用（${day.key}）` : '复制失败', ok ? 'success' : 'error'); })()">
+                                                    {{ day.costLabel }}
+                                                </td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -260,6 +307,7 @@
                                     </div>
                                 </div>
                             </section>
+                            </div>
                         </div>
                     </template>
                 </div>

@@ -99,6 +99,111 @@
     box-shadow: var(--shadow-subtle);
 }
 
+.usage-content {
+    position: relative;
+}
+
+.usage-content-loading {
+    opacity: 0.75;
+}
+
+.usage-content-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    padding: 12px 10px;
+    pointer-events: none;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+}
+
+.usage-spinner {
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    border: 2px solid rgba(80, 90, 100, 0.22);
+    border-top-color: rgba(80, 90, 100, 0.7);
+    margin-right: 8px;
+    animation: usage-spin 0.9s linear infinite;
+}
+
+@keyframes usage-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.usage-copyable {
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.usage-copyable:focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+    border-radius: 10px;
+}
+
+.usage-summary-card.usage-copyable:hover {
+    border-color: var(--color-border);
+    background: linear-gradient(180deg, var(--color-surface-alt), var(--color-surface));
+}
+
+.usage-loading-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.usage-skeleton-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.usage-skeleton-block {
+    position: relative;
+    min-height: 220px;
+    overflow: hidden;
+}
+
+.usage-skeleton-line {
+    height: 10px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(150, 160, 170, 0.12), rgba(150, 160, 170, 0.22), rgba(150, 160, 170, 0.12));
+    background-size: 200% 100%;
+    animation: usage-skeleton 1.2s ease-in-out infinite;
+}
+
+.usage-skeleton-line.h-lg {
+    height: 20px;
+    margin-top: 6px;
+}
+
+.usage-skeleton-line.w-40 { width: 40%; }
+.usage-skeleton-line.w-55 { width: 55%; }
+.usage-skeleton-line.w-70 { width: 70%; }
+
+.usage-skeleton-card .usage-skeleton-line + .usage-skeleton-line {
+    margin-top: 10px;
+}
+
+.usage-skeleton-block::before,
+.usage-skeleton-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 25% 10%, rgba(255, 255, 255, 0.22), transparent 55%);
+    pointer-events: none;
+}
+
+@keyframes usage-skeleton {
+    0% { background-position: 0% 0; }
+    100% { background-position: 200% 0; }
+}
+
 .usage-summary-label {
     min-height: 0;
     font-size: 12px;
