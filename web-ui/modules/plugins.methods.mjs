@@ -52,6 +52,18 @@ function ensureBuiltinTemplates(rawList) {
 
 export function createPluginsMethods() {
     return {
+        resetPromptComposerVarValues() {
+            this.promptComposerVarValuesRaw = {};
+            if (typeof this.$nextTick === 'function') {
+                this.$nextTick(() => {
+                    const first = this.$refs && this.$refs.promptComposerFirstField
+                        ? this.$refs.promptComposerFirstField
+                        : null;
+                    if (first && typeof first.focus === 'function') first.focus();
+                });
+            }
+        },
+
         selectPromptComposerTemplate(id) {
             const next = typeof id === 'string' ? id.trim() : '';
             if (!next) return;

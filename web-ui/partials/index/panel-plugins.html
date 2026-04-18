@@ -80,30 +80,43 @@
                                             <div v-if="!promptComposerActiveTemplate" class="plugins-panel-note">暂无可用模板。</div>
 
                                             <template v-else>
-                                                <label v-for="(name, idx) in (promptComposerActiveTemplate.vars || [])" :key="'compose-var-' + name" class="prompt-var-row">
-                                                    <span class="prompt-var-label mono">{{ name }}</span>
-                                                    <textarea
-                                                        v-if="name === 'code'"
-                                                        :ref="idx === 0 ? 'promptComposerFirstField' : null"
-                                                        class="form-input prompt-compose-code-input"
-                                                        rows="10"
-                                                        spellcheck="false"
-                                                        :value="promptComposerVarValues[name] || ''"
-                                                        @input="setPromptComposerVarValue(name, $event.target.value)"
-                                                        placeholder="把需要润色的代码注释粘贴到这里（支持多行）"></textarea>
-                                                    <input
-                                                        v-else
-                                                        :ref="idx === 0 ? 'promptComposerFirstField' : null"
-                                                        class="form-input prompt-var-input"
-                                                        type="text"
-                                                        :value="promptComposerVarValues[name] || ''"
-                                                        @input="setPromptComposerVarValue(name, $event.target.value)"
-                                                        :placeholder="'请输入 ' + name">
-                                                </label>
+                                                <div class="prompt-vars-block">
+                                                    <div class="prompt-vars-head">
+                                                        <div>
+                                                            <div class="prompt-vars-title">Variables</div>
+                                                            <div class="plugins-panel-note">填写变量后即可生成结果。</div>
+                                                        </div>
+                                                        <button type="button" class="btn-mini" @click="resetPromptComposerVarValues" :disabled="pluginsLoading">重置</button>
+                                                    </div>
+
+                                                    <div v-if="!(promptComposerActiveTemplate.vars || []).length" class="prompt-vars-empty">No variables detected.</div>
+                                                    <div v-else class="prompt-vars-grid">
+                                                        <label v-for="(name, idx) in (promptComposerActiveTemplate.vars || [])" :key="'compose-var-' + name" class="prompt-var-row">
+                                                            <span class="prompt-var-label mono">{{ name }}</span>
+                                                            <textarea
+                                                                v-if="name === 'code'"
+                                                                :ref="idx === 0 ? 'promptComposerFirstField' : null"
+                                                                class="form-input prompt-compose-code-input"
+                                                                rows="10"
+                                                                spellcheck="false"
+                                                                :value="promptComposerVarValues[name] || ''"
+                                                                @input="setPromptComposerVarValue(name, $event.target.value)"
+                                                                placeholder="把需要润色的代码注释粘贴到这里（支持多行）"></textarea>
+                                                            <input
+                                                                v-else
+                                                                :ref="idx === 0 ? 'promptComposerFirstField' : null"
+                                                                class="form-input prompt-var-input"
+                                                                type="text"
+                                                                :value="promptComposerVarValues[name] || ''"
+                                                                @input="setPromptComposerVarValue(name, $event.target.value)"
+                                                                :placeholder="'请输入 ' + name">
+                                                        </label>
+                                                    </div>
+                                                </div>
 
                                                 <div class="prompt-compose-actions">
                                                     <button type="button" class="btn-mini" @click="copyPromptComposerRendered" :disabled="pluginsLoading || !promptComposerRendered">复制</button>
-                                                    <button type="button" class="btn-mini" @click="resetPromptComposer" :disabled="pluginsLoading || !promptComposerRendered">清空</button>
+                                                    <button type="button" class="btn-mini" @click="resetPromptComposerVarValues" :disabled="pluginsLoading || !(promptComposerRendered || '')">清空变量</button>
                                                 </div>
                                             </template>
                                         </div>
