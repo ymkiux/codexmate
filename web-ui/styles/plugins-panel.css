@@ -111,6 +111,183 @@
 }
 
 /* Prompt templates */
+.prompt-templates-modebar {
+    display: inline-flex;
+    gap: 8px;
+    padding: 6px;
+    border: 1px solid rgba(160, 145, 130, 0.18);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.62);
+    margin-bottom: var(--spacing-sm);
+}
+
+.mode-pill {
+    border: 0;
+    border-radius: 999px;
+    padding: 8px 12px;
+    font-size: var(--font-size-caption);
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    background: transparent;
+    color: var(--color-text-tertiary);
+    transition: background var(--transition-fast) var(--ease-spring), color var(--transition-fast) var(--ease-spring), transform var(--transition-fast) var(--ease-spring);
+}
+
+.mode-pill.active {
+    background: linear-gradient(to bottom, rgba(201, 94, 75, 0.18) 0%, rgba(201, 94, 75, 0.08) 100%);
+    color: var(--color-text-secondary);
+}
+
+.mode-pill:hover {
+    transform: translateY(-1px);
+}
+
+.prompt-compose {
+    display: grid;
+    gap: var(--spacing-sm);
+}
+
+.prompt-compose-command-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.prompt-compose-command-input {
+    flex: 1;
+    min-width: 240px;
+}
+
+.prompt-compose-picker {
+    border: 1px solid rgba(160, 145, 130, 0.22);
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.82);
+    box-shadow: var(--shadow-subtle);
+    padding: 12px;
+}
+
+.prompt-compose-picker-head {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.prompt-compose-picker-head .form-input {
+    flex: 1;
+    min-width: 220px;
+}
+
+.prompt-compose-picker-list {
+    display: grid;
+    gap: 10px;
+    max-height: min(44vh, 420px);
+    overflow: auto;
+    padding-right: 2px;
+}
+
+.prompt-compose-picker-item {
+    width: 100%;
+    text-align: left;
+    border: 1px dashed var(--color-border-soft);
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.58);
+    padding: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+    transition: border-color var(--transition-fast) var(--ease-spring), background var(--transition-fast) var(--ease-spring);
+}
+
+.prompt-compose-picker-item:hover {
+    border-color: rgba(201, 94, 75, 0.55);
+}
+
+.prompt-compose-picker-item-title {
+    font-size: var(--font-size-secondary);
+    font-weight: var(--font-weight-secondary);
+    color: var(--color-text-secondary);
+}
+
+.prompt-compose-picker-item-meta {
+    margin-top: 6px;
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+    color: var(--color-text-tertiary);
+    font-size: var(--font-size-caption);
+}
+
+.prompt-compose-picker-item-meta .mono {
+    font-family: var(--font-family-mono);
+}
+
+.prompt-compose-workspace {
+    display: grid;
+    gap: var(--spacing-sm);
+}
+
+.prompt-compose-selected {
+    padding: 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(160, 145, 130, 0.18);
+    background: rgba(255, 255, 255, 0.62);
+}
+
+.prompt-compose-selected-title {
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-secondary);
+    color: var(--color-text-secondary);
+}
+
+.prompt-compose-selected-meta {
+    margin-top: 6px;
+    font-size: var(--font-size-caption);
+    color: var(--color-text-tertiary);
+    line-height: 1.5;
+}
+
+.prompt-compose-canvas {
+    padding: 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(160, 145, 130, 0.18);
+    background: rgba(255, 255, 255, 0.62);
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-caption);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.prompt-fragment-text {
+    color: var(--color-text-secondary);
+}
+
+.prompt-fragment-var {
+    display: inline-block;
+    vertical-align: baseline;
+    min-width: 120px;
+    max-width: 100%;
+    padding: 6px 8px;
+    margin: 0 4px;
+    border-radius: 10px;
+    border: 1px solid rgba(201, 94, 75, 0.45);
+    background: rgba(255, 243, 236, 0.9);
+    color: var(--color-text-primary);
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-caption);
+    line-height: 1.4;
+    resize: vertical;
+}
+
+.prompt-fragment-var:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(201, 94, 75, 0.16);
+}
+
 .prompt-templates-grid {
     display: grid;
     grid-template-columns: minmax(260px, 360px) minmax(0, 1fr);
@@ -283,4 +460,3 @@
         grid-template-columns: 1fr;
     }
 }
-

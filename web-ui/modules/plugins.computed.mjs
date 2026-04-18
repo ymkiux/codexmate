@@ -31,6 +31,33 @@ function parseTemplateVariables(templateText) {
     return Array.from(vars).sort((a, b) => a.localeCompare(b, 'en-US'));
 }
 
+function parseTemplateParts(templateText) {
+    const text = typeof templateText === 'string' ? templateText : '';
+    const parts = [];
+    const re = /\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g;
+    let lastIndex = 0;
+    for (;;) {
+        const match = re.exec(text);
+        if (!match) break;
+        const matchIndex = match.index;
+        if (matchIndex > lastIndex) {
+            parts.push({ type: 'text', value: text.slice(lastIndex, matchIndex) });
+        }
+        const name = String(match[1] || '').trim();
+        parts.push({ type: 'var', name: name || '' });
+        lastIndex = matchIndex + match[0].length;
+    }
+    if (lastIndex < text.length) {
+        parts.push({ type: 'text', value: text.slice(lastIndex) });
+    }
+    return parts.filter((part) => {
+        if (!part) return false;
+        if (part.type === 'text') return typeof part.value === 'string' && part.value.length > 0;
+        if (part.type === 'var') return typeof part.name === 'string' && part.name.trim().length > 0;
+        return false;
+    });
+}
+
 function formatIsoDateLabel(iso) {
     if (!iso) return '';
     const ms = Date.parse(iso);
@@ -129,7 +156,47 @@ export function createPluginsComputed() {
             const draft = this.promptTemplateDraft;
             if (!draft) return '';
             return renderTemplate(draft.template, this.promptTemplateVarValues);
+        },
+
+        promptComposerVarValues() {
+            const values = this.promptComposerVarValuesRaw;
+            return values && typeof values === 'object' ? values : {};
+        },
+
+        promptComposerActiveTemplate() {
+            const id = typeof this.promptComposerSelectedTemplateId === 'string'
+                ? this.promptComposerSelectedTemplateId.trim()
+                : '';
+            if (!id) return null;
+            const list = this.promptTemplatesList;
+            return list.find((item) => item.id === id) || null;
+        },
+
+        promptComposerParts() {
+            const tpl = this.promptComposerActiveTemplate;
+            if (!tpl) return [];
+            return parseTemplateParts(tpl.template);
+        },
+
+        promptComposerRendered() {
+            const tpl = this.promptComposerActiveTemplate;
+            if (!tpl) return '';
+            return renderTemplate(tpl.template, this.promptComposerVarValues);
+        },
+
+        promptComposerPickerList() {
+            const keyword = typeof this.promptComposerPickerKeyword === 'string'
+                ? this.promptComposerPickerKeyword.trim().toLowerCase()
+                : '';
+            const list = this.promptTemplatesList;
+            if (!keyword) return list;
+            return list.filter((item) => {
+                return (
+                    item.name.toLowerCase().includes(keyword)
+                    || (item.description && item.description.toLowerCase().includes(keyword))
+                    || item.vars.some((v) => v.toLowerCase().includes(keyword))
+                );
+            });
         }
     };
 }
-
