@@ -357,4 +357,6 @@
     font-size: 11px;
     line-height: 1.1;
     box-shadow: none;
+    min-height: 30px;
+    white-space: nowrap;
 }
