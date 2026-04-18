@@ -222,6 +222,20 @@
     flex-wrap: wrap;
 }
 
+/* 缩减顶部操作按钮尺寸（刷新概览 / 打开 Skills 管理），并确保两者对齐 */
+.selector-header.market-overview-header .market-header-actions .btn-tool-compact,
+.selector-header.market-overview-header .market-header-actions .btn-tool.btn-tool-compact {
+    min-height: 22px !important;
+    padding: 2px 7px !important;
+    font-size: 10px !important;
+    line-height: 1 !important;
+    white-space: nowrap;
+    width: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .market-target-switch {
     display: flex;
     flex-wrap: wrap;

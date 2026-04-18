@@ -86,6 +86,7 @@ export function switchMainTab(tab) {
     const enteringSessionsTab = nextTab === 'sessions';
     const enteringUsageTab = nextTab === 'usage';
     const enteringOrchestrationTab = nextTab === 'orchestration';
+    const enteringPluginsTab = nextTab === 'plugins';
     emitSessionLoadDebug(this, 'switchMainTab:start', `from=${previousTab}\nto=${nextTab}`);
     this.mainTab = nextTab;
 
@@ -184,6 +185,19 @@ export function switchMainTab(tab) {
             marketOverviewLoad = null;
         }
         void Promise.resolve(marketOverviewLoad).catch(() => {});
+    }
+    if (enteringPluginsTab && typeof this.loadPluginsOverview === 'function') {
+        // Default behavior: always land on Prompt Templates + Compose when entering Plugins.
+        this.pluginsActiveId = 'prompt-templates';
+        this.promptTemplatesMode = 'compose';
+        this.promptComposerPickerVisible = false;
+        let pluginsLoad = null;
+        try {
+            pluginsLoad = this.loadPluginsOverview({ silent: true });
+        } catch (_) {
+            pluginsLoad = null;
+        }
+        void Promise.resolve(pluginsLoad).catch(() => {});
     }
     if (nextTab === 'config' && this.configMode === 'claude') {
         const expectedTab = nextTab;

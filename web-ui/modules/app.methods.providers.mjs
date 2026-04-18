@@ -394,7 +394,10 @@ export function createProvidersMethods(options = {}) {
         },
 
         displayApiKey(configName) {
-            const key = this.claudeConfigs[configName]?.apiKey;
+            const config = this.claudeConfigs && this.claudeConfigs[configName]
+                ? this.claudeConfigs[configName]
+                : null;
+            const key = config ? config.apiKey : '';
             return this.formatKey(key);
         }
     };
