@@ -54,6 +54,106 @@ function buildBuiltinMisakaTemplate() {
 
 export function createPluginsMethods() {
     return {
+        onPromptComposerKeydown(event) {
+            const e = event || null;
+            if (!e || e.key !== 'Enter') return;
+            if (e.shiftKey) return;
+            const value = typeof this.promptComposerCommand === 'string' ? this.promptComposerCommand.trim() : '';
+            if (value !== '/plugin' && value !== '/plugins') return;
+            e.preventDefault();
+            this.openPromptComposerPicker();
+        },
+
+        onPromptComposerPickerKeydown(event) {
+            const e = event || null;
+            if (!e) return;
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                this.closePromptComposerPicker();
+            }
+        },
+
+        openPromptComposerPicker() {
+            this.promptComposerPickerVisible = true;
+            this.promptComposerPickerKeyword = '';
+            if (typeof this.$nextTick === 'function') {
+                this.$nextTick(() => {
+                    const input = this.$refs && this.$refs.promptComposerPickerSearch
+                        ? this.$refs.promptComposerPickerSearch
+                        : null;
+                    if (input && typeof input.focus === 'function') input.focus();
+                });
+            }
+        },
+
+        closePromptComposerPicker() {
+            this.promptComposerPickerVisible = false;
+            if (typeof this.$nextTick === 'function') {
+                this.$nextTick(() => {
+                    const input = this.$refs && this.$refs.promptComposerCommandInput
+                        ? this.$refs.promptComposerCommandInput
+                        : null;
+                    if (input && typeof input.focus === 'function') input.focus();
+                });
+            }
+        },
+
+        usePromptTemplateInComposer(id) {
+            const next = typeof id === 'string' ? id.trim() : '';
+            if (!next) return;
+            this.promptComposerSelectedTemplateId = next;
+            this.promptComposerVarValuesRaw = {};
+            this.promptComposerCommand = '';
+            this.promptComposerPickerVisible = false;
+            this.promptTemplatesMode = 'compose';
+            if (typeof this.$nextTick === 'function') {
+                this.$nextTick(() => {
+                    const firstVar = document.querySelector('.prompt-fragment-var');
+                    if (firstVar && typeof firstVar.focus === 'function') firstVar.focus();
+                });
+            }
+        },
+
+        resetPromptComposer() {
+            this.promptComposerCommand = '';
+            this.promptComposerSelectedTemplateId = '';
+            this.promptComposerVarValuesRaw = {};
+            this.promptComposerPickerVisible = false;
+            this.promptComposerPickerKeyword = '';
+        },
+
+        setPromptComposerVarValue(name, value) {
+            const key = typeof name === 'string' ? name.trim() : '';
+            if (!key) return;
+            const current = this.promptComposerVarValuesRaw && typeof this.promptComposerVarValuesRaw === 'object'
+                ? this.promptComposerVarValuesRaw
+                : {};
+            const next = { ...current };
+            next[key] = value == null ? '' : String(value);
+            this.promptComposerVarValuesRaw = next;
+        },
+
+        async copyPromptComposerRendered() {
+            const text = typeof this.promptComposerRendered === 'string' ? this.promptComposerRendered.trim() : '';
+            if (!text) {
+                this.showMessage('Nothing to copy', 'info');
+                return;
+            }
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(text);
+                    this.showMessage('Copied', 'success');
+                    return;
+                }
+            } catch (_) {}
+            const ok = typeof this.fallbackCopyText === 'function' ? this.fallbackCopyText(text) : false;
+            if (ok) {
+                this.showMessage('Copied', 'success');
+                return;
+            }
+            this.showMessage('Copy failed', 'error');
+        },
+
         selectPlugin(pluginId) {
             const id = typeof pluginId === 'string' ? pluginId.trim() : '';
             if (!id) return;
@@ -83,6 +183,10 @@ export function createPluginsMethods() {
                 this.promptTemplatesLoadedOnce = true;
                 if (!this.pluginsActiveId) {
                     this.pluginsActiveId = 'prompt-templates';
+                }
+
+                if (!this.promptTemplatesMode) {
+                    this.promptTemplatesMode = 'compose';
                 }
 
                 const currentSelected = typeof this.promptTemplateSelectedId === 'string'
@@ -115,6 +219,7 @@ export function createPluginsMethods() {
             const entry = list.find((item) => item.id === next);
             if (!entry) return;
             this.promptTemplateSelectedId = next;
+            this.promptTemplatesMode = 'manage';
             this.promptTemplateDraftRaw = {
                 id: entry.id,
                 name: entry.name,

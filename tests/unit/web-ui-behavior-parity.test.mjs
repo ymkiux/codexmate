@@ -378,7 +378,13 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'promptTemplatesKeyword',
         'promptTemplateSelectedId',
         'promptTemplateDraftRaw',
-        'promptTemplateVarValuesRaw'
+        'promptTemplateVarValuesRaw',
+        'promptTemplatesMode',
+        'promptComposerCommand',
+        'promptComposerPickerVisible',
+        'promptComposerPickerKeyword',
+        'promptComposerSelectedTemplateId',
+        'promptComposerVarValuesRaw'
     );
     if (parityAgainstHead) {
         const allowedExtraKeySet = new Set(allowedExtraCurrentKeys);
@@ -472,7 +478,15 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'deletePromptTemplate',
         'exportPromptTemplates',
         'triggerPromptTemplatesImport',
-        'handlePromptTemplatesImportChange'
+        'handlePromptTemplatesImportChange',
+        'onPromptComposerKeydown',
+        'onPromptComposerPickerKeydown',
+        'openPromptComposerPicker',
+        'closePromptComposerPicker',
+        'usePromptTemplateInComposer',
+        'resetPromptComposer',
+        'setPromptComposerVarValue',
+        'copyPromptComposerRendered'
     );
     const allowedMissingCurrentMethodKeys = [
         'closeInstallModal',
@@ -526,6 +540,11 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'promptTemplateVars',
         'promptTemplateVarValues',
         'renderedPrompt',
+        'promptComposerVarValues',
+        'promptComposerActiveTemplate',
+        'promptComposerParts',
+        'promptComposerRendered',
+        'promptComposerPickerList',
         'sessionUsageDaily',
         'sessionUsageDailyTableRows',
         'taskOrchestrationSelectedRun',
