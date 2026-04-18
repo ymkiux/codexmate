@@ -215,6 +215,13 @@ codexmate codex --model gpt-5.3-codex --follow-up "step1" --follow-up "step2"
 - Apply to `~/.openclaw/openclaw.json`
 - Manage `~/.openclaw/workspace/AGENTS.md`
 
+### Plugins Mode (Prompt Templates)
+- Entry: switch to **Plugins** → **Prompt Templates**
+- Manage custom templates (JSON import/export)
+- Variables: in **Manage**, you can “Add variable” (inserts `{{var}}`) and fill variable values in the Variables panel
+- Generate & copy: after filling variables, copy the final rendered prompt from **Preview**
+- Built-in template: ships a single read-only template for light code-comment polishing
+
 ### Sessions Mode
 - Unified Codex + Claude sessions
 - Browser / Usage subview switching

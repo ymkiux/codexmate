@@ -216,6 +216,13 @@ codexmate codex --model gpt-5.3-codex --follow-up "步骤1" --follow-up "步骤2
 - 应用到 `~/.openclaw/openclaw.json`
 - 管理 `~/.openclaw/workspace/AGENTS.md`
 
+### Plugins 模式（提示词模板）
+- 入口：顶部切到 **Plugins** → **提示词模板**
+- 支持管理自定义模板（导入/导出 JSON）
+- 变量管理：在 **管理** 中可“新增变量”（插入 `{{var}}`），并在 Variables 区填写变量值
+- 生成与复制：变量填写后可在 **Preview** 里一键复制最终提示词
+- 内置模板：仅提供一个“代码注释润色”，只读不可编辑
+
 ### 会话模式
 - Codex + Claude 会话统一列表
 - Browser / Usage 双子视图切换
