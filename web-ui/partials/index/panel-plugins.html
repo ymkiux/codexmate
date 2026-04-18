@@ -193,14 +193,17 @@
                                         <template v-else>
                                             <div class="prompt-editor-head">
                                                 <div class="prompt-editor-title-row">
-                                                    <input class="form-input prompt-editor-name" type="text" v-model.trim="promptTemplateDraft.name" placeholder="Template name" aria-label="Template name">
+                                                    <input class="form-input prompt-editor-name" type="text" v-model.trim="promptTemplateDraft.name" :disabled="promptTemplateDraft.isBuiltin" placeholder="Template name" aria-label="Template name">
                                                     <div class="prompt-editor-actions">
                                                         <button type="button" class="btn-mini" @click="duplicatePromptTemplate" :disabled="pluginsLoading">Duplicate</button>
                                                         <button type="button" class="btn-mini delete" @click="deletePromptTemplate" :disabled="pluginsLoading || promptTemplateDraft.isBuiltin">Delete</button>
-                                                        <button type="button" class="btn-mini" @click="savePromptTemplate" :disabled="pluginsLoading">Save</button>
+                                                        <button type="button" class="btn-mini" @click="savePromptTemplate" :disabled="pluginsLoading || promptTemplateDraft.isBuiltin">Save</button>
                                                     </div>
                                                 </div>
-                                                <input class="form-input" type="text" v-model.trim="promptTemplateDraft.description" placeholder="Description (optional)" aria-label="Template description">
+                                                <div v-if="promptTemplateDraft.isBuiltin" class="plugins-panel-note">
+                                                    内置模板为只读。如需修改请先 Duplicate 成自定义模板。
+                                                </div>
+                                                <input class="form-input" type="text" v-model.trim="promptTemplateDraft.description" :disabled="promptTemplateDraft.isBuiltin" placeholder="Description (optional)" aria-label="Template description">
                                             </div>
 
                                             <div class="prompt-editor-body">
@@ -208,6 +211,7 @@
                                                 <textarea
                                                     class="form-input prompt-editor-textarea"
                                                     v-model="promptTemplateDraft.template"
+                                                    :disabled="promptTemplateDraft.isBuiltin"
                                                     rows="10"
                                                     spellcheck="false"
                                                     aria-label="Template body"
