@@ -173,9 +173,9 @@
                                                             <div class="prompt-vars-title">Variables</div>
                                                             <div class="plugins-panel-note">Detected from the template. Fill them to render the final prompt.</div>
                                                         </div>
-                                                        <div class="prompt-editor-actions">
-                                                            <button type="button" class="btn-mini" @click="addPromptTemplateVariable" :disabled="pluginsLoading || promptTemplateDraft.isBuiltin">新增变量</button>
-                                                            <button type="button" class="btn-mini" @click="resetPromptVariableValues" :disabled="pluginsLoading || promptTemplateDraft.isBuiltin">Reset</button>
+                                                        <div v-if="!promptTemplateDraft.isBuiltin" class="prompt-editor-actions">
+                                                            <button type="button" class="btn-mini" @click="addPromptTemplateVariable" :disabled="pluginsLoading">新增变量</button>
+                                                            <button type="button" class="btn-mini" @click="resetPromptVariableValues" :disabled="pluginsLoading">Reset</button>
                                                         </div>
                                                     </div>
 
