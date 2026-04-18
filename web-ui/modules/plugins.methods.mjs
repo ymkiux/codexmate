@@ -28,17 +28,41 @@ function normalizePromptTemplateDraft(draft) {
 function buildBuiltinMisakaTemplate() {
     return {
         id: 'builtin_misaka',
-        name: '代码注释润色',
-        description: '轻微收敛以下代码注释 {{code}}',
+        name: 'Use Skill: 御坂',
+        description: '快速调用御坂技能（在 {{input}} 中填写你的需求）',
         template: [
-            '轻微收敛以下代码注释',
+            'Use Skill: 御坂',
             '',
-            '{{code}}'
+            '{{input}}'
         ].join('\n'),
         createdAt: nowIso(),
         updatedAt: nowIso(),
         isBuiltin: true
     };
+}
+
+function buildBuiltinFrontendDesignTemplate() {
+    return {
+        id: 'builtin_frontend_design',
+        name: 'Use Skill: frontend-design',
+        description: '快速调用 frontend-design（在 {{input}} 中填写 UI / 组件需求）',
+        template: [
+            'Use Skill: frontend-design',
+            '',
+            '{{input}}'
+        ].join('\n'),
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+        isBuiltin: true
+    };
+}
+
+function ensureBuiltinTemplates(rawList) {
+    const list = Array.isArray(rawList) ? rawList.filter(Boolean) : [];
+    const builtins = [buildBuiltinMisakaTemplate(), buildBuiltinFrontendDesignTemplate()];
+    const builtinIdSet = new Set(builtins.map((tpl) => tpl.id));
+    const rest = list.filter((item) => !(item && item.isBuiltin === true && builtinIdSet.has(item.id)));
+    return [...builtins, ...rest];
 }
 
 export function createPluginsMethods() {
@@ -207,14 +231,10 @@ export function createPluginsMethods() {
             this.pluginsLoading = true;
             try {
                 const rawList = readPromptTemplatesFromStorage(localStorage);
-                const normalized = Array.isArray(rawList) ? rawList : [];
-                if (!normalized.length) {
-                    const builtins = [buildBuiltinMisakaTemplate()];
-                    this.promptTemplatesListRaw = builtins;
-                    persistPromptTemplatesToStorage(builtins, localStorage);
-                } else {
-                    this.promptTemplatesListRaw = normalized;
-                }
+                const normalized = ensureBuiltinTemplates(rawList);
+                this.promptTemplatesListRaw = normalized;
+                // Keep built-in templates in sync (and ensure they exist).
+                persistPromptTemplatesToStorage(normalized, localStorage);
 
                 this.promptTemplatesLoadedOnce = true;
                 if (!this.pluginsActiveId) {
@@ -227,18 +247,23 @@ export function createPluginsMethods() {
                 if (this.promptTemplatesMode !== 'compose' && this.promptTemplatesMode !== 'manage') {
                     this.promptTemplatesMode = 'compose';
                 }
-
-                const currentSelected = typeof this.promptTemplateSelectedId === 'string'
-                    ? this.promptTemplateSelectedId
-                    : '';
-                const first = Array.isArray(this.promptTemplatesList) && this.promptTemplatesList.length
-                    ? this.promptTemplatesList[0]
-                    : null;
-                if (!currentSelected && first) {
-                    this.selectPromptTemplate(first.id);
+                if (this.mainTab === 'plugins') {
+                    // UX default: always start from Compose when user enters Plugins.
+                    this.promptTemplatesMode = 'compose';
                 }
-                if (!silent && normalized.length === 0) {
-                    this.showMessage('Initialized with a built-in template.', 'success');
+
+                // In Compose mode we keep the flow lightweight and do not auto-select a template.
+                // In Manage mode we can auto-select the first template for convenience.
+                if (this.promptTemplatesMode === 'manage') {
+                    const currentSelected = typeof this.promptTemplateSelectedId === 'string'
+                        ? this.promptTemplateSelectedId
+                        : '';
+                    const first = Array.isArray(this.promptTemplatesList) && this.promptTemplatesList.length
+                        ? this.promptTemplatesList[0]
+                        : null;
+                    if (!currentSelected && first) {
+                        this.selectPromptTemplate(first.id);
+                    }
                 }
 
                 // When entering the Plugins tab, focus the command input by default (better UX).
