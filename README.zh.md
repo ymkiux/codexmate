@@ -92,6 +92,7 @@ flowchart LR
       CFG["配置管理"]
       SESS["会话/Usage 管理"]
       SKL["Skills 管理"]
+      PLG["插件：提示词模板"]
     end
 
     subgraph Files["只操作你的本地文件（可审计/可回滚）"]
@@ -100,15 +101,18 @@ flowchart LR
       OPENCLAW["~/.openclaw/*.json5 + ~/.openclaw/openclaw.json + workspace/AGENTS.md"]
       SKILLS["~/.{codex,claude,agents}/skills"]
       SESSFILES["sessions / usage / trash / runs"]
+      BROWSER["浏览器存储（模板）"]
     end
 
     CLI --> API
     WEB --> API
     MCP --> API
+    WEB --> PLG
 
     API --> CFG
     API --> SESS
     API --> SKL
+    PLG --> BROWSER
 
     CFG --> CODEX
     CFG --> CLAUDE
@@ -124,6 +128,7 @@ flowchart LR
 | 配置管理（Codex / Claude / OpenClaw） | `~/.codex/*`、`~/.claude/settings.json`、`~/.claude/CLAUDE.md`、`~/.openclaw/*` | 一键切换 provider/model、管理多套配置、写入前后可控与可回滚 |
 | 会话与 Usage | sessions / usage 聚合 / trash | 更快定位会话、筛选导出、批量清理、查看趋势与占比 |
 | Skills 市场 | `~/.{codex,claude,agents}/skills` | 本地安装/导入/导出/分发（ZIP），跨应用复用更省事 |
+| 插件（提示词模板） | 浏览器存储 | 可复用的提示词模板（变量 + 一键复制） |
 | MCP（stdio） | 本地 API / 文件能力 | 让外部工具以“可控权限”调用本地能力（默认只读） |
 
 ## 快速开始

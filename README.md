@@ -89,6 +89,7 @@ flowchart LR
       CFG["Config management"]
       SESS["Sessions & Usage"]
       SKL["Skills management"]
+      PLG["Plugins: Prompt templates"]
     end
 
     subgraph Files["Local files only (auditable & reversible)"]
@@ -97,15 +98,18 @@ flowchart LR
       OPENCLAW["~/.openclaw/*.json5 + ~/.openclaw/openclaw.json + workspace/AGENTS.md"]
       SKILLS["~/.{codex,claude,agents}/skills"]
       STATE["sessions / usage / trash / runs"]
+      BROWSER["Browser storage (templates)"]
     end
 
     CLI --> API
     WEB --> API
     MCP --> API
+    WEB --> PLG
 
     API --> CFG
     API --> SESS
     API --> SKL
+    PLG --> BROWSER
 
     CFG --> CODEX
     CFG --> CLAUDE
@@ -121,6 +125,7 @@ flowchart LR
 | Config management (Codex / Claude / OpenClaw) | `~/.codex/*`, `~/.claude/settings.json`, `~/.claude/CLAUDE.md`, `~/.openclaw/*` | Faster provider/model switching, multi-profile management, safer writes with backups |
 | Sessions & Usage | sessions / usage aggregates / trash | Quickly locate sessions, filter/export, batch cleanup, and view trends |
 | Skills market | `~/.{codex,claude,agents}/skills` | Local install/import/export (ZIP), cross-app reuse |
+| Plugins (Prompt templates) | Browser storage | Reusable prompt templates with variables and one-click copy |
 | MCP (stdio) | local API + file operations | Integrate with external tools under controllable permissions (read-only by default) |
 
 ## Quick Start
