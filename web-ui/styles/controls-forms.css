@@ -353,10 +353,10 @@
 }
 
 .selector-header .btn-tool-compact {
-    padding: 5px 8px;
-    font-size: 11px;
-    line-height: 1.1;
+    padding: 3px 7px;
+    font-size: 10px;
+    line-height: 1;
     box-shadow: none;
-    min-height: 30px;
+    min-height: 24px;
     white-space: nowrap;
 }

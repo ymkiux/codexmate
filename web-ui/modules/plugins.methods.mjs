@@ -352,6 +352,31 @@ export function createPluginsMethods() {
             this.promptTemplateVarValuesRaw = {};
         },
 
+        addPromptTemplateVariable() {
+            const draft = normalizePromptTemplateDraft(this.promptTemplateDraftRaw);
+            if (!draft || !draft.id) return;
+            if (draft.isBuiltin) {
+                this.showMessage('内置模板不可编辑', 'error');
+                return;
+            }
+            const name = window.prompt('请输入变量名（仅字母/数字/下划线/中划线/点）', 'var');
+            const key = typeof name === 'string' ? name.trim() : '';
+            if (!key) return;
+            if (!/^[a-zA-Z0-9_.-]+$/.test(key)) {
+                this.showMessage('变量名不合法', 'error');
+                return;
+            }
+            const placeholder = `{{${key}}}`;
+            const current = typeof draft.template === 'string' ? draft.template : '';
+            if (current.includes(placeholder)) {
+                this.showMessage('变量已存在', 'info');
+                return;
+            }
+            const nextText = current && !current.endsWith('\n') ? `${current}\n${placeholder}\n` : `${current}${placeholder}\n`;
+            this.promptTemplateDraftRaw = { ...draft, template: nextText };
+            this.showMessage('已添加变量', 'success');
+        },
+
         setPromptVariableValue(name, value) {
             const key = typeof name === 'string' ? name.trim() : '';
             if (!key) return;

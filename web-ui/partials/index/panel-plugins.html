@@ -78,47 +78,14 @@
                                             </select>
 
                                             <div v-if="!promptComposerActiveTemplate" class="plugins-panel-note">暂无可用模板。</div>
-
-                                            <template v-else>
-                                                <div class="prompt-vars-block">
-                                                    <div class="prompt-vars-head">
-                                                        <div>
-                                                            <div class="prompt-vars-title">Variables</div>
-                                                            <div class="plugins-panel-note">填写变量后即可生成结果。</div>
-                                                        </div>
-                                                        <button type="button" class="btn-mini" @click="resetPromptComposerVarValues" :disabled="pluginsLoading">重置</button>
-                                                    </div>
-
-                                                    <div v-if="!(promptComposerActiveTemplate.vars || []).length" class="prompt-vars-empty">No variables detected.</div>
-                                                    <div v-else class="prompt-vars-grid">
-                                                        <label v-for="(name, idx) in (promptComposerActiveTemplate.vars || [])" :key="'compose-var-' + name" class="prompt-var-row">
-                                                            <span class="prompt-var-label mono">{{ name }}</span>
-                                                            <textarea
-                                                                v-if="name === 'code'"
-                                                                :ref="idx === 0 ? 'promptComposerFirstField' : null"
-                                                                class="form-input prompt-compose-code-input"
-                                                                rows="10"
-                                                                spellcheck="false"
-                                                                :value="promptComposerVarValues[name] || ''"
-                                                                @input="setPromptComposerVarValue(name, $event.target.value)"
-                                                                placeholder="把需要润色的代码注释粘贴到这里（支持多行）"></textarea>
-                                                            <input
-                                                                v-else
-                                                                :ref="idx === 0 ? 'promptComposerFirstField' : null"
-                                                                class="form-input prompt-var-input"
-                                                                type="text"
-                                                                :value="promptComposerVarValues[name] || ''"
-                                                                @input="setPromptComposerVarValue(name, $event.target.value)"
-                                                                :placeholder="'请输入 ' + name">
-                                                        </label>
-                                                    </div>
-                                                </div>
-
-                                                <div class="prompt-compose-actions">
-                                                    <button type="button" class="btn-mini" @click="copyPromptComposerRendered" :disabled="pluginsLoading || !promptComposerRendered">复制</button>
-                                                    <button type="button" class="btn-mini" @click="resetPromptComposerVarValues" :disabled="pluginsLoading || !(promptComposerRendered || '')">清空变量</button>
-                                                </div>
-                                            </template>
+                                            <div v-else class="plugins-panel-note">变量填写与新增请在「管理」中进行。</div>
+                                            <div class="prompt-compose-actions">
+                                                <button
+                                                    type="button"
+                                                    class="btn-mini"
+                                                    @click="selectPromptTemplate(promptComposerSelectedTemplateId)"
+                                                    :disabled="pluginsLoading || !promptComposerSelectedTemplateId">去管理填写变量</button>
+                                            </div>
                                         </div>
 
                                         <div class="prompt-preview-block prompt-compose-preview">
@@ -177,14 +144,14 @@
                                             <div class="prompt-editor-head">
                                                 <div class="prompt-editor-title-row">
                                                     <input class="form-input prompt-editor-name" type="text" v-model.trim="promptTemplateDraft.name" :disabled="promptTemplateDraft.isBuiltin" placeholder="Template name" aria-label="Template name">
-                                                    <div class="prompt-editor-actions">
-                                                        <button type="button" class="btn-mini" @click="duplicatePromptTemplate" :disabled="pluginsLoading || promptTemplateDraft.isBuiltin">Duplicate</button>
-                                                        <button type="button" class="btn-mini delete" @click="deletePromptTemplate" :disabled="pluginsLoading || promptTemplateDraft.isBuiltin">Delete</button>
-                                                        <button type="button" class="btn-mini" @click="savePromptTemplate" :disabled="pluginsLoading || promptTemplateDraft.isBuiltin">Save</button>
+                                                    <div v-if="!promptTemplateDraft.isBuiltin" class="prompt-editor-actions">
+                                                        <button type="button" class="btn-mini" @click="duplicatePromptTemplate" :disabled="pluginsLoading">Duplicate</button>
+                                                        <button type="button" class="btn-mini delete" @click="deletePromptTemplate" :disabled="pluginsLoading">Delete</button>
+                                                        <button type="button" class="btn-mini" @click="savePromptTemplate" :disabled="pluginsLoading">Save</button>
                                                     </div>
                                                 </div>
                                                 <div v-if="promptTemplateDraft.isBuiltin" class="plugins-panel-note">
-                                                    内置模板为只读。如需修改请先 Duplicate 成自定义模板。
+                                                    内置模板为只读，不支持编辑/保存/删除/复制。
                                                 </div>
                                                 <input class="form-input" type="text" v-model.trim="promptTemplateDraft.description" :disabled="promptTemplateDraft.isBuiltin" placeholder="Description (optional)" aria-label="Template description">
                                             </div>
@@ -206,14 +173,17 @@
                                                             <div class="prompt-vars-title">Variables</div>
                                                             <div class="plugins-panel-note">Detected from the template. Fill them to render the final prompt.</div>
                                                         </div>
-                                                        <button type="button" class="btn-mini" @click="resetPromptVariableValues" :disabled="pluginsLoading">Reset</button>
+                                                        <div class="prompt-editor-actions">
+                                                            <button type="button" class="btn-mini" @click="addPromptTemplateVariable" :disabled="pluginsLoading || promptTemplateDraft.isBuiltin">新增变量</button>
+                                                            <button type="button" class="btn-mini" @click="resetPromptVariableValues" :disabled="pluginsLoading || promptTemplateDraft.isBuiltin">Reset</button>
+                                                        </div>
                                                     </div>
 
                                                     <div v-if="!promptTemplateVars.length" class="prompt-vars-empty">No variables detected.</div>
                                                     <div v-else class="prompt-vars-grid">
                                                         <label v-for="name in promptTemplateVars" :key="'prompt-var-' + name" class="prompt-var-row">
                                                             <span class="prompt-var-label mono">{{ name }}</span>
-                                                            <input class="form-input prompt-var-input" type="text" :value="promptTemplateVarValues[name] || ''" @input="setPromptVariableValue(name, $event.target.value)" :placeholder="'Value for ' + name">
+                                                            <input class="form-input prompt-var-input" type="text" :disabled="promptTemplateDraft.isBuiltin" :value="promptTemplateVarValues[name] || ''" @input="setPromptVariableValue(name, $event.target.value)" :placeholder="'Value for ' + name">
                                                         </label>
                                                     </div>
                                                 </div>
