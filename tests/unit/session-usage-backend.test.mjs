@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
 const fs = require('fs');
-const usageCore = require(path.join(__dirname, '..', '..', 'lib', 'cli-session-usage.js'));
+const usageCore = require(path.join(__dirname, '..', '..', 'cli', 'session-usage.js'));
 
 const cliPath = path.join(__dirname, '..', '..', 'cli.js');
 const cliContent = fs.readFileSync(cliPath, 'utf-8');

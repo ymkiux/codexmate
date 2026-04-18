@@ -138,7 +138,7 @@ const {
     extractSessionDetailPreviewFromTailText,
     extractSessionDetailPreviewFromFileFast
 } = require('./lib/cli-sessions');
-const { listSessionUsageCore } = require('./lib/cli-session-usage');
+const { listSessionUsageCore } = require('./cli/session-usage');
 const {
     readBundledWebUiCss,
     readBundledWebUiHtml,
