@@ -25,31 +25,15 @@ function normalizePromptTemplateDraft(draft) {
     };
 }
 
-function buildBuiltinMisakaTemplate() {
+function buildBuiltinCommentPolishTemplate() {
     return {
-        id: 'builtin_misaka',
-        name: 'Use Skill: 御坂',
-        description: '快速调用御坂技能（在 {{input}} 中填写你的需求）',
+        id: 'builtin_comment_polish',
+        name: '代码注释润色',
+        description: '轻微收敛以下代码注释 {{code}}',
         template: [
-            'Use Skill: 御坂',
+            '轻微收敛以下代码注释',
             '',
-            '{{input}}'
-        ].join('\n'),
-        createdAt: nowIso(),
-        updatedAt: nowIso(),
-        isBuiltin: true
-    };
-}
-
-function buildBuiltinFrontendDesignTemplate() {
-    return {
-        id: 'builtin_frontend_design',
-        name: 'Use Skill: frontend-design',
-        description: '快速调用 frontend-design（在 {{input}} 中填写 UI / 组件需求）',
-        template: [
-            'Use Skill: frontend-design',
-            '',
-            '{{input}}'
+            '{{code}}'
         ].join('\n'),
         createdAt: nowIso(),
         updatedAt: nowIso(),
@@ -59,7 +43,7 @@ function buildBuiltinFrontendDesignTemplate() {
 
 function ensureBuiltinTemplates(rawList) {
     const list = Array.isArray(rawList) ? rawList.filter(Boolean) : [];
-    const builtins = [buildBuiltinMisakaTemplate(), buildBuiltinFrontendDesignTemplate()];
+    const builtins = [buildBuiltinCommentPolishTemplate()];
     const builtinIdSet = new Set(builtins.map((tpl) => tpl.id));
     // Built-ins are fixed and should not be overridden (even if user imports a conflicting id).
     const rest = list.filter((item) => !(item && builtinIdSet.has(item.id)));
@@ -253,6 +237,16 @@ export function createPluginsMethods() {
                     this.promptTemplatesMode = 'compose';
                 }
 
+                // With a single built-in template, Compose should be ready-to-use without extra steps.
+                if (this.mainTab === 'plugins' && this.promptTemplatesMode === 'compose') {
+                    if (!this.promptComposerSelectedTemplateId) {
+                        this.promptComposerSelectedTemplateId = 'builtin_comment_polish';
+                    }
+                    if (!this.promptComposerVarValuesRaw || typeof this.promptComposerVarValuesRaw !== 'object') {
+                        this.promptComposerVarValuesRaw = {};
+                    }
+                }
+
                 // In Compose mode we keep the flow lightweight and do not auto-select a template.
                 // In Manage mode we can auto-select the first template for convenience.
                 if (this.promptTemplatesMode === 'manage') {
@@ -270,8 +264,8 @@ export function createPluginsMethods() {
                 // When entering the Plugins tab, focus the command input by default (better UX).
                 if (this.mainTab === 'plugins' && this.promptTemplatesMode === 'compose' && typeof this.$nextTick === 'function') {
                     this.$nextTick(() => {
-                        const input = this.$refs && this.$refs.promptComposerCommandInput
-                            ? this.$refs.promptComposerCommandInput
+                        const input = this.$refs && this.$refs.promptComposerCodeInput
+                            ? this.$refs.promptComposerCodeInput
                             : null;
                         if (input && typeof input.focus === 'function') input.focus();
                     });
