@@ -39,8 +39,8 @@
                         <section class="plugins-main" aria-label="Plugin workspace">
                             <div v-if="pluginsActiveId === 'prompt-templates'" class="plugins-panel">
                                 <div class="plugins-panel-head">
-                                    <div class="plugins-panel-title">Prompt Templates</div>
-                                    <div class="plugins-panel-subtitle">Create, parameterize, and copy prompts with <code v-pre>{{var}}</code> placeholders.</div>
+                                    <div class="plugins-panel-title">提示词模板</div>
+                                    <div class="plugins-panel-subtitle">内置：代码注释润色（<code v-pre>{{code}}</code>）。复制后直接粘贴到输入框即可。</div>
                                 </div>
 
                                 <div class="prompt-templates-modebar" role="tablist" aria-label="Prompt templates mode">
@@ -49,13 +49,13 @@
                                         role="tab"
                                         :aria-selected="promptTemplatesMode === 'compose'"
                                         :class="['mode-pill', { active: promptTemplatesMode === 'compose' }]"
-                                        @click="promptTemplatesMode = 'compose'">Compose</button>
+                                        @click="promptTemplatesMode = 'compose'">生成</button>
                                     <button
                                         type="button"
                                         role="tab"
                                         :aria-selected="promptTemplatesMode !== 'compose'"
                                         :class="['mode-pill', { active: promptTemplatesMode !== 'compose' }]"
-                                        @click="promptTemplatesMode = 'manage'">Manage</button>
+                                        @click="promptTemplatesMode = 'manage'">管理</button>
                                 </div>
 
                                 <div v-if="promptTemplatesMode === 'compose'" class="prompt-compose">
@@ -66,7 +66,7 @@
                                         </div>
 
                                         <div class="prompt-compose-form">
-                                            <label class="form-label">代码注释</label>
+                                            <label class="form-label">粘贴代码注释</label>
                                             <textarea
                                                 ref="promptComposerCodeInput"
                                                 class="form-input prompt-compose-code-input"
@@ -74,7 +74,7 @@
                                                 spellcheck="false"
                                                 :value="promptComposerVarValues.code || ''"
                                                 @input="setPromptComposerVarValue('code', $event.target.value)"
-                                                placeholder="把需要润色的代码注释粘贴到这里"></textarea>
+                                                placeholder="把需要润色的代码注释粘贴到这里（支持多行）"></textarea>
                                             <div class="prompt-compose-actions">
                                                 <button type="button" class="btn-mini" @click="copyPromptComposerRendered" :disabled="pluginsLoading || !promptComposerRendered">复制</button>
                                                 <button type="button" class="btn-mini" @click="setPromptComposerVarValue('code', '')" :disabled="pluginsLoading || !(promptComposerVarValues.code || '')">清空</button>
@@ -84,8 +84,8 @@
                                         <div class="prompt-preview-block prompt-compose-preview">
                                             <div class="prompt-vars-head">
                                                 <div>
-                                                    <div class="prompt-vars-title">Preview</div>
-                                                    <div class="plugins-panel-note">复制后可直接粘贴到 Codex/Claude 输入框。</div>
+                                                    <div class="prompt-vars-title">生成结果</div>
+                                                    <div class="plugins-panel-note">点“复制”后直接粘贴到 Codex/Claude 输入框。</div>
                                                 </div>
                                                 <button type="button" class="btn-mini" @click="copyPromptComposerRendered" :disabled="pluginsLoading || !promptComposerRendered">复制</button>
                                             </div>
@@ -102,14 +102,14 @@
                                                 type="text"
                                                 v-model.trim="promptTemplatesKeyword"
                                                 aria-label="Search templates"
-                                                placeholder="Search templates">
-                                            <button type="button" class="btn-mini" @click="createPromptTemplate" :disabled="pluginsLoading">New</button>
-                                            <button type="button" class="btn-mini" @click="exportPromptTemplates" :disabled="pluginsLoading || !promptTemplatesList.length">Export</button>
-                                            <button type="button" class="btn-mini" @click="triggerPromptTemplatesImport" :disabled="pluginsLoading">Import</button>
+                                                placeholder="搜索模板">
+                                            <button type="button" class="btn-mini" @click="createPromptTemplate" :disabled="pluginsLoading">新建</button>
+                                            <button type="button" class="btn-mini" @click="exportPromptTemplates" :disabled="pluginsLoading || !promptTemplatesList.length">导出</button>
+                                            <button type="button" class="btn-mini" @click="triggerPromptTemplatesImport" :disabled="pluginsLoading">导入</button>
                                         </div>
 
-                                        <div v-if="pluginsLoading && !promptTemplatesLoadedOnce" class="skills-empty-state">Loading templates...</div>
-                                        <div v-else-if="!filteredPromptTemplates.length" class="skills-empty-state">No templates found.</div>
+                                        <div v-if="pluginsLoading && !promptTemplatesLoadedOnce" class="skills-empty-state">正在加载模板...</div>
+                                        <div v-else-if="!filteredPromptTemplates.length" class="skills-empty-state">暂无模板。</div>
                                         <div v-else class="prompt-templates-list" role="list">
                                             <button
                                                 v-for="tpl in filteredPromptTemplates"

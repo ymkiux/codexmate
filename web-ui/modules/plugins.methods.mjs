@@ -44,9 +44,9 @@ function buildBuiltinCommentPolishTemplate() {
 function ensureBuiltinTemplates(rawList) {
     const list = Array.isArray(rawList) ? rawList.filter(Boolean) : [];
     const builtins = [buildBuiltinCommentPolishTemplate()];
-    const builtinIdSet = new Set(builtins.map((tpl) => tpl.id));
-    // Built-ins are fixed and should not be overridden (even if user imports a conflicting id).
-    const rest = list.filter((item) => !(item && builtinIdSet.has(item.id)));
+    // Built-ins are fixed and should not be overridden. Also, clean up any legacy built-ins
+    // that may have been persisted previously.
+    const rest = list.filter((item) => !(item && item.isBuiltin === true));
     return [...builtins, ...rest];
 }
 
