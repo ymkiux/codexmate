@@ -104,6 +104,7 @@ const {
 const {
     createZipCommandController
 } = require('./cli/zip-commands');
+const { createCrushController } = require('./cli/crush');
 const {
     getCodexSkillsDir,
     getClaudeSkillsDir,
@@ -1587,6 +1588,13 @@ const {
     MAX_SKILLS_ZIP_UNCOMPRESSED_BYTES,
     ensureDir
 });
+
+const {
+    getCrushConfig,
+    applyCrushConfig,
+    initCrushConfig,
+    cmdCrush
+} = createCrushController({ readConfigOrVirtualDefault });
 
 async function buildConfigHealthReport(params = {}) {
     return buildConfigHealthReportCore(params, {
@@ -8405,6 +8413,15 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                         case 'apply-openclaw-workspace-file':
                             result = applyOpenclawWorkspaceFile(params || {});
                             break;
+                        case 'get-crush-config':
+                            result = getCrushConfig(params || {});
+                            break;
+                        case 'apply-crush-config':
+                            result = applyCrushConfig(params || {});
+                            break;
+                        case 'init-crush-config':
+                            result = initCrushConfig(params || {});
+                            break;
                         case 'switch':
                         case 'use':
                         case 'add':
@@ -13132,6 +13149,7 @@ async function main() {
         console.log('  codexmate qwen [参数...]   等同于 qwen --yolo');
         console.log('  codexmate mcp [serve] [--transport stdio] [--allow-write|--read-only]');
         console.log('  codexmate export-session --source <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]');
+        console.log('  codexmate crush <path|get|init> [--include-keys]  生成/管理 Crush 配置（crush.json）');
         console.log('  codexmate zip <路径> [--max:级别]  压缩（系统 zip 优先，其次 zip-lib）');
         console.log('  codexmate unzip <zip文件> [输出目录]  解压（zip-lib）');
         console.log('  codexmate unzip-ext <zip目录> [输出目录] [--ext:后缀[,后缀...]] [--no-recursive]  批量提取 ZIP 指定后缀文件（默认递归）');
@@ -13192,6 +13210,7 @@ async function main() {
         case 'proxy': await cmdProxy(args.slice(1)); break;
         case 'workflow': await cmdWorkflow(args.slice(1)); break;
         case 'task': await cmdTask(args.slice(1)); break;
+        case 'crush': cmdCrush(args.slice(1)); break;
         case 'run': cmdStart(parseStartOptions(args.slice(1))); break;
         case 'start':
             console.error('错误: 命令已更名为 "run"，请使用: codexmate run');

@@ -10,7 +10,8 @@
 export const CONFIG_MODE_SET = new Set([
     ...Object.keys(PROVIDER_CONFIG_MODE_META),
     'claude',
-    'openclaw'
+    'openclaw',
+    'crush'
 ]);
 
 export function getProviderConfigModeMeta(mode) {
@@ -61,6 +62,7 @@ export function createConfigModeComputed() {
             if (providerMeta) return providerMeta.label;
             if (this.configMode === 'claude') return 'Claude Code';
             if (this.configMode === 'openclaw') return 'OpenClaw';
+            if (this.configMode === 'crush') return 'Crush';
             return '未选择';
         },
         inspectorCurrentConfigLabel() {
@@ -76,6 +78,9 @@ export function createConfigModeComputed() {
             if (this.configMode === 'openclaw') {
                 const openclaw = typeof this.currentOpenclawConfig === 'string' ? this.currentOpenclawConfig.trim() : '';
                 return openclaw || '未选择';
+            }
+            if (this.configMode === 'crush') {
+                return this.crushConfigExists ? 'crush.json' : '未配置';
             }
             return '未选择';
         },
@@ -94,6 +99,9 @@ export function createConfigModeComputed() {
                     ? this.openclawStructured.agentPrimary.trim()
                     : '';
                 return model || '按配置文件';
+            }
+            if (this.configMode === 'crush') {
+                return '--';
             }
             return '未选择';
         },
@@ -119,6 +127,12 @@ export function createConfigModeComputed() {
                     return 'OpenClaw 保存/应用中';
                 }
                 return 'JSON5 可保存并应用';
+            }
+            if (this.configMode === 'crush') {
+                if (this.crushConfigLoading) {
+                    return 'Crush 配置读取/写入中';
+                }
+                return 'Crush crush.json';
             }
             return '未选择';
         }

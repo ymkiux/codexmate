@@ -310,6 +310,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 openclawFileLoading: false,
                 openclawSaving: false,
                 openclawApplying: false,
+                crushConfigPath: '',
+                crushConfigExists: false,
+                crushConfigLoading: false,
+                crushConfigDraft: '',
+                crushConfigScope: 'global',
                 openclawWorkspaceFileName: 'SOUL.md',
                 agentsWorkspaceFileName: '',
                 openclawStructured: {

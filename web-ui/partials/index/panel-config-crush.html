@@ -1,0 +1,82 @@
+<!-- Crush 配置模式 -->
+<div
+    v-show="mainTab === 'config' && configMode === 'crush'"
+    class="mode-content mode-cards"
+    id="panel-config-crush"
+    role="tabpanel"
+    :aria-labelledby="'tab-config-crush'">
+    <div class="config-template-hint">
+        读写 <code>crush.json</code>（Crush 配置文件）。参考：<a href="https://github.com/charmbracelet/crush" target="_blank" rel="noopener">charmbracelet/crush</a>。
+    </div>
+
+    <div class="selector-section">
+        <div class="selector-header">
+            <span class="selector-title">配置范围</span>
+        </div>
+        <select class="model-select" v-model="crushConfigScope" @change="onCrushConfigScopeChange" :disabled="crushConfigLoading">
+            <option value="project-dot">.crush.json（项目）</option>
+            <option value="project">crush.json（项目）</option>
+            <option value="global">crush.json（全局）</option>
+        </select>
+        <div class="config-template-hint">
+            提示：Crush 加载优先级是 <code>.crush.json</code> &gt; <code>crush.json</code> &gt; 全局配置。
+        </div>
+    </div>
+
+    <div class="selector-section">
+        <div class="selector-header">
+            <span class="selector-title">配置路径</span>
+        </div>
+        <div class="config-template-hint">
+            <code>{{ crushConfigPath || '未知' }}</code>
+            <span v-if="crushConfigExists">（已存在）</span>
+            <span v-else>（未创建）</span>
+        </div>
+    </div>
+
+    <div class="selector-section">
+        <div class="selector-header settings-tab-header">
+            <div class="settings-tab-actions">
+                <button class="btn-tool btn-tool-compact" @click="loadCrushConfig" :disabled="crushConfigLoading">
+                    {{ crushConfigLoading ? '加载中...' : '加载' }}
+                </button>
+                <button class="btn-tool btn-tool-compact" @click="formatCrushConfig" :disabled="crushConfigLoading || !crushConfigDraft">
+                    格式化
+                </button>
+                <button class="btn-tool btn-tool-compact" @click="validateCrushConfig" :disabled="crushConfigLoading || !crushConfigDraft">
+                    校验
+                </button>
+                <button class="btn-tool btn-tool-compact" @click="saveCrushConfig" :disabled="crushConfigLoading || !crushConfigDraft">
+                    保存
+                </button>
+            </div>
+        </div>
+        <div class="config-template-hint">
+            编辑器保存的是全局 crush 配置；项目内 <code>.crush.json</code> / <code>crush.json</code> 仍优先生效。
+        </div>
+    </div>
+
+    <div class="selector-section">
+        <div class="selector-header">
+            <span class="selector-title">模板与引导</span>
+        </div>
+        <button class="btn-tool" @click="initCrushConfig" :disabled="crushConfigLoading">
+            {{ crushConfigLoading ? '生成中...' : '生成 providers 模板（不写入）' }}
+        </button>
+        <div class="config-template-hint">
+            不会写入真实密钥；默认用 <code>$PROVIDER_API_KEY</code> 形式占位，你确认无误后再点“保存”。
+        </div>
+    </div>
+
+    <div class="selector-section">
+        <div class="selector-header">
+            <span class="selector-title">crush.json</span>
+        </div>
+        <textarea
+            v-model="crushConfigDraft"
+            class="form-input template-editor"
+            spellcheck="false"
+            :readonly="crushConfigLoading"
+            placeholder="{\n  \"$schema\": \"https://charm.land/crush.json\",\n  \"providers\": {}\n}"></textarea>
+    </div>
+</div>
