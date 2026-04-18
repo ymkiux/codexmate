@@ -52,6 +52,23 @@ function ensureBuiltinTemplates(rawList) {
 
 export function createPluginsMethods() {
     return {
+        selectPromptComposerTemplate(id) {
+            const next = typeof id === 'string' ? id.trim() : '';
+            if (!next) return;
+            if (next === this.promptComposerSelectedTemplateId) return;
+            this.promptComposerSelectedTemplateId = next;
+            // Reset values when switching template to avoid leaking unrelated vars.
+            this.promptComposerVarValuesRaw = {};
+            if (typeof this.$nextTick === 'function') {
+                this.$nextTick(() => {
+                    const first = this.$refs && this.$refs.promptComposerFirstField
+                        ? this.$refs.promptComposerFirstField
+                        : null;
+                    if (first && typeof first.focus === 'function') first.focus();
+                });
+            }
+        },
+
         onPromptComposerInput() {
             const raw = typeof this.promptComposerCommand === 'string' ? this.promptComposerCommand : '';
             const text = raw.trimStart();
@@ -151,8 +168,8 @@ export function createPluginsMethods() {
             if (typeof this.$nextTick === 'function') {
                 this.$nextTick(() => {
                     // Focus the first placeholder field if it exists.
-                    const firstVar = this.$refs && this.$refs.promptComposerFirstVar
-                        ? this.$refs.promptComposerFirstVar
+                    const firstVar = this.$refs && this.$refs.promptComposerFirstField
+                        ? this.$refs.promptComposerFirstField
                         : null;
                     if (firstVar && typeof firstVar.focus === 'function') firstVar.focus();
                 });
@@ -239,7 +256,9 @@ export function createPluginsMethods() {
 
                 // With a single built-in template, Compose should be ready-to-use without extra steps.
                 if (this.mainTab === 'plugins' && this.promptTemplatesMode === 'compose') {
-                    if (!this.promptComposerSelectedTemplateId) {
+                    const list = Array.isArray(this.promptTemplatesList) ? this.promptTemplatesList : [];
+                    const exists = list.some((item) => item && item.id === this.promptComposerSelectedTemplateId);
+                    if (!this.promptComposerSelectedTemplateId || !exists) {
                         this.promptComposerSelectedTemplateId = 'builtin_comment_polish';
                     }
                     if (!this.promptComposerVarValuesRaw || typeof this.promptComposerVarValuesRaw !== 'object') {
@@ -389,6 +408,10 @@ export function createPluginsMethods() {
         duplicatePromptTemplate() {
             const draft = normalizePromptTemplateDraft(this.promptTemplateDraftRaw);
             if (!draft.id) return;
+            if (draft.isBuiltin) {
+                this.showMessage('内置模板不可复制', 'error');
+                return;
+            }
             const nextId = createId('prompt');
             this.promptTemplateDraftRaw = {
                 ...draft,

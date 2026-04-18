@@ -171,6 +171,10 @@
     gap: 10px;
 }
 
+.prompt-compose-template-select {
+    width: 100%;
+}
+
 .prompt-compose-code-input {
     font-family: var(--font-family-mono);
     font-size: var(--font-size-caption);

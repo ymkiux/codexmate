@@ -480,6 +480,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'triggerPromptTemplatesImport',
         'handlePromptTemplatesImportChange',
         'onPromptComposerInput',
+        'selectPromptComposerTemplate',
         'onPromptComposerKeydown',
         'onPromptComposerPickerKeydown',
         'openPromptComposerPicker',
