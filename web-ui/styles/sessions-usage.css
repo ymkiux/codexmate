@@ -104,7 +104,7 @@
 }
 
 .usage-content-loading {
-    opacity: 0.75;
+    opacity: 0.82;
 }
 
 .usage-content-overlay {
@@ -148,8 +148,7 @@
 }
 
 .usage-summary-card.usage-copyable:hover {
-    border-color: var(--color-border);
-    background: linear-gradient(180deg, var(--color-surface-alt), var(--color-surface));
+    border-color: var(--color-border-strong);
 }
 
 .usage-loading-skeleton {
