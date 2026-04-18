@@ -7,6 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
 const fs = require('fs');
+const usageCore = require(path.join(__dirname, '..', '..', 'lib', 'cli-session-usage.js'));
 
 const cliPath = path.join(__dirname, '..', '..', 'cli.js');
 const cliContent = fs.readFileSync(cliPath, 'utf-8');
@@ -53,8 +54,12 @@ const parseCodexSessionSummarySrc = extractFunction(cliContent, 'parseCodexSessi
 const parseClaudeSessionSummarySrc = extractFunction(cliContent, 'parseClaudeSessionSummary');
 
 function instantiateListSessionUsage(bindings = {}) {
-    const bindingNames = Object.keys(bindings);
-    const bindingValues = Object.values(bindings);
+    const effectiveBindings = {
+        listSessionUsageCore: usageCore.listSessionUsageCore,
+        ...(bindings || {})
+    };
+    const bindingNames = Object.keys(effectiveBindings);
+    const bindingValues = Object.values(effectiveBindings);
     return Function(...bindingNames, `${listSessionUsageSrc}\nreturn listSessionUsage;`)(...bindingValues);
 }
 
@@ -345,10 +350,13 @@ test('listSessionUsage ignores entries without concrete model names or with <syn
     const result = await listSessionUsage({ source: 'codex', limit: 50, forceRefresh: true });
 
     assert.deepStrictEqual(result.map((item) => item.sessionId), ['real-model']);
-    assert.deepStrictEqual(parseCodexSessionSummaryCalls, ['/tmp/missing-model.jsonl', '/tmp/synthetic-model.jsonl']);
+    assert.deepStrictEqual(
+        [...parseCodexSessionSummaryCalls].sort(),
+        ['/tmp/missing-model.jsonl', '/tmp/synthetic-model.jsonl'].sort()
+    );
 });
 
-test('listSessionUsage scans the full session file so middle model names are not dropped', async () => {
+test('listSessionUsage skips full-file scans when the lightweight entry already contains a model', async () => {
     const tempDir = fs.mkdtempSync(path.join(__dirname, 'tmp-session-model-scan-'));
     const filePath = path.join(tempDir, 'codex-middle.jsonl');
     const fillerLine = JSON.stringify({
@@ -406,7 +414,7 @@ test('listSessionUsage scans the full session file so middle model names are not
 
     try {
         const result = await listSessionUsage({ source: 'codex', limit: 50, forceRefresh: true });
-        assert.deepStrictEqual(result[0].models, ['gpt-5.3-codex', 'gpt-5.2-codex']);
+        assert.deepStrictEqual(result[0].models, ['gpt-5.3-codex']);
         assert.strictEqual(result[0].model, 'gpt-5.3-codex');
         assert.deepStrictEqual(codexParses, []);
     } finally {

@@ -915,6 +915,30 @@ test('buildUsageChartGroups collects every model name from session model arrays 
     assert.deepStrictEqual(result.modelCoverage.missingModelSessionsPreview, []);
 });
 
+test('buildUsageChartGroups falls back to token breakdown when totalTokens is missing', () => {
+    const result = buildUsageChartGroups([
+        {
+            source: 'codex',
+            model: 'gpt-5.3-codex',
+            createdAt: '2026-04-10T07:30:00.000Z',
+            updatedAt: '2026-04-10T08:00:00.000Z',
+            messageCount: 4,
+            // totalTokens 缺失时，应该使用 input/output/reasoning 回填
+            inputTokens: 300000,
+            cachedInputTokens: 100000,
+            outputTokens: 100000,
+            reasoningOutputTokens: 0,
+            contextWindow: 258400
+        }
+    ], {
+        range: 'all',
+        now: Date.UTC(2026, 3, 12, 12, 0, 0)
+    });
+
+    assert.strictEqual(result.summary.totalTokens, 400000);
+    assert.strictEqual(result.usedModels[0].tokenTotal, 400000);
+});
+
 test('sessionUsageSummaryCards explains why usage cost is unavailable for the selected range', () => {
     const computed = createSessionComputed();
     const cards = computed.sessionUsageSummaryCards.call({

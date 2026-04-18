@@ -78,6 +78,41 @@ function collectSessionModelNames(session) {
     return models;
 }
 
+function readSessionTotalTokens(session) {
+    if (!session || typeof session !== 'object') {
+        return 0;
+    }
+
+    const rawTotalTokens = Number(session.totalTokens);
+    const hasExplicitTotal = Number.isFinite(rawTotalTokens) && rawTotalTokens >= 0;
+    const explicitTotal = hasExplicitTotal ? Math.max(0, Math.floor(rawTotalTokens)) : null;
+
+    const inputTokens = Number.isFinite(Number(session.inputTokens))
+        ? Math.max(0, Math.floor(Number(session.inputTokens)))
+        : null;
+    const outputTokens = Number.isFinite(Number(session.outputTokens))
+        ? Math.max(0, Math.floor(Number(session.outputTokens)))
+        : null;
+    const reasoningOutputTokens = Number.isFinite(Number(session.reasoningOutputTokens))
+        ? Math.max(0, Math.floor(Number(session.reasoningOutputTokens)))
+        : 0;
+
+    // 对齐 usage 口径：当总 token 缺失时，使用拆分字段回填（input + output + reasoning）。
+    // cachedInputTokens 一般包含在 inputTokens 中，因此不在此重复相加。
+    const hasBreakdown = !(inputTokens === null && outputTokens === null && reasoningOutputTokens === 0);
+    const breakdownTotal = hasBreakdown
+        ? (inputTokens || 0) + (outputTokens || 0) + reasoningOutputTokens
+        : 0;
+
+    if (breakdownTotal > 0) {
+        return breakdownTotal;
+    }
+    if (explicitTotal !== null) {
+        return explicitTotal;
+    }
+    return 0;
+}
+
 export function buildSessionFilterCacheState(source, pathFilter) {
     return {
         source: normalizeSessionSource(source, 'all'),
@@ -280,9 +315,7 @@ export function buildUsageChartGroups(sessions = [], options = {}) {
         const messageCount = Number.isFinite(Number(session.messageCount))
             ? Math.max(0, Math.floor(Number(session.messageCount)))
             : 0;
-        const sessionTotalTokens = Number.isFinite(Number(session.totalTokens))
-            ? Math.max(0, Math.floor(Number(session.totalTokens)))
-            : 0;
+        const sessionTotalTokens = readSessionTotalTokens(session);
         const sessionContextWindow = Number.isFinite(Number(session.contextWindow))
             ? Math.max(0, Math.floor(Number(session.contextWindow)))
             : 0;
