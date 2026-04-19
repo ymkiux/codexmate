@@ -550,7 +550,8 @@ export function createSessionComputed() {
                 }
             }
 
-            const rows = [...byDay.values()].sort((a, b) => a.key.localeCompare(b.key, 'en-US'));
+            // UI 展示：当天在最上面（倒序）。
+            const rows = [...byDay.values()].sort((a, b) => b.key.localeCompare(a.key, 'en-US'));
             const maxTokens = rows.reduce((max, item) => Math.max(max, item.tokenTotal), 0);
             const maxCost = rows.reduce((max, item) => Math.max(max, item.estimatedCostUsd), 0);
 
