@@ -4,13 +4,15 @@
 
 # Codex Mate
 
-**Codex / Claude Code / OpenClaw 的本地配置与会话管理工具**
+**Codex / Claude Code / OpenClaw 的本地控制台：配置、会话与 Usage 统计一体化管理。**
 
-[![Build](https://img.shields.io/github/actions/workflow/status/SakuraByteCore/codexmate/release.yml?label=build)](https://github.com/SakuraByteCore/codexmate/actions/workflows/release.yml)
-[![Version](https://img.shields.io/npm/v/codexmate?label=version&registry_uri=https%3A%2F%2Fregistry.npmjs.org)](https://www.npmjs.com/package/codexmate)
-[![Downloads](https://img.shields.io/npm/dt/codexmate?label=downloads)](https://www.npmjs.com/package/codexmate)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/node-%3E%3D14.0.0-green.svg)](https://nodejs.org/)
+[![Build](https://img.shields.io/github/actions/workflow/status/SakuraByteCore/codexmate/release.yml?label=build&style=flat)](https://github.com/SakuraByteCore/codexmate/actions/workflows/release.yml)
+[![Version](https://img.shields.io/npm/v/codexmate?label=version&style=flat)](https://www.npmjs.com/package/codexmate)
+[![Downloads](https://img.shields.io/npm/dt/codexmate?label=downloads&style=flat)](https://www.npmjs.com/package/codexmate)
+[![Node](https://img.shields.io/node/v/codexmate?label=Node.js&style=flat&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![License](https://img.shields.io/npm/l/codexmate?label=license&style=flat)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/SakuraByteCore/codexmate?label=stars&style=flat)](https://github.com/SakuraByteCore/codexmate/stargazers)
+[![Issues](https://img.shields.io/github/issues/SakuraByteCore/codexmate?label=issues&style=flat)](https://github.com/SakuraByteCore/codexmate/issues)
 
 [快速开始](#快速开始) · [命令速查](#命令速查) · [Web 界面](#web-界面) · [MCP](#mcp) · [English](README.md)
 
@@ -28,6 +30,7 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 - OpenClaw JSON5 配置与 Workspace `AGENTS.md`
 - Codex / Claude Code Skills 市场（安装目标切换、本地 skills 管理、跨应用导入、ZIP 分发）
 - Codex / Claude 本地会话浏览、筛选、导出、删除与 Usage 统计概览
+- 插件（提示词模板）：模板复用、变量填写、一键复制
 - 任务编排（规划中，未开放）
 
 项目不依赖云端托管，配置写入你的本地文件，便于审计和回滚。Skills 市场同样坚持本地优先，只操作本地目录，不依赖远程在线市场。
@@ -67,6 +70,10 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 - 查看本地已安装 skills、根目录与状态
 - 扫描 `Codex` / `Claude Code` / `Agents` 可导入来源
 - 支持跨应用导入、ZIP 导入 / 导出、批量删除
+
+**插件**
+- 提示词模板：本地保存/编辑/复用（支持变量）
+- 编写 → 填参 → 一键复制的工作流（模板数据保存在浏览器存储）
 
 **任务编排（规划中，未开放）**
 - 当前版本暂未开放

@@ -753,7 +753,7 @@ test('sessionUsageSummaryCards uses compact units for long token and context tot
     assert.strictEqual(tokensCard.title, '1,234,567');
     assert.strictEqual(contextCard.value, '256K');
     assert.strictEqual(contextCard.title, '256,000');
-    assert.strictEqual(costCard.value, '暂无');
+    assert.strictEqual(costCard.value, '0');
     assert.strictEqual(costCard.label, '预估费用 · 近 7 天');
     assert.ok(!costCard.note);
     assert.match(costCard.title, /缺少可匹配的模型单价或 token 拆分/);
@@ -983,7 +983,7 @@ test('sessionUsageSummaryCards explains why usage cost is unavailable for the se
 
     const costCard = cards.find((card) => card.key === 'estimated-cost');
     assert(costCard, 'missing estimated cost summary card');
-    assert.strictEqual(costCard.value, '暂无');
+    assert.strictEqual(costCard.value, '0');
     assert.ok(!costCard.note);
     assert.match(costCard.title, /缺少可匹配的模型单价或 token 拆分/);
 });

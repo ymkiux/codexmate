@@ -138,17 +138,17 @@
                                                     role="button"
                                                     tabindex="0"
                                                     :title="`点击复制：${day.costTitle}`"
-                                                    @click="(String(day.costTitle || '').trim() && String(day.costTitle || '').trim() !== '暂无')
+                                                    @click="(String(day.costTitle || '').trim())
                                                         ? ((typeof fallbackCopyText === 'function' && fallbackCopyText(String(day.costTitle || '').trim()))
                                                             ? showMessage(`已复制：预估费用（${day.key}）`, 'success')
                                                             : showMessage('复制失败', 'error'))
                                                         : showMessage('没有可复制内容', 'info')"
-                                                    @keydown.enter.prevent="(String(day.costTitle || '').trim() && String(day.costTitle || '').trim() !== '暂无')
+                                                    @keydown.enter.prevent="(String(day.costTitle || '').trim())
                                                         ? ((typeof fallbackCopyText === 'function' && fallbackCopyText(String(day.costTitle || '').trim()))
                                                             ? showMessage(`已复制：预估费用（${day.key}）`, 'success')
                                                             : showMessage('复制失败', 'error'))
                                                         : showMessage('没有可复制内容', 'info')"
-                                                    @keydown.space.prevent="(String(day.costTitle || '').trim() && String(day.costTitle || '').trim() !== '暂无')
+                                                    @keydown.space.prevent="(String(day.costTitle || '').trim())
                                                         ? ((typeof fallbackCopyText === 'function' && fallbackCopyText(String(day.costTitle || '').trim()))
                                                             ? showMessage(`已复制：预估费用（${day.key}）`, 'success')
                                                             : showMessage('复制失败', 'error'))
