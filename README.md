@@ -30,6 +30,7 @@ Codex Mate is a local-first CLI + Web UI for unified management of:
 - OpenClaw JSON5 profiles and workspace `AGENTS.md`
 - Local skills market for Codex / Claude Code (target switching, local skills management, cross-app import, ZIP distribution)
 - Local Codex/Claude sessions (list/filter/export/delete) with Usage analytics overview
+- Plugins (Prompt templates): reusable templates with variables and one-click copy
 
 It works on local files directly and does not require cloud hosting. The skills market is also local-first: it operates on local directories and does not depend on a remote marketplace.
 
@@ -67,6 +68,10 @@ It works on local files directly and does not require cloud hosting. The skills 
 - Inspect local installed skills, root paths, and status
 - Scan importable sources from `Codex` / `Claude Code` / `Agents`
 - Support cross-app import, ZIP import/export, and batch delete
+
+**Plugins**
+- Prompt templates: save, edit, and reuse prompts with variables
+- Compose + copy workflow for fast prompt iteration (stored locally in browser storage)
 
 **Engineering Utilities**
 - MCP stdio domains (`tools`, `resources`, `prompts`)
