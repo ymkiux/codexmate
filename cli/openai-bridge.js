@@ -547,6 +547,9 @@ function shouldFallbackFromUpstreamResponses(status, bodyText) {
     if (!text) return false;
     if (/not implemented/i.test(text)) return true;
     if (/convert_request_failed/i.test(text)) return true;
+    if (/unknown (endpoint|route)/i.test(text)) return true;
+    if (/unsupported.*\/?v1\/responses/i.test(text)) return true;
+    if (/does not support.*responses/i.test(text)) return true;
 
     // Best-effort parse for structured error codes.
     try {
@@ -555,6 +558,9 @@ function shouldFallbackFromUpstreamResponses(status, bodyText) {
         const msg = parsed && parsed.error && typeof parsed.error.message === 'string' ? parsed.error.message : '';
         if (code === 'convert_request_failed') return true;
         if (/not implemented/i.test(msg)) return true;
+        if (/unknown (endpoint|route)/i.test(msg)) return true;
+        if (/unsupported.*\/?v1\/responses/i.test(msg)) return true;
+        if (/does not support.*responses/i.test(msg)) return true;
     } catch (_) {}
 
     return false;
