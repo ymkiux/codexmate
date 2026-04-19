@@ -120,12 +120,19 @@ test('openai-bridge falls back to upstream /chat/completions when /responses is 
             return;
         }
         if (req.url === '/v1/chat/completions' && req.method === 'POST') {
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({
-                id: 'chatcmpl_x',
-                model: 'gpt-test',
-                choices: [{ message: { role: 'assistant', content: 'hello-from-chat' } }]
-            }));
+            let body = '';
+            req.on('data', (c) => (body += c));
+            req.on('end', () => {
+                const parsed = JSON.parse(body || '{}');
+                // 确保 responses 的 object input 能被转换为 chat messages
+                assert.equal(parsed.messages && parsed.messages[0] && parsed.messages[0].role, 'user');
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    id: 'chatcmpl_x',
+                    model: 'gpt-test',
+                    choices: [{ message: { role: 'assistant', content: 'hello-from-chat' } }]
+                }));
+            });
             return;
         }
         res.writeHead(404, { 'Content-Type': 'application/json' });
@@ -160,7 +167,7 @@ test('openai-bridge falls back to upstream /chat/completions when /responses is 
         },
         body: {
             model: 'gpt-test',
-            input: 'ping',
+            input: { type: 'input_text', text: 'ping' },
             stream: false
         }
     });

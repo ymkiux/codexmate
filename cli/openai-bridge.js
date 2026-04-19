@@ -218,9 +218,69 @@ function extractChatCompletionResult(payload) {
 }
 
 function normalizeResponsesInputToChatMessages(input) {
+    // 支持：
+    // - string
+    // - { role, content }（单条 message）
+    // - { type:"input_text"|"input_image", ... }（单个 block）
+    // - [{ role, content: [...] }]（messages array）
+    // - [{ type:"input_text"|"input_image", ... }]（blocks array -> 单条 user 消息）
     if (typeof input === 'string') {
         return [{ role: 'user', content: input }];
     }
+
+    const toChatContent = (blocks) => {
+        if (!Array.isArray(blocks)) return '';
+        const out = [];
+        for (const block of blocks) {
+            if (!block || typeof block !== 'object') continue;
+            const type = typeof block.type === 'string' ? block.type : '';
+            if ((type === 'input_text' || type === 'output_text') && typeof block.text === 'string') {
+                out.push({ type: 'text', text: block.text });
+                continue;
+            }
+            if (type === 'input_image') {
+                const raw = block.image_url != null ? block.image_url : block.imageUrl;
+                const url = typeof raw === 'string'
+                    ? raw
+                    : (raw && typeof raw === 'object' && typeof raw.url === 'string' ? raw.url : '');
+                if (url) {
+                    out.push({ type: 'image_url', image_url: { url } });
+                }
+                continue;
+            }
+            // 容错：兼容已是 chat content 的 {type:"text"} / {type:"image_url"}
+            if (type === 'text' && typeof block.text === 'string') {
+                out.push({ type: 'text', text: block.text });
+                continue;
+            }
+            if (type === 'image_url' && block.image_url) {
+                out.push({ type: 'image_url', image_url: block.image_url });
+            }
+        }
+        if (out.length === 0) return '';
+        return out;
+    };
+
+    const toRole = (value) => {
+        const roleRaw = typeof value === 'string' ? value.trim().toLowerCase() : '';
+        return roleRaw === 'assistant' ? 'assistant' : (roleRaw === 'system' ? 'system' : 'user');
+    };
+
+    if (input && typeof input === 'object' && !Array.isArray(input)) {
+        if (typeof input.role === 'string' && input.content != null) {
+            const role = toRole(input.role);
+            const content = Array.isArray(input.content)
+                ? toChatContent(input.content)
+                : input.content;
+            return content ? [{ role, content }] : [];
+        }
+        if (typeof input.type === 'string') {
+            const content = toChatContent([input]);
+            return content ? [{ role: 'user', content }] : [];
+        }
+        return [];
+    }
+
     if (!Array.isArray(input)) {
         return [];
     }
@@ -241,10 +301,7 @@ function normalizeResponsesInputToChatMessages(input) {
                     tool_calls: [{
                         id: callId,
                         type: 'function',
-                        function: {
-                            name,
-                            arguments: args || ''
-                        }
+                        function: { name, arguments: args || '' }
                     }]
                 });
             }
@@ -264,43 +321,34 @@ function normalizeResponsesInputToChatMessages(input) {
                 }
             }
             if (toolCallId) {
-                messages.push({
-                    role: 'tool',
-                    tool_call_id: toolCallId,
-                    content: String(content || '')
-                });
+                messages.push({ role: 'tool', tool_call_id: toolCallId, content: String(content || '') });
             }
             continue;
         }
 
-        const roleRaw = typeof item.role === 'string' ? item.role.trim().toLowerCase() : '';
-        const role = roleRaw === 'assistant' ? 'assistant' : (roleRaw === 'system' ? 'system' : 'user');
-        const content = item.content;
-        if (typeof content === 'string') {
-            if (content.trim()) messages.push({ role, content });
+        // message form
+        if (typeof item.role === 'string' && item.content != null) {
+            const role = toRole(item.role);
+            const content = Array.isArray(item.content)
+                ? toChatContent(item.content)
+                : item.content;
+            if (content) {
+                messages.push({ role, content });
+            }
             continue;
         }
-        if (Array.isArray(content)) {
-            const text = content
-                .map((block) => {
-                    if (!block) return '';
-                    if (typeof block === 'string') return block;
-                    if (typeof block === 'object') {
-                        if (typeof block.text === 'string') return block.text;
-                        if (typeof block.content === 'string') return block.content;
-                        if (typeof block.type === 'string' && (block.type === 'input_text' || block.type === 'output_text')
-                            && typeof block.text === 'string') {
-                            return block.text;
-                        }
-                    }
-                    return '';
-                })
-                .filter(Boolean)
-                .join('');
-            if (text.trim()) messages.push({ role, content: text });
-        }
     }
-    return messages;
+
+    if (messages.length > 0) {
+        return messages;
+    }
+
+    // 退化：把 input array 当作单条 user content blocks
+    const fallbackContent = toChatContent(input);
+    if (fallbackContent) {
+        return [{ role: 'user', content: fallbackContent }];
+    }
+    return [];
 }
 
 function convertResponsesRequestToChatCompletions(payload) {
