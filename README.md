@@ -4,13 +4,15 @@
 
 # Codex Mate
 
-**Local configuration and session manager for Codex / Claude Code / OpenClaw**
+**Local-first control panel for Codex / Claude Code / OpenClaw configs, sessions, and usage analytics.**
 
-[![Build](https://img.shields.io/github/actions/workflow/status/SakuraByteCore/codexmate/release.yml?label=build)](https://github.com/SakuraByteCore/codexmate/actions/workflows/release.yml)
-[![Version](https://img.shields.io/npm/v/codexmate?label=version&registry_uri=https%3A%2F%2Fregistry.npmjs.org)](https://www.npmjs.com/package/codexmate)
-[![Downloads](https://img.shields.io/npm/dt/codexmate?label=downloads)](https://www.npmjs.com/package/codexmate)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Node](https://img.shields.io/badge=node-%3E%3D14.0.0-green.svg)](https://nodejs.org/)
+[![Build](https://img.shields.io/github/actions/workflow/status/SakuraByteCore/codexmate/release.yml?label=build&style=flat)](https://github.com/SakuraByteCore/codexmate/actions/workflows/release.yml)
+[![Version](https://img.shields.io/npm/v/codexmate?label=version&style=flat)](https://www.npmjs.com/package/codexmate)
+[![Downloads](https://img.shields.io/npm/dt/codexmate?label=downloads&style=flat)](https://www.npmjs.com/package/codexmate)
+[![Node](https://img.shields.io/node/v/codexmate?label=Node.js&style=flat&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![License](https://img.shields.io/npm/l/codexmate?label=license&style=flat)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/SakuraByteCore/codexmate?label=stars&style=flat)](https://github.com/SakuraByteCore/codexmate/stargazers)
+[![Issues](https://img.shields.io/github/issues/SakuraByteCore/codexmate?label=issues&style=flat)](https://github.com/SakuraByteCore/codexmate/issues)
 
 [Quick Start](#quick-start) · [Commands](#command-reference) · [Web UI](#web-ui) · [MCP](#mcp) · [中文](README.zh.md)
 
@@ -28,6 +30,7 @@ Codex Mate is a local-first CLI + Web UI for unified management of:
 - OpenClaw JSON5 profiles and workspace `AGENTS.md`
 - Local skills market for Codex / Claude Code (target switching, local skills management, cross-app import, ZIP distribution)
 - Local Codex/Claude sessions (list/filter/export/delete) with Usage analytics overview
+- Plugins (Prompt templates): reusable templates with variables and one-click copy
 
 It works on local files directly and does not require cloud hosting. The skills market is also local-first: it operates on local directories and does not depend on a remote marketplace.
 
@@ -65,6 +68,10 @@ It works on local files directly and does not require cloud hosting. The skills 
 - Inspect local installed skills, root paths, and status
 - Scan importable sources from `Codex` / `Claude Code` / `Agents`
 - Support cross-app import, ZIP import/export, and batch delete
+
+**Plugins**
+- Prompt templates: save, edit, and reuse prompts with variables
+- Compose + copy workflow for fast prompt iteration (stored locally in browser storage)
 
 **Engineering Utilities**
 - MCP stdio domains (`tools`, `resources`, `prompts`)

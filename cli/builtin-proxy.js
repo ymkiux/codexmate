@@ -1,5 +1,6 @@
 const http = require('http');
 const net = require('net');
+const crypto = require('crypto');
 const toml = require('@iarna/toml');
 const { readJsonFile, writeJsonAtomic } = require('../lib/cli-file-utils');
 const { isValidHttpUrl, normalizeBaseUrl, joinApiUrl } = require('../lib/cli-utils');
@@ -64,6 +65,327 @@ function createBuiltinProxyRuntimeController(deps = {}) {
     if (typeof formatHostForUrl !== 'function') throw new Error('createBuiltinProxyRuntimeController 缺少 formatHostForUrl');
 
     let runtime = null;
+
+    function readRequestBody(req, maxBytes) {
+        return new Promise((resolve) => {
+            let body = '';
+            let size = 0;
+            let aborted = false;
+            req.on('data', (chunk) => {
+                if (aborted) return;
+                size += chunk.length;
+                if (Number.isFinite(maxBytes) && maxBytes > 0 && size > maxBytes) {
+                    aborted = true;
+                    try { req.destroy(); } catch (_) {}
+                    resolve({ error: '请求体过大' });
+                    return;
+                }
+                body += chunk;
+            });
+            req.on('end', () => {
+                if (aborted) return;
+                resolve({ body });
+            });
+            req.on('error', (err) => resolve({ error: err && err.message ? err.message : 'request failed' }));
+        });
+    }
+
+    function parseJsonOrError(text) {
+        if (typeof text !== 'string' || !text.trim()) {
+            return { value: null, error: 'empty body' };
+        }
+        try {
+            return { value: JSON.parse(text), error: '' };
+        } catch (e) {
+            return { value: null, error: e && e.message ? e.message : 'invalid json' };
+        }
+    }
+
+    function shouldFallbackFromUpstreamResponses(status, bodyText) {
+        if (!Number.isFinite(status)) return false;
+        if (status === 404 || status === 405 || status === 501) return true;
+        const text = String(bodyText || '');
+        if (!text) return false;
+        if (/not implemented/i.test(text)) return true;
+        if (/convert_request_failed/i.test(text)) return true;
+        try {
+            const parsed = JSON.parse(text);
+            const code = parsed && parsed.error && typeof parsed.error.code === 'string' ? parsed.error.code : '';
+            const msg = parsed && parsed.error && typeof parsed.error.message === 'string' ? parsed.error.message : '';
+            if (code === 'convert_request_failed') return true;
+            if (/not implemented/i.test(msg)) return true;
+        } catch (_) {}
+        return false;
+    }
+
+    function proxyRequestJson(targetUrl, options = {}) {
+        const parsed = new URL(targetUrl);
+        const transport = parsed.protocol === 'https:' ? https : http;
+        const bodyText = options.body ? JSON.stringify(options.body) : '';
+        const headers = {
+            'Accept': 'application/json',
+            ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+            ...(options.headers || {})
+        };
+        if (options.body) {
+            headers['Content-Length'] = Buffer.byteLength(bodyText, 'utf-8');
+        }
+        const timeoutMs = Number.isFinite(options.timeoutMs)
+            ? Math.max(1000, Number(options.timeoutMs))
+            : 30000;
+
+        return new Promise((resolve) => {
+            let settled = false;
+            const finish = (value) => {
+                if (settled) return;
+                settled = true;
+                resolve(value);
+            };
+            const req = transport.request({
+                protocol: parsed.protocol,
+                hostname: parsed.hostname,
+                port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
+                method: options.method || 'GET',
+                path: `${parsed.pathname}${parsed.search}`,
+                headers,
+                agent: parsed.protocol === 'https:' ? HTTPS_KEEP_ALIVE_AGENT : HTTP_KEEP_ALIVE_AGENT
+            }, (upstreamRes) => {
+                const chunks = [];
+                upstreamRes.on('data', (chunk) => chunk && chunks.push(chunk));
+                upstreamRes.on('end', () => {
+                    const text = chunks.length ? Buffer.concat(chunks).toString('utf-8') : '';
+                    finish({
+                        ok: true,
+                        status: upstreamRes.statusCode || 0,
+                        headers: upstreamRes.headers || {},
+                        bodyText: text
+                    });
+                });
+            });
+            req.setTimeout(timeoutMs, () => {
+                try { req.destroy(new Error('timeout')); } catch (_) {}
+                finish({ ok: false, error: 'timeout' });
+            });
+            req.on('error', (err) => finish({ ok: false, error: err && err.message ? err.message : 'request failed' }));
+            if (bodyText) {
+                req.write(bodyText);
+            }
+            req.end();
+        });
+    }
+
+    function extractChatCompletionResult(payload) {
+        if (!payload || typeof payload !== 'object') return { text: '' };
+        const choice = Array.isArray(payload.choices) ? payload.choices[0] : null;
+        const message = choice && typeof choice === 'object' ? choice.message : null;
+        const content = message && typeof message === 'object' ? message.content : '';
+        let text = '';
+        if (typeof content === 'string') {
+            text = content;
+        } else if (Array.isArray(content)) {
+            text = content
+                .map((item) => {
+                    if (!item) return '';
+                    if (typeof item === 'string') return item;
+                    if (typeof item === 'object') {
+                        if (typeof item.text === 'string') return item.text;
+                        if (typeof item.content === 'string') return item.content;
+                    }
+                    return '';
+                })
+                .filter(Boolean)
+                .join('');
+        }
+        return { text };
+    }
+
+    function normalizeResponsesInputToChatMessages(input) {
+        // 支持：
+        // - string
+        // - { role, content }（单条 message）
+        // - { type:"input_text"|"input_image", ... }（单个 block）
+        // - [{ role, content: [{type:"input_text"|"input_image", ...}] }]
+        // - [{ type:"input_text"|"input_image", ... }]（视为单条 user 消息）
+        if (typeof input === 'string') {
+            return [{ role: 'user', content: input }];
+        }
+        if (input && typeof input === 'object' && !Array.isArray(input)) {
+            if (typeof input.role === 'string' && input.content != null) {
+                const role = input.role.trim() || 'user';
+                const content = Array.isArray(input.content)
+                    ? toChatContent(input.content)
+                    : input.content;
+                return content ? [{ role, content }] : [];
+            }
+            // 单个 block：{type:"input_text"|"input_image", ...}
+            if (typeof input.type === 'string') {
+                const content = toChatContent([input]);
+                return content ? [{ role: 'user', content }] : [];
+            }
+            return [];
+        }
+        if (!Array.isArray(input)) {
+            return [];
+        }
+
+        const toChatContent = (blocks) => {
+            if (!Array.isArray(blocks)) return '';
+            const out = [];
+            for (const block of blocks) {
+                if (!block || typeof block !== 'object') continue;
+                const type = typeof block.type === 'string' ? block.type : '';
+                if (type === 'input_text' && typeof block.text === 'string') {
+                    out.push({ type: 'text', text: block.text });
+                    continue;
+                }
+                if (type === 'input_image') {
+                    const raw = block.image_url != null ? block.image_url : block.imageUrl;
+                    const url = typeof raw === 'string'
+                        ? raw
+                        : (raw && typeof raw === 'object' && typeof raw.url === 'string' ? raw.url : '');
+                    if (url) {
+                        out.push({ type: 'image_url', image_url: { url } });
+                    }
+                    continue;
+                }
+                // 容错：兼容已是 chat content 的 {type:"text"} / {type:"image_url"}
+                if (type === 'text' && typeof block.text === 'string') {
+                    out.push({ type: 'text', text: block.text });
+                    continue;
+                }
+                if (type === 'image_url' && block.image_url) {
+                    out.push({ type: 'image_url', image_url: block.image_url });
+                }
+            }
+            if (out.length === 0) return '';
+            return out;
+        };
+
+        const messages = [];
+        for (const item of input) {
+            if (!item || typeof item !== 'object') continue;
+            if (typeof item.role === 'string' && item.content != null) {
+                const role = item.role.trim() || 'user';
+                const content = Array.isArray(item.content)
+                    ? toChatContent(item.content)
+                    : item.content;
+                if (content) {
+                    messages.push({ role, content });
+                }
+                continue;
+            }
+        }
+
+        if (messages.length > 0) {
+            return messages;
+        }
+
+        // 退化：把 input array 当作单条 user content blocks
+        const fallbackContent = toChatContent(input);
+        if (fallbackContent) {
+            return [{ role: 'user', content: fallbackContent }];
+        }
+        return [];
+    }
+
+    function ensureResponseMetadata(payload) {
+        const base = payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : {};
+        const id = typeof base.id === 'string' && base.id.trim()
+            ? base.id.trim()
+            : `resp_${crypto.randomBytes(10).toString('hex')}`;
+        const model = typeof base.model === 'string' ? base.model : '';
+        return {
+            object: 'response',
+            id,
+            model,
+            ...base
+        };
+    }
+
+    function writeSse(res, eventName, dataObj) {
+        if (eventName) {
+            res.write(`event: ${eventName}\n`);
+        }
+        if (dataObj === '[DONE]') {
+            res.write('data: [DONE]\n\n');
+            return;
+        }
+        res.write(`data: ${JSON.stringify(dataObj)}\n\n`);
+    }
+
+    function sendResponsesSse(res, responsePayload) {
+        const response = ensureResponseMetadata(responsePayload);
+        const responseId = response.id;
+        const model = response.model;
+        let sequence = 0;
+        const nextSeq = () => {
+            sequence += 1;
+            return sequence;
+        };
+
+        writeSse(res, 'response.created', {
+            type: 'response.created',
+            response: {
+                id: responseId,
+                model,
+                created_at: response.created_at
+            }
+        });
+
+        const output = Array.isArray(response.output) ? response.output : [];
+        for (let outputIndex = 0; outputIndex < output.length; outputIndex += 1) {
+            const item = output[outputIndex];
+            if (!item || typeof item !== 'object') continue;
+            const itemType = typeof item.type === 'string' ? item.type : '';
+            const itemId = typeof item.id === 'string' && item.id.trim()
+                ? item.id.trim()
+                : `item_${crypto.randomBytes(8).toString('hex')}`;
+
+            writeSse(res, 'response.output_item.added', {
+                type: 'response.output_item.added',
+                output_index: outputIndex,
+                item: { ...item, id: itemId }
+            });
+
+            if (itemType === 'message') {
+                const content = Array.isArray(item.content) ? item.content : [];
+                for (let contentIndex = 0; contentIndex < content.length; contentIndex += 1) {
+                    const block = content[contentIndex];
+                    if (!block || typeof block !== 'object') continue;
+                    if (block.type !== 'output_text') continue;
+                    const text = typeof block.text === 'string' ? block.text : '';
+                    if (text) {
+                        writeSse(res, 'response.output_text.delta', {
+                            type: 'response.output_text.delta',
+                            item_id: itemId,
+                            output_index: outputIndex,
+                            content_index: contentIndex,
+                            delta: text,
+                            sequence_number: nextSeq()
+                        });
+                    }
+                    writeSse(res, 'response.output_text.done', {
+                        type: 'response.output_text.done',
+                        item_id: itemId,
+                        output_index: outputIndex,
+                        content_index: contentIndex,
+                        text,
+                        sequence_number: nextSeq()
+                    });
+                }
+            }
+
+            writeSse(res, 'response.output_item.done', {
+                type: 'response.output_item.done',
+                output_index: outputIndex,
+                item: { ...item, id: itemId },
+                sequence_number: nextSeq()
+            });
+        }
+
+        writeSse(res, 'response.completed', { type: 'response.completed', response });
+        writeSse(res, 'done', '[DONE]');
+    }
 
     function canListenPort(host, port) {
         return new Promise((resolve) => {
@@ -374,6 +696,148 @@ function createBuiltinProxyRuntimeController(deps = {}) {
                     'Content-Length': Buffer.byteLength(body, 'utf-8')
                 });
                 res.end(body, 'utf-8');
+                return;
+            }
+
+            // Responses shim：
+            // - Codex CLI 默认走 /v1/responses（含 SSE）
+            // - 某些上游只支持 /v1/chat/completions
+            // 因此这里优先尝试 /v1/responses（stream=false），失败再转换到 chat/completions 并回包为 responses。
+            if ((incomingPath === '/v1/responses' || incomingPath === '/v1/responses/') && (req.method || 'GET').toUpperCase() === 'POST') {
+                void (async () => {
+                    const { body, error } = await readRequestBody(req, 10 * 1024 * 1024);
+                    if (error) {
+                        res.writeHead(413, { 'Content-Type': 'application/json; charset=utf-8' });
+                        res.end(JSON.stringify({ error }));
+                        return;
+                    }
+                    const parsed = parseJsonOrError(body);
+                    if (parsed.error) {
+                        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                        res.end(JSON.stringify({ error: `invalid json: ${parsed.error}` }));
+                        return;
+                    }
+
+                    const payload = parsed.value && typeof parsed.value === 'object' ? parsed.value : {};
+                    const wantsStream = payload.stream === true;
+
+                    const commonHeaders = {
+                        ...(upstream.authHeader ? { 'Authorization': upstream.authHeader } : {}),
+                        'X-Codexmate-Proxy': '1'
+                    };
+
+                    const upstreamResponsesUrl = joinApiUrl(upstream.baseUrl, 'responses');
+                    const upstreamResponses = upstreamResponsesUrl
+                        ? await proxyRequestJson(upstreamResponsesUrl, {
+                            method: 'POST',
+                            headers: commonHeaders,
+                            timeoutMs,
+                            body: { ...payload, stream: false }
+                        })
+                        : { ok: false, error: 'failed to build upstream URL' };
+
+                    // 优先走上游 /responses（如果支持）。若上游报错且不是“端点不支持”，则直接透传错误。
+                    if (upstreamResponses.ok && upstreamResponses.status >= 200 && upstreamResponses.status < 300) {
+                        const json = parseJsonOrError(upstreamResponses.bodyText);
+                        if (json.error) {
+                            res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
+                            res.end(JSON.stringify({ error: `Upstream JSON parse failed: ${json.error}` }));
+                            return;
+                        }
+                        const responsesPayload = ensureResponseMetadata(json.value);
+                        if (wantsStream) {
+                            res.writeHead(200, {
+                                'Content-Type': 'text/event-stream; charset=utf-8',
+                                'Cache-Control': 'no-cache',
+                                'Connection': 'keep-alive',
+                                'X-Accel-Buffering': 'no'
+                            });
+                            sendResponsesSse(res, responsesPayload);
+                            res.end();
+                            return;
+                        }
+                        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                        res.end(JSON.stringify(responsesPayload));
+                        return;
+                    }
+
+                    if (upstreamResponses.ok && upstreamResponses.status >= 400) {
+                        if (!shouldFallbackFromUpstreamResponses(upstreamResponses.status, upstreamResponses.bodyText)) {
+                            res.writeHead(upstreamResponses.status, { 'Content-Type': 'application/json; charset=utf-8' });
+                            res.end(upstreamResponses.bodyText || JSON.stringify({ error: 'Upstream error' }));
+                            return;
+                        }
+                        // fallthrough to chat/completions conversion
+                    }
+
+                    if (!upstreamResponses.ok) {
+                        res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
+                        res.end(JSON.stringify({ error: upstreamResponses.error || 'Upstream request failed' }));
+                        return;
+                    }
+
+                    const model = typeof payload.model === 'string' ? payload.model : '';
+                    const messages = normalizeResponsesInputToChatMessages(payload.input);
+                    const chatBody = {
+                        model,
+                        messages,
+                        stream: false
+                    };
+                    if (payload.max_output_tokens != null && chatBody.max_tokens == null) {
+                        chatBody.max_tokens = payload.max_output_tokens;
+                    }
+
+                    const upstreamChatUrl = joinApiUrl(upstream.baseUrl, 'chat/completions');
+                    if (!upstreamChatUrl) {
+                        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                        res.end(JSON.stringify({ error: 'failed to build upstream URL' }));
+                        return;
+                    }
+
+                    const upstreamChat = await proxyRequestJson(upstreamChatUrl, {
+                        method: 'POST',
+                        headers: commonHeaders,
+                        timeoutMs,
+                        body: chatBody
+                    });
+                    if (!upstreamChat.ok) {
+                        res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
+                        res.end(JSON.stringify({ error: upstreamChat.error || 'proxy request failed' }));
+                        return;
+                    }
+
+                    const chatJson = parseJsonOrError(upstreamChat.bodyText);
+                    if (chatJson.error) {
+                        res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
+                        res.end(JSON.stringify({ error: `invalid upstream response: ${chatJson.error}` }));
+                        return;
+                    }
+
+                    const { text } = extractChatCompletionResult(chatJson.value);
+                    const responsesPayload = ensureResponseMetadata({
+                        model,
+                        output: [{
+                            type: 'message',
+                            role: 'assistant',
+                            content: [{ type: 'output_text', text }]
+                        }],
+                        usage: chatJson.value && chatJson.value.usage ? chatJson.value.usage : undefined
+                    });
+
+                    if (wantsStream) {
+                        res.writeHead(200, {
+                            'Content-Type': 'text/event-stream; charset=utf-8',
+                            'Cache-Control': 'no-cache',
+                            'Connection': 'keep-alive',
+                            'X-Accel-Buffering': 'no'
+                        });
+                        sendResponsesSse(res, responsesPayload);
+                        res.end();
+                        return;
+                    }
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify(responsesPayload));
+                })();
                 return;
             }
 
