@@ -460,7 +460,7 @@ export function createSessionComputed() {
                 {
                     key: 'estimated-cost',
                     label: `预估费用 · ${usageRangeLabel}`,
-                    value: estimatedCost.hasEstimate ? formatUsageEstimatedCost(estimatedCost.totalCostUsd) : '暂无',
+                    value: estimatedCost.hasEstimate ? formatUsageEstimatedCost(estimatedCost.totalCostUsd) : '0',
                     title: estimatedCost.hasEstimate
                         ? `${estimatedCost.skippedUnsupportedSessions > 0 ? '暂不含 Claude，' : ''}${estimatedCost.catalogSessions > 0
                             ? (estimatedCost.configuredSessions > 0 ? '按已配置单价 + 公开模型目录估算' : '按公开模型目录估算')
@@ -561,8 +561,8 @@ export function createSessionComputed() {
                     tokenLabel: formatCompactUsageSummaryNumber(row.tokenTotal),
                     tokenTitle: formatUsageSummaryNumber(row.tokenTotal),
                     tokenPercent: maxTokens > 0 ? Math.round((row.tokenTotal / maxTokens) * 1000) / 10 : 0,
-                    costLabel: row.hasCostEstimate ? formatUsageEstimatedCost(row.estimatedCostUsd) : '暂无',
-                    costTitle: row.hasCostEstimate ? formatUsageEstimatedCost(row.estimatedCostUsd, { precise: true }) : '暂无',
+                    costLabel: row.hasCostEstimate ? formatUsageEstimatedCost(row.estimatedCostUsd) : '0',
+                    costTitle: row.hasCostEstimate ? formatUsageEstimatedCost(row.estimatedCostUsd, { precise: true }) : '0',
                     costPercent: maxCost > 0 ? Math.round((row.estimatedCostUsd / maxCost) * 1000) / 10 : 0
                 })),
                 maxTokens,
