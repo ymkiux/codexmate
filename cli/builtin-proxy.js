@@ -202,10 +202,27 @@ function createBuiltinProxyRuntimeController(deps = {}) {
     function normalizeResponsesInputToChatMessages(input) {
         // 支持：
         // - string
+        // - { role, content }（单条 message）
+        // - { type:"input_text"|"input_image", ... }（单个 block）
         // - [{ role, content: [{type:"input_text"|"input_image", ...}] }]
         // - [{ type:"input_text"|"input_image", ... }]（视为单条 user 消息）
         if (typeof input === 'string') {
             return [{ role: 'user', content: input }];
+        }
+        if (input && typeof input === 'object' && !Array.isArray(input)) {
+            if (typeof input.role === 'string' && input.content != null) {
+                const role = input.role.trim() || 'user';
+                const content = Array.isArray(input.content)
+                    ? toChatContent(input.content)
+                    : input.content;
+                return content ? [{ role, content }] : [];
+            }
+            // 单个 block：{type:"input_text"|"input_image", ...}
+            if (typeof input.type === 'string') {
+                const content = toChatContent([input]);
+                return content ? [{ role: 'user', content }] : [];
+            }
+            return [];
         }
         if (!Array.isArray(input)) {
             return [];

@@ -86,7 +86,7 @@ test('builtin-proxy /v1/responses falls back to chat-only upstream and returns R
     const resp = await requestText(`http://127.0.0.1:${proxyPort}/v1/responses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: { model: 'gpt-test', input: 'ping', stream: false }
+        body: { model: 'gpt-test', input: { type: 'input_text', text: 'ping' }, stream: false }
     });
     assert.equal(resp.status, 200);
     const parsed = JSON.parse(resp.text);
@@ -154,4 +154,3 @@ test('builtin-proxy /v1/responses stream=true returns SSE wrapper with done sent
     await proxy.close();
     await upstream.close();
 });
-
