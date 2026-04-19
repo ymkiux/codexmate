@@ -686,7 +686,7 @@ function createBuiltinProxyRuntimeController(deps = {}) {
             // - Codex CLI 默认走 /v1/responses（含 SSE）
             // - 某些上游只支持 /v1/chat/completions
             // 因此这里优先尝试 /v1/responses（stream=false），失败再转换到 chat/completions 并回包为 responses。
-            if (incomingPath === '/v1/responses' && (req.method || 'GET').toUpperCase() === 'POST') {
+            if ((incomingPath === '/v1/responses' || incomingPath === '/v1/responses/') && (req.method || 'GET').toUpperCase() === 'POST') {
                 void (async () => {
                     const { body, error } = await readRequestBody(req, 10 * 1024 * 1024);
                     if (error) {
@@ -719,32 +719,43 @@ function createBuiltinProxyRuntimeController(deps = {}) {
                         })
                         : { ok: false, error: 'failed to build upstream URL' };
 
-                    const canFallback = upstreamResponses.ok
-                        ? shouldFallbackFromUpstreamResponses(upstreamResponses.status, upstreamResponses.bodyText)
-                        : true;
-
-                    if (upstreamResponses.ok && !canFallback) {
+                    // 优先走上游 /responses（如果支持）。若上游报错且不是“端点不支持”，则直接透传错误。
+                    if (upstreamResponses.ok && upstreamResponses.status >= 200 && upstreamResponses.status < 300) {
                         const json = parseJsonOrError(upstreamResponses.bodyText);
-                        if (!json.error && json.value) {
-                            const responsesPayload = ensureResponseMetadata(json.value);
-                            if (wantsStream) {
-                                res.writeHead(200, {
-                                    'Content-Type': 'text/event-stream; charset=utf-8',
-                                    'Cache-Control': 'no-cache',
-                                    'Connection': 'keep-alive',
-                                    'X-Accel-Buffering': 'no'
-                                });
-                                sendResponsesSse(res, responsesPayload);
-                                res.end();
-                                return;
-                            }
-                            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-                            res.end(JSON.stringify(responsesPayload));
+                        if (json.error) {
+                            res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
+                            res.end(JSON.stringify({ error: `Upstream JSON parse failed: ${json.error}` }));
                             return;
                         }
-                        // 如果上游返回 200 但 body 解析失败，直接透传以便排查
-                        res.writeHead(upstreamResponses.status || 502, { 'Content-Type': 'application/json; charset=utf-8' });
-                        res.end(upstreamResponses.bodyText || '');
+                        const responsesPayload = ensureResponseMetadata(json.value);
+                        if (wantsStream) {
+                            res.writeHead(200, {
+                                'Content-Type': 'text/event-stream; charset=utf-8',
+                                'Cache-Control': 'no-cache',
+                                'Connection': 'keep-alive',
+                                'X-Accel-Buffering': 'no'
+                            });
+                            sendResponsesSse(res, responsesPayload);
+                            res.end();
+                            return;
+                        }
+                        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                        res.end(JSON.stringify(responsesPayload));
+                        return;
+                    }
+
+                    if (upstreamResponses.ok && upstreamResponses.status >= 400) {
+                        if (!shouldFallbackFromUpstreamResponses(upstreamResponses.status, upstreamResponses.bodyText)) {
+                            res.writeHead(upstreamResponses.status, { 'Content-Type': 'application/json; charset=utf-8' });
+                            res.end(upstreamResponses.bodyText || JSON.stringify({ error: 'Upstream error' }));
+                            return;
+                        }
+                        // fallthrough to chat/completions conversion
+                    }
+
+                    if (!upstreamResponses.ok) {
+                        res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
+                        res.end(JSON.stringify({ error: upstreamResponses.error || 'Upstream request failed' }));
                         return;
                     }
 
