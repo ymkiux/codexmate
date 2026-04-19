@@ -814,6 +814,8 @@ function createOpenaiBridgeHttpHandler(options = {}) {
 
             const responsesRequest = parsed.value;
             const streamRequested = !!(responsesRequest && typeof responsesRequest === 'object' && responsesRequest.stream === true);
+            const acceptHeader = req && req.headers ? (req.headers.accept || req.headers.Accept || '') : '';
+            const wantsSse = /text\/event-stream/i.test(String(acceptHeader || ''));
 
             // Maxx-style behavior: prefer upstream /responses if supported.
             // Fallback to /chat/completions conversion when upstream does not implement /responses (404/405).
@@ -837,13 +839,14 @@ function createOpenaiBridgeHttpHandler(options = {}) {
                     return;
                 }
                 const upstreamPayload = upstreamJson.value;
-                if (streamRequested) {
+                if (streamRequested && wantsSse) {
                     res.writeHead(200, {
                         'Content-Type': 'text/event-stream; charset=utf-8',
                         'Cache-Control': 'no-cache',
                         'Connection': 'keep-alive',
                         'X-Accel-Buffering': 'no'
                     });
+                    if (typeof res.flushHeaders === 'function') res.flushHeaders();
                     sendResponsesSse(res, upstreamPayload);
                     res.end();
                     return;
@@ -911,13 +914,14 @@ function createOpenaiBridgeHttpHandler(options = {}) {
             const toolCalls = extracted && Array.isArray(extracted.toolCalls) ? extracted.toolCalls : [];
             const responsesPayload = buildResponsesPayloadFromChatResult(model, text, toolCalls, upstreamJson.value);
 
-            if (converted.streamRequested) {
+            if (converted.streamRequested && wantsSse) {
                 res.writeHead(200, {
                     'Content-Type': 'text/event-stream; charset=utf-8',
                     'Cache-Control': 'no-cache',
                     'Connection': 'keep-alive',
                     'X-Accel-Buffering': 'no'
                 });
+                if (typeof res.flushHeaders === 'function') res.flushHeaders();
                 sendResponsesSse(res, responsesPayload);
                 res.end();
                 return;
