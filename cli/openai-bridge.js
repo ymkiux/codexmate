@@ -729,12 +729,15 @@ function createOpenaiBridgeHttpHandler(options = {}) {
             // 兼容：某些客户端在自定义 base_url 时可能不带 Authorization。
             // 为避免在 LAN 暴露无鉴权的代理，这里仅允许 loopback 连接缺省 token。
             const remoteAddr = req && req.socket ? req.socket.remoteAddress : '';
-            if (!token && !isLoopbackAddress(remoteAddr)) {
+            const isLoopback = isLoopbackAddress(remoteAddr);
+            if (!token && !isLoopback) {
                 res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
                 res.end(JSON.stringify({ error: 'Unauthorized' }));
                 return;
             }
-            if (token && token !== expectedToken) {
+            // loopback 上的本地代理：允许客户端携带任意 Authorization（例如 Codex 会附带 provider apiKey）。
+            // 非 loopback 时仍强制校验 expectedToken，避免局域网被未授权调用。
+            if (!isLoopback && token && token !== expectedToken) {
                 res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
                 res.end(JSON.stringify({ error: 'Unauthorized' }));
                 return;
