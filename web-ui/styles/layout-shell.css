@@ -19,6 +19,10 @@ body::after {
     min-height: 100vh;
 }
 
+:root {
+    --side-rail-width: 248px;
+}
+
 /* ============================================
    布局：双栏（侧栏 + 主区）
    ============================================ */
@@ -114,11 +118,14 @@ body::after {
 
 .lang-fab {
     position: fixed;
-    left: 50%;
+    left: 0;
     bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-    transform: translateX(-50%);
+    width: var(--side-rail-width, 248px);
+    transform: none;
     z-index: 60;
     pointer-events: none;
+    display: flex;
+    justify-content: center;
 }
 
 .lang-fab .lang-switch {
