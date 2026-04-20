@@ -1,16 +1,16 @@
         <div v-if="showConfigTemplateModal" class="modal-overlay" @click.self="!configTemplateApplying && closeConfigTemplateModal()">
             <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="config-template-modal-title">
-                <div class="modal-title" id="config-template-modal-title">Config 模板编辑器（手动确认应用）</div>
+                <div class="modal-title" id="config-template-modal-title">{{ t('modal.configTemplate.title') }}</div>
 
                 <div class="form-group">
-                    <label class="form-label">config.toml 模板</label>
+                    <label class="form-label">{{ t('modal.configTemplate.label') }}</label>
                     <div v-if="configTemplateDiffVisible" class="agents-diff-container">
                         <div class="agents-diff-header">
                             <div class="agents-diff-title">
-                                差异预览（config.toml）
-                                <span v-if="configTemplateDiffLoading" class="agents-diff-subtitle">生成中...</span>
-                                <span v-else-if="configTemplateDiffError" class="agents-diff-subtitle">生成失败</span>
-                                <span v-else-if="!configTemplateDiffHasChanges" class="agents-diff-subtitle">未检测到改动</span>
+                                {{ t('diff.title.configTemplate') }}
+                                <span v-if="configTemplateDiffLoading" class="agents-diff-subtitle">{{ t('diff.generating') }}</span>
+                                <span v-else-if="configTemplateDiffError" class="agents-diff-subtitle">{{ t('diff.failed') }}</span>
+                                <span v-else-if="!configTemplateDiffHasChanges" class="agents-diff-subtitle">{{ t('diff.noChanges') }}</span>
                             </div>
                             <div class="agents-diff-stats">
                                 <span class="agents-diff-stat add">+{{ configTemplateDiffStats.added || 0 }}</span>
@@ -40,34 +40,34 @@
                         spellcheck="false"
                         :readonly="configTemplateApplying || configTemplateDiffLoading"
                         @input="onConfigTemplateContentInput"
-                        placeholder="在这里编辑 config.toml 模板内容"></textarea>
+                        :placeholder="t('modal.configTemplate.placeholder')"></textarea>
                     <div class="template-editor-warning">
                         <template v-if="configTemplateDiffConfirmEnabled">
-                            两步确认：先预览差异，再应用写入。
+                            {{ t('modal.configTemplate.mode.twoStep') }}
                         </template>
                         <template v-else>
-                            一步应用：点击“应用”直接写入。
+                            {{ t('modal.configTemplate.mode.oneStep') }}
                         </template>
-                        <div v-if="configTemplateDiffVisible && (configTemplateDiffLoading || configTemplateApplying)" class="agents-diff-hint">正在生成差异或应用中，操作暂不可用。</div>
-                        <div v-else-if="configTemplateDiffVisible && configTemplateDiffError" class="agents-diff-hint">差异预览失败，请返回编辑后重试。</div>
-                        <div v-else-if="configTemplateDiffVisible && !configTemplateDiffHasChanges" class="agents-diff-hint">未检测到改动，可返回编辑继续修改或取消退出。</div>
-                        <div v-else-if="configTemplateDiffVisible" class="agents-diff-hint">当前为预览模式，可点击“应用”写入或“返回编辑”继续修改。</div>
+                        <div v-if="configTemplateDiffVisible && (configTemplateDiffLoading || configTemplateApplying)" class="agents-diff-hint">{{ t('diff.hint.busy') }}</div>
+                        <div v-else-if="configTemplateDiffVisible && configTemplateDiffError" class="agents-diff-hint">{{ t('diff.hint.failedBack') }}</div>
+                        <div v-else-if="configTemplateDiffVisible && !configTemplateDiffHasChanges" class="agents-diff-hint">{{ t('diff.hint.noChangesBack') }}</div>
+                        <div v-else-if="configTemplateDiffVisible" class="agents-diff-hint">{{ t('diff.hint.previewMode') }}</div>
                     </div>
                 </div>
 
                 <div class="btn-group">
-                    <button class="btn btn-cancel" @click="closeConfigTemplateModal" :disabled="configTemplateApplying || configTemplateDiffLoading">取消</button>
+                    <button class="btn btn-cancel" @click="closeConfigTemplateModal" :disabled="configTemplateApplying || configTemplateDiffLoading">{{ t('common.cancel') }}</button>
                     <button
                         v-if="configTemplateDiffVisible"
                         class="btn"
                         @click="resetConfigTemplateDiffState"
                         :disabled="configTemplateApplying || configTemplateDiffLoading">
-                        返回编辑
+                        {{ t('common.backToEdit') }}
                     </button>
                     <button class="btn btn-confirm" @click="applyConfigTemplate" :disabled="configTemplateApplying || configTemplateDiffLoading || (configTemplateDiffVisible && !configTemplateDiffHasChanges)">
                         {{ configTemplateApplying
-                            ? (configTemplateDiffVisible || !configTemplateDiffConfirmEnabled ? '应用中...' : '确认中...')
-                            : (configTemplateDiffVisible || !configTemplateDiffConfirmEnabled ? '应用' : '确认')
+                            ? (configTemplateDiffVisible || !configTemplateDiffConfirmEnabled ? t('common.applying') : t('common.confirming'))
+                            : (configTemplateDiffVisible || !configTemplateDiffConfirmEnabled ? t('common.apply') : t('common.confirm'))
                         }}
                     </button>
                 </div>
@@ -83,35 +83,35 @@
                             class="btn-mini btn-modal-copy"
                             @click="exportAgentsContent"
                             :disabled="agentsLoading">
-                            导出
+                            {{ t('modal.agents.export') }}
                         </button>
                         <button
                             class="btn-mini btn-modal-copy"
                             @click="copyAgentsContent"
                             :disabled="agentsLoading">
-                            复制
+                            {{ t('modal.agents.copy') }}
                         </button>
                     </div>
                 </div>
 
                 <div class="modal-editor-body">
                     <div class="form-group">
-                        <label class="form-label">目标文件</label>
+                        <label class="form-label">{{ t('modal.agents.targetFile') }}</label>
                         <div class="form-hint">
-                            {{ agentsPath || '未加载' }}
+                            {{ agentsPath || t('common.notLoaded') }}
                             <span v-if="agentsPath">
-                                （{{ agentsExists ? '已存在' : '不存在，将在保存时创建' }}）
+                                （{{ agentsExists ? t('common.exists') : t('common.notExistsWillCreateOnSave') }}）
                             </span>
                         </div>
                     </div>
 
 
                     <div class="form-group">
-                        <label class="form-label">AGENTS.md 内容</label>
+                        <label class="form-label">{{ t('modal.agents.contentLabel') }}</label>
                         <div
                             v-if="!agentsLoading && (hasAgentsContentChanged() || agentsDiffVisible)"
                             class="agents-diff-save-alert">
-                            {{ agentsDiffVisible ? '预览模式：当前改动尚未保存，只有点击“应用”后才会写入文件。' : '检测到未保存改动：关闭页面或应用前请先保存。' }}
+                            {{ agentsDiffVisible ? t('modal.agents.unsaved.previewModeHint') : t('modal.agents.unsaved.detectedHint') }}
                         </div>
                         <div v-if="agentsDiffVisible">
                             <div
@@ -120,10 +120,10 @@
                                 <span class="agents-diff-stat add">+{{ agentsDiffStats.added }}</span>
                                 <span class="agents-diff-stat del">-{{ agentsDiffStats.removed }}</span>
                             </div>
-                            <div v-if="agentsDiffLoading" class="state-message">生成差异中...</div>
+                            <div v-if="agentsDiffLoading" class="state-message">{{ t('diff.generating') }}</div>
                             <div v-else-if="agentsDiffError" class="state-message error">{{ agentsDiffError }}</div>
-                            <div v-else-if="agentsDiffTruncated" class="agents-diff-empty">内容过大，已跳过逐行差异预览</div>
-                            <div v-else-if="!agentsDiffHasChanges" class="agents-diff-empty">未检测到改动</div>
+                            <div v-else-if="agentsDiffTruncated" class="agents-diff-empty">{{ t('diff.tooLargeSkip') }}</div>
+                            <div v-else-if="!agentsDiffHasChanges" class="agents-diff-empty">{{ t('diff.noChanges') }}</div>
                             <div v-else class="agents-diff-view agents-diff-editor">
                                 <div
                                     v-for="(line, index) in agentsDiffLines"
@@ -143,32 +143,32 @@
                             spellcheck="false"
                             :readonly="agentsLoading || agentsSaving"
                             @input="onAgentsContentInput"
-                            placeholder="在这里编辑 AGENTS.md 内容"></textarea>
+                            :placeholder="t('modal.agents.placeholder')"></textarea>
                         <div class="template-editor-warning">
                             {{ agentsModalHint }}
-                            <div class="agents-diff-hint">快捷键：Esc（差异预览时返回编辑，编辑时关闭窗口）。</div>
-                            <div v-if="!agentsDiffVisible" class="agents-diff-hint">保存需两步：先点击“确认”预览差异，再点击“应用”保存。</div>
-                            <div v-else-if="agentsDiffLoading || agentsSaving" class="agents-diff-hint">正在生成差异或应用中，操作暂不可用。</div>
-                            <div v-else-if="agentsDiffError" class="agents-diff-hint">差异预览失败，请返回编辑后重试。</div>
-                            <div v-else-if="!agentsDiffHasChanges" class="agents-diff-hint">未检测到改动，可返回编辑继续修改或取消退出。</div>
-                            <div v-else-if="agentsDiffTruncated" class="agents-diff-hint">内容过大，已跳过预览，可点击“应用”保存或“返回编辑”继续修改。</div>
-                            <div v-else class="agents-diff-hint">当前为预览模式，可点击“应用”保存或“返回编辑”继续修改。</div>
+                            <div class="agents-diff-hint">{{ t('modal.agents.hint.shortcuts') }}</div>
+                            <div v-if="!agentsDiffVisible" class="agents-diff-hint">{{ t('modal.agents.hint.twoStepSave') }}</div>
+                            <div v-else-if="agentsDiffLoading || agentsSaving" class="agents-diff-hint">{{ t('diff.hint.busy') }}</div>
+                            <div v-else-if="agentsDiffError" class="agents-diff-hint">{{ t('diff.hint.failedBack') }}</div>
+                            <div v-else-if="!agentsDiffHasChanges" class="agents-diff-hint">{{ t('diff.hint.noChangesBack') }}</div>
+                            <div v-else-if="agentsDiffTruncated" class="agents-diff-hint">{{ t('diff.viewHint.truncated') }}</div>
+                            <div v-else class="agents-diff-hint">{{ t('diff.viewHint.preview') }}</div>
                         </div>
                     </div>
 
                 </div>
 
                 <div class="btn-group modal-editor-footer">
-                    <button class="btn btn-cancel" @click="closeAgentsModal" :disabled="agentsSaving || agentsDiffLoading">取消</button>
+                    <button class="btn btn-cancel" @click="closeAgentsModal" :disabled="agentsSaving || agentsDiffLoading">{{ t('common.cancel') }}</button>
                     <button
                         v-if="agentsDiffVisible"
                         class="btn"
                         @click="resetAgentsDiffState"
                         :disabled="agentsSaving || agentsDiffLoading">
-                        返回编辑
+                        {{ t('common.backToEdit') }}
                     </button>
                     <button class="btn btn-confirm" @click="applyAgentsContent" :disabled="agentsSaving || agentsLoading || agentsDiffLoading || (agentsDiffVisible && !agentsDiffHasChanges)">
-                        {{ agentsSaving ? (agentsDiffVisible ? '应用中...' : '确认中...') : (agentsDiffVisible ? '应用' : '确认') }}
+                        {{ agentsSaving ? (agentsDiffVisible ? t('common.applying') : t('common.confirming')) : (agentsDiffVisible ? t('common.apply') : t('common.confirm')) }}
                     </button>
                 </div>
             </div>

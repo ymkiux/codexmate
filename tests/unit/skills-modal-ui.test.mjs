@@ -16,7 +16,7 @@ test('skills modal template includes overview counters and reset entry', () => {
     assert.match(html, /exportSelectedSkills/);
     assert.match(html, /skillsZipImportInput/);
     assert.match(html, /<div class="modal modal-wide skills-modal" role="dialog" aria-modal="true" aria-labelledby="skills-modal-title">/);
-    assert.match(html, /<div class="modal-title" id="skills-modal-title">Skills 管理<\/div>/);
+    assert.match(html, /<div class="modal-title" id="skills-modal-title">\{\{\s*t\('modal\.skills\.title'\)\s*\}\}<\/div>/);
     assert.match(html, /@click="importSelectedSkills" :disabled="skillsImporting \|\| skillsScanningImports \|\| skillsImportSelectedCount === 0 \|\| skillsZipImporting \|\| skillsExporting \|\| skillsDeleting"/);
 });
 

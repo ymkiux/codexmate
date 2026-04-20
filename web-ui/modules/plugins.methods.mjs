@@ -25,13 +25,15 @@ function normalizePromptTemplateDraft(draft) {
     };
 }
 
-function buildBuiltinCommentPolishTemplate() {
+function buildBuiltinCommentPolishTemplate(t) {
+    const tr = (key, fallback, params = null) => (typeof t === 'function' ? t(key, params) : fallback);
+    const line1 = tr('plugins.builtin.commentPolish.line1', '轻微收敛以下代码注释');
     return {
         id: 'builtin_comment_polish',
-        name: '代码注释润色',
-        description: '轻微收敛以下代码注释 {{code}}',
+        name: tr('plugins.builtin.commentPolish.name', '代码注释润色'),
+        description: tr('plugins.builtin.commentPolish.desc', '轻微收敛以下代码注释 {{code}}'),
         template: [
-            '轻微收敛以下代码注释',
+            line1,
             '',
             '{{code}}'
         ].join('\n'),
@@ -41,13 +43,13 @@ function buildBuiltinCommentPolishTemplate() {
     };
 }
 
-function ensureBuiltinTemplates(rawList) {
+function ensureBuiltinTemplates(rawList, builtins) {
     const list = Array.isArray(rawList) ? rawList.filter(Boolean) : [];
-    const builtins = [buildBuiltinCommentPolishTemplate()];
+    const builtinList = Array.isArray(builtins) ? builtins.filter(Boolean) : [];
     // Built-ins are fixed and should not be overridden. Also, clean up any legacy built-ins
     // that may have been persisted previously.
     const rest = list.filter((item) => !(item && item.isBuiltin === true));
-    return [...builtins, ...rest];
+    return [...builtinList, ...rest];
 }
 
 export function createPluginsMethods() {
@@ -210,22 +212,22 @@ export function createPluginsMethods() {
         async copyPromptComposerRendered() {
             const text = typeof this.promptComposerRendered === 'string' ? this.promptComposerRendered.trim() : '';
             if (!text) {
-                this.showMessage('Nothing to copy', 'info');
+                this.showMessage(typeof this.t === 'function' ? this.t('toast.copy.empty') : 'Nothing to copy', 'info');
                 return;
             }
             try {
                 if (navigator.clipboard && window.isSecureContext) {
                     await navigator.clipboard.writeText(text);
-                    this.showMessage('Copied', 'success');
+                    this.showMessage(typeof this.t === 'function' ? this.t('toast.copy.ok') : 'Copied', 'success');
                     return;
                 }
             } catch (_) {}
             const ok = typeof this.fallbackCopyText === 'function' ? this.fallbackCopyText(text) : false;
             if (ok) {
-                this.showMessage('Copied', 'success');
+                this.showMessage(typeof this.t === 'function' ? this.t('toast.copy.ok') : 'Copied', 'success');
                 return;
             }
-            this.showMessage('Copy failed', 'error');
+            this.showMessage(typeof this.t === 'function' ? this.t('toast.copy.fail') : 'Copy failed', 'error');
         },
 
         selectPlugin(pluginId) {
@@ -244,8 +246,9 @@ export function createPluginsMethods() {
 
             this.pluginsLoading = true;
             try {
+                const t = typeof this.t === 'function' ? this.t : null;
                 const rawList = readPromptTemplatesFromStorage(localStorage);
-                const normalized = ensureBuiltinTemplates(rawList);
+                const normalized = ensureBuiltinTemplates(rawList, [buildBuiltinCommentPolishTemplate(t)]);
                 this.promptTemplatesListRaw = normalized;
                 // Keep built-in templates in sync (and ensure they exist).
                 persistPromptTemplatesToStorage(normalized, localStorage);
@@ -304,7 +307,7 @@ export function createPluginsMethods() {
                 return true;
             } catch (e) {
                 if (!silent) {
-                    this.showMessage('Failed to load plugins', 'error');
+                    this.showMessage(typeof this.t === 'function' ? this.t('toast.plugins.loadFail') : 'Failed to load plugins', 'error');
                 }
                 return false;
             } finally {
@@ -334,9 +337,12 @@ export function createPluginsMethods() {
 
         createPromptTemplate() {
             const id = createId('prompt');
+            const name = typeof this.t === 'function'
+                ? this.t('plugins.promptTemplates.manage.newTemplateName')
+                : 'New template';
             const draft = {
                 id,
-                name: 'New template',
+                name,
                 description: '',
                 template: '',
                 createdAt: nowIso(),
@@ -356,7 +362,7 @@ export function createPluginsMethods() {
             const draft = normalizePromptTemplateDraft(this.promptTemplateDraftRaw);
             if (!draft || !draft.id) return;
             if (draft.isBuiltin) {
-                this.showMessage('内置模板不可编辑', 'error');
+                this.showMessage(typeof this.t === 'function' ? this.t('toast.templates.builtinNotEditable') : 'Built-in templates are not editable', 'error');
                 return;
             }
             // Use project-style modal (no native prompt).
@@ -382,24 +388,32 @@ export function createPluginsMethods() {
             const draft = normalizePromptTemplateDraft(this.promptTemplateDraftRaw);
             if (!draft || !draft.id) return;
             if (draft.isBuiltin) {
-                this.promptTemplateVarDraftError = '内置模板不可编辑';
+                this.promptTemplateVarDraftError = typeof this.t === 'function'
+                    ? this.t('toast.templates.builtinNotEditable')
+                    : 'Built-in templates are not editable';
                 return;
             }
             const key = typeof this.promptTemplateVarDraftName === 'string'
                 ? this.promptTemplateVarDraftName.trim()
                 : '';
             if (!key) {
-                this.promptTemplateVarDraftError = '请输入变量名';
+                this.promptTemplateVarDraftError = typeof this.t === 'function'
+                    ? this.t('toast.templates.varNameRequired')
+                    : 'Variable name is required';
                 return;
             }
             if (!/^[a-zA-Z0-9_.-]+$/.test(key)) {
-                this.promptTemplateVarDraftError = '变量名仅支持字母/数字/下划线/中划线/点';
+                this.promptTemplateVarDraftError = typeof this.t === 'function'
+                    ? this.t('toast.templates.varNameInvalid')
+                    : 'Variable name may only contain letters, numbers, underscore, dash, dot';
                 return;
             }
             const placeholder = `{{${key}}}`;
             const current = typeof draft.template === 'string' ? draft.template : '';
             if (current.includes(placeholder)) {
-                this.promptTemplateVarDraftError = '变量已存在';
+                this.promptTemplateVarDraftError = typeof this.t === 'function'
+                    ? this.t('toast.templates.varExists')
+                    : 'Variable already exists';
                 return;
             }
             const nextText = current && !current.endsWith('\n')
@@ -408,7 +422,7 @@ export function createPluginsMethods() {
             this.promptTemplateDraftRaw = { ...draft, template: nextText };
             this.showPromptTemplateVarModal = false;
             this.promptTemplateVarDraftError = '';
-            this.showMessage('已添加变量', 'success');
+            this.showMessage(typeof this.t === 'function' ? this.t('toast.templates.varAdded') : 'Variable added', 'success');
         },
 
         setPromptVariableValue(name, value) {
@@ -422,33 +436,33 @@ export function createPluginsMethods() {
         async copyRenderedPrompt() {
             const text = typeof this.renderedPrompt === 'string' ? this.renderedPrompt.trim() : '';
             if (!text) {
-                this.showMessage('Nothing to copy', 'info');
+                this.showMessage(typeof this.t === 'function' ? this.t('toast.copy.empty') : 'Nothing to copy', 'info');
                 return;
             }
             try {
                 if (navigator.clipboard && window.isSecureContext) {
                     await navigator.clipboard.writeText(text);
-                    this.showMessage('Copied', 'success');
+                    this.showMessage(typeof this.t === 'function' ? this.t('toast.copy.ok') : 'Copied', 'success');
                     return;
                 }
             } catch (_) {}
             const ok = typeof this.fallbackCopyText === 'function' ? this.fallbackCopyText(text) : false;
             if (ok) {
-                this.showMessage('Copied', 'success');
+                this.showMessage(typeof this.t === 'function' ? this.t('toast.copy.ok') : 'Copied', 'success');
                 return;
             }
-            this.showMessage('Copy failed', 'error');
+            this.showMessage(typeof this.t === 'function' ? this.t('toast.copy.fail') : 'Copy failed', 'error');
         },
 
         async savePromptTemplate() {
             const draft = normalizePromptTemplateDraft(this.promptTemplateDraftRaw);
             if (draft.isBuiltin) {
-                this.showMessage('内置模板不可修改，请先 Duplicate 再编辑', 'error');
+                this.showMessage(typeof this.t === 'function' ? this.t('toast.templates.builtinNotModifiable') : 'Built-in templates are read-only. Duplicate first.', 'error');
                 return false;
             }
             const name = draft.name.trim();
             if (!name) {
-                this.showMessage('Template name is required', 'error');
+                this.showMessage(typeof this.t === 'function' ? this.t('toast.templates.nameRequired') : 'Template name is required', 'error');
                 return false;
             }
             const nextId = draft.id ? draft.id : createId('prompt');
@@ -472,7 +486,7 @@ export function createPluginsMethods() {
             persistPromptTemplatesToStorage(list, localStorage);
             this.promptTemplateDraftRaw = entry;
             this.promptTemplateSelectedId = nextId;
-            this.showMessage('Saved', 'success');
+            this.showMessage(typeof this.t === 'function' ? this.t('toast.save.ok') : 'Saved', 'success');
             return true;
         },
 
@@ -480,7 +494,7 @@ export function createPluginsMethods() {
             const draft = normalizePromptTemplateDraft(this.promptTemplateDraftRaw);
             if (!draft.id) return;
             if (draft.isBuiltin) {
-                this.showMessage('内置模板不可复制', 'error');
+                this.showMessage(typeof this.t === 'function' ? this.t('toast.templates.builtinNotDuplicable') : 'Built-in templates cannot be duplicated', 'error');
                 return;
             }
             const nextId = createId('prompt');
@@ -500,14 +514,15 @@ export function createPluginsMethods() {
             const draft = normalizePromptTemplateDraft(this.promptTemplateDraftRaw);
             if (!draft.id) return;
             if (draft.isBuiltin) {
-                this.showMessage('Built-in templates cannot be deleted', 'error');
+                this.showMessage(typeof this.t === 'function' ? this.t('toast.templates.builtinNotDeletable') : 'Built-in templates cannot be deleted', 'error');
                 return;
             }
+            const t = typeof this.t === 'function' ? this.t : null;
             const confirmed = await this.requestConfirmDialog({
-                title: 'Delete template',
-                message: `Delete “${draft.name || draft.id}”? This action cannot be undone.`,
-                confirmText: 'Delete',
-                cancelText: 'Cancel',
+                title: t ? t('toast.templates.deleteTitle') : 'Delete template',
+                message: t ? t('toast.templates.deleteMessage', { name: draft.name || draft.id }) : `Delete “${draft.name || draft.id}”? This action cannot be undone.`,
+                confirmText: t ? t('toast.templates.deleteConfirm') : 'Delete',
+                cancelText: t ? t('toast.templates.deleteCancel') : 'Cancel',
                 danger: true
             });
             if (!confirmed) return;
@@ -520,13 +535,13 @@ export function createPluginsMethods() {
             this.promptTemplateSelectedId = '';
             const first = this.promptTemplatesList && this.promptTemplatesList.length ? this.promptTemplatesList[0] : null;
             if (first) this.selectPromptTemplate(first.id);
-            this.showMessage('Deleted', 'success');
+            this.showMessage(typeof this.t === 'function' ? this.t('toast.delete.ok') : 'Deleted', 'success');
         },
 
         exportPromptTemplates() {
             const list = this.promptTemplatesList;
             if (!Array.isArray(list) || !list.length) {
-                this.showMessage('Nothing to export', 'info');
+                this.showMessage(typeof this.t === 'function' ? this.t('toast.export.empty') : 'Nothing to export', 'info');
                 return;
             }
             const payload = JSON.stringify(list.map((item) => ({
@@ -540,10 +555,10 @@ export function createPluginsMethods() {
             })), null, 2);
             if (typeof this.downloadTextFile === 'function') {
                 this.downloadTextFile(`prompt-templates-${Date.now()}.json`, payload, 'application/json;charset=utf-8');
-                this.showMessage('Exported', 'success');
+                this.showMessage(typeof this.t === 'function' ? this.t('toast.export.ok') : 'Exported', 'success');
                 return;
             }
-            this.showMessage('Export not supported', 'error');
+            this.showMessage(typeof this.t === 'function' ? this.t('toast.export.notSupported') : 'Export not supported', 'error');
         },
 
         triggerPromptTemplatesImport() {
@@ -551,7 +566,7 @@ export function createPluginsMethods() {
                 ? this.$refs.promptTemplatesImportInput
                 : null;
             if (!input) {
-                this.showMessage('Import is not available', 'error');
+                this.showMessage(typeof this.t === 'function' ? this.t('toast.import.notAvailable') : 'Import is not available', 'error');
                 return;
             }
             input.value = '';
@@ -566,18 +581,18 @@ export function createPluginsMethods() {
             try {
                 text = await file.text();
             } catch (_) {
-                this.showMessage('Failed to read file', 'error');
+                this.showMessage(typeof this.t === 'function' ? this.t('toast.import.readFileFail') : 'Failed to read file', 'error');
                 return;
             }
             let parsed;
             try {
                 parsed = JSON.parse(text);
             } catch (_) {
-                this.showMessage('Invalid JSON', 'error');
+                this.showMessage(typeof this.t === 'function' ? this.t('toast.import.invalidJson') : 'Invalid JSON', 'error');
                 return;
             }
             if (!Array.isArray(parsed)) {
-                this.showMessage('Expected an array', 'error');
+                this.showMessage(typeof this.t === 'function' ? this.t('toast.import.expectedArray') : 'Expected an array', 'error');
                 return;
             }
             const list = Array.isArray(this.promptTemplatesListRaw) ? [...this.promptTemplatesListRaw] : [];
@@ -599,7 +614,7 @@ export function createPluginsMethods() {
             }
             this.promptTemplatesListRaw = list;
             persistPromptTemplatesToStorage(list, localStorage);
-            this.showMessage('Imported', 'success');
+            this.showMessage(typeof this.t === 'function' ? this.t('toast.import.ok') : 'Imported', 'success');
         }
     };
 }

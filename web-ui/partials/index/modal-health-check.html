@@ -2,30 +2,30 @@
             <div class="modal modal-wide health-check-dialog" role="dialog" aria-modal="true" aria-labelledby="health-check-dialog-title">
                 <div class="modal-header">
                     <div>
-                        <div class="modal-title" id="health-check-dialog-title">健康聊天测试</div>
-                        <div class="health-check-dialog-subtitle">发一轮真实对话，快速确认可用性。</div>
+                        <div class="modal-title" id="health-check-dialog-title">{{ t('modal.healthCheck.title') }}</div>
+                        <div class="health-check-dialog-subtitle">{{ t('modal.healthCheck.subtitle') }}</div>
                     </div>
                     <div v-if="healthCheckDialogLockedProvider" class="health-check-dialog-lock">
-                        已锁定：{{ healthCheckDialogLockedProvider }}
+                        {{ t('modal.healthCheck.lockedPrefix', { value: healthCheckDialogLockedProvider }) }}
                     </div>
                 </div>
 
                 <div class="health-check-dialog-controls">
                     <div class="form-group health-check-dialog-provider">
-                        <label class="form-label">提供商</label>
+                        <label class="form-label">{{ t('field.provider') }}</label>
                         <select
                             v-model="healthCheckDialogSelectedProvider"
                             class="form-select"
                             :disabled="!!healthCheckDialogLockedProvider || healthCheckDialogSending">
-                            <option value="" disabled>请选择提供商</option>
+                            <option value="" disabled>{{ t('placeholder.selectProvider') }}</option>
                             <option v-for="provider in displayProvidersList" :key="'health-check-provider-' + provider.name" :value="provider.name">
                                 {{ provider.name }}
                             </option>
                         </select>
                     </div>
                     <div v-if="healthCheckDialogLastResult" class="health-check-dialog-result" :class="healthCheckDialogLastResult.ok ? 'ok' : 'error'">
-                        <span>{{ healthCheckDialogLastResult.ok ? '已收到回复' : '本轮失败' }}</span>
-                        <span v-if="healthCheckDialogLastResult.model">模型：{{ healthCheckDialogLastResult.model }}</span>
+                        <span>{{ healthCheckDialogLastResult.ok ? t('modal.healthCheck.result.ok') : t('modal.healthCheck.result.fail') }}</span>
+                        <span v-if="healthCheckDialogLastResult.model">{{ t('label.model') }}{{ healthCheckDialogLastResult.model }}</span>
                         <span v-if="healthCheckDialogLastResult.status">HTTP {{ healthCheckDialogLastResult.status }}</span>
                         <span v-if="healthCheckDialogLastResult.durationMs">{{ healthCheckDialogLastResult.durationMs }} ms</span>
                     </div>
@@ -33,14 +33,14 @@
 
                 <div class="health-check-dialog-thread">
                     <div v-if="healthCheckDialogMessages.length === 0" class="health-check-dialog-empty">
-                        发一句话，看是否正常回复。
+                        {{ t('modal.healthCheck.emptyHint') }}
                     </div>
                     <div
                         v-for="item in healthCheckDialogMessages"
                         :key="item.id"
                         :class="['health-check-message', item.role, item.ok === false ? 'error' : '']">
                         <div class="health-check-message-meta">
-                            <span>{{ item.role === 'user' ? '你' : '提供商' }}</span>
+                            <span>{{ item.role === 'user' ? t('role.you') : t('role.provider') }}</span>
                             <span v-if="item.model">{{ item.model }}</span>
                             <span v-if="item.status">HTTP {{ item.status }}</span>
                             <span v-if="item.durationMs">{{ item.durationMs }} ms</span>
@@ -51,21 +51,21 @@
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">消息</label>
+                    <label class="form-label">{{ t('field.message') }}</label>
                     <textarea
                         v-model="healthCheckDialogPrompt"
                         class="form-input health-check-dialog-textarea"
                         rows="4"
                         :disabled="healthCheckDialogSending"
-                        placeholder="例如：请回复“连接正常”。"
+                        :placeholder="t('placeholder.healthCheckPromptExample')"
                         @keydown.ctrl.enter.prevent="sendHealthCheckDialogMessage"></textarea>
-                    <div class="form-hint">真实接口，单轮发送，不带历史上下文。</div>
+                    <div class="form-hint">{{ t('modal.healthCheck.realApiHint') }}</div>
                 </div>
 
                 <div class="btn-group">
-                    <button class="btn btn-cancel" @click="closeHealthCheckDialog()" :disabled="healthCheckDialogSending">关闭</button>
+                    <button class="btn btn-cancel" @click="closeHealthCheckDialog()" :disabled="healthCheckDialogSending">{{ t('common.close') }}</button>
                     <button class="btn btn-confirm" @click="sendHealthCheckDialogMessage" :disabled="healthCheckDialogSending">
-                        {{ healthCheckDialogSending ? '发送中...' : '发送测试' }}
+                        {{ healthCheckDialogSending ? t('common.sending') : t('modal.healthCheck.send') }}
                     </button>
                 </div>
             </div>

@@ -5,15 +5,15 @@
                     role="tabpanel"
                     aria-labelledby="tab-plugins">
                     <div class="plugins-layout">
-                        <aside class="plugins-sidebar" aria-label="Plugin list">
+                        <aside class="plugins-sidebar" :aria-label="t('plugins.sidebar.ariaList')">
                             <div class="selector-header plugins-sidebar-header">
                                 <div>
-                                    <span class="selector-title">Plugins</span>
-                                    <div class="plugins-panel-note">Reusable, standardized utilities. Future custom plugins should follow the same structure.</div>
+                                    <span class="selector-title">{{ t('plugins.sidebar.title') }}</span>
+                                    <div class="plugins-panel-note">{{ t('plugins.sidebar.note') }}</div>
                                 </div>
                                 <div class="settings-tab-actions">
                                     <button type="button" class="btn-tool btn-tool-compact" @click="loadPluginsOverview({ forceRefresh: true, silent: false })" :disabled="loading || !!initError || pluginsLoading">
-                                        {{ pluginsLoading ? 'Refreshing...' : 'Refresh' }}
+                                        {{ pluginsLoading ? t('plugins.refreshing') : t('plugins.refresh') }}
                                     </button>
                                 </div>
                             </div>
@@ -36,37 +36,37 @@
                             </div>
                         </aside>
 
-                        <section class="plugins-main" aria-label="Plugin workspace">
+                        <section class="plugins-main" :aria-label="t('plugins.main.ariaWorkspace')">
                             <div v-if="pluginsActiveId === 'prompt-templates'" class="plugins-panel">
                                 <div class="plugins-panel-head">
-                                    <div class="plugins-panel-title">提示词模板</div>
-                                    <div class="plugins-panel-subtitle">内置：代码注释润色（<code v-pre>{{code}}</code>）。复制后直接粘贴到输入框即可。</div>
+                                    <div class="plugins-panel-title">{{ t('plugins.promptTemplates.title') }}</div>
+                                    <div class="plugins-panel-subtitle">{{ t('plugins.promptTemplates.subtitle') }}</div>
                                 </div>
 
-                                <div class="prompt-templates-modebar" role="tablist" aria-label="Prompt templates mode">
+                                <div class="prompt-templates-modebar" role="tablist" :aria-label="t('plugins.promptTemplates.mode.aria')">
                                     <button
                                         type="button"
                                         role="tab"
                                         :aria-selected="promptTemplatesMode === 'compose'"
                                         :class="['mode-pill', { active: promptTemplatesMode === 'compose' }]"
-                                        @click="promptTemplatesMode = 'compose'">生成</button>
+                                        @click="promptTemplatesMode = 'compose'">{{ t('plugins.promptTemplates.mode.compose') }}</button>
                                     <button
                                         type="button"
                                         role="tab"
                                         :aria-selected="promptTemplatesMode !== 'compose'"
                                         :class="['mode-pill', { active: promptTemplatesMode !== 'compose' }]"
-                                        @click="promptTemplatesMode = 'manage'">管理</button>
+                                        @click="promptTemplatesMode = 'manage'">{{ t('plugins.promptTemplates.mode.manage') }}</button>
                                 </div>
 
                                 <div v-if="promptTemplatesMode === 'compose'" class="prompt-compose">
                                     <div class="prompt-compose-workspace">
                                         <div class="prompt-compose-selected">
-                                            <div class="prompt-compose-selected-title">{{ (promptComposerActiveTemplate && promptComposerActiveTemplate.name) ? promptComposerActiveTemplate.name : '选择模板' }}</div>
-                                            <div class="prompt-compose-selected-meta">{{ (promptComposerActiveTemplate && promptComposerActiveTemplate.description) ? promptComposerActiveTemplate.description : '请选择一个模板开始生成。' }}</div>
+                                            <div class="prompt-compose-selected-title">{{ (promptComposerActiveTemplate && promptComposerActiveTemplate.name) ? promptComposerActiveTemplate.name : t('plugins.promptTemplates.compose.chooseTemplate') }}</div>
+                                            <div class="prompt-compose-selected-meta">{{ (promptComposerActiveTemplate && promptComposerActiveTemplate.description) ? promptComposerActiveTemplate.description : t('plugins.promptTemplates.compose.chooseTemplateHint') }}</div>
                                         </div>
 
                                         <div class="prompt-compose-form">
-                                            <label class="form-label">选择模板</label>
+                                            <label class="form-label">{{ t('plugins.promptTemplates.compose.selectTemplate') }}</label>
                                             <select
                                                 class="form-select prompt-compose-template-select"
                                                 :value="promptComposerSelectedTemplateId"
@@ -77,24 +77,24 @@
                                                 </option>
                                             </select>
 
-                                            <div v-if="!promptComposerActiveTemplate" class="plugins-panel-note">暂无可用模板。</div>
-                                            <div v-else class="plugins-panel-note">变量填写与新增请在「管理」中进行。</div>
+                                            <div v-if="!promptComposerActiveTemplate" class="plugins-panel-note">{{ t('plugins.promptTemplates.compose.empty') }}</div>
+                                            <div v-else class="plugins-panel-note">{{ t('plugins.promptTemplates.compose.varsHint') }}</div>
                                             <div class="prompt-compose-actions">
                                                 <button
                                                     type="button"
                                                     class="btn-mini"
                                                     @click="selectPromptTemplate(promptComposerSelectedTemplateId)"
-                                                    :disabled="pluginsLoading || !promptComposerSelectedTemplateId">去管理填写变量</button>
+                                                    :disabled="pluginsLoading || !promptComposerSelectedTemplateId">{{ t('plugins.promptTemplates.compose.goManage') }}</button>
                                             </div>
                                         </div>
 
                                         <div class="prompt-preview-block prompt-compose-preview">
                                             <div class="prompt-vars-head">
                                                 <div>
-                                                    <div class="prompt-vars-title">生成结果</div>
-                                                    <div class="plugins-panel-note">点“复制”后直接粘贴到 Codex/Claude 输入框。</div>
+                                                    <div class="prompt-vars-title">{{ t('plugins.promptTemplates.compose.outputTitle') }}</div>
+                                                    <div class="plugins-panel-note">{{ t('plugins.promptTemplates.compose.outputHint') }}</div>
                                                 </div>
-                                                <button type="button" class="btn-mini" @click="copyPromptComposerRendered" :disabled="pluginsLoading || !promptComposerRendered">复制</button>
+                                                <button type="button" class="btn-mini" @click="copyPromptComposerRendered" :disabled="pluginsLoading || !promptComposerRendered">{{ t('plugins.promptTemplates.compose.copy') }}</button>
                                             </div>
                                             <textarea class="form-input prompt-preview-textarea" :value="promptComposerRendered" rows="10" readonly spellcheck="false" aria-label="Rendered prompt (composer)"></textarea>
                                         </div>
@@ -109,14 +109,14 @@
                                                 type="text"
                                                 v-model.trim="promptTemplatesKeyword"
                                                 aria-label="Search templates"
-                                                placeholder="搜索模板">
-                                            <button type="button" class="btn-mini" @click="createPromptTemplate" :disabled="pluginsLoading">新建</button>
-                                            <button type="button" class="btn-mini" @click="exportPromptTemplates" :disabled="pluginsLoading || !promptTemplatesList.length">导出</button>
-                                            <button type="button" class="btn-mini" @click="triggerPromptTemplatesImport" :disabled="pluginsLoading">导入</button>
+                                                :placeholder="t('plugins.promptTemplates.manage.searchPlaceholder')">
+                                            <button type="button" class="btn-mini" @click="createPromptTemplate" :disabled="pluginsLoading">{{ t('plugins.promptTemplates.manage.create') }}</button>
+                                            <button type="button" class="btn-mini" @click="exportPromptTemplates" :disabled="pluginsLoading || !promptTemplatesList.length">{{ t('plugins.promptTemplates.manage.export') }}</button>
+                                            <button type="button" class="btn-mini" @click="triggerPromptTemplatesImport" :disabled="pluginsLoading">{{ t('plugins.promptTemplates.manage.import') }}</button>
                                         </div>
 
-                                        <div v-if="pluginsLoading && !promptTemplatesLoadedOnce" class="skills-empty-state">正在加载模板...</div>
-                                        <div v-else-if="!filteredPromptTemplates.length" class="skills-empty-state">暂无模板。</div>
+                                        <div v-if="pluginsLoading && !promptTemplatesLoadedOnce" class="skills-empty-state">{{ t('plugins.promptTemplates.manage.loading') }}</div>
+                                        <div v-else-if="!filteredPromptTemplates.length" class="skills-empty-state">{{ t('plugins.promptTemplates.manage.empty') }}</div>
                                         <div v-else class="prompt-templates-list" role="list">
                                             <button
                                                 v-for="tpl in filteredPromptTemplates"
@@ -128,36 +128,36 @@
                                                 <div class="prompt-template-item-main">
                                                     <div class="prompt-template-item-title">{{ tpl.name }}</div>
                                                     <div class="prompt-template-item-meta">
-                                                        <span class="mono">{{ tpl.varCount }} vars</span>
+                                                        <span class="mono">{{ t('plugins.promptTemplates.manage.vars', { count: tpl.varCount }) }}</span>
                                                         <span>·</span>
                                                         <span class="mono">{{ tpl.updatedLabel }}</span>
                                                     </div>
                                                 </div>
-                                                <span :class="['pill', tpl.isBuiltin ? 'configured' : 'source']">{{ tpl.isBuiltin ? 'built-in' : 'custom' }}</span>
+                                                <span :class="['pill', tpl.isBuiltin ? 'configured' : 'source']">{{ tpl.isBuiltin ? t('plugins.promptTemplates.manage.builtin') : t('plugins.promptTemplates.manage.custom') }}</span>
                                             </button>
                                         </div>
                                     </div>
 
                                     <div class="prompt-templates-pane prompt-templates-pane-editor">
-                                        <div v-if="!promptTemplateDraft" class="skills-empty-state">Select a template to edit.</div>
+                                        <div v-if="!promptTemplateDraft" class="skills-empty-state">{{ t('plugins.promptTemplates.editor.selectHint') }}</div>
                                         <template v-else>
                                             <div class="prompt-editor-head">
                                                 <div class="prompt-editor-title-row">
-                                                    <input class="form-input prompt-editor-name" type="text" v-model.trim="promptTemplateDraft.name" :disabled="promptTemplateDraft.isBuiltin" placeholder="Template name" aria-label="Template name">
+                                                    <input class="form-input prompt-editor-name" type="text" v-model.trim="promptTemplateDraft.name" :disabled="promptTemplateDraft.isBuiltin" :placeholder="t('plugins.promptTemplates.editor.namePlaceholder')" aria-label="Template name">
                                                     <div v-if="!promptTemplateDraft.isBuiltin" class="prompt-editor-actions">
-                                                        <button type="button" class="btn-mini" @click="duplicatePromptTemplate" :disabled="pluginsLoading">Duplicate</button>
-                                                        <button type="button" class="btn-mini delete" @click="deletePromptTemplate" :disabled="pluginsLoading">Delete</button>
-                                                        <button type="button" class="btn-mini" @click="savePromptTemplate" :disabled="pluginsLoading">Save</button>
+                                                        <button type="button" class="btn-mini" @click="duplicatePromptTemplate" :disabled="pluginsLoading">{{ t('plugins.promptTemplates.editor.duplicate') }}</button>
+                                                        <button type="button" class="btn-mini delete" @click="deletePromptTemplate" :disabled="pluginsLoading">{{ t('plugins.promptTemplates.editor.delete') }}</button>
+                                                        <button type="button" class="btn-mini" @click="savePromptTemplate" :disabled="pluginsLoading">{{ t('plugins.promptTemplates.editor.save') }}</button>
                                                     </div>
                                                 </div>
                                                 <div v-if="promptTemplateDraft.isBuiltin" class="plugins-panel-note">
-                                                    内置模板为只读，不支持编辑/保存/删除/复制。
+                                                    {{ t('plugins.promptTemplates.editor.builtinReadOnly') }}
                                                 </div>
-                                                <input class="form-input" type="text" v-model.trim="promptTemplateDraft.description" :disabled="promptTemplateDraft.isBuiltin" placeholder="Description (optional)" aria-label="Template description">
+                                                <input class="form-input" type="text" v-model.trim="promptTemplateDraft.description" :disabled="promptTemplateDraft.isBuiltin" :placeholder="t('plugins.promptTemplates.editor.descPlaceholder')" aria-label="Template description">
                                             </div>
 
                                             <div class="prompt-editor-body">
-                                                <label class="form-label">Template</label>
+                                                <label class="form-label">{{ t('plugins.promptTemplates.editor.templateLabel') }}</label>
                                                 <textarea
                                                     class="form-input prompt-editor-textarea"
                                                     v-model="promptTemplateDraft.template"
@@ -165,25 +165,25 @@
                                                     rows="10"
                                                     spellcheck="false"
                                                     aria-label="Template body"
-                                                    placeholder="Write your prompt template here. Use &#123;&#123;var&#125;&#125; placeholders."></textarea>
+                                                    :placeholder="t('plugins.promptTemplates.editor.templatePlaceholder')"></textarea>
 
                                                 <div class="prompt-vars-block">
                                                     <div class="prompt-vars-head">
                                                         <div>
-                                                            <div class="prompt-vars-title">Variables</div>
-                                                            <div class="plugins-panel-note">Detected from the template. Fill them to render the final prompt.</div>
+                                                            <div class="prompt-vars-title">{{ t('plugins.promptTemplates.vars.title') }}</div>
+                                                            <div class="plugins-panel-note">{{ t('plugins.promptTemplates.vars.hint') }}</div>
                                                         </div>
                                                         <div v-if="!promptTemplateDraft.isBuiltin" class="prompt-editor-actions">
-                                                            <button type="button" class="btn-mini" @click="addPromptTemplateVariable" :disabled="pluginsLoading">新增变量</button>
-                                                            <button type="button" class="btn-mini" @click="resetPromptVariableValues" :disabled="pluginsLoading">Reset</button>
+                                                            <button type="button" class="btn-mini" @click="addPromptTemplateVariable" :disabled="pluginsLoading">{{ t('plugins.promptTemplates.vars.add') }}</button>
+                                                            <button type="button" class="btn-mini" @click="resetPromptVariableValues" :disabled="pluginsLoading">{{ t('plugins.promptTemplates.vars.reset') }}</button>
                                                         </div>
                                                     </div>
 
-                                                    <div v-if="!promptTemplateVars.length" class="prompt-vars-empty">No variables detected.</div>
+                                                    <div v-if="!promptTemplateVars.length" class="prompt-vars-empty">{{ t('plugins.promptTemplates.vars.empty') }}</div>
                                                     <div v-else class="prompt-vars-grid">
                                                         <label v-for="name in promptTemplateVars" :key="'prompt-var-' + name" class="prompt-var-row">
                                                             <span class="prompt-var-label mono">{{ name }}</span>
-                                                            <input class="form-input prompt-var-input" type="text" :disabled="promptTemplateDraft.isBuiltin" :value="promptTemplateVarValues[name] || ''" @input="setPromptVariableValue(name, $event.target.value)" :placeholder="'Value for ' + name">
+                                                            <input class="form-input prompt-var-input" type="text" :disabled="promptTemplateDraft.isBuiltin" :value="promptTemplateVarValues[name] || ''" @input="setPromptVariableValue(name, $event.target.value)" :placeholder="t('plugins.promptTemplates.vars.valuePlaceholder', { name })">
                                                         </label>
                                                     </div>
                                                 </div>
@@ -191,10 +191,10 @@
                                                 <div class="prompt-preview-block">
                                                     <div class="prompt-vars-head">
                                                         <div>
-                                                            <div class="prompt-vars-title">Preview</div>
-                                                            <div class="plugins-panel-note">Rendered output (safe replacement: missing vars become empty).</div>
+                                                            <div class="prompt-vars-title">{{ t('plugins.promptTemplates.preview.title') }}</div>
+                                                            <div class="plugins-panel-note">{{ t('plugins.promptTemplates.preview.hint') }}</div>
                                                         </div>
-                                                        <button type="button" class="btn-mini" @click="copyRenderedPrompt" :disabled="pluginsLoading">Copy</button>
+                                                        <button type="button" class="btn-mini" @click="copyRenderedPrompt" :disabled="pluginsLoading">{{ t('plugins.promptTemplates.preview.copy') }}</button>
                                                     </div>
                                                     <textarea class="form-input prompt-preview-textarea" :value="renderedPrompt" rows="10" readonly spellcheck="false" aria-label="Rendered prompt"></textarea>
                                                 </div>
@@ -204,7 +204,7 @@
                                 </div>
                             </div>
 
-                            <div v-else class="skills-empty-state">Select a plugin from the left panel.</div>
+                            <div v-else class="skills-empty-state">{{ t('plugins.promptTemplates.noPluginSelected') }}</div>
                         </section>
                     </div>
                 </div>
@@ -219,25 +219,25 @@
                 <!-- 新增变量（Prompt Templates） -->
                 <div v-if="showPromptTemplateVarModal" class="modal-overlay" @click.self="closePromptTemplateVarModal">
                     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="add-prompt-var-modal-title">
-                        <div class="modal-title" id="add-prompt-var-modal-title">新增变量</div>
+                        <div class="modal-title" id="add-prompt-var-modal-title">{{ t('plugins.promptTemplates.varModal.title') }}</div>
 
                         <div class="form-group">
-                            <label class="form-label">变量名</label>
+                            <label class="form-label">{{ t('plugins.promptTemplates.varModal.nameLabel') }}</label>
                             <input
                                 ref="promptTemplateVarNameInput"
                                 v-model.trim="promptTemplateVarDraftName"
                                 :class="['form-input', { invalid: !!promptTemplateVarDraftError }]"
-                                placeholder="例如: code"
+                                :placeholder="t('placeholder.varNameExample')"
                                 autocomplete="off"
                                 spellcheck="false"
                                 @keydown.enter.prevent="confirmAddPromptTemplateVariable">
                             <div v-if="promptTemplateVarDraftError" class="form-hint form-error">{{ promptTemplateVarDraftError }}</div>
-                            <div v-else class="form-hint">仅支持字母/数字/下划线/中划线/点，将插入为 <code v-pre>{{var}}</code>。</div>
+                            <div v-else class="form-hint">{{ t('hint.varNameRules') }}</div>
                         </div>
 
                         <div class="btn-group">
-                            <button class="btn btn-cancel" @click="closePromptTemplateVarModal">取消</button>
-                            <button class="btn btn-confirm" @click="confirmAddPromptTemplateVariable">添加</button>
+                            <button class="btn btn-cancel" @click="closePromptTemplateVarModal">{{ t('plugins.promptTemplates.varModal.cancel') }}</button>
+                            <button class="btn btn-confirm" @click="confirmAddPromptTemplateVariable">{{ t('plugins.promptTemplates.varModal.add') }}</button>
                         </div>
                     </div>
                 </div>

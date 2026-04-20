@@ -424,6 +424,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (typeof this.initI18n === 'function') {
                 this.initI18n();
             }
+            if (typeof this.t === 'function') {
+                this.confirmDialogConfirmText = this.t('confirm.ok');
+                this.confirmDialogCancelText = this.t('confirm.cancel');
+                this.agentsModalTitle = this.t('modal.agents.title');
+                this.agentsModalHint = this.t('modal.agents.hint');
+            }
             this.initSessionStandalone();
             this.updateCompactLayoutMode();
             if (!this.taskOrchestrationTabEnabled && this.mainTab === 'orchestration') {

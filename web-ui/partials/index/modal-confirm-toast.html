@@ -5,7 +5,7 @@
                 aria-modal="true"
                 aria-describedby="confirm-dialog-message"
                 :aria-labelledby="confirmDialogTitle ? 'confirm-dialog-title' : null"
-                :aria-label="confirmDialogTitle ? null : '确认操作'">
+                :aria-label="confirmDialogTitle ? null : t('confirm.aria')">
                 <div id="confirm-dialog-title" class="modal-title">{{ confirmDialogTitle }}</div>
                 <div id="confirm-dialog-message" class="confirm-dialog-message">{{ confirmDialogMessage }}</div>
                 <div class="btn-group confirm-dialog-actions">

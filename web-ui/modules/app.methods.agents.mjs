@@ -271,16 +271,17 @@ export function createAgentsMethods(options = {}) {
                 this.confirmDialogResolver(false);
             }
             const confirmDisabled = options.confirmDisabled;
+            const t = typeof this.t === 'function' ? this.t : null;
             this.confirmDialogTitle = typeof options.title === 'string' && options.title.trim()
                 ? options.title.trim()
-                : '请确认操作';
+                : (t ? t('confirm.title.default') : '请确认操作');
             this.confirmDialogMessage = typeof options.message === 'string' ? options.message : '';
             this.confirmDialogConfirmText = typeof options.confirmText === 'string' && options.confirmText.trim()
                 ? options.confirmText.trim()
-                : '确认';
+                : (t ? t('confirm.ok') : '确认');
             this.confirmDialogCancelText = typeof options.cancelText === 'string' && options.cancelText.trim()
                 ? options.cancelText.trim()
-                : '取消';
+                : (t ? t('confirm.cancel') : '取消');
             this.confirmDialogDanger = !!options.danger;
             this.confirmDialogConfirmDisabled = typeof confirmDisabled === 'function' ? false : !!confirmDisabled;
             this.confirmDialogDisableWhen = typeof confirmDisabled === 'function' ? confirmDisabled : null;
@@ -306,8 +307,13 @@ export function createAgentsMethods(options = {}) {
             this.showConfirmDialog = false;
             this.confirmDialogTitle = '';
             this.confirmDialogMessage = '';
-            this.confirmDialogConfirmText = '确认';
-            this.confirmDialogCancelText = '取消';
+            if (typeof this.t === 'function') {
+                this.confirmDialogConfirmText = this.t('confirm.ok');
+                this.confirmDialogCancelText = this.t('confirm.cancel');
+            } else {
+                this.confirmDialogConfirmText = '确认';
+                this.confirmDialogCancelText = '取消';
+            }
             this.confirmDialogDanger = false;
             this.confirmDialogConfirmDisabled = false;
             this.confirmDialogDisableWhen = null;
