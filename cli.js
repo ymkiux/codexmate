@@ -8912,11 +8912,12 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
         : (host === '0.0.0.0' ? DEFAULT_WEB_OPEN_HOST : host);
     const openUrl = `http://${formatHostForUrl(openHost)}:${port}`;
     server.listen(port, host, () => {
-        console.log('\n✓ Web UI 已启动:', openUrl);
+        console.log('\n✓ Web UI 已启动');
+        console.log(`  待访问: ${openUrl}`);
         if (host && host !== openHost) {
             console.log('  监听地址:', host);
         }
-        console.log('  按 Ctrl+C 退出\n');
+        console.log('  退出: Ctrl+C\n');
         if (isAnyAddressHost(host)) {
             console.warn('! 安全提示: 当前监听所有网卡（无鉴权）。');
             console.warn('  建议仅在可信网络使用，或改用 --host 127.0.0.1。');
@@ -9035,39 +9036,19 @@ function cmdStart(options = {}) {
         || process.env.CODEXMATE_DEV === '1'
         || process.env.CODEXMATE_DEV === 'true';
 
+    // 禁止自动打开浏览器：仅输出 URL，交由用户自行点击/打开。
     let serverHandle = createWebServer({
         htmlPath,
         assetsDir,
         webDir,
         host,
         port,
-        openBrowser: !options.noBrowser && !isDev
+        openBrowser: false
     });
 
-    const requestWebUiRestart = createSerializedWebUiRestartHandler(async (info) => {
-            const fileLabel = info && info.filename ? info.filename : (info && info.target ? path.basename(info.target) : 'unknown');
-            console.log(`\n~ 侦测到前端变更 (${fileLabel})，重启中...`);
-            serverHandle = await restartWebUiServerAfterFrontendChange({
-                serverHandle,
-                serverOptions: {
-                    htmlPath,
-                    assetsDir,
-                    webDir,
-                    host,
-                    port,
-                    openBrowser: false
-                }
-            });
-        });
-
-    const stopWatch = watchPathsForRestart(
-        [webDir, legacyHtmlPath],
-        (info) => {
-            void requestWebUiRestart(info).catch((err) => {
-                console.error('! 重启 Web UI 失败:', err && err.message ? err.message : err);
-            });
-        }
-    );
+    // 禁止前端变更侦测与自动重启：避免终端输出噪音与访问时短暂 Connection Refused。
+    // 如需热重启，请由开发者自行使用外部 watcher / nodemon 等工具。
+    const stopWatch = () => {};
 
     const handleExit = () => {
         stopWatch();
