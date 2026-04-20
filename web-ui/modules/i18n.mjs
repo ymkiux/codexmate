@@ -351,6 +351,57 @@ const DICT = Object.freeze({
         'settings.reset.hint': '会先备份 config.toml，再写入默认配置。',
         'settings.reset.button': '重装配置',
         'settings.reset.loading': '重装中...'
+        ,
+
+        // Market (Skills)
+        'market.title': 'Skills 概览',
+        'market.subtitle': '切换目标并查看本地 Skills。',
+        'market.refresh': '刷新概览',
+        'market.refreshing': '刷新中...',
+        'market.openManager': '打开 Skills 管理',
+        'market.target.aria': '选择 Skills 安装目标',
+        'market.summary.target': '安装目标',
+        'market.summary.total': '本地总数',
+        'market.summary.configured': '含 SKILL.md',
+        'market.summary.missing': '缺少 SKILL.md',
+        'market.summary.importable': '可导入',
+        'market.summary.importableDirect': '可直接导入',
+        'market.root.fallback': '默认目录',
+
+        'market.installed.title': '已安装 Skills',
+        'market.installed.note': '仅显示前 6 项。',
+        'market.local.refresh': '刷新本地',
+        'market.local.refreshing': '刷新中...',
+        'market.local.loading': '正在加载本地 Skills...',
+        'market.local.empty': '当前暂无已安装 skill。',
+        'market.pill.verified': '已验证',
+        'market.pill.missingSkill': '待补 SKILL.md',
+
+        'market.import.title': '可导入来源',
+        'market.import.note': '扫描并导入到当前 {target}。',
+        'market.import.scan': '扫描来源',
+        'market.import.scanning': '扫描中...',
+        'market.import.loading': '正在扫描可导入 skill...',
+        'market.import.empty': '暂未扫描到可导入 skill。',
+        'market.pill.importableDirect': '可直接导入',
+        'market.pill.importMissing': '缺少 SKILL.md',
+
+        'market.actions.title': '分发入口',
+        'market.actions.note': '操作均作用于当前安装目标。',
+        'market.action.manage.title': '本地 Skills 管理',
+        'market.action.manage.copy': '管理当前 {target} 的已装 skills',
+        'market.action.crossImport.title': '跨应用导入',
+        'market.action.crossImport.copy': '导入到当前 {target}',
+        'market.action.zipImport.title': 'ZIP 导入',
+        'market.action.zipImport.copy': '从 ZIP 导入到当前目标',
+
+        'market.help.title': '操作说明',
+        'market.help.target.title': '目标切换',
+        'market.help.target.copy': '当前操作写入 {target} 目录。',
+        'market.help.crossImport.title': '跨应用导入',
+        'market.help.crossImport.copy': '从其他宿主导入未托管 skill。',
+        'market.help.zipImport.title': 'ZIP 导入',
+        'market.help.zipImport.copy': '从 ZIP 导入本地 skill。'
     },
     en: {
         // Global
@@ -702,6 +753,57 @@ const DICT = Object.freeze({
         'settings.reset.hint': 'Backs up config.toml, then writes default config.',
         'settings.reset.button': 'Reset config',
         'settings.reset.loading': 'Resetting...'
+        ,
+
+        // Market (Skills)
+        'market.title': 'Skills Overview',
+        'market.subtitle': 'Switch target and inspect local skills.',
+        'market.refresh': 'Refresh overview',
+        'market.refreshing': 'Refreshing...',
+        'market.openManager': 'Open Skills manager',
+        'market.target.aria': 'Select skills target',
+        'market.summary.target': 'Target',
+        'market.summary.total': 'Local total',
+        'market.summary.configured': 'With SKILL.md',
+        'market.summary.missing': 'Missing SKILL.md',
+        'market.summary.importable': 'Importable',
+        'market.summary.importableDirect': 'Direct importable',
+        'market.root.fallback': 'Default path',
+
+        'market.installed.title': 'Installed skills',
+        'market.installed.note': 'Showing top 6 only.',
+        'market.local.refresh': 'Refresh local',
+        'market.local.refreshing': 'Refreshing...',
+        'market.local.loading': 'Loading local skills...',
+        'market.local.empty': 'No installed skills found.',
+        'market.pill.verified': 'Verified',
+        'market.pill.missingSkill': 'Missing SKILL.md',
+
+        'market.import.title': 'Import sources',
+        'market.import.note': 'Scan and import into {target}.',
+        'market.import.scan': 'Scan sources',
+        'market.import.scanning': 'Scanning...',
+        'market.import.loading': 'Scanning importable skills...',
+        'market.import.empty': 'No importable skills found yet.',
+        'market.pill.importableDirect': 'Direct import',
+        'market.pill.importMissing': 'Missing SKILL.md',
+
+        'market.actions.title': 'Distribution',
+        'market.actions.note': 'Actions apply to the current target.',
+        'market.action.manage.title': 'Manage local skills',
+        'market.action.manage.copy': 'Manage installed skills for {target}',
+        'market.action.crossImport.title': 'Cross-app import',
+        'market.action.crossImport.copy': 'Import into {target}',
+        'market.action.zipImport.title': 'ZIP import',
+        'market.action.zipImport.copy': 'Import from ZIP into target',
+
+        'market.help.title': 'How it works',
+        'market.help.target.title': 'Target switch',
+        'market.help.target.copy': 'Actions write into the {target} directory.',
+        'market.help.crossImport.title': 'Cross-app import',
+        'market.help.crossImport.copy': 'Import unmanaged skills from other hosts.',
+        'market.help.zipImport.title': 'ZIP import',
+        'market.help.zipImport.copy': 'Import local skills from a ZIP file.'
     }
 });
 

@@ -176,9 +176,9 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /<button type="button" class="market-action-card" @click="openSkillsManager" :disabled="loading \|\| !!initError \|\| skillsMarketBusy">/);
     assert.match(html, /<button type="button" class="market-action-card" @click="scanImportableSkills\(\{ silent: false \}\)" :disabled="loading \|\| !!initError \|\| skillsMarketBusy">/);
     assert.match(html, /<button type="button" class="market-action-card" @click="triggerSkillsZipImport" :disabled="loading \|\| !!initError \|\| skillsMarketBusy">/);
-    assert.match(html, /class="market-target-switch" role="group" aria-label="选择 Skills 安装目标"/);
+    assert.match(html, /class="market-target-switch" role="group" :aria-label="t\('market\.target\.aria'\)"/);
     assert.match(html, /class="market-target-switch market-target-switch-compact" role="group" aria-label="选择 Skills 管理目标"/);
-    assert.doesNotMatch(html, /class="market-target-switch" role="tablist" aria-label="选择 Skills 安装目标"/);
+    assert.doesNotMatch(html, /class="market-target-switch" role="tablist" :aria-label="t\('market\.target\.aria'\)"/);
     assert.doesNotMatch(html, /class="market-target-switch market-target-switch-compact" role="tablist" aria-label="选择 Skills 管理目标"/);
     assert.match(html, /class="side-section" role="navigation" :aria-label="t\('side\.config'\)"/);
     assert.match(html, /class="side-section" role="navigation" :aria-label="t\('side\.sessions'\)"/);
@@ -192,7 +192,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(sideRail, /id="side-tab-docs"[\s\S]*:aria-current="mainTab === 'docs' \? 'page' : null"/);
     assert.match(sideRail, /id="side-tab-settings"[\s\S]*:aria-current="mainTab === 'settings' \? 'page' : null"/);
     assert.match(html, /skillsDefaultRootPath/);
-    assert.match(html, /可直接导入/);
+    assert.match(html, /\{\{\s*skill\.hasSkillFile\s*\?\s*t\('market\.pill\.importableDirect'\)\s*:\s*t\('market\.pill\.importMissing'\)\s*\}\}/);
     assert.doesNotMatch(html, /在线生态目录/);
     assert.doesNotMatch(html, /查看在线目录/);
     assert.doesNotMatch(html, /skillsMarketRemoteCount/);

@@ -7,20 +7,20 @@
                     <div class="selector-section market-overview-section">
                         <div class="selector-header market-overview-header">
                             <div>
-                                <span class="selector-title">Skills 概览</span>
-                                <div class="skills-panel-note">切换目标并查看本地 Skills。</div>
+                                <span class="selector-title">{{ t('market.title') }}</span>
+                                <div class="skills-panel-note">{{ t('market.subtitle') }}</div>
                             </div>
                             <div class="settings-tab-actions market-header-actions">
                                 <button type="button" class="btn-tool btn-tool-compact" @click="loadSkillsMarketOverview({ forceRefresh: true, silent: false })" :disabled="loading || !!initError || skillsMarketBusy">
-                                    {{ skillsMarketLoading ? '刷新中...' : '刷新概览' }}
+                                    {{ skillsMarketLoading ? t('market.refreshing') : t('market.refresh') }}
                                 </button>
                                 <button type="button" class="btn-tool btn-tool-compact" @click="openSkillsManager" :disabled="loading || !!initError || skillsMarketBusy">
-                                    打开 Skills 管理
+                                    {{ t('market.openManager') }}
                                 </button>
                             </div>
                         </div>
 
-                        <div class="market-target-switch" role="group" aria-label="选择 Skills 安装目标">
+                        <div class="market-target-switch" role="group" :aria-label="t('market.target.aria')">
                             <button
                                 type="button"
                                 :class="['market-target-chip', { active: skillsTargetApp === 'codex' }]"
@@ -43,27 +43,27 @@
 
                         <div class="skills-summary-strip market-summary-strip">
                             <div class="skills-summary-item">
-                                <span class="skills-summary-label">安装目标</span>
+                                <span class="skills-summary-label">{{ t('market.summary.target') }}</span>
                                 <strong class="skills-summary-value">{{ skillsTargetLabel }}</strong>
                             </div>
                             <div class="skills-summary-item">
-                                <span class="skills-summary-label">本地总数</span>
+                                <span class="skills-summary-label">{{ t('market.summary.total') }}</span>
                                 <strong class="skills-summary-value">{{ skillsList.length }}</strong>
                             </div>
                             <div class="skills-summary-item">
-                                <span class="skills-summary-label">含 SKILL.md</span>
+                                <span class="skills-summary-label">{{ t('market.summary.configured') }}</span>
                                 <strong class="skills-summary-value">{{ skillsConfiguredCount }}</strong>
                             </div>
                             <div class="skills-summary-item">
-                                <span class="skills-summary-label">缺少 SKILL.md</span>
+                                <span class="skills-summary-label">{{ t('market.summary.missing') }}</span>
                                 <strong class="skills-summary-value">{{ skillsMissingSkillFileCount }}</strong>
                             </div>
                             <div class="skills-summary-item">
-                                <span class="skills-summary-label">可导入</span>
+                                <span class="skills-summary-label">{{ t('market.summary.importable') }}</span>
                                 <strong class="skills-summary-value">{{ skillsImportList.length }}</strong>
                             </div>
                             <div class="skills-summary-item">
-                                <span class="skills-summary-label">可直接导入</span>
+                                <span class="skills-summary-label">{{ t('market.summary.importableDirect') }}</span>
                                 <strong class="skills-summary-value">{{ skillsImportConfiguredCount }}</strong>
                             </div>
                         </div>
@@ -73,15 +73,15 @@
                         <div class="skills-panel market-panel">
                             <div class="skills-panel-header">
                                 <div class="skills-panel-title-wrap">
-                                    <div class="skills-panel-title">已安装 Skills</div>
-                                    <div class="skills-panel-note">仅显示前 6 项。</div>
+                                    <div class="skills-panel-title">{{ t('market.installed.title') }}</div>
+                                    <div class="skills-panel-note">{{ t('market.installed.note') }}</div>
                                 </div>
                                 <button type="button" class="btn-mini" @click="refreshSkillsList({ silent: false })" :disabled="loading || !!initError || skillsMarketBusy">
-                                    {{ skillsLoading ? '刷新中...' : '刷新本地' }}
+                                    {{ skillsLoading ? t('market.local.refreshing') : t('market.local.refresh') }}
                                 </button>
                             </div>
-                            <div v-if="skillsLoading && !skillsMarketLocalLoadedOnce" class="skills-empty-state">正在加载本地 Skills...</div>
-                            <div v-else-if="skillsList.length === 0" class="skills-empty-state">当前暂无已安装 skill。</div>
+                            <div v-if="skillsLoading && !skillsMarketLocalLoadedOnce" class="skills-empty-state">{{ t('market.local.loading') }}</div>
+                            <div v-else-if="skillsList.length === 0" class="skills-empty-state">{{ t('market.local.empty') }}</div>
                             <div v-else class="market-preview-list">
                                 <div v-for="skill in skillsMarketInstalledPreview" :key="'market-local-' + skill.name" class="market-preview-item">
                                     <div class="market-preview-main">
@@ -89,7 +89,7 @@
                                         <div class="market-preview-meta">{{ skill.description || skill.path }}</div>
                                     </div>
                                     <span :class="['pill', skill.hasSkillFile ? 'configured' : 'empty']">
-                                        {{ skill.hasSkillFile ? '已验证' : '待补 SKILL.md' }}
+                                        {{ skill.hasSkillFile ? t('market.pill.verified') : t('market.pill.missingSkill') }}
                                     </span>
                                 </div>
                             </div>
@@ -98,15 +98,15 @@
                         <div class="skills-panel market-panel">
                             <div class="skills-panel-header">
                                 <div class="skills-panel-title-wrap">
-                                    <div class="skills-panel-title">可导入来源</div>
-                                    <div class="skills-panel-note">扫描并导入到当前 {{ skillsTargetLabel }}。</div>
+                                    <div class="skills-panel-title">{{ t('market.import.title') }}</div>
+                                    <div class="skills-panel-note">{{ t('market.import.note', { target: skillsTargetLabel }) }}</div>
                                 </div>
                                 <button type="button" class="btn-mini" @click="scanImportableSkills({ silent: false })" :disabled="loading || !!initError || skillsMarketBusy">
-                                    {{ skillsScanningImports ? '扫描中...' : '扫描来源' }}
+                                    {{ skillsScanningImports ? t('market.import.scanning') : t('market.import.scan') }}
                                 </button>
                             </div>
-                            <div v-if="skillsScanningImports && !skillsMarketImportLoadedOnce" class="skills-empty-state">正在扫描可导入 skill...</div>
-                            <div v-else-if="skillsImportList.length === 0" class="skills-empty-state">暂未扫描到可导入 skill。</div>
+                            <div v-if="skillsScanningImports && !skillsMarketImportLoadedOnce" class="skills-empty-state">{{ t('market.import.loading') }}</div>
+                            <div v-else-if="skillsImportList.length === 0" class="skills-empty-state">{{ t('market.import.empty') }}</div>
                             <div v-else class="market-preview-list">
                                 <div v-for="skill in skillsMarketImportPreview" :key="'market-import-' + buildSkillImportKey(skill)" class="market-preview-item">
                                     <div class="market-preview-main">
@@ -114,7 +114,7 @@
                                         <div class="market-preview-meta">{{ skill.sourceLabel }} · {{ skill.sourcePath }}</div>
                                     </div>
                                     <span :class="['pill', skill.hasSkillFile ? 'configured' : 'empty']">
-                                        {{ skill.hasSkillFile ? '可直接导入' : '缺少 SKILL.md' }}
+                                        {{ skill.hasSkillFile ? t('market.pill.importableDirect') : t('market.pill.importMissing') }}
                                     </span>
                                 </div>
                             </div>
@@ -123,22 +123,22 @@
                         <div class="skills-panel market-panel market-actions-panel">
                             <div class="skills-panel-header">
                                 <div class="skills-panel-title-wrap">
-                                    <div class="skills-panel-title">分发入口</div>
-                                    <div class="skills-panel-note">操作均作用于当前安装目标。</div>
+                                    <div class="skills-panel-title">{{ t('market.actions.title') }}</div>
+                                    <div class="skills-panel-note">{{ t('market.actions.note') }}</div>
                                 </div>
                             </div>
                             <div class="market-action-grid">
                                 <button type="button" class="market-action-card" @click="openSkillsManager" :disabled="loading || !!initError || skillsMarketBusy">
-                                    <span class="market-action-title">本地 Skills 管理</span>
-                                    <span class="market-action-copy">管理当前 {{ skillsTargetLabel }} 的已装 skills</span>
+                                    <span class="market-action-title">{{ t('market.action.manage.title') }}</span>
+                                    <span class="market-action-copy">{{ t('market.action.manage.copy', { target: skillsTargetLabel }) }}</span>
                                 </button>
                                 <button type="button" class="market-action-card" @click="scanImportableSkills({ silent: false })" :disabled="loading || !!initError || skillsMarketBusy">
-                                    <span class="market-action-title">跨应用导入</span>
-                                    <span class="market-action-copy">导入到当前 {{ skillsTargetLabel }}</span>
+                                    <span class="market-action-title">{{ t('market.action.crossImport.title') }}</span>
+                                    <span class="market-action-copy">{{ t('market.action.crossImport.copy', { target: skillsTargetLabel }) }}</span>
                                 </button>
                                 <button type="button" class="market-action-card" @click="triggerSkillsZipImport" :disabled="loading || !!initError || skillsMarketBusy">
-                                    <span class="market-action-title">ZIP 导入</span>
-                                    <span class="market-action-copy">从 ZIP 导入到当前目标</span>
+                                    <span class="market-action-title">{{ t('market.action.zipImport.title') }}</span>
+                                    <span class="market-action-copy">{{ t('market.action.zipImport.copy') }}</span>
                                 </button>
                             </div>
                         </div>
@@ -146,26 +146,26 @@
                         <div class="skills-panel market-panel market-panel-wide">
                             <div class="skills-panel-header">
                                 <div class="skills-panel-title-wrap">
-                                    <div class="skills-panel-title">操作说明</div>
+                                    <div class="skills-panel-title">{{ t('market.help.title') }}</div>
                                 </div>
                             </div>
                             <div class="market-preview-list">
                                 <div class="market-preview-item">
                                     <div class="market-preview-main">
-                                        <div class="market-preview-title">目标切换</div>
-                                        <div class="market-preview-meta">当前操作写入 {{ skillsTargetLabel }} 目录。</div>
+                                        <div class="market-preview-title">{{ t('market.help.target.title') }}</div>
+                                        <div class="market-preview-meta">{{ t('market.help.target.copy', { target: skillsTargetLabel }) }}</div>
                                     </div>
                                 </div>
                                 <div class="market-preview-item">
                                     <div class="market-preview-main">
-                                        <div class="market-preview-title">跨应用导入</div>
-                                        <div class="market-preview-meta">从其他宿主导入未托管 skill。</div>
+                                        <div class="market-preview-title">{{ t('market.help.crossImport.title') }}</div>
+                                        <div class="market-preview-meta">{{ t('market.help.crossImport.copy') }}</div>
                                     </div>
                                 </div>
                                 <div class="market-preview-item">
                                     <div class="market-preview-main">
-                                        <div class="market-preview-title">ZIP 导入</div>
-                                        <div class="market-preview-meta">从 ZIP 导入本地 skill。</div>
+                                        <div class="market-preview-title">{{ t('market.help.zipImport.title') }}</div>
+                                        <div class="market-preview-meta">{{ t('market.help.zipImport.copy') }}</div>
                                     </div>
                                 </div>
                             </div>
