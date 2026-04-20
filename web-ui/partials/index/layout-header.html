@@ -277,20 +277,20 @@
                         </div>
                     </button>
                 </div>
-
-                <div class="side-section" role="group" :aria-label="t('lang.label')">
-                    <div class="side-section-title">{{ t('lang.label') }}</div>
-                    <div class="lang-toggle">
-                        <button type="button" class="lang-toggle-btn" :class="{ active: (lang || 'zh') === 'zh' }" @click="setLang('zh')">
-                            {{ t('lang.zh') }}
-                        </button>
-                        <button type="button" class="lang-toggle-btn" :class="{ active: (lang || 'zh') === 'en' }" @click="setLang('en')">
-                            {{ t('lang.en') }}
-                        </button>
-                    </div>
-                </div>
                 </div>
 
+                <div class="side-rail-lang" role="group" :aria-label="t('lang.label')">
+                    <button
+                        type="button"
+                        class="lang-switch"
+                        :aria-label="t('lang.label')"
+                        @click="setLang((lang || 'zh') === 'zh' ? 'en' : 'zh')">
+                        <span class="lang-switch-track" :data-lang="lang || 'zh'">
+                            <span class="lang-switch-text lang-switch-zh">中</span>
+                            <span class="lang-switch-text lang-switch-en">EN</span>
+                        </span>
+                    </button>
+                </div>
             </aside>
             <main class="main-panel">
                 <div class="main-panel-topbar">
