@@ -170,13 +170,6 @@ textarea:focus-visible {
         height: 44px;
         min-height: 44px;
     }
-
-    body {
-        padding: var(--spacing-md) var(--spacing-sm);
-    }
-    .container {
-        padding: 0 var(--spacing-sm) var(--spacing-md);
-    }
     .top-tabs {
         gap: 5px;
         margin: 2px 0 8px;
