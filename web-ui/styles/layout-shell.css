@@ -95,6 +95,49 @@ body::after {
     width: auto;
 }
 
+.lang-choice {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 999px;
+    border: 1px solid rgba(163, 146, 134, 0.32);
+    background: rgba(255, 253, 252, 0.92);
+    box-shadow: 0 14px 34px rgba(27, 23, 20, 0.22);
+    backdrop-filter: blur(10px);
+}
+
+.lang-choice-btn {
+    min-width: 44px;
+    height: 30px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-family: var(--font-family-mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    transition: background-color var(--transition-fast) var(--ease-smooth), border-color var(--transition-fast) var(--ease-smooth), color var(--transition-fast) var(--ease-smooth), transform var(--transition-fast) var(--ease-smooth);
+}
+
+.lang-choice-btn:hover {
+    border-color: rgba(163, 146, 134, 0.32);
+    background: rgba(255, 255, 255, 0.72);
+    color: var(--color-text-primary);
+}
+
+.lang-choice-btn.active {
+    border-color: rgba(199, 116, 98, 0.55);
+    background: rgba(199, 116, 98, 0.14);
+    color: var(--color-brand-dark);
+}
+
+.lang-choice-btn:active {
+    transform: translateY(1px);
+}
+
 .lang-fab .lang-switch-track {
     box-shadow: 0 14px 34px rgba(27, 23, 20, 0.22);
     background: rgba(255, 253, 252, 0.92);
@@ -126,6 +169,12 @@ body::after {
     pointer-events: none;
     display: flex;
     justify-content: center;
+}
+
+.lang-fab .lang-choice {
+    pointer-events: auto;
+    position: relative;
+    z-index: 1;
 }
 
 .lang-fab .lang-switch {
@@ -164,6 +213,8 @@ body::after {
     background: linear-gradient(180deg, rgba(255, 253, 252, 0.45) 0%, rgba(255, 253, 252, 0.95) 48%, rgba(255, 253, 252, 1) 100%);
     border-top: 1px solid var(--color-border);
     backdrop-filter: blur(10px);
+    display: flex;
+    justify-content: center;
 }
 
 .lang-switch {

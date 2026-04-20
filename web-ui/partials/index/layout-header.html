@@ -106,16 +106,20 @@
         </div>
 
         <div v-if="!sessionStandalone" class="lang-fab" role="group" :aria-label="t('lang.label')">
-            <button
-                type="button"
-                class="lang-switch"
-                :aria-label="t('lang.label')"
-                @click="setLang((lang || 'zh') === 'zh' ? 'en' : 'zh')">
-                <span class="lang-switch-track" :data-lang="lang || 'zh'">
-                    <span class="lang-switch-text lang-switch-zh">ZH</span>
-                    <span class="lang-switch-text lang-switch-en">EN</span>
-                </span>
-            </button>
+            <div class="lang-choice" role="group" :aria-label="t('lang.label')">
+                <button
+                    type="button"
+                    class="lang-choice-btn"
+                    :aria-pressed="(lang || 'zh') === 'zh'"
+                    :class="{ active: (lang || 'zh') === 'zh' }"
+                    @click="setLang('zh')">ZH</button>
+                <button
+                    type="button"
+                    class="lang-choice-btn"
+                    :aria-pressed="(lang || 'zh') === 'en'"
+                    :class="{ active: (lang || 'zh') === 'en' }"
+                    @click="setLang('en')">EN</button>
+            </div>
         </div>
 
         <div :class="['app-shell', { standalone: sessionStandalone }]">
@@ -293,16 +297,20 @@
                 </div>
 
                 <div class="side-rail-lang" role="group" :aria-label="t('lang.label')">
-                    <button
-                        type="button"
-                        class="lang-switch"
-                        :aria-label="t('lang.label')"
-                        @click="setLang((lang || 'zh') === 'zh' ? 'en' : 'zh')">
-                        <span class="lang-switch-track" :data-lang="lang || 'zh'">
-                            <span class="lang-switch-text lang-switch-zh">ZH</span>
-                            <span class="lang-switch-text lang-switch-en">EN</span>
-                        </span>
-                    </button>
+                    <div class="lang-choice" role="group" :aria-label="t('lang.label')">
+                        <button
+                            type="button"
+                            class="lang-choice-btn"
+                            :aria-pressed="(lang || 'zh') === 'zh'"
+                            :class="{ active: (lang || 'zh') === 'zh' }"
+                            @click="setLang('zh')">ZH</button>
+                        <button
+                            type="button"
+                            class="lang-choice-btn"
+                            :aria-pressed="(lang || 'zh') === 'en'"
+                            :class="{ active: (lang || 'zh') === 'en' }"
+                            @click="setLang('en')">EN</button>
+                    </div>
                 </div>
             </aside>
             <main class="main-panel">
