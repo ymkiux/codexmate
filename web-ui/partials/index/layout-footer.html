@@ -1,6 +1,6 @@
             <!-- 加载状态 -->
             <div v-if="loading" class="state-message">
-                加载配置中...
+                {{ t('app.loadingConfig') }}
             </div>
 
             <div v-else-if="initError" class="state-message error">

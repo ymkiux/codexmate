@@ -131,7 +131,7 @@
                         <div class="side-item-title">{{ t('side.docs.cliInstall') }}</div>
                         <div class="side-item-meta">
                             <span>{{ t('side.docs.cliInstall.meta') }}</span>
-                            <span>{{ String(installPackageManager || 'npm').toUpperCase() }} · {{ installCommandAction === 'update' ? 'Update' : (installCommandAction === 'uninstall' ? 'Uninstall' : 'Install') }}</span>
+                            <span>{{ String(installPackageManager || 'npm').toUpperCase() }} · {{ installCommandAction === 'update' ? t('common.update') : (installCommandAction === 'uninstall' ? t('common.uninstall') : t('common.install')) }}</span>
                         </div>
                     </button>
                 </div>
@@ -148,7 +148,7 @@
                         <div class="side-item-title">{{ t('side.config.codex') }}</div>
                         <div class="side-item-meta">
                             <span>{{ t('side.config.codex.meta') }}</span>
-                            <span v-if="currentProvider">当前 {{ currentProvider }}</span>
+                            <span v-if="currentProvider">{{ t('common.current', { value: currentProvider }) }}</span>
                         </div>
                     </button>
                     <button
@@ -162,7 +162,7 @@
                         <div class="side-item-title">{{ t('side.config.claude') }}</div>
                         <div class="side-item-meta">
                             <span>{{ t('side.config.claude.meta') }}</span>
-                            <span v-if="currentClaudeConfig">当前 {{ currentClaudeConfig }}</span>
+                            <span v-if="currentClaudeConfig">{{ t('common.current', { value: currentClaudeConfig }) }}</span>
                         </div>
                     </button>
                     <button
@@ -176,7 +176,7 @@
                         <div class="side-item-title">{{ t('side.config.openclaw') }}</div>
                         <div class="side-item-meta">
                             <span>{{ t('side.config.openclaw.meta') }}</span>
-                            <span v-if="currentOpenclawConfig">当前 {{ currentOpenclawConfig }}</span>
+                            <span v-if="currentOpenclawConfig">{{ t('common.current', { value: currentOpenclawConfig }) }}</span>
                         </div>
                     </button>
                 </div>
@@ -193,7 +193,7 @@
                         <div class="side-item-title">{{ t('side.sessions.browser') }}</div>
                         <div class="side-item-meta">
                             <span>{{ t('side.sessions.browser.meta') }}</span>
-                            <span>来源：{{ sessionFilterSource === 'all' ? '全部' : (sessionFilterSource === 'codex' ? 'Codex' : 'Claude') }}</span>
+                            <span>{{ t('sessions.sourceLabel', { value: (sessionFilterSource === 'all' ? t('sessions.source.all') : (sessionFilterSource === 'codex' ? 'Codex' : 'Claude')) }) }}</span>
                         </div>
                     </button>
                     <button
@@ -205,8 +205,8 @@
                         @click="onMainTabClick('usage', $event)">
                         <div class="side-item-title">{{ t('tab.usage') }}</div>
                         <div class="side-item-meta">
-                            <span>Local stats / Trends</span>
-                            <span>范围：{{ sessionsUsageTimeRange === 'all' ? '全部' : (sessionsUsageTimeRange === '30d' ? '近 30 天' : '近 7 天') }}</span>
+                            <span>{{ t('side.usage.meta') }}</span>
+                            <span>{{ t('usage.rangeLabel', { value: (sessionsUsageTimeRange === 'all' ? t('usage.range.all') : (sessionsUsageTimeRange === '30d' ? t('usage.range.30d.short') : t('usage.range.7d.short'))) }) }}</span>
                         </div>
                     </button>
                 </div>
@@ -222,8 +222,8 @@
                         @click="onMainTabClick('orchestration', $event)">
                         <div class="side-item-title">{{ t('tab.orchestration') }}</div>
                         <div class="side-item-meta">
-                            <span>Plan / Queue / Runs</span>
-                            <span>队列 {{ taskOrchestrationQueueStats.running }} 运行中 · {{ taskOrchestrationQueueStats.queued }} 等待中</span>
+                            <span>{{ t('side.orchestration.meta') }}</span>
+                            <span>{{ t('orchestration.queueStats', { running: taskOrchestrationQueueStats.running, queued: taskOrchestrationQueueStats.queued }) }}</span>
                         </div>
                     </button>
                 </div>
@@ -239,8 +239,8 @@
                         @click="onMainTabClick('market', $event)">
                         <div class="side-item-title">{{ t('tab.market') }}</div>
                         <div class="side-item-meta">
-                            <span>{{ skillsTargetLabel }} / 本地 Skills</span>
-                            <span>已装 {{ skillsList.length }} · 可导入 {{ skillsImportList.length }}</span>
+                            <span>{{ t('skills.localLabel', { target: skillsTargetLabel }) }}</span>
+                            <span>{{ t('skills.counts', { installed: skillsList.length, importable: skillsImportList.length }) }}</span>
                         </div>
                     </button>
                 </div>
@@ -306,124 +306,124 @@
                         <template v-if="isProviderConfigMode">
                             <div class="status-chip">
                                 <span class="label">{{ activeProviderConfigChipLabel }}</span>
-                                <span class="value">{{ currentProvider || '未选择' }}</span>
+                                <span class="value">{{ currentProvider || t('common.notSelected') }}</span>
                             </div>
                             <div class="status-chip">
                                 <span class="label">{{ activeProviderModelChipLabel }}</span>
-                                <span class="value">{{ currentModel || '未选择' }}</span>
+                                <span class="value">{{ currentModel || t('common.notSelected') }}</span>
                             </div>
                         </template>
                         <template v-else-if="configMode === 'claude'">
                             <div class="status-chip">
-                                <span class="label">Claude 配置</span>
-                                <span class="value">{{ currentClaudeConfig || '未选择' }}</span>
+                                <span class="label">{{ t('status.claudeConfig') }}</span>
+                                <span class="value">{{ currentClaudeConfig || t('common.notSelected') }}</span>
                             </div>
                             <div class="status-chip">
-                                <span class="label">Claude 模型</span>
-                                <span class="value">{{ currentClaudeModel || '未选择' }}</span>
+                                <span class="label">{{ t('status.claudeModel') }}</span>
+                                <span class="value">{{ currentClaudeModel || t('common.notSelected') }}</span>
                             </div>
                         </template>
                         <template v-else-if="configMode === 'openclaw'">
                             <div class="status-chip">
-                                <span class="label">OpenClaw 配置</span>
-                                <span class="value">{{ currentOpenclawConfig || '未选择' }}</span>
+                                <span class="label">{{ t('status.openclawConfig') }}</span>
+                                <span class="value">{{ currentOpenclawConfig || t('common.notSelected') }}</span>
                             </div>
                             <div class="status-chip">
-                                <span class="label">工作区文件</span>
-                                <span class="value">{{ openclawWorkspaceFileName || '未选择' }}</span>
+                                <span class="label">{{ t('status.workspaceFile') }}</span>
+                                <span class="value">{{ openclawWorkspaceFileName || t('common.notSelected') }}</span>
                             </div>
                         </template>
                         <template v-else>
                             <div class="status-chip">
-                                <span class="label">配置模式</span>
-                                <span class="value">未选择</span>
+                                <span class="label">{{ t('status.configMode') }}</span>
+                                <span class="value">{{ t('common.notSelected') }}</span>
                             </div>
                         </template>
                     </div>
                     <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'sessions'">
                         <div class="status-chip">
-                            <span class="label">当前来源</span>
+                            <span class="label">{{ t('status.currentSource') }}</span>
                             <span class="value">
-                                {{ sessionFilterSource === 'all' ? '全部' : (sessionFilterSource === 'claude' ? 'Claude Code' : 'Codex') }}
+                                {{ sessionFilterSource === 'all' ? t('sessions.source.all') : (sessionFilterSource === 'claude' ? 'Claude Code' : 'Codex') }}
                             </span>
                         </div>
                         <div class="status-chip">
-                            <span class="label">会话数</span>
+                            <span class="label">{{ t('status.sessionCount') }}</span>
                             <span class="value">{{ sessionsList.length }}</span>
                         </div>
                     </div>
                     <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'usage'">
                         <div class="status-chip">
-                            <span class="label">统计范围</span>
-                            <span class="value">{{ sessionsUsageTimeRange === 'all' ? '全部' : (sessionsUsageTimeRange === '30d' ? '近 30 天' : '近 7 天') }}</span>
+                            <span class="label">{{ t('status.range') }}</span>
+                            <span class="value">{{ sessionsUsageTimeRange === 'all' ? t('usage.range.all') : (sessionsUsageTimeRange === '30d' ? t('usage.range.30d.short') : t('usage.range.7d.short')) }}</span>
                         </div>
                         <div class="status-chip">
-                            <span class="label">总会话数</span>
+                            <span class="label">{{ t('status.totalSessions') }}</span>
                             <span class="value">{{ sessionUsageSummaryCards[0] ? sessionUsageSummaryCards[0].value : 0 }}</span>
                         </div>
                         <div class="status-chip">
-                            <span class="label">总消息数</span>
+                            <span class="label">{{ t('status.totalMessages') }}</span>
                             <span class="value">{{ sessionUsageSummaryCards[1] ? sessionUsageSummaryCards[1].value : 0 }}</span>
                         </div>
                     </div>
                     <div class="status-strip" v-else-if="!sessionStandalone && taskOrchestrationTabEnabled && mainTab === 'orchestration'">
                         <div class="status-chip">
-                            <span class="label">引擎</span>
+                            <span class="label">{{ t('status.engine') }}</span>
                             <span class="value">{{ taskOrchestration.selectedEngine === 'workflow' ? 'Workflow' : 'Codex' }}</span>
                         </div>
                         <div class="status-chip">
-                            <span class="label">并发度</span>
+                            <span class="label">{{ t('status.concurrency') }}</span>
                             <span class="value">{{ taskOrchestration.concurrency }}</span>
                         </div>
                         <div class="status-chip">
-                            <span class="label">运行中</span>
+                            <span class="label">{{ t('status.running') }}</span>
                             <span class="value">{{ taskOrchestrationQueueStats.running }}</span>
                         </div>
                         <div class="status-chip">
-                            <span class="label">排队中</span>
+                            <span class="label">{{ t('status.queued') }}</span>
                             <span class="value">{{ taskOrchestrationQueueStats.queued }}</span>
                         </div>
                         <div class="status-chip">
-                            <span class="label">历史 Runs</span>
+                            <span class="label">{{ t('status.runs') }}</span>
                             <span class="value">{{ taskOrchestration.runs.length }}</span>
                         </div>
                     </div>
                     <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'market'">
                         <div class="status-chip">
-                            <span class="label">当前目标</span>
+                            <span class="label">{{ t('status.currentTarget') }}</span>
                             <span class="value">{{ skillsTargetLabel }}</span>
                         </div>
                         <div class="status-chip">
-                            <span class="label">本地 Skills</span>
+                            <span class="label">{{ t('status.localSkills') }}</span>
                             <span class="value">{{ skillsList.length }}</span>
                         </div>
                         <div class="status-chip">
-                            <span class="label">可导入</span>
+                            <span class="label">{{ t('status.importable') }}</span>
                             <span class="value">{{ skillsImportList.length }}</span>
                         </div>
                         <div class="status-chip">
-                            <span class="label">可直接导入</span>
+                            <span class="label">{{ t('status.importableDirect') }}</span>
                             <span class="value">{{ skillsImportConfiguredCount }}</span>
                         </div>
                     </div>
                     <div class="status-strip" v-else-if="!sessionStandalone && mainTab === 'docs'">
                         <div class="status-chip">
-                            <span class="label">包管理器</span>
+                            <span class="label">{{ t('status.pm') }}</span>
                             <span class="value">{{ String(installPackageManager || 'npm').toUpperCase() }}</span>
                         </div>
                         <div class="status-chip">
-                            <span class="label">当前操作</span>
-                            <span class="value">{{ installCommandAction === 'update' ? '升级' : (installCommandAction === 'uninstall' ? '卸载' : '安装') }}</span>
+                            <span class="label">{{ t('status.action') }}</span>
+                            <span class="value">{{ installCommandAction === 'update' ? t('common.update') : (installCommandAction === 'uninstall' ? t('common.uninstall') : t('common.install')) }}</span>
                         </div>
                         <div class="status-chip">
-                            <span class="label">镜像</span>
-                            <span class="value">{{ installRegistryPreview || '官方默认' }}</span>
+                            <span class="label">{{ t('status.registry') }}</span>
+                            <span class="value">{{ installRegistryPreview || t('common.defaultOfficial') }}</span>
                         </div>
                     </div>
                     <div
                         v-if="!sessionStandalone && mainTab === 'config' && isProviderConfigMode && forceCompactLayout && !loading && !initError && displayProvidersList.length > 1"
                         class="provider-fast-switch">
-                        <label class="provider-fast-switch-label" for="provider-fast-switch-select">快速切换提供商</label>
+                        <label class="provider-fast-switch-label" for="provider-fast-switch-select">{{ t('status.quickSwitchProvider') }}</label>
                         <select
                             id="provider-fast-switch-select"
                             class="provider-fast-switch-select"

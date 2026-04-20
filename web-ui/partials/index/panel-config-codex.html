@@ -10,13 +10,13 @@
                     <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M10 4v12M4 10h12"/>
                     </svg>
-                    新增提供商
+                    {{ t('config.addProvider') }}
                 </button>
 
                 <!-- 模型选择器 -->
                 <div class="selector-section">
                     <div class="selector-header">
-                        <span class="selector-title">模型</span>
+                        <span class="selector-title">{{ t('config.models') }}</span>
                         <div class="selector-actions">
                             <button class="btn-icon" @click="showModelModal = true" aria-label="Add model" title="添加模型" v-if="modelsSource === 'legacy'">+</button>
                             <button class="btn-icon" @click="showModelListModal = true" aria-label="Manage models" title="管理模型" v-if="modelsSource === 'legacy'">≡</button>
@@ -29,7 +29,7 @@
                         @change="onModelChange"
                         :disabled="codexModelsLoading"
                     >
-                        <option v-if="codexModelsLoading" value="">加载中...</option>
+                        <option v-if="codexModelsLoading" value="">{{ t('config.modelLoading') }}</option>
                         <option v-else v-for="model in models" :key="model" :value="model">{{ model }}</option>
                     </select>
                     <input
@@ -40,63 +40,63 @@
                         :placeholder="activeProviderModelPlaceholder"
                     >
                     <div class="config-template-hint" v-if="modelsSource === 'unlimited'">
-                        当前无模型列表，可手填。
+                        {{ t('config.models.unlimited') }}
                     </div>
                     <div class="config-template-hint" v-if="modelsSource === 'error'">
-                        模型列表获取失败，可手填。
+                        {{ t('config.models.error') }}
                     </div>
                     <div class="config-template-hint" v-if="modelsSource === 'remote' && !modelsHasCurrent">
-                        {{ isCodexConfigMode ? '当前模型不在列表，可手填或改模板。' : '当前模型不在列表，可手填。' }}
+                        {{ isCodexConfigMode ? t('config.models.notInList.codex') : t('config.models.notInList.other') }}
                     </div>
                     <div class="config-template-hint" v-if="isCodexConfigMode">
-                        先改模板，再应用。
+                        {{ t('config.template.editFirst') }}
                     </div>
                     <div class="config-template-hint" v-else-if="activeProviderBridgeHint">
-                        {{ activeProviderBridgeHint }} 模板仅限 Codex 编辑。
+                        {{ t('config.template.bridgeCodexOnly', { hint: activeProviderBridgeHint }) }}
                     </div>
                     <button class="btn-tool btn-template-editor" v-if="isCodexConfigMode" @click="openConfigTemplateEditor" :disabled="loading || !!initError">
-                        打开模板编辑器
+                        {{ t('config.template.openEditor') }}
                     </button>
                 </div>
 
                 <template v-if="isCodexConfigMode">
                 <div class="selector-section">
                     <div class="selector-header">
-                        <span class="selector-title">服务档</span>
+                        <span class="selector-title">{{ t('config.serviceTier') }}</span>
                     </div>
                     <select class="model-select" v-model="serviceTier" @change="onServiceTierChange">
-                        <option value="fast">fast（默认）</option>
+                        <option value="fast">{{ t('config.serviceTier.fast') }}</option>
                         <option value="standard">standard</option>
                     </select>
                     <div class="config-template-hint">
-                        仅 fast 写入 <code>service_tier</code>。
+                        {{ t('config.serviceTier.hint', { field: 'service_tier' }) }}
                     </div>
                 </div>
 
                 <div class="selector-section">
                     <div class="selector-header">
-                        <span class="selector-title">推理强度</span>
+                        <span class="selector-title">{{ t('config.reasoningEffort') }}</span>
                     </div>
                     <select class="model-select" v-model="modelReasoningEffort" @change="onReasoningEffortChange">
                         <option value="high">high</option>
-                        <option value="medium">medium（默认）</option>
+                        <option value="medium">{{ t('config.reasoningEffort.medium') }}</option>
                         <option value="low">low</option>
                         <option value="xhigh">xhigh</option>
                     </select>
                     <div class="config-template-hint">
-                        控制推理深度；high 更深。
+                        {{ t('config.reasoningEffort.hint') }}
                     </div>
                 </div>
 
                 <div class="selector-section">
                     <div class="selector-header">
-                        <span class="selector-title">压缩阈值</span>
+                        <span class="selector-title">{{ t('config.contextBudget') }}</span>
                         <div class="selector-actions">
                             <button
                                 class="btn-tool btn-tool-compact"
                                 @click="resetCodexContextBudgetDefaults"
                                 :disabled="loading || !!initError || codexApplying">
-                                重置
+                                {{ t('config.reset') }}
                             </button>
                         </div>
                     </div>
@@ -109,12 +109,12 @@
                                 class="form-input"
                                 inputmode="numeric"
                                 autocomplete="off"
-                                placeholder="例如: 190000"
+                                :placeholder="t('config.example', { value: 190000 })"
                                 @focus="editingCodexBudgetField = 'modelContextWindowInput'"
                                 @input="sanitizePositiveIntegerDraft('modelContextWindowInput')"
                                 @blur="onModelContextWindowBlur"
                                 @keydown.enter.prevent="onModelContextWindowBlur">
-                            <div class="form-hint">上下文上限，默认 190000。</div>
+                            <div class="form-hint">{{ t('config.contextWindow.hint') }}</div>
                         </div>
                         <div class="form-group codex-config-field">
                             <label class="form-label" for="codex-model-auto-compact-token-limit">model_auto_compact_token_limit</label>
@@ -124,12 +124,12 @@
                                 class="form-input"
                                 inputmode="numeric"
                                 autocomplete="off"
-                                placeholder="例如: 185000"
+                                :placeholder="t('config.example', { value: 185000 })"
                                 @focus="editingCodexBudgetField = 'modelAutoCompactTokenLimitInput'"
                                 @input="sanitizePositiveIntegerDraft('modelAutoCompactTokenLimitInput')"
                                 @blur="onModelAutoCompactTokenLimitBlur"
                                 @keydown.enter.prevent="onModelAutoCompactTokenLimitBlur">
-                            <div class="form-hint">自动压缩阈值，默认 185000。</div>
+                            <div class="form-hint">{{ t('config.autoCompact.hint') }}</div>
                         </div>
                     </div>
                 </div>
@@ -139,7 +139,7 @@
                         <span class="selector-title">AGENTS.md</span>
                     </div>
                     <button class="btn-tool" @click="openAgentsEditor" :disabled="loading || !!initError || agentsLoading">
-                        {{ agentsLoading ? '加载中...' : '打开 AGENTS.md' }}
+                        {{ agentsLoading ? t('config.modelLoading') : t('config.agents.open') }}
                     </button>
                 </div>
 
@@ -159,10 +159,10 @@
                             <div class="card-content">
                                 <div class="card-title">
                                     <span>{{ provider.name }}</span>
-                                    <span v-if="provider.readOnly" class="provider-readonly-badge">系统</span>
+                                    <span v-if="provider.readOnly" class="provider-readonly-badge">{{ t('config.badge.system') }}</span>
                                 </div>
                                 <div class="card-subtitle">
-                                    {{ provider.url || '未设 URL' }}
+                                    {{ provider.url || t('config.url.unset') }}
                                 </div>
                             </div>
                         </div>
@@ -179,7 +179,7 @@
                                     @click="openHealthCheckDialog({ providerName: provider.name, locked: true })"
                                     :disabled="displayCurrentProvider !== provider.name"
                                     :aria-label="`Open health dialog for ${provider.name}`"
-                                    :title="displayCurrentProvider === provider.name ? '健康聊天测试' : '请先切换到该提供商'"
+                                    :title="displayCurrentProvider === provider.name ? t('config.healthTest') : t('config.switchProviderFirst')"
                                 >
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
@@ -193,7 +193,7 @@
                                     :class="{ loading: providerShareLoading[provider.name], disabled: !shouldAllowProviderShare(provider) }"
                                     :disabled="providerShareLoading[provider.name] || !shouldAllowProviderShare(provider)"
                                     @click="copyProviderShareCommand(provider)"
-                                    :title="shouldAllowProviderShare(provider) ? '分享命令' : '不可分享'"
+                                    :title="shouldAllowProviderShare(provider) ? t('config.shareCommand') : t('config.shareDisabled')"
                                     aria-label="Share import command">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/>
