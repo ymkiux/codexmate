@@ -1,6 +1,16 @@
     <div id="app" class="container" v-cloak>
         <div v-if="!sessionStandalone" class="top-tabs" role="tablist" aria-label="Navigation">
             <button class="top-tab"
+                id="tab-docs"
+                role="tab"
+                data-main-tab="docs"
+                :tabindex="mainTab === 'docs' ? 0 : -1"
+                :aria-selected="mainTab === 'docs'"
+                aria-controls="panel-docs"
+                :class="{ active: isMainTabNavActive('docs') }"
+                @pointerdown="onMainTabPointerDown('docs', $event)"
+                @click="onMainTabClick('docs', $event)">Docs</button>
+            <button class="top-tab"
                 id="tab-config-codex"
                 role="tab"
                 data-main-tab="config"
@@ -84,16 +94,6 @@
                 @pointerdown="onMainTabPointerDown('plugins', $event)"
                 @click="onMainTabClick('plugins', $event)">Plugins</button>
             <button class="top-tab"
-                id="tab-docs"
-                role="tab"
-                data-main-tab="docs"
-                :tabindex="mainTab === 'docs' ? 0 : -1"
-                :aria-selected="mainTab === 'docs'"
-                aria-controls="panel-docs"
-                :class="{ active: isMainTabNavActive('docs') }"
-                @pointerdown="onMainTabPointerDown('docs', $event)"
-                @click="onMainTabClick('docs', $event)">Docs</button>
-            <button class="top-tab"
                 id="tab-settings"
                 role="tab"
                 data-main-tab="settings"
@@ -119,6 +119,22 @@
                 </div>
 
                 <div class="side-rail-nav">
+                <div class="side-section" role="navigation" aria-label="Docs">
+                    <div class="side-section-title">Docs</div>
+                    <button
+                        id="side-tab-docs"
+                        data-main-tab="docs"
+                        :aria-current="mainTab === 'docs' ? 'page' : null"
+                        :class="['side-item', { active: isMainTabNavActive('docs') }]"
+                        @pointerdown="onMainTabPointerDown('docs', $event)"
+                        @click="onMainTabClick('docs', $event)">
+                        <div class="side-item-title">CLI Install</div>
+                        <div class="side-item-meta">
+                            <span>Install / Update / Uninstall</span>
+                            <span>{{ String(installPackageManager || 'npm').toUpperCase() }} · {{ installCommandAction === 'update' ? 'Update' : (installCommandAction === 'uninstall' ? 'Uninstall' : 'Install') }}</span>
+                        </div>
+                    </button>
+                </div>
                 <div class="side-section" role="navigation" aria-label="Config">
                     <div class="side-section-title">Config</div>
                     <button
@@ -242,23 +258,6 @@
                         <div class="side-item-meta">
                             <span>Templates / Variables</span>
                             <span>{{ promptTemplatesList.length }} templates</span>
-                        </div>
-                    </button>
-                </div>
-
-                <div class="side-section" role="navigation" aria-label="Docs">
-                    <div class="side-section-title">Docs</div>
-                    <button
-                        id="side-tab-docs"
-                        data-main-tab="docs"
-                        :aria-current="mainTab === 'docs' ? 'page' : null"
-                        :class="['side-item', { active: isMainTabNavActive('docs') }]"
-                        @pointerdown="onMainTabPointerDown('docs', $event)"
-                        @click="onMainTabClick('docs', $event)">
-                        <div class="side-item-title">CLI Install</div>
-                        <div class="side-item-meta">
-                            <span>Install / Update / Uninstall</span>
-                            <span>{{ String(installPackageManager || 'npm').toUpperCase() }} · {{ installCommandAction === 'update' ? 'Update' : (installCommandAction === 'uninstall' ? 'Uninstall' : 'Install') }}</span>
                         </div>
                     </button>
                 </div>

@@ -14,7 +14,7 @@
 [![Stars](https://img.shields.io/github/stars/SakuraByteCore/codexmate?label=stars&style=flat)](https://github.com/SakuraByteCore/codexmate/stargazers)
 [![Issues](https://img.shields.io/github/issues/SakuraByteCore/codexmate?label=issues&style=flat)](https://github.com/SakuraByteCore/codexmate/issues)
 
-[快速开始](#快速开始) · [命令速查](#命令速查) · [Web 界面](#web-界面) · [MCP](#mcp) · [English](README.md)
+[文档](https://sakurabytecore.github.io/codexmate/) · [快速开始](#快速开始) · [命令速查](#命令速查) · [Web 界面](#web-界面) · [MCP](#mcp) · [English](README.md)
 
 </div>
 
@@ -152,6 +152,21 @@ codexmate run
 默认监听 `0.0.0.0:3737`，支持局域网访问，并尝试自动打开浏览器。
 
 > 安全提示：默认监听会在当前局域网暴露未鉴权的管理界面。若包含 API Key、provider 配置或 skills 管理，请仅在可信网络中使用；如需仅本机访问，可设置 `CODEXMATE_HOST=127.0.0.1` 或启动时传入 `--host 127.0.0.1`。
+
+### 安装 Codex CLI / Claude Code（可选）
+
+Codex Mate 支持透传调用官方 CLI（例如 `codexmate codex ...`），建议先安装：
+
+```bash
+# Codex CLI（默认）
+npm install -g @openai/codex
+
+# Termux（Android）上的 Codex CLI
+npm install -g @mmmbuto/codex-cli-termux@latest
+
+# Claude Code
+npm install -g @anthropic-ai/claude-code
+```
 
 ### 从源码运行
 

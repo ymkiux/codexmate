@@ -14,7 +14,7 @@
 [![Stars](https://img.shields.io/github/stars/SakuraByteCore/codexmate?label=stars&style=flat)](https://github.com/SakuraByteCore/codexmate/stargazers)
 [![Issues](https://img.shields.io/github/issues/SakuraByteCore/codexmate?label=issues&style=flat)](https://github.com/SakuraByteCore/codexmate/issues)
 
-[Quick Start](#quick-start) · [Commands](#command-reference) · [Web UI](#web-ui) · [MCP](#mcp) · [中文](README.zh.md)
+[Docs](https://sakurabytecore.github.io/codexmate/) · [Quick Start](#quick-start) · [Commands](#command-reference) · [Web UI](#web-ui) · [MCP](#mcp) · [中文](README.zh.md)
 
 </div>
 
@@ -149,6 +149,21 @@ codexmate run
 Default listen address is `0.0.0.0:3737` for LAN access, and browser auto-open is enabled by default.
 
 > Safety note: the unauthenticated management UI is exposed to your current LAN by default. Use trusted networks only; for local-only access, set `CODEXMATE_HOST=127.0.0.1` or pass `--host 127.0.0.1`.
+
+### Install Codex CLI / Claude Code CLI (optional)
+
+Codex Mate can pass through to the official CLIs (e.g. `codexmate codex ...`). Install them first:
+
+```bash
+# Codex CLI (default)
+npm install -g @openai/codex
+
+# Codex CLI on Termux (Android)
+npm install -g @mmmbuto/codex-cli-termux@latest
+
+# Claude Code
+npm install -g @anthropic-ai/claude-code
+```
 
 ### Run from source
 
