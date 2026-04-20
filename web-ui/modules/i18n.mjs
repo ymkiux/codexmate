@@ -1,10 +1,13 @@
 const I18N_STORAGE_KEY = 'codexmateLang';
+const SUPPORTED_LANGS = Object.freeze(['zh', 'en', 'ja', 'ko']);
 
 const DICT = Object.freeze({
     zh: {
         // Global
         'lang.zh': '中文',
         'lang.en': 'English',
+        'lang.ja': '日本語',
+        'lang.ko': '한국어',
         'lang.label': '语言',
 
         // Common
@@ -443,6 +446,8 @@ const DICT = Object.freeze({
         // Global
         'lang.zh': '中文',
         'lang.en': 'English',
+        'lang.ja': '日本語',
+        'lang.ko': '한국어',
         'lang.label': 'Language',
 
         // Common
@@ -876,12 +881,26 @@ const DICT = Object.freeze({
         'openclaw.notConfigured': 'Not configured',
         'openclaw.action.edit': 'Edit',
         'openclaw.action.delete': 'Delete'
+    },
+    ja: {
+        'lang.zh': '中文',
+        'lang.en': 'English',
+        'lang.ja': '日本語',
+        'lang.ko': '한국어',
+        'lang.label': 'Language'
+    },
+    ko: {
+        'lang.zh': '中文',
+        'lang.en': 'English',
+        'lang.ja': '日本語',
+        'lang.ko': '한국어',
+        'lang.label': 'Language'
     }
 });
 
 function normalizeLang(value) {
     const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
-    return normalized === 'en' ? 'en' : 'zh';
+    return SUPPORTED_LANGS.includes(normalized) ? normalized : 'zh';
 }
 
 function interpolate(template, params) {
@@ -903,7 +922,7 @@ export function createI18nMethods() {
             this.lang = next;
             try {
                 if (typeof document !== 'undefined' && document.documentElement) {
-                    document.documentElement.lang = next === 'en' ? 'en' : 'zh-CN';
+                    document.documentElement.lang = next === 'zh' ? 'zh-CN' : next;
                 }
             } catch (_) {}
         },
@@ -917,15 +936,16 @@ export function createI18nMethods() {
             } catch (_) {}
             try {
                 if (typeof document !== 'undefined' && document.documentElement) {
-                    document.documentElement.lang = next === 'en' ? 'en' : 'zh-CN';
+                    document.documentElement.lang = next === 'zh' ? 'zh-CN' : next;
                 }
             } catch (_) {}
         },
         t(key, params = null) {
             const lang = normalizeLang(this.lang);
             const table = DICT[lang] || DICT.zh;
-            const fallback = DICT.zh;
-            const raw = (table && table[key]) || (fallback && fallback[key]) || key;
+            const fallbackEn = DICT.en;
+            const fallbackZh = DICT.zh;
+            const raw = (table && table[key]) || (fallbackEn && fallbackEn[key]) || (fallbackZh && fallbackZh[key]) || key;
             return interpolate(raw, params);
         }
     };

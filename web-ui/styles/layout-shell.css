@@ -87,6 +87,7 @@ body::after {
     position: sticky;
     bottom: 0;
     z-index: 2;
+    margin-top: auto;
     padding: 12px 10px;
     background: linear-gradient(180deg, rgba(255, 253, 252, 0.45) 0%, rgba(255, 253, 252, 0.95) 48%, rgba(255, 253, 252, 1) 100%);
     border-top: 1px solid var(--color-border);
@@ -141,6 +142,8 @@ body::after {
     color: var(--color-text-secondary);
     transition: transform 220ms var(--ease-spring), opacity 220ms var(--ease-spring);
     will-change: transform, opacity;
+    opacity: 0;
+    transform: translateY(10px);
 }
 
 .lang-switch-track[data-lang="zh"] .lang-switch-zh {
@@ -150,7 +153,6 @@ body::after {
 
 .lang-switch-track[data-lang="zh"] .lang-switch-en {
     opacity: 0;
-    transform: translateY(14px);
 }
 
 .lang-switch-track[data-lang="en"] .lang-switch-en {
@@ -160,7 +162,16 @@ body::after {
 
 .lang-switch-track[data-lang="en"] .lang-switch-zh {
     opacity: 0;
-    transform: translateY(-14px);
+}
+
+.lang-switch-track[data-lang="ja"] .lang-switch-ja {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.lang-switch-track[data-lang="ko"] .lang-switch-ko {
+    opacity: 1;
+    transform: translateY(0);
 }
 
 .lang-switch-track::after {
