@@ -56,37 +56,60 @@ function formatUsageEstimatedCost(value, options = {}) {
     }).format(numeric);
 }
 
-function formatUsageRangeLabel(range) {
+function formatUsageRangeLabel(range, t) {
     const normalized = typeof range === 'string' ? range.trim().toLowerCase() : '7d';
+    if (typeof t === 'function') {
+        if (normalized === '30d') return t('usage.range.30d');
+        if (normalized === 'all') return t('usage.range.all');
+        return t('usage.range.7d');
+    }
     if (normalized === '30d') return '近 30 天';
     if (normalized === 'all') return '全部';
     return '近 7 天';
 }
 
 function formatUsageDuration(value, options = {}) {
+    const normalizedLang = typeof options.lang === 'string' ? options.lang.trim().toLowerCase() : '';
+    const isEn = normalizedLang === 'en';
     const numeric = Number(value);
     if (!Number.isFinite(numeric) || numeric <= 0) {
-        return '0分';
+        return isEn ? '0m' : '0分';
     }
     const totalMinutes = Math.floor(numeric / 60000);
     if (totalMinutes <= 0) {
-        return '<1分';
+        return isEn ? '<1m' : '<1分';
     }
     const maxParts = Number.isFinite(Number(options.maxParts))
         ? Math.max(1, Math.floor(Number(options.maxParts)))
         : 2;
     const compact = options.compact !== false;
     const units = compact
-        ? [
-            { label: '天', value: 24 * 60 },
-            { label: '时', value: 60 },
-            { label: '分', value: 1 }
-        ]
-        : [
-            { label: '天', value: 24 * 60 },
-            { label: '小时', value: 60 },
-            { label: '分', value: 1 }
-        ];
+        ? (
+            isEn
+                ? [
+                    { label: 'd', value: 24 * 60 },
+                    { label: 'h', value: 60 },
+                    { label: 'm', value: 1 }
+                ]
+                : [
+                    { label: '天', value: 24 * 60 },
+                    { label: '时', value: 60 },
+                    { label: '分', value: 1 }
+                ]
+        )
+        : (
+            isEn
+                ? [
+                    { label: 'day', value: 24 * 60 },
+                    { label: 'hr', value: 60 },
+                    { label: 'min', value: 1 }
+                ]
+                : [
+                    { label: '天', value: 24 * 60 },
+                    { label: '小时', value: 60 },
+                    { label: '分', value: 1 }
+                ]
+        );
     let remainingMinutes = totalMinutes;
     const parts = [];
     for (const unit of units) {
@@ -97,13 +120,13 @@ function formatUsageDuration(value, options = {}) {
         if (count <= 0) {
             continue;
         }
-        parts.push(`${count}${unit.label}`);
+        parts.push(compact ? `${count}${unit.label}` : (isEn ? `${count} ${unit.label}` : `${count}${unit.label}`));
         remainingMinutes -= count * unit.value;
         if (parts.length >= maxParts) {
             break;
         }
     }
-    return parts.length ? parts.join(compact ? '' : ' ') : '0分';
+    return parts.length ? parts.join(compact ? '' : ' ') : (isEn ? '0m' : '0分');
 }
 
 const KNOWN_USAGE_MODEL_PRICING = Object.freeze({
@@ -420,9 +443,13 @@ export function createSessionComputed() {
         },
         sessionQueryPlaceholder() {
             if (this.isSessionQueryEnabled) {
-                return '关键词检索（支持 Codex/Claude，例：claude code）';
+                return typeof this.t === 'function'
+                    ? this.t('sessions.query.placeholder.enabled')
+                    : '关键词检索（支持 Codex/Claude，例：claude code）';
             }
-            return '当前来源暂不支持关键词检索';
+            return typeof this.t === 'function'
+                ? this.t('sessions.query.placeholder.disabled')
+                : '当前来源暂不支持关键词检索';
         },
         sessionUsageCharts() {
             return buildUsageChartGroups(this.sessionsUsageList, {
@@ -436,64 +463,88 @@ export function createSessionComputed() {
             const filteredUsageSessions = this.sessionUsageCharts && Array.isArray(this.sessionUsageCharts.filteredSessions)
                 ? this.sessionUsageCharts.filteredSessions
                 : this.sessionsUsageList;
-            const usageRangeLabel = formatUsageRangeLabel(this.sessionsUsageTimeRange);
+            const t = typeof this.t === 'function' ? this.t : null;
+            const usageRangeLabel = formatUsageRangeLabel(this.sessionsUsageTimeRange, t);
             const estimatedCost = estimateUsageCostSummary(
                 filteredUsageSessions,
                 this.providersList,
                 this.currentProvider
             );
+            const noneLabel = t ? t('common.none') : '暂无';
+            const estimatedCostPrefix = estimatedCost.skippedUnsupportedSessions > 0
+                ? (t ? t('usage.estimatedCost.note.excludesClaudePrefix') : '暂不含 Claude，')
+                : '';
+            const estimatedCostMethod = estimatedCost.catalogSessions > 0
+                ? (estimatedCost.configuredSessions > 0
+                    ? (t ? t('usage.estimatedCost.method.configuredAndCatalog') : '按已配置单价 + 公开模型目录估算')
+                    : (t ? t('usage.estimatedCost.method.catalog') : '按公开模型目录估算'))
+                : (t ? t('usage.estimatedCost.method.configured') : '按已配置单价估算');
+            const estimatedCostTitle = estimatedCost.hasEstimate
+                ? (t ? t('usage.estimatedCost.detail.estimate', {
+                    prefix: estimatedCostPrefix,
+                    method: estimatedCostMethod,
+                    estimate: formatUsageEstimatedCost(estimatedCost.totalCostUsd, { precise: true }),
+                    covered: estimatedCost.estimatedSessions,
+                    total: estimatedCost.totalSessions,
+                    percent: estimatedCost.coveragePercent
+                }) : `${estimatedCostPrefix}${estimatedCostMethod}，估算 ${formatUsageEstimatedCost(estimatedCost.totalCostUsd, { precise: true })}，覆盖 ${estimatedCost.estimatedSessions}/${estimatedCost.totalSessions} 个会话，约 ${estimatedCost.coveragePercent}% token`)
+                : (t ? t('usage.estimatedCost.detail.missing', { prefix: estimatedCostPrefix }) : `${estimatedCostPrefix}缺少可匹配的模型单价或 token 拆分。请先补 models.cost，或确认会话已记录 input/output token。`);
             return [
-                { key: 'sessions', label: '总会话数', value: formatUsageSummaryNumber(summary.totalSessions || 0) },
-                { key: 'messages', label: '总消息数', value: formatUsageSummaryNumber(summary.totalMessages || 0) },
+                { key: 'sessions', label: t ? t('usage.summary.sessions') : '总会话数', value: formatUsageSummaryNumber(summary.totalSessions || 0) },
+                { key: 'messages', label: t ? t('usage.summary.messages') : '总消息数', value: formatUsageSummaryNumber(summary.totalMessages || 0) },
                 {
                     key: 'tokens',
-                    label: '总 token 数',
+                    label: t ? t('usage.summary.tokens') : '总 token 数',
                     value: formatCompactUsageSummaryNumber(summary.totalTokens || 0),
                     title: formatUsageSummaryNumber(summary.totalTokens || 0)
                 },
                 {
                     key: 'context-window',
-                    label: '总上下文数',
+                    label: t ? t('usage.summary.contextWindow') : '总上下文数',
                     value: formatCompactUsageSummaryNumber(summary.totalContextWindow || 0),
                     title: formatUsageSummaryNumber(summary.totalContextWindow || 0)
                 },
                 {
                     key: 'estimated-cost',
-                    label: `预估费用 · ${usageRangeLabel}`,
+                    label: t ? t('usage.summary.estimatedCost', { range: usageRangeLabel }) : `预估费用 · ${usageRangeLabel}`,
                     value: estimatedCost.hasEstimate ? formatUsageEstimatedCost(estimatedCost.totalCostUsd) : '0',
-                    title: estimatedCost.hasEstimate
-                        ? `${estimatedCost.skippedUnsupportedSessions > 0 ? '暂不含 Claude，' : ''}${estimatedCost.catalogSessions > 0
-                            ? (estimatedCost.configuredSessions > 0 ? '按已配置单价 + 公开模型目录估算' : '按公开模型目录估算')
-                            : '按已配置单价估算'}，估算 ${formatUsageEstimatedCost(estimatedCost.totalCostUsd, { precise: true })}，覆盖 ${estimatedCost.estimatedSessions}/${estimatedCost.totalSessions} 个会话，约 ${estimatedCost.coveragePercent}% token`
-                        : `${estimatedCost.skippedUnsupportedSessions > 0 ? '暂不统计 Claude 费用。' : ''}缺少可匹配的模型单价或 token 拆分。请先补 models.cost，或确认会话已记录 input/output token。`
+                    title: estimatedCostTitle
                 },
                 {
                     key: 'active-duration',
-                    label: '活跃时长',
-                    value: formatUsageDuration(summary.activeDurationMs || 0, { compact: true }),
-                    title: `累计会话跨度 ${formatUsageDuration(summary.activeDurationMs || 0, { maxParts: 3, compact: false })}`
+                    label: t ? t('usage.summary.activeDuration') : '活跃时长',
+                    value: formatUsageDuration(summary.activeDurationMs || 0, { compact: true, lang: this.lang }),
+                    title: t
+                        ? t('usage.summary.activeDuration.title', {
+                            value: formatUsageDuration(summary.activeDurationMs || 0, { maxParts: 3, compact: false, lang: this.lang })
+                        })
+                        : `累计会话跨度 ${formatUsageDuration(summary.activeDurationMs || 0, { maxParts: 3, compact: false, lang: this.lang })}`
                 },
                 {
                     key: 'total-duration',
-                    label: '总时长',
-                    value: formatUsageDuration(summary.totalDurationMs || 0, { compact: true }),
-                    title: `整体时间跨度 ${formatUsageDuration(summary.totalDurationMs || 0, { maxParts: 3, compact: false })}`
+                    label: t ? t('usage.summary.totalDuration') : '总时长',
+                    value: formatUsageDuration(summary.totalDurationMs || 0, { compact: true, lang: this.lang }),
+                    title: t
+                        ? t('usage.summary.totalDuration.title', {
+                            value: formatUsageDuration(summary.totalDurationMs || 0, { maxParts: 3, compact: false, lang: this.lang })
+                        })
+                        : `整体时间跨度 ${formatUsageDuration(summary.totalDurationMs || 0, { maxParts: 3, compact: false, lang: this.lang })}`
                 },
-                { key: 'days', label: '活跃天数', value: formatUsageSummaryNumber(summary.activeDays || 0) },
-                { key: 'avg-messages', label: '平均每会话消息', value: summary.avgMessagesPerSession || 0 },
+                { key: 'days', label: t ? t('usage.summary.activeDays') : '活跃天数', value: formatUsageSummaryNumber(summary.activeDays || 0) },
+                { key: 'avg-messages', label: t ? t('usage.summary.avgMessagesPerSession') : '平均每会话消息', value: summary.avgMessagesPerSession || 0 },
                 {
                     key: 'busiest-day',
-                    label: '最忙日',
+                    label: t ? t('usage.summary.busiestDay') : '最忙日',
                     value: summary.busiestDay && summary.busiestDay.totalSessions > 0
                         ? `${summary.busiestDay.label} · ${summary.busiestDay.totalSessions}`
-                        : '暂无'
+                        : noneLabel
                 },
                 {
                     key: 'busiest-hour',
-                    label: '高峰时段',
+                    label: t ? t('usage.summary.busiestHour') : '高峰时段',
                     value: summary.busiestHour && summary.busiestHour.count > 0
                         ? `${summary.busiestHour.label} · ${summary.busiestHour.count}`
-                        : '暂无'
+                        : noneLabel
                 }
             ];
         },

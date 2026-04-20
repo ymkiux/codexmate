@@ -34,8 +34,8 @@
                         <div class="session-toolbar-group session-toolbar-primary">
                             <select class="session-source-select" v-model="sessionFilterSource" @change="onSessionSourceChange" :disabled="sessionsLoading">
                                 <option value="all">{{ t('common.all') }}</option>
-                                <option value="codex">Codex</option>
-                                <option value="claude">Claude Code</option>
+                                <option value="codex">{{ t('sessions.source.codex') }}</option>
+                                <option value="claude">{{ t('sessions.source.claudeCode') }}</option>
                             </select>
                             <select
                                 class="session-path-select"
@@ -171,7 +171,7 @@
                                         <div class="session-preview-title">{{ activeSession.title || activeSession.sessionId }}</div>
                                         <div class="session-preview-meta">
                                             <span class="session-preview-meta-item">{{ activeSession.sourceLabel }}</span>
-                                            <span class="session-preview-meta-item">{{ activeSession.updatedAt || 'unknown time' }}</span>
+                                            <span class="session-preview-meta-item">{{ activeSession.updatedAt || t('sessions.unknownTime') }}</span>
                                         </div>
                                         <div class="session-preview-meta" v-if="activeSession.cwd">
                                             <span class="session-preview-meta-item">{{ activeSession.cwd }}</span>
@@ -254,7 +254,7 @@
                                             :class="['session-msg', msg.normalizedRole === 'user' ? 'user' : (msg.normalizedRole === 'system' ? 'system' : 'assistant')]">
                                             <div class="session-msg-header">
                                                 <div class="session-msg-meta">
-                                                    <span class="session-msg-role">{{ msg.roleLabel || (msg.normalizedRole === 'user' ? 'User' : (msg.normalizedRole === 'system' ? 'System' : 'Assistant')) }}</span>
+                                                    <span class="session-msg-role">{{ msg.roleLabel || (msg.normalizedRole === 'user' ? t('sessions.roleLabel.user') : (msg.normalizedRole === 'system' ? t('sessions.roleLabel.system') : t('sessions.roleLabel.assistant'))) }}</span>
                                                     <span class="session-msg-time">{{ msg.timestamp || '' }}</span>
                                                 </div>
                                             </div>

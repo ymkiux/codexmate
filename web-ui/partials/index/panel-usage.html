@@ -168,14 +168,14 @@
                             <section class="usage-card">
                                 <div class="usage-card-title">{{ t('usage.trend.sessions') }}</div>
                                 <div class="usage-legend">
-                                    <span><span class="usage-legend-dot" style="background:#4f8cff"></span>Codex</span>
-                                    <span><span class="usage-legend-dot" style="background:#b277ff"></span>Claude</span>
+                                    <span><span class="usage-legend-dot" style="background:#4f8cff"></span>{{ t('usage.legend.codex') }}</span>
+                                    <span><span class="usage-legend-dot" style="background:#b277ff"></span>{{ t('usage.legend.claude') }}</span>
                                 </div>
                                 <div class="usage-bars">
                                     <div v-for="bucket in sessionUsageCharts.buckets" :key="bucket.key" class="usage-bar-group">
                                         <div class="usage-bar-stack">
-                                            <div class="usage-bar codex" :style="{ height: ((bucket.codex / Math.max(sessionUsageCharts.maxSessionBucket, 1)) * 100) + '%' }" :title="`Codex ${bucket.codex}`"></div>
-                                            <div class="usage-bar claude" :style="{ height: ((bucket.claude / Math.max(sessionUsageCharts.maxSessionBucket, 1)) * 100) + '%' }" :title="`Claude ${bucket.claude}`"></div>
+                                            <div class="usage-bar codex" :style="{ height: ((bucket.codex / Math.max(sessionUsageCharts.maxSessionBucket, 1)) * 100) + '%' }" :title="t('usage.trend.sessions.codexTitle', { count: bucket.codex })"></div>
+                                            <div class="usage-bar claude" :style="{ height: ((bucket.claude / Math.max(sessionUsageCharts.maxSessionBucket, 1)) * 100) + '%' }" :title="t('usage.trend.sessions.claudeTitle', { count: bucket.claude })"></div>
                                         </div>
                                         <div class="usage-bar-label">{{ bucket.label }}</div>
                                     </div>
@@ -187,7 +187,7 @@
                                 <div class="usage-bars">
                                     <div v-for="bucket in sessionUsageCharts.buckets" :key="bucket.key + '-messages'" class="usage-bar-group">
                                         <div class="usage-bar-stack">
-                                            <div class="usage-bar codex" style="width:100%" :style="{ height: ((bucket.totalMessages / Math.max(sessionUsageCharts.maxMessageBucket, 1)) * 100) + '%' }" :title="`${bucket.totalMessages} messages`"></div>
+                                            <div class="usage-bar codex" style="width:100%" :style="{ height: ((bucket.totalMessages / Math.max(sessionUsageCharts.maxMessageBucket, 1)) * 100) + '%' }" :title="t('usage.trend.messages.barTitle', { count: bucket.totalMessages })"></div>
                                         </div>
                                         <div class="usage-bar-label">{{ bucket.label }}</div>
                                     </div>
