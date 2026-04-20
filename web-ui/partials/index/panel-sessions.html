@@ -31,7 +31,7 @@
                         </div>
                     </div>
                     <div class="session-toolbar">
-                        <div class="session-toolbar-group">
+                        <div class="session-toolbar-group session-toolbar-primary">
                             <select class="session-source-select" v-model="sessionFilterSource" @change="onSessionSourceChange" :disabled="sessionsLoading">
                                 <option value="all">全部</option>
                                 <option value="codex">Codex</option>
@@ -55,7 +55,7 @@
                                 :disabled="sessionsLoading || !isSessionQueryEnabled"
                                 :placeholder="sessionQueryPlaceholder">
                         </div>
-                        <div class="session-toolbar-group">
+                        <div class="session-toolbar-group session-toolbar-secondary">
                             <select
                                 class="session-role-select"
                                 v-model="sessionRoleFilter"

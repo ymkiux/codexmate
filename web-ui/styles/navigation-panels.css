@@ -38,6 +38,12 @@
     margin: 0 0 12px;
 }
 
+/* Give the status strip a bit more breathing room under the sticky header. */
+.main-panel-topbar .status-strip {
+    margin-top: 10px;
+    margin-bottom: 16px;
+}
+
 .status-chip {
     min-width: 0;
     max-width: 100%;
