@@ -93,9 +93,9 @@ export function createInstallMethods() {
             return 'linux';
         },
 
-        buildInstallCommandMatrix(packageManager) {
+        buildInstallCommandMatrix(packageManager, platformOverride = '') {
             const manager = this.normalizeInstallPackageManager(packageManager);
-            const platform = this.resolveInstallPlatform();
+            const platform = platformOverride ? String(platformOverride).trim().toLowerCase() : this.resolveInstallPlatform();
             const codexPackage = platform === 'termux' ? '@mmmbuto/codex-cli-termux' : '@openai/codex';
             const codexInstallPackage = platform === 'termux' ? '@mmmbuto/codex-cli-termux@latest' : '@openai/codex';
             const matrix = {
@@ -139,11 +139,11 @@ export function createInstallMethods() {
             return matrix;
         },
 
-        getInstallCommand(targetId, actionName) {
+        getInstallCommand(targetId, actionName, platformOverride = '') {
             const targetKey = typeof targetId === 'string' ? targetId.trim() : '';
             if (!targetKey) return '';
             const action = this.normalizeInstallAction(actionName);
-            const currentMap = this.buildInstallCommandMatrix(this.installPackageManager);
+            const currentMap = this.buildInstallCommandMatrix(this.installPackageManager, platformOverride);
             const current = currentMap[targetKey] && typeof currentMap[targetKey][action] === 'string'
                 ? currentMap[targetKey][action]
                 : '';

@@ -44,9 +44,13 @@ export function createDashboardComputed() {
             const action = this.normalizeInstallAction(this.installCommandAction);
             return targets.map((target) => {
                 const id = target && typeof target.id === 'string' ? target.id : '';
+                const termuxCommand = id === 'codex'
+                    ? this.getInstallCommand(id, action, 'termux')
+                    : '';
                 return {
                     ...target,
-                    command: this.getInstallCommand(id, action)
+                    command: this.getInstallCommand(id, action),
+                    termuxCommand
                 };
             });
         },

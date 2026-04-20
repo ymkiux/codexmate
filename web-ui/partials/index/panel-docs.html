@@ -104,6 +104,17 @@
                                                 @click="copyInstallCommand(target.command)">复制</button>
                                         </div>
                                     </div>
+                                    <div
+                                        v-if="target.id === 'codex' && target.termuxCommand && target.termuxCommand !== target.command"
+                                        class="docs-command-row docs-command-row-secondary">
+                                        <div class="docs-command-box" role="group" aria-label="Termux Codex CLI command">
+                                            <code class="install-command"><span class="docs-command-prefix">Termux</span>{{ target.termuxCommand }}</code>
+                                            <button
+                                                type="button"
+                                                class="btn-mini docs-copy-btn"
+                                                @click="copyInstallCommand(target.termuxCommand)">复制</button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>

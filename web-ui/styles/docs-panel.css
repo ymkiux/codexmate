@@ -90,6 +90,10 @@
     gap: 10px;
 }
 
+.docs-command-row-secondary {
+    margin-top: 6px;
+}
+
 .docs-command-box {
     display: grid;
     grid-template-columns: 1fr auto;
@@ -109,6 +113,20 @@
     overflow-x: auto;
     white-space: nowrap;
     user-select: text;
+}
+
+.docs-command-prefix {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    margin-right: 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: rgba(210, 107, 90, 0.10);
+    color: var(--color-text-secondary);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
 }
 
 .docs-command-meta {
