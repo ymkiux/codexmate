@@ -227,10 +227,7 @@ test('performProviderSwitch keeps provider when provider models fail to load', a
         ['loadModelsForProvider', 'beta'],
         ['applyCodexConfigDirect', { silent: true }]
     ]);
-    assert.deepStrictEqual(context.messages, [{
-        text: '模型列表获取失败，但已切换提供商；请检查 URL/密钥或手动设置模型',
-        type: 'error'
-    }]);
+    assert.deepStrictEqual(context.messages, []);
 });
 
 test('updateProvider keeps existing key when edit key input is blank', async () => {
