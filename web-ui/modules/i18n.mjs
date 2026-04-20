@@ -402,6 +402,42 @@ const DICT = Object.freeze({
         'market.help.crossImport.copy': '从其他宿主导入未托管 skill。',
         'market.help.zipImport.title': 'ZIP 导入',
         'market.help.zipImport.copy': '从 ZIP 导入本地 skill。'
+        ,
+
+        // Claude config panel
+        'claude.addProvider': '添加提供商',
+        'claude.applyDefault': '默认应用到 ~/.claude/settings.json。',
+        'claude.presetProviders': '预设供应商',
+        'claude.customConfig': '自定义配置',
+        'claude.model': '模型',
+        'claude.model.placeholder': '例如: claude-3-7-sonnet',
+        'claude.model.hint': '模型修改后会自动保存并应用到当前配置。',
+        'claude.health.title': '配置健康检查',
+        'claude.health.run': '运行检查',
+        'claude.health.running': '检查中...',
+        'claude.md.title': 'CLAUDE.md',
+        'claude.md.open': '打开 CLAUDE.md',
+        'claude.md.hint': '读写 ~/.claude/CLAUDE.md。',
+        'claude.model.unset': '未设置模型',
+        'claude.configured': '已配置',
+        'claude.notConfigured': '未配置',
+        'claude.action.edit': '编辑',
+        'claude.action.delete': '删除',
+        'claude.action.shareDisabled': '分享导入命令（暂时禁用）'
+        ,
+
+        // OpenClaw config panel
+        'openclaw.applyHint': '写入 ~/.openclaw/openclaw.json，支持 JSON5。',
+        'openclaw.agents.hint': '读写 Workspace 的 AGENTS.md，默认路径 ~/.openclaw/workspace/AGENTS.md。',
+        'openclaw.agents.open': '打开 AGENTS.md',
+        'openclaw.workspaceFile': '工作区文件',
+        'openclaw.workspace.placeholder': '例如: SOUL.md',
+        'openclaw.workspace.hint': '仅限 Workspace 内的 .md 文件。',
+        'openclaw.workspace.open': '打开工作区文件',
+        'openclaw.configured': '已配置',
+        'openclaw.notConfigured': '未配置',
+        'openclaw.action.edit': '编辑',
+        'openclaw.action.delete': '删除'
     },
     en: {
         // Global
@@ -804,6 +840,42 @@ const DICT = Object.freeze({
         'market.help.crossImport.copy': 'Import unmanaged skills from other hosts.',
         'market.help.zipImport.title': 'ZIP import',
         'market.help.zipImport.copy': 'Import local skills from a ZIP file.'
+        ,
+
+        // Claude config panel
+        'claude.addProvider': 'Add provider',
+        'claude.applyDefault': 'Applies to ~/.claude/settings.json by default.',
+        'claude.presetProviders': 'Provider presets',
+        'claude.customConfig': 'Custom config',
+        'claude.model': 'Model',
+        'claude.model.placeholder': 'e.g. claude-3-7-sonnet',
+        'claude.model.hint': 'Model changes are saved and applied to the current config automatically.',
+        'claude.health.title': 'Config health check',
+        'claude.health.run': 'Run check',
+        'claude.health.running': 'Checking...',
+        'claude.md.title': 'CLAUDE.md',
+        'claude.md.open': 'Open CLAUDE.md',
+        'claude.md.hint': 'Read/write ~/.claude/CLAUDE.md.',
+        'claude.model.unset': 'Model not set',
+        'claude.configured': 'Configured',
+        'claude.notConfigured': 'Not configured',
+        'claude.action.edit': 'Edit',
+        'claude.action.delete': 'Delete',
+        'claude.action.shareDisabled': 'Share import command (disabled)'
+        ,
+
+        // OpenClaw config panel
+        'openclaw.applyHint': 'Writes to ~/.openclaw/openclaw.json (JSON5 supported).',
+        'openclaw.agents.hint': 'Read/write Workspace AGENTS.md. Default: ~/.openclaw/workspace/AGENTS.md.',
+        'openclaw.agents.open': 'Open AGENTS.md',
+        'openclaw.workspaceFile': 'Workspace file',
+        'openclaw.workspace.placeholder': 'e.g. SOUL.md',
+        'openclaw.workspace.hint': 'Only .md files inside the Workspace are supported.',
+        'openclaw.workspace.open': 'Open workspace file',
+        'openclaw.configured': 'Configured',
+        'openclaw.notConfigured': 'Not configured',
+        'openclaw.action.edit': 'Edit',
+        'openclaw.action.delete': 'Delete'
     }
 });
 

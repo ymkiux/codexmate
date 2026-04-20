@@ -324,15 +324,15 @@ test('config template keeps expected config tabs in top and side navigation', ()
     );
     assert.match(html, /<button[\s\S]*?@click="openEditModal\(provider\)"[\s\S]*?:aria-label="`Edit provider \$\{provider\.name\}`"[\s\S]*?:title="shouldShowProviderEdit\(provider\) \? '编辑' : '不可编辑'">/);
     assert.match(html, /<button[\s\S]*?@click="deleteProvider\(provider\.name\)"[\s\S]*?:aria-label="`Delete provider \$\{provider\.name\}`"[\s\S]*?:title="shouldShowProviderDelete\(provider\) \? '删除' : '不可删除'">/);
-    assert.match(html, /<button class="card-action-btn"[^>]*@click="openEditConfigModal\(name\)"[^>]*:aria-label="`Edit Claude config \$\{name\}`"[^>]*title="编辑">/);
-    assert.match(html, /<button class="card-action-btn delete"[^>]*@click="deleteClaudeConfig\(name\)"[^>]*:aria-label="`Delete Claude config \$\{name\}`"[^>]*title="删除">/);
+    assert.match(html, /<button class="card-action-btn"[^>]*@click="openEditConfigModal\(name\)"[^>]*:aria-label="`Edit Claude config \$\{name\}`"[^>]*:title="t\('claude\.action\.edit'\)">/);
+    assert.match(html, /<button class="card-action-btn delete"[^>]*@click="deleteClaudeConfig\(name\)"[^>]*:aria-label="`Delete Claude config \$\{name\}`"[^>]*:title="t\('claude\.action\.delete'\)">/);
     assert.match(html, /<button class="card-action-btn"[^>]*@click="copyClaudeShareCommand\(name\)"[^>]*disabled[^>]*>/);
-    assert.match(html, /<button class="card-action-btn"[^>]*@click="openOpenclawEditModal\(name\)"[^>]*:aria-label="`Edit OpenClaw config \$\{name\}`"[^>]*title="编辑">/);
+    assert.match(html, /<button class="card-action-btn"[^>]*@click="openOpenclawEditModal\(name\)"[^>]*:aria-label="`Edit OpenClaw config \$\{name\}`"[^>]*:title="t\('openclaw\.action\.edit'\)">/);
     assert.match(
         html,
         /<div class="docs-command-row">[\s\S]*<div class="docs-command-box"[\s\S]*<code class="install-command">\{\{ target\.command \}\}<\/code>[\s\S]*<button[\s\S]*class="btn-mini docs-copy-btn"/
     );
-    assert.match(html, /<button v-if="name !== '默认配置'" class="card-action-btn delete"[^>]*@click="deleteOpenclawConfig\(name\)"[^>]*:aria-label="`Delete OpenClaw config \$\{name\}`"[^>]*title="删除">/);
+    assert.match(html, /<button v-if="name !== '默认配置'" class="card-action-btn delete"[^>]*@click="deleteOpenclawConfig\(name\)"[^>]*:aria-label="`Delete OpenClaw config \$\{name\}`"[^>]*:title="t\('openclaw\.action\.delete'\)">/);
     assert.match(modalsBasic, /<div v-if="showAddModal" class="modal-overlay" @click\.self="closeAddModal">/);
     assert.match(modalsBasic, /<div v-if="showModelModal" class="modal-overlay" @click\.self="closeModelModal">/);
     assert.match(modalsBasic, /<div v-if="showClaudeConfigModal" class="modal-overlay" @click\.self="closeClaudeConfigModal">/);

@@ -6,7 +6,7 @@
                     role="tabpanel"
                     :aria-labelledby="'tab-config-openclaw'">
                 <div class="config-template-hint">
-                    写入 <code>~/.openclaw/openclaw.json</code>，支持 JSON5。
+                    {{ t('openclaw.applyHint') }}
                 </div>
 
                 <div class="selector-section">
@@ -14,27 +14,27 @@
                         <span class="selector-title">AGENTS.md</span>
                     </div>
                     <div class="config-template-hint">
-                        读写 Workspace 的 <code>AGENTS.md</code>，默认路径 <code>~/.openclaw/workspace/AGENTS.md</code>。
+                        {{ t('openclaw.agents.hint') }}
                     </div>
                     <button class="btn-tool" @click="openOpenclawAgentsEditor" :disabled="loading || !!initError || agentsLoading">
-                        {{ agentsLoading ? '加载中...' : '打开 AGENTS.md' }}
+                        {{ agentsLoading ? t('config.modelLoading') : t('openclaw.agents.open') }}
                     </button>
                 </div>
 
                 <div class="selector-section">
                     <div class="selector-header">
-                        <label class="selector-title" for="openclaw-workspace-file">工作区文件</label>
+                        <label class="selector-title" for="openclaw-workspace-file">{{ t('openclaw.workspaceFile') }}</label>
                     </div>
                     <input
                         id="openclaw-workspace-file"
                         class="form-input"
                         v-model="openclawWorkspaceFileName"
-                        placeholder="例如: SOUL.md">
+                        :placeholder="t('openclaw.workspace.placeholder')">
                     <div class="config-template-hint">
-                        仅限 Workspace 内的 <code>.md</code> 文件。
+                        {{ t('openclaw.workspace.hint') }}
                     </div>
                     <button class="btn-tool" @click="openOpenclawWorkspaceEditor" :disabled="loading || !!initError || agentsLoading">
-                        {{ agentsLoading ? '加载中...' : '打开工作区文件' }}
+                        {{ agentsLoading ? t('config.modelLoading') : t('openclaw.workspace.open') }}
                     </button>
                 </div>
 
@@ -56,16 +56,16 @@
                         </div>
                         <div class="card-trailing">
                             <span :class="['pill', openclawHasContent(config) ? 'configured' : 'empty']">
-                                {{ openclawHasContent(config) ? '已配置' : '未配置' }}
+                                {{ openclawHasContent(config) ? t('openclaw.configured') : t('openclaw.notConfigured') }}
                             </span>
                             <div class="card-actions" @click.stop>
-                                <button class="card-action-btn" @click="openOpenclawEditModal(name)" :aria-label="`Edit OpenClaw config ${name}`" title="编辑">
+                                <button class="card-action-btn" @click="openOpenclawEditModal(name)" :aria-label="`Edit OpenClaw config ${name}`" :title="t('openclaw.action.edit')">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                                     </svg>
                                 </button>
-                                <button v-if="name !== '默认配置'" class="card-action-btn delete" @click="deleteOpenclawConfig(name)" :aria-label="`Delete OpenClaw config ${name}`" title="删除">
+                                <button v-if="name !== '默认配置'" class="card-action-btn delete" @click="deleteOpenclawConfig(name)" :aria-label="`Delete OpenClaw config ${name}`" :title="t('openclaw.action.delete')">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M3 6h18"/>
                                         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
