@@ -29,7 +29,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const app = createApp({
         data() {
             return {
-                mainTab: 'config',
+                // 默认选中首个主标签：Docs
+                mainTab: 'docs',
                 configMode: 'codex',
                 currentProvider: '',
                 currentModel: '',

@@ -90,13 +90,19 @@
                                     <div class="docs-command-head">
                                         <div class="install-row-title">{{ target.name }}</div>
                                         <div class="docs-command-meta">
-                                            <span>{{ target.packageName }}</span>
-                                            <span>命令：{{ target.bin }}</span>
+                                            <span class="docs-meta-pill">{{ target.packageName }}</span>
+                                            <span class="docs-meta-pill">bin: {{ target.bin }}</span>
                                         </div>
                                     </div>
                                     <div class="docs-command-row">
-                                        <code class="install-command">{{ target.command }}</code>
-                                        <button type="button" class="btn-mini docs-copy-btn" :disabled="!target.command" @click="copyInstallCommand(target.command)">复制命令</button>
+                                        <div class="docs-command-box" role="group" :aria-label="`${target.name} command`">
+                                            <code class="install-command">{{ target.command }}</code>
+                                            <button
+                                                type="button"
+                                                class="btn-mini docs-copy-btn"
+                                                :disabled="!target.command"
+                                                @click="copyInstallCommand(target.command)">复制</button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
