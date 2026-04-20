@@ -105,6 +105,21 @@
                 @click="onMainTabClick('settings', $event)">{{ t('tab.settings') }}</button>
         </div>
 
+        <div v-if="!sessionStandalone" class="lang-fab" role="group" :aria-label="t('lang.label')">
+            <button
+                type="button"
+                class="lang-switch"
+                :aria-label="t('lang.label')"
+                @click="setLang((lang || 'zh') === 'zh' ? 'en' : ((lang || 'zh') === 'en' ? 'ja' : ((lang || 'zh') === 'ja' ? 'ko' : 'zh')))">
+                <span class="lang-switch-track" :data-lang="lang || 'zh'">
+                    <span class="lang-switch-text lang-switch-zh">ZH</span>
+                    <span class="lang-switch-text lang-switch-en">EN</span>
+                    <span class="lang-switch-text lang-switch-ja">JA</span>
+                    <span class="lang-switch-text lang-switch-ko">KO</span>
+                </span>
+            </button>
+        </div>
+
         <div :class="['app-shell', { standalone: sessionStandalone }]">
             <aside class="side-rail" v-if="!sessionStandalone">
                 <div class="brand-block">
@@ -286,7 +301,7 @@
                         :aria-label="t('lang.label')"
                         @click="setLang((lang || 'zh') === 'zh' ? 'en' : ((lang || 'zh') === 'en' ? 'ja' : ((lang || 'zh') === 'ja' ? 'ko' : 'zh')))">
                         <span class="lang-switch-track" :data-lang="lang || 'zh'">
-                            <span class="lang-switch-text lang-switch-zh">中</span>
+                            <span class="lang-switch-text lang-switch-zh">ZH</span>
                             <span class="lang-switch-text lang-switch-en">EN</span>
                             <span class="lang-switch-text lang-switch-ja">JA</span>
                             <span class="lang-switch-text lang-switch-ko">KO</span>

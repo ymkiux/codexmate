@@ -83,6 +83,71 @@ body::after {
     flex: 1 1 auto;
 }
 
+.lang-fab {
+    display: none;
+}
+
+.lang-fab .lang-switch {
+    width: auto;
+}
+
+.lang-fab .lang-switch-track {
+    box-shadow: 0 14px 34px rgba(27, 23, 20, 0.22);
+    background: rgba(255, 253, 252, 0.92);
+}
+
+.lang-fab .lang-switch:hover .lang-switch-track {
+    transform: translateY(-1px);
+}
+
+.lang-fab .lang-switch:active .lang-switch-track {
+    transform: translateY(0);
+}
+
+.lang-fab .lang-switch-track::after {
+    opacity: 1;
+}
+
+.lang-fab .lang-switch-text {
+    color: var(--color-text-primary);
+}
+
+.lang-fab {
+    position: fixed;
+    left: 50%;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    z-index: 60;
+    pointer-events: none;
+}
+
+.lang-fab .lang-switch {
+    pointer-events: auto;
+}
+
+.lang-fab::before {
+    content: "";
+    position: absolute;
+    inset: -12px -18px;
+    background: radial-gradient(circle at 50% 70%, rgba(247, 243, 239, 0.92), rgba(247, 243, 239, 0));
+    filter: blur(2px);
+    pointer-events: none;
+}
+
+.lang-fab > .lang-switch {
+    position: relative;
+    z-index: 1;
+}
+
+.lang-fab .lang-switch-track {
+    border-color: rgba(163, 146, 134, 0.32);
+    backdrop-filter: blur(10px);
+}
+
+.lang-fab .lang-switch:hover .lang-switch-track {
+    border-color: rgba(199, 116, 98, 0.7);
+}
+
 .side-rail-lang {
     position: sticky;
     bottom: 0;

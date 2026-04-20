@@ -87,6 +87,10 @@ textarea:focus-visible {
         display: none;
     }
 
+    .lang-fab {
+        display: block;
+    }
+
     .top-tabs {
         display: flex !important;
         flex-wrap: nowrap;
