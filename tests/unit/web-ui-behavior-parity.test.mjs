@@ -362,6 +362,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'sessionListVisibleCount'
     ];
     allowedExtraCurrentKeys.push(
+        'lang',
         'configTemplateDiffVisible',
         'configTemplateDiffLoading',
         'configTemplateDiffError',
@@ -412,6 +413,10 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
     const extraCurrentMethodKeys = currentMethodKeys.filter((key) => !headMethodKeys.includes(key)).sort();
     const missingCurrentMethodKeys = headMethodKeys.filter((key) => !currentMethodKeys.includes(key)).sort();
     const allowedExtraCurrentMethodKeys = [
+        'initI18n',
+        'normalizeLang',
+        'setLang',
+        't',
         'cancelScheduledSessionListViewportFill',
         'canSubmitProvider',
         'expandVisibleSessionList',

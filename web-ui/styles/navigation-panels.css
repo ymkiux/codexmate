@@ -44,6 +44,34 @@
     margin-bottom: 16px;
 }
 
+.lang-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.lang-toggle-btn {
+    border: 1px solid var(--color-border);
+    background: rgba(255, 255, 255, 0.75);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-text-secondary);
+    transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.lang-toggle-btn:hover {
+    border-color: rgba(0, 0, 0, 0.22);
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.lang-toggle-btn.active {
+    background: rgba(18, 22, 35, 0.10);
+    border-color: rgba(18, 22, 35, 0.30);
+    color: var(--color-text);
+}
+
 .status-chip {
     min-width: 0;
     max-width: 100%;

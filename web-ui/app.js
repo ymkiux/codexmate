@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const app = createApp({
         data() {
             return {
+                lang: 'zh',
                 // 默认选中首个主标签：Docs
                 mainTab: 'docs',
                 configMode: 'codex',
@@ -420,6 +421,9 @@ document.addEventListener('DOMContentLoaded', () => {
         },
 
         mounted() {
+            if (typeof this.initI18n === 'function') {
+                this.initI18n();
+            }
             this.initSessionStandalone();
             this.updateCompactLayoutMode();
             if (!this.taskOrchestrationTabEnabled && this.mainTab === 'orchestration') {

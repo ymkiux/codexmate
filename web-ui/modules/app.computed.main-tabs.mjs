@@ -132,34 +132,34 @@ function createTaskDraftReadiness(metrics) {
 export function createMainTabsComputed() {
     return {
         mainTabKicker() {
-            if (this.mainTab === 'config') return 'Configuration';
-            if (this.mainTab === 'sessions') return 'Sessions';
-            if (this.mainTab === 'usage') return 'Usage';
-            if (this.mainTab === 'orchestration') return 'Tasks';
-            if (this.mainTab === 'market') return 'Skills';
-            if (this.mainTab === 'plugins') return 'Plugins';
-            if (this.mainTab === 'docs') return 'Docs';
-            return 'Settings';
+            if (this.mainTab === 'config') return this.t('kicker.config');
+            if (this.mainTab === 'sessions') return this.t('kicker.sessions');
+            if (this.mainTab === 'usage') return this.t('kicker.usage');
+            if (this.mainTab === 'orchestration') return this.t('kicker.orchestration');
+            if (this.mainTab === 'market') return this.t('kicker.market');
+            if (this.mainTab === 'plugins') return this.t('kicker.plugins');
+            if (this.mainTab === 'docs') return this.t('kicker.docs');
+            return this.t('kicker.settings');
         },
         mainTabTitle() {
-            if (this.mainTab === 'config') return '本地配置控制台';
-            if (this.mainTab === 'sessions') return '会话与导出';
-            if (this.mainTab === 'usage') return '本地用量与趋势';
-            if (this.mainTab === 'orchestration') return '任务编排';
-            if (this.mainTab === 'market') return 'Skills 安装与同步';
-            if (this.mainTab === 'plugins') return '插件与模板';
-            if (this.mainTab === 'docs') return 'CLI 安装与文档';
-            return '系统与数据设置';
+            if (this.mainTab === 'config') return this.t('title.config');
+            if (this.mainTab === 'sessions') return this.t('title.sessions');
+            if (this.mainTab === 'usage') return this.t('title.usage');
+            if (this.mainTab === 'orchestration') return this.t('title.orchestration');
+            if (this.mainTab === 'market') return this.t('title.market');
+            if (this.mainTab === 'plugins') return this.t('title.plugins');
+            if (this.mainTab === 'docs') return this.t('title.docs');
+            return this.t('title.settings');
         },
         mainTabSubtitle() {
-            if (this.mainTab === 'config') return '管理本地配置与模型。';
-            if (this.mainTab === 'sessions') return '浏览与导出会话。';
-            if (this.mainTab === 'usage') return '查看近 7 / 30 天用量。';
-            if (this.mainTab === 'orchestration') return '规划、排队、执行与回看本地任务。';
-            if (this.mainTab === 'market') return '管理本地 Skills。';
-            if (this.mainTab === 'plugins') return '管理模板化 prompt 与可复用插件。';
-            if (this.mainTab === 'docs') return '查看 CLI 安装命令与排障。';
-            return '管理下载、目录与回收站。';
+            if (this.mainTab === 'config') return this.t('subtitle.config');
+            if (this.mainTab === 'sessions') return this.t('subtitle.sessions');
+            if (this.mainTab === 'usage') return this.t('subtitle.usage');
+            if (this.mainTab === 'orchestration') return this.t('subtitle.orchestration');
+            if (this.mainTab === 'market') return this.t('subtitle.market');
+            if (this.mainTab === 'plugins') return this.t('subtitle.plugins');
+            if (this.mainTab === 'docs') return this.t('subtitle.docs');
+            return this.t('subtitle.settings');
         },
         taskOrchestrationSelectedRun() {
             return this.taskOrchestration && this.taskOrchestration.selectedRunDetail

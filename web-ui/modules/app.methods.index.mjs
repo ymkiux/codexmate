@@ -28,6 +28,7 @@ import { createSessionTrashMethods } from './app.methods.session-trash.mjs';
 import { createStartupClaudeMethods } from './app.methods.startup-claude.mjs';
 import { createSkillsMethods } from './skills.methods.mjs';
 import { createPluginsMethods } from './plugins.methods.mjs';
+import { createI18nMethods } from './i18n.mjs';
 import {
     CONFIG_MODE_SET,
     getProviderConfigModeMeta
@@ -41,6 +42,7 @@ import {
 
 export function createAppMethods() {
     return {
+        ...createI18nMethods(),
         ...createStartupClaudeMethods({
             api,
             defaultModelContextWindow: DEFAULT_MODEL_CONTEXT_WINDOW,
