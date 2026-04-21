@@ -1,6 +1,6 @@
 ﻿{
   "name": "codexmate",
-  "version": "0.0.21",
+  "version": "0.0.22",
   "description": "Codex/Claude Code/OpenClaw 配置、会话与任务编排 CLI + Web 工具",
   "main": "cli.js",
   "bin": {
