@@ -560,6 +560,8 @@ const DICT = Object.freeze({
         'config.template.editFirst': '先改模板，再应用。',
         'config.template.bridgeCodexOnly': '{hint} 模板仅限 Codex 编辑。',
         'config.template.openEditor': '打开模板编辑器',
+        'modal.configTemplate.title': 'Config 模板编辑器（手动确认应用）',
+        'modal.configTemplate.placeholder': '在这里编辑 config.toml 模板内容',
         'config.serviceTier': '服务档',
         'config.serviceTier.fast': 'fast（默认）',
         'config.serviceTier.standard': 'standard',
@@ -573,6 +575,12 @@ const DICT = Object.freeze({
         'config.contextWindow.hint': '上下文上限，默认 190000。',
         'config.autoCompact.hint': '自动压缩阈值，默认 185000。',
         'config.agents.open': '打开 AGENTS.md',
+        'modal.agents.title.default': 'AGENTS.md 编辑器',
+        'modal.agents.title.claudeMd': 'CLAUDE.md 编辑器',
+        'modal.agents.title.openclaw': 'OpenClaw AGENTS.md 编辑器',
+        'modal.agents.hint.default': '保存后会写入目标 AGENTS.md（与 config.toml 同级）。',
+        'modal.agents.hint.claudeMd': '保存后会写入 ~/.claude/CLAUDE.md。',
+        'modal.agents.hint.openclaw': '保存后会写入 OpenClaw Workspace 下的 AGENTS.md。',
         'config.url.unset': '未设 URL',
         'config.badge.system': '系统',
         'config.healthTest': '健康聊天测试',
@@ -584,6 +592,8 @@ const DICT = Object.freeze({
         ,
         'common.current': '当前 {value}',
         'common.notSelected': '未选择',
+        'common.readFromEditor': '从编辑器读取',
+        'common.writeToEditor': '写入编辑器',
         'sessions.sourceLabel': '来源：{value}',
         'usage.rangeLabel': '范围：{value}',
         'sessions.source.all': '全部',
@@ -762,7 +772,10 @@ const DICT = Object.freeze({
         'openclaw.configured': '已配置',
         'openclaw.notConfigured': '未配置',
         'openclaw.action.edit': '编辑',
-        'openclaw.action.delete': '删除'
+        'openclaw.action.delete': '删除',
+        'modal.openclaw.quick.subtitle': '按 3 步完成：填 Provider 和模型，写入编辑器，保存并应用。',
+        'modal.openclaw.quick.step2': '点击写入编辑器',
+        'modal.openclaw.structured.writeHint': '写入编辑器会重排 JSON，注释可能丢失。'
     },
     en: {
         // Global
@@ -1323,6 +1336,8 @@ const DICT = Object.freeze({
         'config.template.editFirst': 'Edit template first, then apply.',
         'config.template.bridgeCodexOnly': '{hint} template is editable in Codex mode only.',
         'config.template.openEditor': 'Open template editor',
+        'modal.configTemplate.title': 'Config template editor (manual confirm)',
+        'modal.configTemplate.placeholder': 'Edit config.toml template here',
         'config.serviceTier': 'Service tier',
         'config.serviceTier.fast': 'fast (default)',
         'config.serviceTier.standard': 'standard',
@@ -1336,6 +1351,12 @@ const DICT = Object.freeze({
         'config.contextWindow.hint': 'Context window limit (default 190000).',
         'config.autoCompact.hint': 'Auto-compaction threshold (default 185000).',
         'config.agents.open': 'Open AGENTS.md',
+        'modal.agents.title.default': 'AGENTS.md editor',
+        'modal.agents.title.claudeMd': 'CLAUDE.md editor',
+        'modal.agents.title.openclaw': 'OpenClaw AGENTS.md editor',
+        'modal.agents.hint.default': 'Saved content will be written to AGENTS.md (next to config.toml).',
+        'modal.agents.hint.claudeMd': 'Saved content will be written to ~/.claude/CLAUDE.md.',
+        'modal.agents.hint.openclaw': 'Saved content will be written to OpenClaw workspace AGENTS.md.',
         'config.url.unset': 'URL not set',
         'config.badge.system': 'System',
         'config.healthTest': 'Health chat test',
@@ -1347,6 +1368,8 @@ const DICT = Object.freeze({
         ,
         'common.current': 'Current {value}',
         'common.notSelected': 'Not selected',
+        'common.readFromEditor': 'Read from editor',
+        'common.writeToEditor': 'Write to editor',
         'sessions.sourceLabel': 'Source: {value}',
         'usage.rangeLabel': 'Range: {value}',
         'sessions.source.all': 'All',
@@ -1525,7 +1548,10 @@ const DICT = Object.freeze({
         'openclaw.configured': 'Configured',
         'openclaw.notConfigured': 'Not configured',
         'openclaw.action.edit': 'Edit',
-        'openclaw.action.delete': 'Delete'
+        'openclaw.action.delete': 'Delete',
+        'modal.openclaw.quick.subtitle': '3 steps: fill provider/model, write to editor, save & apply.',
+        'modal.openclaw.quick.step2': 'Write to editor',
+        'modal.openclaw.structured.writeHint': 'Writing to editor may reformat JSON and drop comments.'
     }
 });
 

@@ -121,7 +121,7 @@
                 <div class="structured-section">
                     <div class="structured-header">
                         <span class="structured-title">结构化配置（高级）</span>
-                        <span class="form-hint">写入编辑器会重排 JSON，注释可能丢失。</span>
+                        <span class="form-hint">{{ t('modal.openclaw.structured.writeHint') }}</span>
                     </div>
                     <div class="structured-grid">
                         <div class="structured-card">
@@ -249,7 +249,7 @@
                     </div>
                     <div class="btn-group">
                         <button class="btn btn-confirm secondary" @click="syncOpenclawStructuredFromText">从文本刷新</button>
-                        <button class="btn btn-confirm" @click="applyOpenclawStructuredToText">写入编辑器</button>
+                        <button class="btn btn-confirm" @click="applyOpenclawStructuredToText">{{ t('common.writeToEditor') }}</button>
                     </div>
                 </div>
 
