@@ -82,17 +82,17 @@
                                     </div>
                                 </div>
 
-                                <div class="selector-grid task-composer-grid task-composer-grid-compact">
+                                <div class="selector-grid task-composer-grid task-composer-grid-compact task-composer-grid-inline">
                                     <label class="selector-field">
                                         <span class="selector-label">{{ t('orchestration.fields.engine') }}</span>
-                                        <select v-model="taskOrchestration.selectedEngine" class="provider-fast-switch-select">
+                                        <select v-model="taskOrchestration.selectedEngine" class="provider-fast-switch-select" disabled>
                                             <option value="codex">{{ t('orchestration.engine.codex') }}</option>
                                             <option value="workflow">{{ t('orchestration.engine.workflow') }}</option>
                                         </select>
                                     </label>
                                     <label class="selector-field">
                                         <span class="selector-label">{{ t('orchestration.fields.runMode') }}</span>
-                                        <select v-model="taskOrchestration.runMode" class="provider-fast-switch-select">
+                                        <select v-model="taskOrchestration.runMode" class="provider-fast-switch-select" disabled>
                                             <option value="write">{{ t('orchestration.runMode.write') }}</option>
                                             <option value="read">{{ t('orchestration.runMode.readOnly') }}</option>
                                             <option value="dry-run">{{ t('orchestration.runMode.dryRun') }}</option>

@@ -148,6 +148,14 @@
     box-shadow: var(--shadow-input-focus);
 }
 
+.provider-fast-switch-select:disabled {
+    cursor: not-allowed;
+    opacity: 0.72;
+    border-color: var(--color-border-soft);
+    background-color: var(--color-surface-alt);
+    box-shadow: none;
+}
+
 .main-panel {
     min-width: 0;
     background: var(--color-bg);
