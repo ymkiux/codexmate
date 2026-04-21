@@ -215,11 +215,12 @@
 
 .market-overview-header {
     gap: var(--spacing-sm);
-    align-items: flex-start;
+    align-items: center;
 }
 
 .market-header-actions {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    align-items: center;
 }
 
 /* 缩减顶部操作按钮尺寸（刷新概览 / 打开 Skills 管理），并确保两者对齐 */
@@ -234,6 +235,15 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+}
+
+@media (max-width: 720px) {
+    .market-overview-header {
+        align-items: flex-start;
+    }
+    .market-header-actions {
+        flex-wrap: wrap;
+    }
 }
 
 .market-target-switch {
