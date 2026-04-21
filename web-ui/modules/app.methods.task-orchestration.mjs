@@ -12,11 +12,11 @@ function createDefaultTaskOrchestrationState() {
         followUpsText: '',
         workflowIdsText: '',
         selectedEngine: 'codex',
-        allowWrite: false,
-        dryRun: false,
+        runMode: 'write',
         concurrency: 2,
         autoFixRounds: 1,
         plan: null,
+        planFingerprint: '',
         planIssues: [],
         planWarnings: [],
         overviewWarnings: [],
@@ -62,6 +62,22 @@ function isActiveStatus(status) {
     return normalized === 'running' || normalized === 'queued';
 }
 
+function normalizeTaskRunMode(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'read') return 'read';
+    if (normalized === 'dry-run' || normalized === 'dryrun' || normalized === 'plan') return 'dry-run';
+    return 'write';
+}
+
+function buildRunModeFlags(runMode) {
+    const normalized = normalizeTaskRunMode(runMode);
+    return {
+        runMode: normalized,
+        allowWrite: normalized === 'write',
+        dryRun: normalized === 'dry-run'
+    };
+}
+
 export function createTaskOrchestrationMethods(options = {}) {
     const { api } = options;
 
@@ -75,6 +91,7 @@ export function createTaskOrchestrationMethods(options = {}) {
                         current[key] = value;
                     }
                 }
+                current.runMode = normalizeTaskRunMode(current.runMode);
                 return current;
             }
             this.taskOrchestration = createDefaultTaskOrchestrationState();
@@ -83,6 +100,7 @@ export function createTaskOrchestrationMethods(options = {}) {
 
         buildTaskOrchestrationRequest() {
             const state = this.ensureTaskOrchestrationState();
+            const flags = buildRunModeFlags(state.runMode);
             return {
                 title: String(state.title || '').trim(),
                 target: String(state.target || '').trim(),
@@ -90,11 +108,27 @@ export function createTaskOrchestrationMethods(options = {}) {
                 followUps: normalizeLines(state.followUpsText),
                 workflowIds: normalizeLines(state.workflowIdsText),
                 engine: String(state.selectedEngine || 'codex').trim().toLowerCase() === 'workflow' ? 'workflow' : 'codex',
-                allowWrite: state.allowWrite === true,
-                dryRun: state.dryRun === true,
+                allowWrite: flags.allowWrite,
+                dryRun: flags.dryRun,
                 concurrency: normalizePositiveInteger(state.concurrency, 2, 1, 8),
                 autoFixRounds: normalizePositiveInteger(state.autoFixRounds, 1, 0, 5)
             };
+        },
+
+        buildTaskOrchestrationFingerprint() {
+            const req = this.buildTaskOrchestrationRequest();
+            return JSON.stringify({
+                title: req.title,
+                target: req.target,
+                notes: req.notes,
+                followUps: req.followUps,
+                workflowIds: req.workflowIds,
+                engine: req.engine,
+                allowWrite: req.allowWrite,
+                dryRun: req.dryRun,
+                concurrency: req.concurrency,
+                autoFixRounds: req.autoFixRounds
+            });
         },
 
         taskRunStatusTone(status) {
@@ -190,6 +224,7 @@ export function createTaskOrchestrationMethods(options = {}) {
                 state.plan = res && res.plan ? res.plan : null;
                 state.planIssues = Array.isArray(res && res.issues) ? res.issues : [];
                 state.planWarnings = Array.isArray(res && res.warnings) ? res.warnings : [];
+                state.planFingerprint = state.plan ? this.buildTaskOrchestrationFingerprint() : '';
                 if (res && res.error) {
                     if (!options.silent) {
                         this.showMessage(res.error, 'error');
@@ -246,7 +281,7 @@ export function createTaskOrchestrationMethods(options = {}) {
             }
         },
 
-        async addTaskOrchestrationToQueue() {
+        async addTaskOrchestrationToQueue(options = {}) {
             const state = this.ensureTaskOrchestrationState();
             if (state.queueAdding) {
                 return null;
@@ -255,19 +290,70 @@ export function createTaskOrchestrationMethods(options = {}) {
             try {
                 const res = await api('task-queue-add', this.buildTaskOrchestrationRequest());
                 if (res && res.error) {
-                    this.showMessage(res.error, 'error');
+                    if (!options.silent) {
+                        this.showMessage(res.error, 'error');
+                    }
                     return res;
                 }
-                await this.loadTaskOrchestrationOverview({ silent: true, includeDetail: false });
-                this.showMessage(`已加入队列: ${res && res.task ? res.task.taskId : ''}`.trim(), 'success');
+                if (!options.deferRefresh) {
+                    await this.loadTaskOrchestrationOverview({ silent: true, includeDetail: false });
+                }
+                if (!options.silent) {
+                    this.showMessage(`已加入队列: ${res && res.task ? res.task.taskId : ''}`.trim(), 'success');
+                }
                 return res;
             } catch (error) {
                 const message = error && error.message ? error.message : '加入队列失败';
-                this.showMessage(message, 'error');
+                if (!options.silent) {
+                    this.showMessage(message, 'error');
+                }
                 return { error: message };
             } finally {
                 state.queueAdding = false;
             }
+        },
+
+        async planAndRunTaskOrchestration() {
+            const state = this.ensureTaskOrchestrationState();
+            if (state.running || state.planning) {
+                return null;
+            }
+            if (!String(state.target || '').trim()) {
+                return null;
+            }
+            if (buildRunModeFlags(state.runMode).dryRun) {
+                return this.previewTaskPlan({ silent: false });
+            }
+            const fingerprint = this.buildTaskOrchestrationFingerprint();
+            const shouldPreview = !state.plan || state.planFingerprint !== fingerprint;
+            if (shouldPreview) {
+                const preview = await this.previewTaskPlan({ silent: true });
+                if (preview && preview.error) {
+                    this.showMessage(preview.error, 'error');
+                    return preview;
+                }
+            }
+            if (state.planIssues && state.planIssues.length) {
+                this.showMessage('计划存在问题，请先修复再执行', 'error');
+                return { error: 'Plan has blocking issues' };
+            }
+            return this.runTaskOrchestration();
+        },
+
+        async queueTaskOrchestrationAndStart() {
+            const state = this.ensureTaskOrchestrationState();
+            if (state.queueAdding || state.queueStarting || state.planning || state.running) {
+                return null;
+            }
+            if (!String(state.target || '').trim()) {
+                return null;
+            }
+            const queued = await this.addTaskOrchestrationToQueue({ silent: true, deferRefresh: true });
+            if (queued && queued.error) {
+                this.showMessage(queued.error, 'error');
+                return queued;
+            }
+            return this.startTaskQueueRunner();
         },
 
         async startTaskQueueRunner() {
@@ -457,8 +543,7 @@ export function createTaskOrchestrationMethods(options = {}) {
             state.followUpsText = '';
             state.workflowIdsText = '';
             state.selectedEngine = 'codex';
-            state.allowWrite = false;
-            state.dryRun = false;
+            state.runMode = 'write';
             state.concurrency = 2;
             state.autoFixRounds = 1;
             state.plan = null;

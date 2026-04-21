@@ -62,14 +62,28 @@
     align-self: flex-start;
 }
 
-.task-hero-actions > .btn-tool-compact {
-    min-width: 108px;
-}
-
 .task-hero-actions > .btn-tool + .btn-tool,
 .task-hero-actions > .btn-tool-compact + .btn-tool,
 .task-hero-actions > .btn-tool + .btn-tool-compact,
 .task-hero-actions > .btn-tool-compact + .btn-tool-compact {
+    margin-top: 0;
+}
+
+.task-section-header .task-header-actions > .btn-tool + .btn-tool,
+.task-section-header .task-header-actions > .btn-tool-compact + .btn-tool,
+.task-section-header .task-header-actions > .btn-tool + .btn-tool-compact,
+.task-section-header .task-header-actions > .btn-tool-compact + .btn-tool-compact {
+    margin-top: 0;
+}
+
+.task-action-row > .btn-tool + .btn-tool,
+.task-action-row > .btn-tool-compact + .btn-tool,
+.task-action-row > .btn-tool + .btn-tool-compact,
+.task-action-row > .btn-tool-compact + .btn-tool-compact,
+.task-action-row-right > .btn-tool + .btn-tool,
+.task-action-row-right > .btn-tool-compact + .btn-tool,
+.task-action-row-right > .btn-tool + .btn-tool-compact,
+.task-action-row-right > .btn-tool-compact + .btn-tool-compact {
     margin-top: 0;
 }
 
@@ -228,6 +242,10 @@
 .task-composer-grid-compact {
     grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
     align-items: stretch;
+}
+
+.task-composer-grid-inline {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .task-field-wide {
@@ -401,11 +419,33 @@
 }
 
 .task-advanced-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     cursor: pointer;
     font-size: 13px;
     font-weight: 700;
     color: var(--color-text-primary);
     list-style: none;
+    min-height: 36px;
+    padding: 0 10px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.64);
+    border: 1px solid var(--color-border-soft);
+    transition:
+        border-color var(--transition-fast) var(--ease-smooth),
+        background var(--transition-fast) var(--ease-smooth),
+        box-shadow var(--transition-fast) var(--ease-smooth);
+}
+
+.task-advanced-summary:hover {
+    border-color: var(--color-border-strong);
+    background: rgba(255, 255, 255, 0.86);
+}
+
+.task-advanced-panel[open] > .task-advanced-summary {
+    border-color: rgba(199, 116, 98, 0.4);
+    box-shadow: var(--shadow-subtle);
 }
 
 .task-advanced-summary::-webkit-details-marker {
@@ -471,11 +511,10 @@
 }
 
 .task-action-row > .btn-tool,
-.task-section-header .settings-tab-actions > .btn-tool-compact,
-.task-action-row-right > .btn-tool,
-.task-detail-toolbar > .btn-tool-compact {
-    min-height: 38px;
-    height: 38px;
+.task-action-row-right > .btn-tool {
+    width: auto;
+    min-height: 36px;
+    height: 36px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -483,7 +522,7 @@
 }
 
 .task-action-preview {
-    min-width: 110px;
+    min-width: 104px;
 }
 
 .task-action-row-right {
@@ -493,7 +532,7 @@
 }
 
 .task-action-row-right-prominent > .btn-tool {
-    min-width: 110px;
+    min-width: 104px;
 }
 
 .task-action-help-prominent,

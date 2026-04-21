@@ -51,7 +51,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.doesNotMatch(html, /使用自定义数字输入框；失焦或回车后会按当前 Codex 配置规范写入模板。/);
     assert.match(
         html,
-        /<button[^>]*@click="resetCodexContextBudgetDefaults"[^>]*>[\s\S]*?重置[\s\S]*?<\/button>/
+        /<button[^>]*@click="resetCodexContextBudgetDefaults"[^>]*>[\s\S]*?t\('config\.reset'\)[\s\S]*?<\/button>/
     );
     assert.match(html, /class="codex-config-grid"/);
     assert.match(html, /onSettingsTabClick\('backup'\)/);
@@ -67,7 +67,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /v-if="taskOrchestrationTabEnabled" class="side-section" role="navigation" :aria-label="t\('side\.orchestration'\)"/);
     assert.match(html, /v-if="taskOrchestrationTabEnabled"[\s\S]*id="panel-orchestration"/);
     assert.match(html, /taskOrchestrationTabEnabled && mainTab === 'orchestration'/);
-    assert.match(bundledScript, /taskOrchestrationTabEnabled:\s*false/);
+    assert.match(bundledScript, /taskOrchestrationTabEnabled:\s*true/);
     assert.match(html, /id="side-tab-orchestration"/);
     assert.match(html, /id="tab-orchestration"/);
     assert.match(html, /data-main-tab="orchestration"/);
@@ -77,11 +77,11 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /:aria-selected="mainTab === 'orchestration'"/);
     assert.match(html, /id="panel-orchestration"/);
     assert.match(html, /v-show="mainTab === 'orchestration'"/);
-    assert.match(orchestrationPanel, /Task orchestration/);
-    assert.match(orchestrationPanel, /把需求拆成可执行步骤/);
+    assert.match(orchestrationPanel, /t\('orchestration\.hero\.kicker'\)/);
+    assert.match(orchestrationPanel, /t\('orchestration\.hero\.title'\)/);
     assert.match(orchestrationPanel, /@click="previewTaskPlan\(\)"/);
-    assert.match(orchestrationPanel, /@click="runTaskOrchestration\(\)"/);
-    assert.match(orchestrationPanel, /@click="addTaskOrchestrationToQueue\(\)"/);
+    assert.match(orchestrationPanel, /@click="planAndRunTaskOrchestration\(\)"/);
+    assert.match(orchestrationPanel, /@click="queueTaskOrchestrationAndStart\(\)"/);
     assert.match(orchestrationPanel, /@click="startTaskQueueRunner\(\)"/);
     assert.match(orchestrationPanel, /@click="retryTaskRunFromUi\(taskOrchestration.selectedRunId\)"/);
     assert.match(orchestrationPanel, /class="selector-section task-hero-card"/);
@@ -100,7 +100,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(orchestrationPanel, /taskOrchestration\.queue\.length \|\| taskOrchestration\.runs\.length \|\| taskOrchestration\.selectedRunId \|\| taskOrchestration\.selectedRunError/);
     assert.match(orchestrationPanel, /taskOrchestration\.plan \|\| taskOrchestration\.planIssues\.length \|\| taskOrchestration\.planWarnings\.length \|\| taskOrchestration\.lastError/);
     assert.match(orchestrationPanel, /class="selector-section task-stage-card"/);
-    assert.match(orchestrationPanel, /有内容时再展开工作区/);
+    assert.match(orchestrationPanel, /t\('orchestration\.stage\.title'\)/);
     assert.match(orchestrationPanel, /class="btn-tool task-action-preview" @click="previewTaskPlan\(\)"/);
     assert.match(orchestrationPanel, /class="task-action-row-right task-action-row-right-prominent"/);
     assert.match(orchestrationPanel, /class="task-action-caption"/);

@@ -446,6 +446,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'syncDefaultOpenclawConfigEntry',
         'ensureTaskOrchestrationState',
         'buildTaskOrchestrationRequest',
+        'buildTaskOrchestrationFingerprint',
         'taskRunStatusTone',
         'isTaskRunActive',
         'formatTaskNodeDependencies',
@@ -455,6 +456,8 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'runTaskOrchestration',
         'addTaskOrchestrationToQueue',
         'startTaskQueueRunner',
+        'planAndRunTaskOrchestration',
+        'queueTaskOrchestrationAndStart',
         'loadTaskRunDetail',
         'selectTaskRun',
         'retryTaskRunFromUi',
@@ -516,6 +519,8 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'primeSessionListRender',
         'resetSessionListRender',
         'scheduleSessionListViewportFill',
+        'persistClaudeChatProjectPath',
+        'openClaudeChatFromTaskOrchestration',
         'setSessionListRef'
     ];
     if (parityAgainstHead) {

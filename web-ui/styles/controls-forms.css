@@ -316,6 +316,13 @@
     margin-top: var(--spacing-xs);
 }
 
+.selector-header .settings-tab-actions > .btn-tool + .btn-tool,
+.selector-header .settings-tab-actions > .btn-tool-compact + .btn-tool,
+.selector-header .settings-tab-actions > .btn-tool + .btn-tool-compact,
+.selector-header .settings-tab-actions > .btn-tool-compact + .btn-tool-compact {
+    margin-top: 0;
+}
+
 .selector-header .trash-header-actions > .btn-tool + .btn-tool {
     margin-top: 0;
 }

@@ -13,12 +13,16 @@ function readTaskOrchestrationDraftMetrics(taskOrchestration) {
     const workflowIds = normalizeTaskDraftLines(state.workflowIdsText);
     const followUps = normalizeTaskDraftLines(state.followUpsText);
     const engine = String(state.selectedEngine || 'codex').trim().toLowerCase() === 'workflow' ? 'workflow' : 'codex';
+    const runMode = String(state.runMode || 'write').trim().toLowerCase();
+    const allowWrite = runMode === 'write';
+    const dryRun = runMode === 'dry-run';
     const plan = state.plan && typeof state.plan === 'object' ? state.plan : null;
     const planNodes = Array.isArray(plan && plan.nodes) ? plan.nodes : [];
     const planIssues = Array.isArray(state.planIssues) ? state.planIssues : [];
     const planWarnings = Array.isArray(state.planWarnings) ? state.planWarnings : [];
     return {
         engine,
+        runMode,
         title,
         target,
         notes,
@@ -34,8 +38,8 @@ function readTaskOrchestrationDraftMetrics(taskOrchestration) {
         workflowCount: workflowIds.length,
         followUpCount: followUps.length,
         planNodeCount: planNodes.length,
-        allowWrite: state.allowWrite === true,
-        dryRun: state.dryRun === true
+        allowWrite,
+        dryRun
     };
 }
 
