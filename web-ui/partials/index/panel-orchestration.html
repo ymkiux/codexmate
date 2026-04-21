@@ -19,9 +19,6 @@
                                 <button type="button" class="btn-tool btn-tool-compact" @click="resetTaskOrchestrationDraft()" :disabled="taskOrchestration.running || taskOrchestration.queueAdding || taskOrchestration.planning">
                                     重置草稿
                                 </button>
-                                <button type="button" class="btn-tool btn-tool-compact" @click="openClaudeChatFromTaskOrchestration()">
-                                    {{ t('orchestration.chat.open') }}
-                                </button>
                             </div>
                         </div>
                         <div v-if="taskOrchestrationQueueStats.running || taskOrchestrationQueueStats.queued || taskOrchestration.runs.length" class="task-hero-meta-strip" aria-label="任务编排概览">
@@ -68,8 +65,7 @@
                                     </div>
                                     <div class="task-config-strip">
                                         <div class="task-config-pill">{{ taskOrchestration.selectedEngine === 'workflow' ? 'Workflow' : 'Codex' }}</div>
-                                        <div class="task-config-pill">{{ taskOrchestration.allowWrite ? '允许写入' : '只读' }}</div>
-                                        <div class="task-config-pill">{{ taskOrchestration.dryRun ? '仅预演' : '真实执行' }}</div>
+                                        <div class="task-config-pill">{{ taskOrchestration.runMode === 'dry-run' ? '仅预演' : (taskOrchestration.runMode === 'read' ? '只读' : '写入') }}</div>
                                         <div v-if="taskOrchestration.title.trim()" class="task-config-pill">标题已设</div>
                                         <div v-if="taskOrchestration.selectedEngine === 'workflow' && taskOrchestrationDraftMetrics.workflowCount > 0" class="task-config-pill">Workflow {{ taskOrchestrationDraftMetrics.workflowCount }}</div>
                                         <div v-if="taskOrchestration.plan" class="task-config-pill">计划 {{ taskOrchestrationDraftMetrics.planNodeCount }} 节点</div>
@@ -94,19 +90,14 @@
                                             <option value="workflow">Workflow</option>
                                         </select>
                                     </label>
-                                    <div class="selector-field task-toggle-card task-toggle-card-inline">
+                                    <label class="selector-field">
                                         <span class="selector-label">运行模式</span>
-                                        <div class="task-toggle-inline">
-                                            <label class="task-toggle">
-                                                <input v-model="taskOrchestration.allowWrite" type="checkbox">
-                                                <span>允许写入</span>
-                                            </label>
-                                            <label class="task-toggle">
-                                                <input v-model="taskOrchestration.dryRun" type="checkbox">
-                                                <span>仅预演</span>
-                                            </label>
-                                        </div>
-                                    </div>
+                                        <select v-model="taskOrchestration.runMode" class="provider-fast-switch-select">
+                                            <option value="write">写入</option>
+                                            <option value="read">只读</option>
+                                            <option value="dry-run">仅预演</option>
+                                        </select>
+                                    </label>
                                 </div>
 
                                 <details class="task-advanced-panel">
@@ -115,11 +106,6 @@
                                         <label class="selector-field task-field-wide">
                                             <span class="selector-label">标题</span>
                                             <input v-model="taskOrchestration.title" type="text" placeholder="可选，默认从目标自动提取">
-                                        </label>
-                                        <label class="selector-field task-field-wide">
-                                            <span class="selector-label">{{ t('orchestration.chat.projectPath') }}</span>
-                                            <input v-model="taskOrchestration.chatProjectPath" type="text" :placeholder="t('orchestration.chat.projectPath.placeholder')" @change="persistClaudeChatProjectPath()">
-                                            <span class="task-field-hint">{{ t('orchestration.chat.projectPath.hint') }}</span>
                                         </label>
                                         <label class="selector-field task-field-wide">
                                             <span class="selector-label">说明</span>
@@ -174,7 +160,7 @@
                                     </button>
                                     <div class="task-action-row-right task-action-row-right-prominent">
                                         <button type="button" class="btn-tool btn-primary" @click="planAndRunTaskOrchestration()" :disabled="taskOrchestration.running || taskOrchestration.planning || !taskOrchestration.target.trim()">
-                                            {{ (taskOrchestration.running || taskOrchestration.planning) ? '准备中...' : (taskOrchestration.dryRun ? '生成计划' : '计划并执行') }}
+                                            {{ (taskOrchestration.running || taskOrchestration.planning) ? '准备中...' : (taskOrchestration.runMode === 'dry-run' ? '生成计划' : '计划并执行') }}
                                         </button>
                                         <button type="button" class="btn-tool" @click="queueTaskOrchestrationAndStart()" :disabled="taskOrchestration.queueAdding || taskOrchestration.queueStarting || taskOrchestration.planning || !taskOrchestration.target.trim()">
                                             {{ (taskOrchestration.queueAdding || taskOrchestration.queueStarting) ? '处理中...' : '入队并开始' }}

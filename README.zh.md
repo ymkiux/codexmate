@@ -31,7 +31,7 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 - Codex / Claude Code Skills 市场（安装目标切换、本地 skills 管理、跨应用导入、ZIP 分发）
 - Codex / Claude 本地会话浏览、筛选、导出、删除与 Usage 统计概览
 - 插件（提示词模板）：模板复用、变量填写、一键复制
-- 任务编排：规划 / 排队 / 执行 / 回看，并可打开 Claude Chat
+- 任务编排：规划 / 排队 / 执行 / 回看
 
 项目不依赖云端托管，配置写入你的本地文件，便于审计和回滚。Skills 市场同样坚持本地优先，只操作本地目录，不依赖远程在线市场。
 
@@ -78,7 +78,6 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 **任务编排**
 - DAG 节点拆分与波次并发
 - 支持计划预览、执行、队列与运行详情
-- 支持打开 Claude Chat（复用 VSCode Claude Code 扩展 WebView）
 
 **工程能力**
 - MCP stdio 能力（tools/resources/prompts）

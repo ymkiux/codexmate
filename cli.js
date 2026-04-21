@@ -145,7 +145,6 @@ const {
     readExecutableBundledJavaScriptModule,
     readExecutableBundledWebUiScript
 } = require('./web-ui/source-bundle.cjs');
-const { createClaudeChatBridge } = require('./cli/claude-chat-bridge');
 const {
     registerDownloadArtifact,
     resolveDownloadArtifact
@@ -8065,13 +8064,6 @@ const PUBLIC_WEB_UI_STATIC_ASSETS = new Set([
 
 function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser }) {
     const connections = new Set();
-    const claudeChatBridge = typeof createClaudeChatBridge === 'function'
-        ? createClaudeChatBridge({
-            projectRoot: __dirname,
-            defaultPermissionMode: 'bypassPermissions',
-            defaultModel: DEFAULT_CLAUDE_MODEL
-        })
-        : null;
     const probeWebUiReadiness = (callback) => {
         const payload = JSON.stringify({ action: 'health-check', params: {} });
         const requestOptions = {
@@ -8212,9 +8204,6 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
 
     const server = http.createServer((req, res) => {
         const requestPath = (req.url || '/').split('?')[0];
-        if (claudeChatBridge && claudeChatBridge.handleHttpRequest(req, res)) {
-            return;
-        }
         if (typeof openaiBridgeHandler === 'function' && openaiBridgeHandler(req, res)) {
             return;
         }
@@ -8906,15 +8895,6 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
     server.on('connection', (socket) => {
         connections.add(socket);
         socket.on('close', () => connections.delete(socket));
-    });
-
-    server.on('upgrade', (req, socket, head) => {
-        if (claudeChatBridge && claudeChatBridge.handleWsUpgrade(req, socket, head)) {
-            return;
-        }
-        try {
-            socket.destroy();
-        } catch (_) {}
     });
 
     server.once('error', (err) => {

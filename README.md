@@ -31,7 +31,7 @@ Codex Mate is a local-first CLI + Web UI for unified management of:
 - Local skills market for Codex / Claude Code (target switching, local skills management, cross-app import, ZIP distribution)
 - Local Codex/Claude sessions (list/filter/export/delete) with Usage analytics overview
 - Plugins (Prompt templates): reusable templates with variables and one-click copy
-- Task orchestration: plan/queue/run/review local tasks, plus optional Claude chat launcher
+- Task orchestration: plan/queue/run/review local tasks
 
 It works on local files directly and does not require cloud hosting. The skills market is also local-first: it operates on local directories and does not depend on a remote marketplace.
 

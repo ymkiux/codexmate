@@ -6,15 +6,13 @@ function createDefaultTaskOrchestrationState() {
         queueAdding: false,
         queueStarting: false,
         retrying: false,
-        chatProjectPath: '',
         target: '',
         title: '',
         notes: '',
         followUpsText: '',
         workflowIdsText: '',
         selectedEngine: 'codex',
-        allowWrite: false,
-        dryRun: false,
+        runMode: 'write',
         concurrency: 2,
         autoFixRounds: 1,
         plan: null,
@@ -34,50 +32,6 @@ function createDefaultTaskOrchestrationState() {
         lastLoadedAt: '',
         lastError: ''
     };
-}
-
-const TASK_CLAUDE_CHAT_PROJECT_STORAGE_KEY = 'codexmateTaskClaudeChatProjectPath';
-
-function readLocalStorageItem(key) {
-    try {
-        if (typeof localStorage === 'undefined') {
-            return '';
-        }
-        return localStorage.getItem(key) || '';
-    } catch (_) {
-        return '';
-    }
-}
-
-function setLocalStorageItem(key, value) {
-    try {
-        if (typeof localStorage === 'undefined') {
-            return;
-        }
-        localStorage.setItem(key, value);
-    } catch (_) {}
-}
-
-function removeLocalStorageItem(key) {
-    try {
-        if (typeof localStorage === 'undefined') {
-            return;
-        }
-        localStorage.removeItem(key);
-    } catch (_) {}
-}
-
-function encodeBase64Utf8(value) {
-    const text = String(value || '');
-    try {
-        return btoa(unescape(encodeURIComponent(text)));
-    } catch (_) {
-        try {
-            return btoa(text);
-        } catch (_) {
-            return '';
-        }
-    }
 }
 
 function normalizeLines(text) {
@@ -108,6 +62,22 @@ function isActiveStatus(status) {
     return normalized === 'running' || normalized === 'queued';
 }
 
+function normalizeTaskRunMode(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'read') return 'read';
+    if (normalized === 'dry-run' || normalized === 'dryrun' || normalized === 'plan') return 'dry-run';
+    return 'write';
+}
+
+function buildRunModeFlags(runMode) {
+    const normalized = normalizeTaskRunMode(runMode);
+    return {
+        runMode: normalized,
+        allowWrite: normalized === 'write',
+        dryRun: normalized === 'dry-run'
+    };
+}
+
 export function createTaskOrchestrationMethods(options = {}) {
     const { api } = options;
 
@@ -118,48 +88,19 @@ export function createTaskOrchestrationMethods(options = {}) {
                 const defaults = createDefaultTaskOrchestrationState();
                 for (const [key, value] of Object.entries(defaults)) {
                     if (typeof current[key] === 'undefined') {
-                        if (key === 'chatProjectPath') {
-                            current[key] = readLocalStorageItem(TASK_CLAUDE_CHAT_PROJECT_STORAGE_KEY) || value;
-                        } else {
-                            current[key] = value;
-                        }
+                        current[key] = value;
                     }
                 }
+                current.runMode = normalizeTaskRunMode(current.runMode);
                 return current;
             }
             this.taskOrchestration = createDefaultTaskOrchestrationState();
-            this.taskOrchestration.chatProjectPath = readLocalStorageItem(TASK_CLAUDE_CHAT_PROJECT_STORAGE_KEY) || '';
             return this.taskOrchestration;
-        },
-
-        persistClaudeChatProjectPath() {
-            const state = this.ensureTaskOrchestrationState();
-            const value = String(state.chatProjectPath || '').trim();
-            if (!value) {
-                removeLocalStorageItem(TASK_CLAUDE_CHAT_PROJECT_STORAGE_KEY);
-                return;
-            }
-            setLocalStorageItem(TASK_CLAUDE_CHAT_PROJECT_STORAGE_KEY, value);
-        },
-
-        openClaudeChatFromTaskOrchestration() {
-            const state = this.ensureTaskOrchestrationState();
-            const projectPath = String(state.chatProjectPath || '').trim();
-            if (!projectPath) {
-                this.showMessage(this.t('orchestration.chat.missingProjectPath'), 'error');
-                return;
-            }
-            const projectParam = encodeBase64Utf8(projectPath);
-            if (!projectParam) {
-                this.showMessage(this.t('orchestration.chat.invalidProjectPath'), 'error');
-                return;
-            }
-            const url = `/claude-chat?project=${encodeURIComponent(projectParam)}`;
-            window.open(url, '_blank', 'noopener');
         },
 
         buildTaskOrchestrationRequest() {
             const state = this.ensureTaskOrchestrationState();
+            const flags = buildRunModeFlags(state.runMode);
             return {
                 title: String(state.title || '').trim(),
                 target: String(state.target || '').trim(),
@@ -167,8 +108,8 @@ export function createTaskOrchestrationMethods(options = {}) {
                 followUps: normalizeLines(state.followUpsText),
                 workflowIds: normalizeLines(state.workflowIdsText),
                 engine: String(state.selectedEngine || 'codex').trim().toLowerCase() === 'workflow' ? 'workflow' : 'codex',
-                allowWrite: state.allowWrite === true,
-                dryRun: state.dryRun === true,
+                allowWrite: flags.allowWrite,
+                dryRun: flags.dryRun,
                 concurrency: normalizePositiveInteger(state.concurrency, 2, 1, 8),
                 autoFixRounds: normalizePositiveInteger(state.autoFixRounds, 1, 0, 5)
             };
@@ -380,7 +321,7 @@ export function createTaskOrchestrationMethods(options = {}) {
             if (!String(state.target || '').trim()) {
                 return null;
             }
-            if (state.dryRun === true) {
+            if (buildRunModeFlags(state.runMode).dryRun) {
                 return this.previewTaskPlan({ silent: false });
             }
             const fingerprint = this.buildTaskOrchestrationFingerprint();
@@ -602,8 +543,7 @@ export function createTaskOrchestrationMethods(options = {}) {
             state.followUpsText = '';
             state.workflowIdsText = '';
             state.selectedEngine = 'codex';
-            state.allowWrite = false;
-            state.dryRun = false;
+            state.runMode = 'write';
             state.concurrency = 2;
             state.autoFixRounds = 1;
             state.plan = null;
