@@ -76,6 +76,17 @@
     margin-top: 0;
 }
 
+.task-action-row > .btn-tool + .btn-tool,
+.task-action-row > .btn-tool-compact + .btn-tool,
+.task-action-row > .btn-tool + .btn-tool-compact,
+.task-action-row > .btn-tool-compact + .btn-tool-compact,
+.task-action-row-right > .btn-tool + .btn-tool,
+.task-action-row-right > .btn-tool-compact + .btn-tool,
+.task-action-row-right > .btn-tool + .btn-tool-compact,
+.task-action-row-right > .btn-tool-compact + .btn-tool-compact {
+    margin-top: 0;
+}
+
 .task-hero-meta-strip {
     display: flex;
     flex-wrap: wrap;
