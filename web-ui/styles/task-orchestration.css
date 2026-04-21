@@ -397,11 +397,33 @@
 }
 
 .task-advanced-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     cursor: pointer;
     font-size: 13px;
     font-weight: 700;
     color: var(--color-text-primary);
     list-style: none;
+    min-height: 36px;
+    padding: 0 10px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.64);
+    border: 1px solid var(--color-border-soft);
+    transition:
+        border-color var(--transition-fast) var(--ease-smooth),
+        background var(--transition-fast) var(--ease-smooth),
+        box-shadow var(--transition-fast) var(--ease-smooth);
+}
+
+.task-advanced-summary:hover {
+    border-color: var(--color-border-strong);
+    background: rgba(255, 255, 255, 0.86);
+}
+
+.task-advanced-panel[open] > .task-advanced-summary {
+    border-color: rgba(199, 116, 98, 0.4);
+    box-shadow: var(--shadow-subtle);
 }
 
 .task-advanced-summary::-webkit-details-marker {

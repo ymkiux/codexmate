@@ -105,7 +105,7 @@
                                     <div class="selector-grid task-composer-grid task-composer-grid-secondary">
                                         <label class="selector-field task-field-wide">
                                             <span class="selector-label">{{ t('orchestration.fields.title') }}</span>
-                                            <input v-model="taskOrchestration.title" type="text" :placeholder="t('orchestration.fields.title.placeholder')">
+                                            <input v-model="taskOrchestration.title" class="model-input" type="text" :placeholder="t('orchestration.fields.title.placeholder')">
                                         </label>
                                         <label class="selector-field task-field-wide">
                                             <span class="selector-label">{{ t('orchestration.fields.notes') }}</span>
@@ -118,12 +118,12 @@
                                         </label>
                                         <label class="selector-field">
                                             <span class="selector-label">{{ t('orchestration.fields.concurrency') }}</span>
-                                            <input v-model="taskOrchestration.concurrency" type="number" min="1" max="8">
+                                            <input v-model="taskOrchestration.concurrency" class="model-input" type="number" min="1" max="8">
                                             <span class="task-field-hint">{{ t('orchestration.fields.concurrency.hint') }}</span>
                                         </label>
                                         <label class="selector-field">
                                             <span class="selector-label">{{ t('orchestration.fields.autoFixRounds') }}</span>
-                                            <input v-model="taskOrchestration.autoFixRounds" type="number" min="0" max="5">
+                                            <input v-model="taskOrchestration.autoFixRounds" class="model-input" type="number" min="0" max="5">
                                             <span class="task-field-hint">{{ t('orchestration.fields.autoFixRounds.hint') }}</span>
                                         </label>
                                         <label v-if="taskOrchestration.selectedEngine === 'workflow'" class="selector-field task-field-wide">
