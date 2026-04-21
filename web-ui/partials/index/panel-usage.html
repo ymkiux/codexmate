@@ -302,7 +302,7 @@
                             <section class="usage-card">
                                 <div class="usage-card-title">{{ t('usage.paths.title') }}</div>
                                 <div v-if="!sessionUsageCharts.topPaths.length" class="usage-list-value">{{ t('usage.paths.empty') }}</div>
-                                <div v-else class="usage-list">
+                                <div v-else class="usage-list usage-list-scroll usage-list-top-paths">
                                     <div v-for="item in sessionUsageCharts.topPaths" :key="item.path" class="usage-list-row">
                                         <div class="usage-list-label">{{ t('usage.paths.count', { count: item.count }) }}</div>
                                         <div class="usage-progress"><div class="usage-progress-fill" :style="{ width: ((item.count / Math.max((sessionUsageCharts.topPaths.length ? sessionUsageCharts.topPaths[0].count : 1), 1)) * 100) + '%' }"></div></div>

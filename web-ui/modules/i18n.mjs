@@ -59,6 +59,10 @@ const DICT = Object.freeze({
         'common.notExistsWillCreateOnSave': '不存在，将在保存时创建',
         'common.none': '暂无',
 
+        // Brand
+        'brand.kicker.workspace': '工作区',
+        'brand.subtitle.localConfigSessionsWorkspace': '本地配置与会话工作区',
+
         // Confirm dialog
         'confirm.aria': '确认操作',
         'confirm.title.default': '请确认操作',
@@ -842,6 +846,10 @@ const DICT = Object.freeze({
         'common.notExistsWillCreateOnApply': 'Not found. Will be created on apply.',
         'common.notExistsWillCreateOnSave': 'Not found. Will be created on save.',
         'common.none': 'None',
+
+        // Brand
+        'brand.kicker.workspace': 'Workspace',
+        'brand.subtitle.localConfigSessionsWorkspace': 'Local config & sessions workspace',
 
         // Confirm dialog
         'confirm.aria': 'Confirm action',
