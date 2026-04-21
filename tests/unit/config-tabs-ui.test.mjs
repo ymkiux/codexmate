@@ -80,8 +80,8 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(orchestrationPanel, /Task orchestration/);
     assert.match(orchestrationPanel, /把需求拆成可执行步骤/);
     assert.match(orchestrationPanel, /@click="previewTaskPlan\(\)"/);
-    assert.match(orchestrationPanel, /@click="runTaskOrchestration\(\)"/);
-    assert.match(orchestrationPanel, /@click="addTaskOrchestrationToQueue\(\)"/);
+    assert.match(orchestrationPanel, /@click="planAndRunTaskOrchestration\(\)"/);
+    assert.match(orchestrationPanel, /@click="queueTaskOrchestrationAndStart\(\)"/);
     assert.match(orchestrationPanel, /@click="startTaskQueueRunner\(\)"/);
     assert.match(orchestrationPanel, /@click="retryTaskRunFromUi\(taskOrchestration.selectedRunId\)"/);
     assert.match(orchestrationPanel, /class="selector-section task-hero-card"/);

@@ -89,7 +89,7 @@
                                 <div class="selector-grid task-composer-grid task-composer-grid-compact">
                                     <label class="selector-field">
                                         <span class="selector-label">引擎</span>
-                                        <select v-model="taskOrchestration.selectedEngine">
+                                        <select v-model="taskOrchestration.selectedEngine" class="provider-fast-switch-select">
                                             <option value="codex">Codex</option>
                                             <option value="workflow">Workflow</option>
                                         </select>
@@ -170,21 +170,18 @@
                                 </div>
                                 <div class="task-action-row task-action-row-prominent">
                                     <button type="button" class="btn-tool task-action-preview" @click="previewTaskPlan()" :disabled="taskOrchestration.planning || taskOrchestration.running || !taskOrchestration.target.trim()">
-                                        {{ taskOrchestration.planning ? '规划中...' : '预览计划' }}
+                                        {{ taskOrchestration.planning ? '规划中...' : '仅预览' }}
                                     </button>
                                     <div class="task-action-row-right task-action-row-right-prominent">
-                                        <button type="button" class="btn-tool btn-primary" @click="runTaskOrchestration()" :disabled="taskOrchestration.running || !taskOrchestration.target.trim()">
-                                            {{ taskOrchestration.running ? '启动中...' : '立即执行' }}
+                                        <button type="button" class="btn-tool btn-primary" @click="planAndRunTaskOrchestration()" :disabled="taskOrchestration.running || taskOrchestration.planning || !taskOrchestration.target.trim()">
+                                            {{ (taskOrchestration.running || taskOrchestration.planning) ? '准备中...' : (taskOrchestration.dryRun ? '生成计划' : '计划并执行') }}
                                         </button>
-                                        <button type="button" class="btn-tool" @click="addTaskOrchestrationToQueue()" :disabled="taskOrchestration.queueAdding || !taskOrchestration.target.trim()">
-                                            {{ taskOrchestration.queueAdding ? '加入中...' : '加入队列' }}
-                                        </button>
-                                        <button v-if="taskOrchestration.queue.length" type="button" class="btn-tool" @click="startTaskQueueRunner()" :disabled="taskOrchestration.queueStarting">
-                                            {{ taskOrchestration.queueStarting ? '启动中...' : '开始队列' }}
+                                        <button type="button" class="btn-tool" @click="queueTaskOrchestrationAndStart()" :disabled="taskOrchestration.queueAdding || taskOrchestration.queueStarting || taskOrchestration.planning || !taskOrchestration.target.trim()">
+                                            {{ (taskOrchestration.queueAdding || taskOrchestration.queueStarting) ? '处理中...' : '入队并开始' }}
                                         </button>
                                     </div>
                                 </div>
-                                <div class="task-action-caption">预览不会执行。批量任务再入队。</div>
+                                <div class="task-action-caption">“计划并执行”会在必要时自动刷新计划；批量任务用“入队并开始”。</div>
                             </div>
                         </section>
                     </div>
