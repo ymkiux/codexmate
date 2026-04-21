@@ -19,6 +19,9 @@
                                 <button type="button" class="btn-tool btn-tool-compact" @click="resetTaskOrchestrationDraft()" :disabled="taskOrchestration.running || taskOrchestration.queueAdding || taskOrchestration.planning">
                                     重置草稿
                                 </button>
+                                <button type="button" class="btn-tool btn-tool-compact" @click="openClaudeChatFromTaskOrchestration()">
+                                    {{ t('orchestration.chat.open') }}
+                                </button>
                             </div>
                         </div>
                         <div v-if="taskOrchestrationQueueStats.running || taskOrchestrationQueueStats.queued || taskOrchestration.runs.length" class="task-hero-meta-strip" aria-label="任务编排概览">
@@ -112,6 +115,11 @@
                                         <label class="selector-field task-field-wide">
                                             <span class="selector-label">标题</span>
                                             <input v-model="taskOrchestration.title" type="text" placeholder="可选，默认从目标自动提取">
+                                        </label>
+                                        <label class="selector-field task-field-wide">
+                                            <span class="selector-label">{{ t('orchestration.chat.projectPath') }}</span>
+                                            <input v-model="taskOrchestration.chatProjectPath" type="text" :placeholder="t('orchestration.chat.projectPath.placeholder')" @change="persistClaudeChatProjectPath()">
+                                            <span class="task-field-hint">{{ t('orchestration.chat.projectPath.hint') }}</span>
                                         </label>
                                         <label class="selector-field task-field-wide">
                                             <span class="selector-label">说明</span>

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en" class="{{THEME_CLASS}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0d1117">
+    <title>Claude Code</title>
+    <link href="/webview/index.css" rel="stylesheet">
+    <link href="/static/css-variables.css" rel="stylesheet">
+    <style>
+        html, body { margin: 0; padding: 0; height: 100dvh; overflow: hidden; }
+        body { background: var(--vscode-editor-background); color: var(--vscode-foreground); }
+        .vscode-dark { color-scheme: dark; }
+        .vscode-light { color-scheme: light; }
+        .web-cc-wrapper { display: flex; flex-direction: column; height: 100%; width: 100%; max-width: 100vw; overflow: hidden; }
+        .web-cc-nav { display: flex; align-items: center; justify-content: space-between; height: 36px; padding: 0 12px; background: var(--vscode-sideBar-background, #252526); border-bottom: 1px solid var(--vscode-panel-border, #80808059); font-size: 13px; flex-shrink: 0; }
+        .web-cc-nav-left { display: flex; align-items: center; gap: 10px; }
+        .web-cc-nav-left a { color: var(--vscode-textLink-foreground, #3794ff); text-decoration: none; font-size: 13px; }
+        .web-cc-nav-left a:hover { text-decoration: underline; }
+        .web-cc-nav-left .nav-separator { color: var(--vscode-descriptionForeground, #ccccccb3); }
+        .web-cc-nav-left .nav-project { color: var(--vscode-foreground, #cccccc); font-weight: 500; max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .web-cc-nav-right { display: flex; align-items: center; gap: 8px; }
+        .web-cc-nav-right .nav-theme-btn { background: none; border: 1px solid var(--vscode-button-secondaryBackground, #3a3d41); color: var(--vscode-foreground, #cccccc); padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 15px; min-width: 32px; min-height: 28px; display: inline-flex; align-items: center; justify-content: center; }
+        .web-cc-nav-right .nav-theme-btn:hover { background: var(--vscode-button-secondaryHoverBackground, #45494e); }
+        .theme-icon { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid currentColor; background: linear-gradient(to right, currentColor 50%, transparent 50%); }
+        #root { flex: 1; min-height: 0; width: 100%; max-width: 100%; overflow: hidden; }
+    </style>
+</head>
+<body class="{{THEME_CLASS}}">
+    <div class="web-cc-wrapper">
+        <nav class="web-cc-nav">
+            <div class="web-cc-nav-left">
+                <a href="/web-ui">← Codex Mate</a>
+                <span class="nav-separator">/</span>
+                <span class="nav-project" title="{{PROJECT_PATH}}">{{PROJECT_NAME}}</span>
+            </div>
+            <div class="web-cc-nav-right">
+                <button class="nav-theme-btn" id="themeBtn" onclick="toggleTheme()" title="Theme"><span class="theme-icon"></span></button>
+                <button class="nav-theme-btn" onclick="location.reload()" title="Reload">&#x21BB;</button>
+            </div>
+        </nav>
+        <div id="root" {{ROOT_DATA_ATTRS}}></div>
+    </div>
+    <script>
+        window.WEB_CC_CONFIG = {
+            projectPath: "{{PROJECT_PATH_JS}}",
+            wsUrl: "{{WS_URL}}",
+            permissionMode: "{{PERMISSION_MODE}}"
+        };
+        function applyTheme(theme) {
+            var cls = theme === 'light' ? 'vscode-light' : 'vscode-dark';
+            document.documentElement.classList.remove('vscode-dark', 'vscode-light');
+            document.documentElement.classList.add(cls);
+            document.body.classList.remove('vscode-dark', 'vscode-light');
+            document.body.classList.add(cls);
+        }
+        (function() {
+            var saved = localStorage.getItem('web-cc-theme');
+            if (saved === 'light' || saved === 'dark') {
+                applyTheme(saved);
+            }
+        })();
+        function toggleTheme() {
+            var isLight = document.body.classList.contains('vscode-light');
+            var newTheme = isLight ? 'dark' : 'light';
+            applyTheme(newTheme);
+            localStorage.setItem('web-cc-theme', newTheme);
+        }
+    </script>
+    <script src="/static/shim.js"></script>
+    <script src="/webview/index.js"></script>
+</body>
+</html>
+

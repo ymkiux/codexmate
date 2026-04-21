@@ -6,6 +6,7 @@ function createDefaultTaskOrchestrationState() {
         queueAdding: false,
         queueStarting: false,
         retrying: false,
+        chatProjectPath: '',
         target: '',
         title: '',
         notes: '',
@@ -32,6 +33,50 @@ function createDefaultTaskOrchestrationState() {
         lastLoadedAt: '',
         lastError: ''
     };
+}
+
+const TASK_CLAUDE_CHAT_PROJECT_STORAGE_KEY = 'codexmateTaskClaudeChatProjectPath';
+
+function readLocalStorageItem(key) {
+    try {
+        if (typeof localStorage === 'undefined') {
+            return '';
+        }
+        return localStorage.getItem(key) || '';
+    } catch (_) {
+        return '';
+    }
+}
+
+function setLocalStorageItem(key, value) {
+    try {
+        if (typeof localStorage === 'undefined') {
+            return;
+        }
+        localStorage.setItem(key, value);
+    } catch (_) {}
+}
+
+function removeLocalStorageItem(key) {
+    try {
+        if (typeof localStorage === 'undefined') {
+            return;
+        }
+        localStorage.removeItem(key);
+    } catch (_) {}
+}
+
+function encodeBase64Utf8(value) {
+    const text = String(value || '');
+    try {
+        return btoa(unescape(encodeURIComponent(text)));
+    } catch (_) {
+        try {
+            return btoa(text);
+        } catch (_) {
+            return '';
+        }
+    }
 }
 
 function normalizeLines(text) {
@@ -72,13 +117,44 @@ export function createTaskOrchestrationMethods(options = {}) {
                 const defaults = createDefaultTaskOrchestrationState();
                 for (const [key, value] of Object.entries(defaults)) {
                     if (typeof current[key] === 'undefined') {
-                        current[key] = value;
+                        if (key === 'chatProjectPath') {
+                            current[key] = readLocalStorageItem(TASK_CLAUDE_CHAT_PROJECT_STORAGE_KEY) || value;
+                        } else {
+                            current[key] = value;
+                        }
                     }
                 }
                 return current;
             }
             this.taskOrchestration = createDefaultTaskOrchestrationState();
+            this.taskOrchestration.chatProjectPath = readLocalStorageItem(TASK_CLAUDE_CHAT_PROJECT_STORAGE_KEY) || '';
             return this.taskOrchestration;
+        },
+
+        persistClaudeChatProjectPath() {
+            const state = this.ensureTaskOrchestrationState();
+            const value = String(state.chatProjectPath || '').trim();
+            if (!value) {
+                removeLocalStorageItem(TASK_CLAUDE_CHAT_PROJECT_STORAGE_KEY);
+                return;
+            }
+            setLocalStorageItem(TASK_CLAUDE_CHAT_PROJECT_STORAGE_KEY, value);
+        },
+
+        openClaudeChatFromTaskOrchestration() {
+            const state = this.ensureTaskOrchestrationState();
+            const projectPath = String(state.chatProjectPath || '').trim();
+            if (!projectPath) {
+                this.showMessage(this.t('orchestration.chat.missingProjectPath'), 'error');
+                return;
+            }
+            const projectParam = encodeBase64Utf8(projectPath);
+            if (!projectParam) {
+                this.showMessage(this.t('orchestration.chat.invalidProjectPath'), 'error');
+                return;
+            }
+            const url = `/claude-chat?project=${encodeURIComponent(projectParam)}`;
+            window.open(url, '_blank', 'noopener');
         },
 
         buildTaskOrchestrationRequest() {

@@ -172,6 +172,14 @@ const DICT = Object.freeze({
         'subtitle.settings': '管理下载、目录与回收站。'
         ,
 
+        // Task orchestration
+        'orchestration.chat.open': 'Claude Chat',
+        'orchestration.chat.projectPath': 'Chat 工作目录',
+        'orchestration.chat.projectPath.placeholder': '例如: /path/to/project',
+        'orchestration.chat.projectPath.hint': '用于在浏览器打开 Claude Code Chat，并以该目录作为工作区。',
+        'orchestration.chat.missingProjectPath': '请先填写 Claude Chat 工作目录',
+        'orchestration.chat.invalidProjectPath': 'Claude Chat 工作目录无效',
+
         // Plugins panel
         'plugins.sidebar.title': 'Plugins',
         'plugins.sidebar.note': '可复用的标准化工具。未来自定义插件应遵循相同结构。',
@@ -947,6 +955,14 @@ const DICT = Object.freeze({
         'subtitle.docs': 'CLI install commands and troubleshooting.',
         'subtitle.settings': 'Manage downloads, directories, and trash.'
         ,
+
+        // Task orchestration
+        'orchestration.chat.open': 'Claude chat',
+        'orchestration.chat.projectPath': 'Chat workspace',
+        'orchestration.chat.projectPath.placeholder': 'e.g. /path/to/project',
+        'orchestration.chat.projectPath.hint': 'Launch Claude Code chat in browser using this working directory.',
+        'orchestration.chat.missingProjectPath': 'Set a chat workspace path first',
+        'orchestration.chat.invalidProjectPath': 'Chat workspace path is invalid',
 
         // Plugins panel
         'plugins.sidebar.title': 'Plugins',
