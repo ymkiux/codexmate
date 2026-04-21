@@ -14,6 +14,10 @@
     min-width: 0;
 }
 
+.session-toolbar-secondary {
+    justify-content: flex-end;
+}
+
 .session-toolbar-grow {
     grid-column: 1 / -1;
 }
@@ -70,6 +74,27 @@
 .session-query-input {
     flex: 2;
     min-width: 220px;
+}
+
+@media (min-width: 980px) {
+    /* Wider screens: align left/right control groups, keep query spanning full width. */
+    .session-toolbar {
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .session-toolbar-primary {
+        grid-column: span 6;
+    }
+
+    .session-toolbar-secondary {
+        grid-column: span 6;
+        justify-content: flex-end;
+    }
+
+    .session-toolbar-grow {
+        grid-column: 1 / -1;
+    }
 }
 
 .session-source-select:hover,

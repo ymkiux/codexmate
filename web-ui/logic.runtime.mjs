@@ -108,16 +108,20 @@ export function shouldForceCompactLayoutMode(options = {}) {
     const coarsePointer = !!options.coarsePointer;
     const noHover = !!options.noHover;
     const isSmallPhysicalScreen = shortEdge > 0 && shortEdge <= 920;
-    const isNarrowViewport = viewportWidth > 0 && viewportWidth <= 960;
+    const isNarrowViewport = viewportWidth > 0 && viewportWidth <= 720;
     const pointerSuggestsTouchOnly = coarsePointer && noHover;
 
-    if (isMobileUa) {
-        return isNarrowViewport || isSmallPhysicalScreen;
+    if (viewportWidth > 0) {
+        if (!isNarrowViewport) {
+            return false;
+        }
+        if (isMobileUa) {
+            return true;
+        }
+        return pointerSuggestsTouchOnly && maxTouchPoints > 0;
     }
-    if (!pointerSuggestsTouchOnly) {
-        return false;
-    }
-    if (maxTouchPoints <= 0) {
+
+    if (!pointerSuggestsTouchOnly || maxTouchPoints <= 0) {
         return false;
     }
     return isSmallPhysicalScreen;

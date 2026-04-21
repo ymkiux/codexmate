@@ -102,7 +102,6 @@ export function createStartupClaudeMethods(options = {}) {
         },
 
         async loadModelsForProvider(providerName, options = {}) {
-            const silentError = !!options.silentError;
             const targetProvider = typeof providerName === 'string' ? providerName.trim() : '';
             const requestSeq = (Number(this.codexModelsRequestSeq) || 0) + 1;
             this.codexModelsRequestSeq = requestSeq;
@@ -131,9 +130,6 @@ export function createStartupClaudeMethods(options = {}) {
                     return;
                 }
                 if (res.error) {
-                    if (!silentError) {
-                        this.showMessage('获取模型列表失败', 'error');
-                    }
                     this.models = [];
                     this.modelsSource = 'error';
                     this.modelsHasCurrent = true;
@@ -146,9 +142,6 @@ export function createStartupClaudeMethods(options = {}) {
             } catch (_) {
                 if (!isLatestRequest()) {
                     return;
-                }
-                if (!silentError) {
-                    this.showMessage('获取模型列表失败', 'error');
                 }
                 this.models = [];
                 this.modelsSource = 'error';

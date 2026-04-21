@@ -2,11 +2,11 @@
             <div class="modal modal-wide skills-modal" role="dialog" aria-modal="true" aria-labelledby="skills-modal-title">
                 <div class="modal-header skills-modal-header">
                     <div>
-                        <div class="modal-title" id="skills-modal-title">Skills 管理</div>
-                        <div class="skills-modal-subtitle">管理当前宿主的本地 Skills。</div>
+                        <div class="modal-title" id="skills-modal-title">{{ t('modal.skills.title') }}</div>
+                        <div class="skills-modal-subtitle">{{ t('modal.skills.subtitle') }}</div>
                     </div>
                     <div class="modal-header-actions skills-modal-actions">
-                        <div class="market-target-switch market-target-switch-compact" role="group" aria-label="选择 Skills 管理目标">
+                        <div class="market-target-switch market-target-switch-compact" role="group" :aria-label="t('modal.skills.target.aria')">
                             <button
                                 type="button"
                                 :class="['market-target-chip', { active: skillsTargetApp === 'codex' }]"
@@ -25,52 +25,52 @@
                             </button>
                         </div>
                         <button class="btn-mini" @click="refreshSkillsList({ silent: false })" :disabled="skillsLoading || skillsDeleting || skillsScanningImports || skillsImporting || skillsZipImporting || skillsExporting">
-                            {{ skillsLoading ? '刷新中...' : '刷新' }}
+                            {{ skillsLoading ? t('common.refreshing') : t('common.refresh') }}
                         </button>
                     </div>
                 </div>
 
                 <div class="form-group skills-root-group">
-                    <label class="form-label">Skills 目录（{{ skillsTargetLabel }}）</label>
+                    <label class="form-label">{{ t('modal.skills.rootDir', { label: skillsTargetLabel }) }}</label>
                     <div class="skills-root-box">{{ skillsRootPath || skillsDefaultRootPath }}</div>
                 </div>
 
                 <div class="skills-summary-strip">
                     <div class="skills-summary-item">
-                        <span class="skills-summary-label">安装目标</span>
+                        <span class="skills-summary-label">{{ t('modal.skills.summary.target') }}</span>
                         <strong class="skills-summary-value">{{ skillsTargetLabel }}</strong>
                     </div>
                     <div class="skills-summary-item">
-                        <span class="skills-summary-label">本地总数</span>
+                        <span class="skills-summary-label">{{ t('modal.skills.summary.total') }}</span>
                         <strong class="skills-summary-value">{{ skillsList.length }}</strong>
                     </div>
                     <div class="skills-summary-item">
-                        <span class="skills-summary-label">含 SKILL.md</span>
+                        <span class="skills-summary-label">{{ t('modal.skills.summary.withSkill') }}</span>
                         <strong class="skills-summary-value">{{ skillsConfiguredCount }}</strong>
                     </div>
                     <div class="skills-summary-item">
-                        <span class="skills-summary-label">缺少 SKILL.md</span>
+                        <span class="skills-summary-label">{{ t('modal.skills.summary.missingSkill') }}</span>
                         <strong class="skills-summary-value">{{ skillsMissingSkillFileCount }}</strong>
                     </div>
                     <div class="skills-summary-item">
-                        <span class="skills-summary-label">可导入</span>
+                        <span class="skills-summary-label">{{ t('modal.skills.summary.importable') }}</span>
                         <strong class="skills-summary-value">{{ skillsImportList.length }}</strong>
                     </div>
                 </div>
 
-                <div class="skills-manager-grid" aria-label="Skills 管理面板">
+                <div class="skills-manager-grid" :aria-label="t('modal.skills.panel.aria')">
                     <div class="skills-manager-col skills-manager-left">
                         <div class="skills-panel">
                             <div class="skills-panel-header">
                                 <div class="skills-panel-title-wrap">
-                                    <div class="skills-panel-title">本地 Skills</div>
-                                    <div class="skills-panel-note">可检索、筛选与批量删除。</div>
+                                    <div class="skills-panel-title">{{ t('modal.skills.local.title') }}</div>
+                                    <div class="skills-panel-note">{{ t('modal.skills.local.note') }}</div>
                                 </div>
                                 <button
                                     class="btn-mini"
                                     @click="resetSkillsFilters"
                                     :disabled="skillsLoading || skillsDeleting || !skillsFilterDirty">
-                                    重置筛选
+                                    {{ t('common.resetFilters') }}
                                 </button>
                             </div>
 
@@ -79,25 +79,25 @@
                                     class="form-input"
                                     type="text"
                                     v-model.trim="skillsKeyword"
-                                    aria-label="按名称或描述筛选 skill"
-                                    placeholder="按目录名/显示名/描述检索">
-                                <select class="form-select skills-status-select" v-model="skillsStatusFilter" aria-label="按 SKILL.md 状态筛选 skill">
-                                    <option value="all">全部状态</option>
-                                    <option value="with-skill-file">仅含 SKILL.md</option>
-                                    <option value="missing-skill-file">仅缺少 SKILL.md</option>
+                                    :aria-label="t('modal.skills.filter.keywordAria')"
+                                    :placeholder="t('modal.skills.filter.keywordPlaceholder')">
+                                <select class="form-select skills-status-select" v-model="skillsStatusFilter" :aria-label="t('modal.skills.filter.statusAria')">
+                                    <option value="all">{{ t('modal.skills.filter.status.all') }}</option>
+                                    <option value="with-skill-file">{{ t('modal.skills.filter.status.withSkill') }}</option>
+                                    <option value="missing-skill-file">{{ t('modal.skills.filter.status.missingSkill') }}</option>
                                 </select>
                             </div>
 
                             <div class="skill-toolbar">
                                 <label class="skill-select-all">
                                     <input type="checkbox" :checked="skillsAllSelected" @change="toggleAllSkillsSelection" :disabled="skillsLoading || skillsDeleting || skillsSelectableNames.length === 0">
-                                    <span>{{ skillsAllSelected ? '取消全选' : '全选' }}</span>
+                                    <span>{{ skillsAllSelected ? t('common.unselectAll') : t('common.selectAll') }}</span>
                                 </label>
-                                <span class="skill-toolbar-count">已选 {{ skillsSelectedCount }}（筛选命中 {{ filteredSkillsList.length }} / {{ skillsList.length }}，筛选内已选 {{ skillsVisibleSelectedCount }}）</span>
+                                <span class="skill-toolbar-count">{{ t('modal.skills.selection.stats', { selected: skillsSelectedCount, filtered: filteredSkillsList.length, total: skillsList.length, visibleSelected: skillsVisibleSelectedCount }) }}</span>
                             </div>
 
-                            <div v-if="skillsList.length === 0" class="skills-empty-state">暂无可管理的 skill。</div>
-                            <div v-else-if="filteredSkillsList.length === 0" class="skills-empty-state">当前筛选条件下没有匹配的 skill。</div>
+                            <div v-if="skillsList.length === 0" class="skills-empty-state">{{ t('modal.skills.empty.local') }}</div>
+                            <div v-else-if="filteredSkillsList.length === 0" class="skills-empty-state">{{ t('modal.skills.empty.filtered') }}</div>
                             <div v-else class="skill-list">
                                 <label
                                     class="skill-item"
@@ -111,9 +111,9 @@
                                         <div class="skill-item-meta">
                                             <span class="skill-item-path" :title="skill.path">{{ skill.path }}</span>
                                             <span :class="['pill', skill.hasSkillFile ? 'configured' : 'empty']">
-                                                {{ skill.hasSkillFile ? '含 SKILL.md' : '缺少 SKILL.md' }}
+                                                {{ skill.hasSkillFile ? t('modal.skills.pill.hasSkillFile') : t('modal.skills.pill.missingSkillFile') }}
                                             </span>
-                                            <span class="pill source">{{ skill.sourceType === 'symlink' ? '符号链接' : '目录' }}</span>
+                                            <span class="pill source">{{ skill.sourceType === 'symlink' ? t('modal.skills.pill.symlink') : t('modal.skills.pill.dir') }}</span>
                                         </div>
                                     </div>
                                 </label>
@@ -125,21 +125,21 @@
                         <div class="skills-panel skills-import-block">
                             <div class="skills-panel-header">
                                 <div class="skills-panel-title-wrap">
-                                    <div class="skills-import-title">跨应用导入</div>
-                                    <div class="skills-panel-note">扫描并导入到当前 {{ skillsTargetLabel }}。</div>
+                                    <div class="skills-import-title">{{ t('modal.skills.import.title') }}</div>
+                                    <div class="skills-panel-note">{{ t('modal.skills.import.note', { label: skillsTargetLabel }) }}</div>
                                 </div>
                                 <button class="btn-mini" @click="scanImportableSkills" :disabled="skillsLoading || skillsDeleting || skillsScanningImports || skillsImporting || skillsZipImporting || skillsExporting">
-                                    {{ skillsScanningImports ? '扫描中...' : '扫描可导入' }}
+                                    {{ skillsScanningImports ? t('common.scanning') : t('modal.skills.import.scan') }}
                                 </button>
                             </div>
                             <div class="skill-toolbar">
                                 <label class="skill-select-all">
                                     <input type="checkbox" :checked="skillsImportAllSelected" @change="toggleAllSkillsImportSelection" :disabled="skillsScanningImports || skillsImporting || skillsImportSelectableKeys.length === 0">
-                                    <span>{{ skillsImportAllSelected ? '取消全选' : '全选' }}</span>
+                                    <span>{{ skillsImportAllSelected ? t('common.unselectAll') : t('common.selectAll') }}</span>
                                 </label>
-                                <span class="skill-toolbar-count">已选 {{ skillsImportSelectedCount }} / {{ skillsImportSelectableKeys.length }}，含 SKILL.md {{ skillsImportConfiguredCount }}，缺失 {{ skillsImportMissingSkillFileCount }}</span>
+                                <span class="skill-toolbar-count">{{ t('modal.skills.import.stats', { selected: skillsImportSelectedCount, total: skillsImportSelectableKeys.length, configured: skillsImportConfiguredCount, missing: skillsImportMissingSkillFileCount }) }}</span>
                             </div>
-                            <div v-if="skillsImportList.length === 0" class="skills-empty-state skills-import-empty">暂无可导入 skill，点击“扫描可导入”。</div>
+                            <div v-if="skillsImportList.length === 0" class="skills-empty-state skills-import-empty">{{ t('modal.skills.import.emptyHint') }}</div>
                             <div v-else class="skill-list skills-import-list">
                                 <label
                                     class="skill-item"
@@ -154,7 +154,7 @@
                                             <span class="skill-item-path" :title="skill.sourcePath">{{ skill.sourcePath }}</span>
                                             <span class="pill source">{{ skill.sourceLabel }}</span>
                                             <span :class="['pill', skill.hasSkillFile ? 'configured' : 'empty']">
-                                                {{ skill.hasSkillFile ? '含 SKILL.md' : '缺少 SKILL.md' }}
+                                                {{ skill.hasSkillFile ? t('modal.skills.pill.hasSkillFile') : t('modal.skills.pill.missingSkillFile') }}
                                             </span>
                                         </div>
                                     </div>
@@ -165,25 +165,25 @@
                         <div class="skills-panel skills-actions-panel">
                             <div class="skills-panel-header">
                                 <div class="skills-panel-title-wrap">
-                                    <div class="skills-panel-title">批量操作</div>
-                                    <div class="skills-panel-note">右侧为导入操作，左侧为本地选择。</div>
+                                    <div class="skills-panel-title">{{ t('modal.skills.bulk.title') }}</div>
+                                    <div class="skills-panel-note">{{ t('modal.skills.bulk.note') }}</div>
                                 </div>
                             </div>
                             <div class="skills-actions-grid">
                                 <button class="btn btn-cancel" @click="triggerSkillsZipImport" :disabled="skillsZipImporting || skillsDeleting || skillsImporting || skillsScanningImports || skillsExporting">
-                                    {{ skillsZipImporting ? 'ZIP 导入中...' : '导入 ZIP' }}
+                                    {{ skillsZipImporting ? t('modal.skills.actions.zipImporting') : t('modal.skills.actions.zipImport') }}
                                 </button>
                                 <button class="btn btn-confirm" @click="exportSelectedSkills" :disabled="skillsExporting || skillsSelectedCount === 0 || skillsDeleting || skillsImporting || skillsScanningImports || skillsZipImporting">
-                                    {{ skillsExporting ? '导出中...' : '导出选中' }}
+                                    {{ skillsExporting ? t('modal.skills.actions.exporting') : t('modal.skills.actions.exportSelected') }}
                                 </button>
                                 <button class="btn btn-confirm secondary" @click="importSelectedSkills" :disabled="skillsImporting || skillsScanningImports || skillsImportSelectedCount === 0 || skillsZipImporting || skillsExporting || skillsDeleting">
-                                    {{ skillsImporting ? '导入中...' : '导入选中' }}
+                                    {{ skillsImporting ? t('modal.skills.actions.importing') : t('modal.skills.actions.importSelected') }}
                                 </button>
                                 <button class="btn btn-confirm btn-danger" @click="deleteSelectedSkills" :disabled="skillsDeleting || skillsSelectedCount === 0 || skillsImporting || skillsZipImporting || skillsExporting">
-                                    {{ skillsDeleting ? '删除中...' : '删除选中' }}
+                                    {{ skillsDeleting ? t('modal.skills.actions.deleting') : t('modal.skills.actions.deleteSelected') }}
                                 </button>
                                 <button class="btn btn-cancel skills-close-btn" @click="closeSkillsModal" :disabled="skillsLoading || skillsDeleting || skillsImporting || skillsScanningImports || skillsZipImporting || skillsExporting">
-                                    关闭
+                                    {{ t('common.close') }}
                                 </button>
                             </div>
                         </div>

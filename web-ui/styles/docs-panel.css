@@ -1,6 +1,26 @@
 .docs-mode-content {
     display: grid;
     gap: 14px;
+    /* CLI Install 是展示型面板：非输入区域不使用 I-beam（text）光标，避免误导为可编辑。 */
+    cursor: default;
+}
+
+.docs-mode-content * {
+    cursor: default;
+}
+
+.docs-mode-content button,
+.docs-mode-content [role="button"] {
+    cursor: pointer;
+}
+
+.docs-mode-content input,
+.docs-mode-content textarea {
+    cursor: text;
+}
+
+.docs-mode-content select {
+    cursor: pointer;
 }
 
 .docs-overview-section,
@@ -86,14 +106,47 @@
 }
 
 .docs-command-row {
-    display: flex;
-    align-items: center;
+    display: grid;
     gap: 10px;
 }
 
+.docs-command-row-secondary {
+    margin-top: 6px;
+}
+
+.docs-command-box {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: stretch;
+    gap: 10px;
+    padding: 10px 10px 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: rgba(255, 253, 252, 0.9);
+}
+
 .docs-command-row .install-command {
-    flex: 1;
     min-width: 0;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgba(18, 22, 35, 0.06);
+    overflow-x: auto;
+    white-space: nowrap;
+    user-select: text;
+}
+
+.docs-command-prefix {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    margin-right: 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: rgba(210, 107, 90, 0.10);
+    color: var(--color-text-secondary);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
 }
 
 .docs-command-meta {
@@ -104,9 +157,18 @@
     color: var(--color-text-tertiary);
 }
 
+.docs-meta-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    background: rgba(255, 255, 255, 0.6);
+}
+
 .docs-copy-btn {
-    min-width: 92px;
-    min-height: 38px;
+    min-width: 76px;
+    min-height: 40px;
     flex: 0 0 auto;
 }
 
@@ -172,8 +234,11 @@
     }
 
     .docs-command-row {
-        flex-direction: column;
-        align-items: stretch;
+        gap: 8px;
+    }
+
+    .docs-command-box {
+        grid-template-columns: 1fr;
     }
 
     .docs-copy-btn {

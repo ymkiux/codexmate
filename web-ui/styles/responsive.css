@@ -12,6 +12,9 @@ textarea:focus-visible {
 }
 
 @media (max-width: 1280px) {
+    :root {
+        --side-rail-width: 224px;
+    }
     .app-shell {
         grid-template-columns: 224px minmax(0, 1fr);
         gap: 0;
@@ -29,6 +32,9 @@ textarea:focus-visible {
 }
 
 @media (max-width: 960px) {
+    :root {
+        --side-rail-width: 188px;
+    }
     .container {
         padding: 0;
     }
@@ -76,6 +82,9 @@ textarea:focus-visible {
 }
 
 @media (max-width: 720px) {
+    :root {
+        --side-rail-width: min(188px, 46vw);
+    }
     .app-shell {
         grid-template-columns: 1fr;
         min-height: auto;
@@ -85,6 +94,10 @@ textarea:focus-visible {
 
     .side-rail {
         display: none;
+    }
+
+    .lang-fab {
+        display: block;
     }
 
     .top-tabs {
@@ -169,13 +182,6 @@ textarea:focus-visible {
         min-width: 0;
         height: 44px;
         min-height: 44px;
-    }
-
-    body {
-        padding: var(--spacing-md) var(--spacing-sm);
-    }
-    .container {
-        padding: 0 var(--spacing-sm) var(--spacing-md);
     }
     .top-tabs {
         gap: 5px;

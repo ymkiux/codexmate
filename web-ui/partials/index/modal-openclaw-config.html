@@ -3,21 +3,21 @@
                 <div class="modal-title" id="openclaw-config-modal-title">{{ openclawEditorTitle }}</div>
 
                 <div class="form-group">
-                    <label class="form-label">配置名称</label>
-                    <input v-model="openclawEditing.name" class="form-input" :readonly="openclawEditing.lockName" placeholder="例如: 默认配置">
+                    <label class="form-label">{{ t('field.configName') }}</label>
+                    <input v-model="openclawEditing.name" class="form-input" :readonly="openclawEditing.lockName" :placeholder="t('placeholder.openclawConfigNameExample')">
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">目标文件</label>
+                    <label class="form-label">{{ t('field.targetFile') }}</label>
                     <div class="form-hint">
-                        {{ openclawConfigPath || '未加载' }}
+                        {{ openclawConfigPath || t('common.notLoaded') }}
                         <span v-if="openclawConfigPath">
-                            （{{ openclawConfigExists ? '已存在' : '不存在，将在应用时创建' }}）
+                            （{{ openclawConfigExists ? t('common.exists') : t('common.notExistsWillCreateOnApply') }}）
                         </span>
                     </div>
                     <div class="btn-group" style="justify-content:flex-start;">
                         <button class="btn btn-confirm secondary" @click="loadOpenclawConfigFromFile" :disabled="openclawFileLoading">
-                            {{ openclawFileLoading ? '加载中...' : '加载当前配置' }}
+                            {{ openclawFileLoading ? t('common.loading') : t('modal.openclaw.loadCurrent') }}
                         </button>
                     </div>
                 </div>
@@ -25,48 +25,48 @@
                 <div class="quick-section">
                     <div class="quick-header">
                         <div>
-                            <div class="quick-title">新手快速配置</div>
-                            <div class="form-hint">按 3 步完成：填 Provider 和模型，写入编辑器，保存并应用。</div>
+                            <div class="quick-title">{{ t('modal.openclaw.quick.title') }}</div>
+                            <div class="form-hint">{{ t('modal.openclaw.quick.subtitle') }}</div>
                         </div>
                         <div class="quick-actions">
-                            <button class="btn-mini" @click="syncOpenclawQuickFromText">从编辑器读取</button>
-                            <button class="btn-mini" @click="resetOpenclawQuick">清空</button>
+                            <button class="btn-mini" @click="syncOpenclawQuickFromText">{{ t('modal.openclaw.quick.readFromEditor') }}</button>
+                            <button class="btn-mini" @click="resetOpenclawQuick">{{ t('common.clear') }}</button>
                         </div>
                     </div>
                     <div class="quick-steps">
-                        <div class="quick-step"><span class="step-badge">1</span><span>填写 Provider 与模型</span></div>
-                        <div class="quick-step"><span class="step-badge">2</span><span>点击写入编辑器</span></div>
-                        <div class="quick-step"><span class="step-badge">3</span><span>保存并应用</span></div>
+                        <div class="quick-step"><span class="step-badge">1</span><span>{{ t('modal.openclaw.quick.step1') }}</span></div>
+                        <div class="quick-step"><span class="step-badge">2</span><span>{{ t('modal.openclaw.quick.step2') }}</span></div>
+                        <div class="quick-step"><span class="step-badge">3</span><span>{{ t('modal.openclaw.quick.step3') }}</span></div>
                     </div>
                     <div class="quick-grid">
                         <div class="quick-card">
                             <div class="structured-card-title">Provider</div>
                             <div class="form-group">
-                                <label class="form-label">Provider 名称</label>
+                                <label class="form-label">{{ t('field.providerName') }}</label>
                                 <input v-model="openclawQuick.providerName" class="form-input" placeholder="例如: custom-myapi">
-                                <div class="form-hint">会拼成 provider/model 作为主模型标识。</div>
+                                <div class="form-hint">{{ t('modal.openclaw.quick.providerHint') }}</div>
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Base URL</label>
+                                <label class="form-label">{{ t('field.baseUrl') }}</label>
                                 <input v-model="openclawQuick.baseUrl" class="form-input" placeholder="https://api.example.com/v1" :readonly="openclawQuick.baseUrlReadOnly">
-                                <div v-if="openclawQuick.baseUrlDisplayKind === 'builtin-default'" class="form-hint">已按 OpenClaw 内建 provider 默认值回填，可直接修改。</div>
-                                <div v-else-if="openclawQuick.baseUrlReadOnly" class="form-hint">检测到外部引用，快速表单中只读显示；如需修改请使用原文编辑。</div>
+                                <div v-if="openclawQuick.baseUrlDisplayKind === 'builtin-default'" class="form-hint">{{ t('modal.openclaw.quick.baseUrlHintDefault') }}</div>
+                                <div v-else-if="openclawQuick.baseUrlReadOnly" class="form-hint">{{ t('modal.openclaw.quick.baseUrlHintReadonly') }}</div>
                             </div>
                             <div class="form-group">
                                 <label class="form-label">API Key</label>
                                 <div class="list-row">
                                     <input v-model="openclawQuick.apiKey" class="form-input" :readonly="openclawQuick.apiKeyReadOnly" :type="(openclawQuick.apiKeyReadOnly || openclawQuick.showKey) ? 'text' : 'password'" placeholder="sk-...">
                                     <button v-if="!openclawQuick.apiKeyReadOnly" class="btn-mini" @click="toggleOpenclawQuickKey">
-                                        {{ openclawQuick.showKey ? '隐藏' : '显示' }}
+                                        {{ openclawQuick.showKey ? t('common.hide') : t('common.show') }}
                                     </button>
                                 </div>
-                                <div v-if="openclawQuick.apiKeyDisplayKind === 'auth-profile-value'" class="form-hint">当前值来自 OpenClaw 外部认证配置；修改后在“保存并应用”时会回写对应 auth profile。</div>
-                                <div v-else-if="openclawQuick.apiKeyReadOnly" class="form-hint">检测到外部认证或引用，快速表单中只读显示；如需修改请使用原文编辑或对应认证配置。</div>
-                                <div v-else class="form-hint">留空表示不覆盖现有 key。</div>
+                                <div v-if="openclawQuick.apiKeyDisplayKind === 'auth-profile-value'" class="form-hint">{{ t('modal.openclaw.quick.apiKeyHintFromAuth') }}</div>
+                                <div v-else-if="openclawQuick.apiKeyReadOnly" class="form-hint">{{ t('modal.openclaw.quick.apiKeyHintReadonly') }}</div>
+                                <div v-else class="form-hint">{{ t('modal.openclaw.quick.apiKeyHintKeep') }}</div>
                             </div>
                             <div class="form-group">
-                                <label class="form-label">API 类型</label>
-                                <input v-model="openclawQuick.apiType" class="form-input" list="openclawApiTypeList" placeholder="例如: openai-responses">
+                                <label class="form-label">{{ t('field.apiType') }}</label>
+                                <input v-model="openclawQuick.apiType" class="form-input" list="openclawApiTypeList" :placeholder="t('placeholder.apiTypeExample')">
                                 <datalist id="openclawApiTypeList">
                                     <option value="openai-responses"></option>
                                     <option value="openai-chat"></option>
@@ -77,51 +77,51 @@
                         </div>
 
                         <div class="quick-card">
-                            <div class="structured-card-title">模型</div>
+                            <div class="structured-card-title">{{ t('modal.openclaw.quick.modelTitle') }}</div>
                             <div class="form-group">
-                                <label class="form-label">模型 ID</label>
-                                <input v-model="openclawQuick.modelId" class="form-input" placeholder="例如: gpt-4.1">
+                                <label class="form-label">{{ t('field.modelId') }}</label>
+                                <input v-model="openclawQuick.modelId" class="form-input" :placeholder="t('placeholder.modelIdExample')">
                             </div>
                             <div class="form-group">
-                                <label class="form-label">展示名称</label>
-                                <input v-model="openclawQuick.modelName" class="form-input" placeholder="留空则使用模型 ID">
+                                <label class="form-label">{{ t('field.displayName') }}</label>
+                                <input v-model="openclawQuick.modelName" class="form-input" :placeholder="t('placeholder.modelNameOptional')">
                             </div>
                             <div class="form-group">
-                                <label class="form-label">上下文与最大输出</label>
+                                <label class="form-label">{{ t('field.contextAndMaxOutput') }}</label>
                                 <div class="list-row">
-                                    <input v-model="openclawQuick.contextWindow" class="form-input" placeholder="上下文长度">
-                                    <input v-model="openclawQuick.maxTokens" class="form-input" placeholder="最大输出">
+                                    <input v-model="openclawQuick.contextWindow" class="form-input" :placeholder="t('field.contextWindow')">
+                                    <input v-model="openclawQuick.maxTokens" class="form-input" :placeholder="t('field.maxOutput')">
                                 </div>
-                                <div class="form-hint">留空表示不改动已有配置。</div>
+                                <div class="form-hint">{{ t('hint.emptyNoChange') }}</div>
                             </div>
                         </div>
 
                         <div class="quick-card">
-                            <div class="structured-card-title">选项</div>
+                            <div class="structured-card-title">{{ t('modal.openclaw.quick.optionsTitle') }}</div>
                             <label class="quick-option">
                                 <input type="checkbox" v-model="openclawQuick.setPrimary">
-                                设为主模型
+                                {{ t('modal.openclaw.quick.setPrimary') }}
                             </label>
                             <label class="quick-option">
                                 <input type="checkbox" v-model="openclawQuick.overrideProvider">
-                                覆盖同名 Provider 基础信息
+                                {{ t('modal.openclaw.quick.overrideProvider') }}
                             </label>
                             <label class="quick-option">
                                 <input type="checkbox" v-model="openclawQuick.overrideModels">
-                                覆盖同名模型列表
+                                {{ t('modal.openclaw.quick.overrideModels') }}
                             </label>
-                            <div class="form-hint">关闭覆盖会只补空缺字段。</div>
+                            <div class="form-hint">{{ t('modal.openclaw.quick.optionsHint') }}</div>
                         </div>
                     </div>
                     <div class="btn-group">
-                        <button class="btn btn-confirm" @click="applyOpenclawQuickToText">写入编辑器</button>
+                        <button class="btn btn-confirm" @click="applyOpenclawQuickToText">{{ t('modal.openclaw.quick.writeToEditor') }}</button>
                     </div>
                 </div>
 
                 <div class="structured-section">
                     <div class="structured-header">
                         <span class="structured-title">结构化配置（高级）</span>
-                        <span class="form-hint">写入编辑器会重排 JSON，注释可能丢失。</span>
+                        <span class="form-hint">{{ t('modal.openclaw.structured.writeHint') }}</span>
                     </div>
                     <div class="structured-grid">
                         <div class="structured-card">
@@ -249,7 +249,7 @@
                     </div>
                     <div class="btn-group">
                         <button class="btn btn-confirm secondary" @click="syncOpenclawStructuredFromText">从文本刷新</button>
-                        <button class="btn btn-confirm" @click="applyOpenclawStructuredToText">写入编辑器</button>
+                        <button class="btn btn-confirm" @click="applyOpenclawStructuredToText">{{ t('common.writeToEditor') }}</button>
                     </div>
                 </div>
 

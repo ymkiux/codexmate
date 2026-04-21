@@ -180,11 +180,13 @@ export function createAgentsMethods(options = {}) {
         },
 
         setAgentsModalContext(context, options = {}) {
+            const t = typeof this.t === 'function' ? this.t : null;
+            const tr = (key, fallback, params = null) => (t ? t(key, params) : fallback);
             if (context === 'claude-md') {
                 this.agentsContext = 'claude-md';
                 this.agentsWorkspaceFileName = '';
-                this.agentsModalTitle = 'CLAUDE.md 编辑器';
-                this.agentsModalHint = '保存后会写入 ~/.claude/CLAUDE.md。';
+                this.agentsModalTitle = tr('modal.agents.title.claudeMd', 'CLAUDE.md 编辑器');
+                this.agentsModalHint = tr('modal.agents.hint.claudeMd', '保存后会写入 ~/.claude/CLAUDE.md。');
                 return;
             }
             if (context === 'openclaw-workspace') {
@@ -197,11 +199,11 @@ export function createAgentsMethods(options = {}) {
             }
             this.agentsContext = context === 'openclaw' ? 'openclaw' : 'codex';
             if (this.agentsContext === 'openclaw') {
-                this.agentsModalTitle = 'OpenClaw AGENTS.md 编辑器';
-                this.agentsModalHint = '保存后会写入 OpenClaw Workspace 下的 AGENTS.md。';
+                this.agentsModalTitle = tr('modal.agents.title.openclaw', 'OpenClaw AGENTS.md 编辑器');
+                this.agentsModalHint = tr('modal.agents.hint.openclaw', '保存后会写入 OpenClaw Workspace 下的 AGENTS.md。');
             } else {
-                this.agentsModalTitle = 'AGENTS.md 编辑器';
-                this.agentsModalHint = '保存后会写入目标 AGENTS.md（与 config.toml 同级）。';
+                this.agentsModalTitle = tr('modal.agents.title.default', 'AGENTS.md 编辑器');
+                this.agentsModalHint = tr('modal.agents.hint.default', '保存后会写入目标 AGENTS.md（与 config.toml 同级）。');
             }
             this.agentsWorkspaceFileName = '';
         },
@@ -271,16 +273,17 @@ export function createAgentsMethods(options = {}) {
                 this.confirmDialogResolver(false);
             }
             const confirmDisabled = options.confirmDisabled;
+            const t = typeof this.t === 'function' ? this.t : null;
             this.confirmDialogTitle = typeof options.title === 'string' && options.title.trim()
                 ? options.title.trim()
-                : '请确认操作';
+                : (t ? t('confirm.title.default') : '请确认操作');
             this.confirmDialogMessage = typeof options.message === 'string' ? options.message : '';
             this.confirmDialogConfirmText = typeof options.confirmText === 'string' && options.confirmText.trim()
                 ? options.confirmText.trim()
-                : '确认';
+                : (t ? t('confirm.ok') : '确认');
             this.confirmDialogCancelText = typeof options.cancelText === 'string' && options.cancelText.trim()
                 ? options.cancelText.trim()
-                : '取消';
+                : (t ? t('confirm.cancel') : '取消');
             this.confirmDialogDanger = !!options.danger;
             this.confirmDialogConfirmDisabled = typeof confirmDisabled === 'function' ? false : !!confirmDisabled;
             this.confirmDialogDisableWhen = typeof confirmDisabled === 'function' ? confirmDisabled : null;
@@ -306,8 +309,13 @@ export function createAgentsMethods(options = {}) {
             this.showConfirmDialog = false;
             this.confirmDialogTitle = '';
             this.confirmDialogMessage = '';
-            this.confirmDialogConfirmText = '确认';
-            this.confirmDialogCancelText = '取消';
+            if (typeof this.t === 'function') {
+                this.confirmDialogConfirmText = this.t('confirm.ok');
+                this.confirmDialogCancelText = this.t('confirm.cancel');
+            } else {
+                this.confirmDialogConfirmText = '确认';
+                this.confirmDialogCancelText = '取消';
+            }
             this.confirmDialogDanger = false;
             this.confirmDialogConfirmDisabled = false;
             this.confirmDialogDisableWhen = null;

@@ -44,9 +44,13 @@ export function createDashboardComputed() {
             const action = this.normalizeInstallAction(this.installCommandAction);
             return targets.map((target) => {
                 const id = target && typeof target.id === 'string' ? target.id : '';
+                const termuxCommand = id === 'codex'
+                    ? this.getInstallCommand(id, action, 'termux')
+                    : '';
                 return {
                     ...target,
-                    command: this.getInstallCommand(id, action)
+                    command: this.getInstallCommand(id, action),
+                    termuxCommand
                 };
             });
         },
@@ -107,15 +111,15 @@ export function createDashboardComputed() {
             const platform = this.resolveInstallPlatform();
             if (platform === 'win32') {
                 return [
-                    'PowerShell 报权限不足（EACCES/EPERM）时，请以管理员身份执行安装命令。',
-                    '安装后若仍提示找不到命令，重开终端并执行：where codex / where claude。',
-                    '公司网络受限时，可先切换镜像源快捷项（npmmirror / 腾讯云 / 自定义）。'
+                    this.t('docs.tip.win.1'),
+                    this.t('docs.tip.win.2'),
+                    this.t('docs.tip.win.3')
                 ];
             }
             return [
-                '出现 EACCES 权限错误时，优先修复 Node 全局目录权限，不建议直接 sudo npm。',
-                '安装后若命令未生效，重开终端并执行：which codex / which claude。',
-                '公司网络受限时，可先切换镜像源快捷项（npmmirror / 腾讯云 / 自定义）。'
+                this.t('docs.tip.unix.1'),
+                this.t('docs.tip.unix.2'),
+                this.t('docs.tip.unix.3')
             ];
         }
     };

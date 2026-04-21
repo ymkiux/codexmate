@@ -1,47 +1,47 @@
         <!-- 添加提供商模态框 -->
         <div v-if="showAddModal" class="modal-overlay" @click.self="closeAddModal">
             <div class="modal" role="dialog" aria-modal="true" aria-labelledby="add-provider-modal-title">
-                <div class="modal-title" id="add-provider-modal-title">添加提供商</div>
+                <div class="modal-title" id="add-provider-modal-title">{{ t('modal.providerAdd.title') }}</div>
 
                 <div class="form-group">
-                    <label class="form-label">名称</label>
+                    <label class="form-label">{{ t('field.name') }}</label>
                     <input
                         v-model="newProvider.name"
                         :class="['form-input', { invalid: !!providerFieldError('add', 'name') }]"
-                        placeholder="例如: myapi"
+                        :placeholder="t('placeholder.providerNameExample')"
                         autocomplete="off"
                         spellcheck="false"
                         @blur="normalizeProviderDraft('add')">
                     <div v-if="providerFieldError('add', 'name')" class="form-hint form-error">{{ providerFieldError('add', 'name') }}</div>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">API 端点</label>
+                    <label class="form-label">{{ t('field.apiEndpoint') }}</label>
                     <input
                         v-model="newProvider.url"
                         :class="['form-input', { invalid: !!providerFieldError('add', 'url') }]"
-                        placeholder="https://api.example.com/v1"
+                        :placeholder="t('placeholder.apiEndpointExample')"
                         autocomplete="off"
                         spellcheck="false"
                         @blur="normalizeProviderDraft('add')">
                     <div v-if="providerFieldError('add', 'url')" class="form-hint form-error">{{ providerFieldError('add', 'url') }}</div>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">认证密钥</label>
+                    <label class="form-label">{{ t('field.apiKey') }}</label>
                     <input v-model="newProvider.key" class="form-input" type="password" placeholder="sk-...">
                 </div>
                 <div class="form-group">
                     <label class="form-label">
                         <input type="checkbox" v-model="newProvider.useTransform">
-                        使用内建转换（兼容 OpenAI 格式）
+                        {{ t('field.useBuiltinTransform') }}
                     </label>
                     <div class="form-hint">
-                        开启后：写入的 <code>base_url</code> 会指向 Codex Mate 内建转换服务；Codex 使用的令牌固定为 <code>codexmate</code>。
+                        {{ t('hint.useBuiltinTransform') }}
                     </div>
                 </div>
 
                 <div class="btn-group">
-                    <button class="btn btn-cancel" @click="closeAddModal">取消</button>
-                    <button class="btn btn-confirm" @click="addProvider" :disabled="!canSubmitProvider('add')">添加</button>
+                    <button class="btn btn-cancel" @click="closeAddModal">{{ t('common.cancel') }}</button>
+                    <button class="btn btn-confirm" @click="addProvider" :disabled="!canSubmitProvider('add')">{{ t('common.add') }}</button>
                 </div>
             </div>
         </div>
@@ -49,32 +49,32 @@
         <!-- 编辑提供商模态框 -->
         <div v-if="showEditModal" class="modal-overlay" @click.self="closeEditModal">
             <div class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-provider-modal-title">
-                <div class="modal-title" id="edit-provider-modal-title">编辑提供商</div>
+                <div class="modal-title" id="edit-provider-modal-title">{{ t('modal.providerEdit.title') }}</div>
 
                 <div class="form-group">
-                    <label class="form-label">名称</label>
-                    <input v-model="editingProvider.name" class="form-input" placeholder="提供商名称" readonly>
+                    <label class="form-label">{{ t('field.name') }}</label>
+                    <input v-model="editingProvider.name" class="form-input" :placeholder="t('placeholder.providerName')" readonly>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">API 端点</label>
+                    <label class="form-label">{{ t('field.apiEndpoint') }}</label>
                     <input
                         v-model="editingProvider.url"
                         :class="['form-input', { invalid: !!providerFieldError('edit', 'url') }]"
-                        placeholder="https://api.example.com/v1"
+                        :placeholder="t('placeholder.apiEndpointExample')"
                         autocomplete="off"
                         spellcheck="false"
                         @blur="normalizeProviderDraft('edit')">
                     <div v-if="providerFieldError('edit', 'url')" class="form-hint form-error">{{ providerFieldError('edit', 'url') }}</div>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">认证密钥</label>
-                    <input v-model="editingProvider.key" class="form-input" type="password" placeholder="留空则保持不变">
-                    <div class="form-hint">留空表示不修改密钥</div>
+                    <label class="form-label">{{ t('field.apiKey') }}</label>
+                    <input v-model="editingProvider.key" class="form-input" type="password" :placeholder="t('placeholder.keepUnchanged')">
+                    <div class="form-hint">{{ t('hint.keepKeyUnchanged') }}</div>
                 </div>
 
                 <div class="btn-group">
-                    <button class="btn btn-cancel" @click="closeEditModal">取消</button>
-                    <button class="btn btn-confirm" @click="updateProvider" :disabled="!canSubmitProvider('edit')">保存</button>
+                    <button class="btn btn-cancel" @click="closeEditModal">{{ t('common.cancel') }}</button>
+                    <button class="btn btn-confirm" @click="updateProvider" :disabled="!canSubmitProvider('edit')">{{ t('common.save') }}</button>
                 </div>
             </div>
         </div>
@@ -82,16 +82,16 @@
         <!-- 添加模型模态框 -->
         <div v-if="showModelModal" class="modal-overlay" @click.self="closeModelModal">
             <div class="modal" role="dialog" aria-modal="true" aria-labelledby="add-model-modal-title">
-                <div class="modal-title" id="add-model-modal-title">添加模型</div>
+                <div class="modal-title" id="add-model-modal-title">{{ t('modal.modelAdd.title') }}</div>
 
                 <div class="form-group">
-                    <label class="form-label">模型名称</label>
-                    <input v-model="newModelName" class="form-input" placeholder="例如: gpt-5">
+                    <label class="form-label">{{ t('field.modelName') }}</label>
+                    <input v-model="newModelName" class="form-input" :placeholder="t('placeholder.modelExample')">
                 </div>
 
                 <div class="btn-group">
-                    <button class="btn btn-cancel" @click="closeModelModal">取消</button>
-                    <button class="btn btn-confirm" @click="addModel">添加</button>
+                    <button class="btn btn-cancel" @click="closeModelModal">{{ t('common.cancel') }}</button>
+                    <button class="btn btn-confirm" @click="addModel">{{ t('common.add') }}</button>
                 </div>
             </div>
         </div>
@@ -99,17 +99,17 @@
         <!-- 模型列表模态框 -->
         <div v-if="showModelListModal" class="modal-overlay" @click.self="showModelListModal = false">
             <div class="modal" role="dialog" aria-modal="true" aria-labelledby="manage-models-modal-title">
-                <div class="modal-title" id="manage-models-modal-title">管理模型</div>
+                <div class="modal-title" id="manage-models-modal-title">{{ t('modal.modelManage.title') }}</div>
 
                 <div class="model-list">
                     <div v-for="model in models" :key="model" class="model-item">
                         <span>{{ model }}</span>
-                        <button type="button" class="btn-remove-model" @click="removeModel(model)">删除</button>
+                        <button type="button" class="btn-remove-model" @click="removeModel(model)">{{ t('common.delete') }}</button>
                     </div>
                 </div>
 
                 <div class="btn-group">
-                    <button class="btn btn-confirm" @click="showModelListModal = false">关闭</button>
+                    <button class="btn btn-confirm" @click="showModelListModal = false">{{ t('common.close') }}</button>
                 </div>
             </div>
         </div>
@@ -117,24 +117,24 @@
         <!-- 添加Claude配置模态框 -->
         <div v-if="showClaudeConfigModal" class="modal-overlay" @click.self="closeClaudeConfigModal">
             <div class="modal" role="dialog" aria-modal="true" aria-labelledby="add-claude-config-modal-title">
-                <div class="modal-title" id="add-claude-config-modal-title">添加 Claude Code 配置</div>
+                <div class="modal-title" id="add-claude-config-modal-title">{{ t('modal.claudeConfigAdd.title') }}</div>
 
                 <div class="form-group">
-                    <label class="form-label">配置名称</label>
-                    <input v-model="newClaudeConfig.name" class="form-input" placeholder="例如: 智谱GLM">
+                    <label class="form-label">{{ t('field.configName') }}</label>
+                    <input v-model="newClaudeConfig.name" class="form-input" :placeholder="t('placeholder.configNameExample')">
                 </div>
                 <div class="form-group">
                     <label class="form-label">API Key</label>
-                    <input v-model="newClaudeConfig.apiKey" class="form-input" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-...">
+                    <input v-model="newClaudeConfig.apiKey" class="form-input" type="password" autocomplete="off" spellcheck="false" :placeholder="t('placeholder.apiKeyExampleClaude')">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Base URL</label>
-                    <input v-model="newClaudeConfig.baseUrl" class="form-input" placeholder="https://open.bigmodel.cn/api/anthropic">
+                    <label class="form-label">{{ t('field.baseUrl') }}</label>
+                    <input v-model="newClaudeConfig.baseUrl" class="form-input" :placeholder="t('placeholder.baseUrlExampleClaude')">
                 </div>
 
                 <div class="btn-group">
-                    <button class="btn btn-cancel" @click="closeClaudeConfigModal">取消</button>
-                    <button class="btn btn-confirm" @click="addClaudeConfig">添加</button>
+                    <button class="btn btn-cancel" @click="closeClaudeConfigModal">{{ t('common.cancel') }}</button>
+                    <button class="btn btn-confirm" @click="addClaudeConfig">{{ t('common.add') }}</button>
                 </div>
             </div>
         </div>
@@ -142,24 +142,24 @@
         <!-- 编辑Claude配置模态框 -->
         <div v-if="showEditConfigModal" class="modal-overlay" @click.self="closeEditConfigModal">
             <div class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-claude-config-modal-title">
-                <div class="modal-title" id="edit-claude-config-modal-title">编辑 Claude Code 配置</div>
+                <div class="modal-title" id="edit-claude-config-modal-title">{{ t('modal.claudeConfigEdit.title') }}</div>
 
                 <div class="form-group">
-                    <label class="form-label">配置名称</label>
-                    <input v-model="editingConfig.name" class="form-input" placeholder="配置名称" readonly>
+                    <label class="form-label">{{ t('field.configName') }}</label>
+                    <input v-model="editingConfig.name" class="form-input" :placeholder="t('field.configName')" readonly>
                 </div>
                 <div class="form-group">
                     <label class="form-label">API Key</label>
-                    <input v-model="editingConfig.apiKey" class="form-input" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-...">
+                    <input v-model="editingConfig.apiKey" class="form-input" type="password" autocomplete="off" spellcheck="false" :placeholder="t('placeholder.apiKeyExampleClaude')">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Base URL</label>
-                    <input v-model="editingConfig.baseUrl" class="form-input" placeholder="https://open.bigmodel.cn/api/anthropic">
+                    <label class="form-label">{{ t('field.baseUrl') }}</label>
+                    <input v-model="editingConfig.baseUrl" class="form-input" :placeholder="t('placeholder.baseUrlExampleClaude')">
                 </div>
 
                 <div class="btn-group">
-                    <button class="btn btn-cancel" @click="closeEditConfigModal">取消</button>
-                    <button class="btn btn-confirm" @click="saveAndApplyConfig">保存并应用</button>
+                    <button class="btn btn-cancel" @click="closeEditConfigModal">{{ t('common.cancel') }}</button>
+                    <button class="btn btn-confirm" @click="saveAndApplyConfig">{{ t('common.saveApply') }}</button>
                 </div>
             </div>
         </div>

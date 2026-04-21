@@ -78,6 +78,13 @@ export function createInstallMethods() {
         },
 
         resolveInstallPlatform() {
+            const navUserAgent = typeof navigator !== 'undefined' && typeof navigator.userAgent === 'string'
+                ? navigator.userAgent.trim().toLowerCase()
+                : '';
+            // Termux runs on Android; Codex CLI needs a Termux-friendly build.
+            if (navUserAgent.includes('termux') || navUserAgent.includes('android')) {
+                return 'termux';
+            }
             const navPlatform = typeof navigator !== 'undefined' && typeof navigator.platform === 'string'
                 ? navigator.platform.trim().toLowerCase()
                 : '';
@@ -86,8 +93,11 @@ export function createInstallMethods() {
             return 'linux';
         },
 
-        buildInstallCommandMatrix(packageManager) {
+        buildInstallCommandMatrix(packageManager, platformOverride = '') {
             const manager = this.normalizeInstallPackageManager(packageManager);
+            const platform = platformOverride ? String(platformOverride).trim().toLowerCase() : this.resolveInstallPlatform();
+            const codexPackage = platform === 'termux' ? '@mmmbuto/codex-cli-termux' : '@openai/codex';
+            const codexInstallPackage = platform === 'termux' ? '@mmmbuto/codex-cli-termux@latest' : '@openai/codex';
             const matrix = {
                 claude: {
                     install: '',
@@ -104,34 +114,36 @@ export function createInstallMethods() {
                 matrix.claude.install = 'pnpm add -g @anthropic-ai/claude-code';
                 matrix.claude.update = 'pnpm up -g @anthropic-ai/claude-code';
                 matrix.claude.uninstall = 'pnpm remove -g @anthropic-ai/claude-code';
-                matrix.codex.install = 'pnpm add -g @openai/codex';
-                matrix.codex.update = 'pnpm up -g @openai/codex';
-                matrix.codex.uninstall = 'pnpm remove -g @openai/codex';
+                matrix.codex.install = `pnpm add -g ${codexInstallPackage}`;
+                matrix.codex.update = `pnpm up -g ${codexPackage}`;
+                matrix.codex.uninstall = `pnpm remove -g ${codexPackage}`;
                 return matrix;
             }
             if (manager === 'bun') {
                 matrix.claude.install = 'bun add -g @anthropic-ai/claude-code';
                 matrix.claude.update = 'bun update -g @anthropic-ai/claude-code';
                 matrix.claude.uninstall = 'bun remove -g @anthropic-ai/claude-code';
-                matrix.codex.install = 'bun add -g @openai/codex';
-                matrix.codex.update = 'bun update -g @openai/codex';
-                matrix.codex.uninstall = 'bun remove -g @openai/codex';
+                matrix.codex.install = `bun add -g ${codexInstallPackage}`;
+                matrix.codex.update = `bun update -g ${codexPackage}`;
+                matrix.codex.uninstall = `bun remove -g ${codexPackage}`;
                 return matrix;
             }
             matrix.claude.install = 'npm install -g @anthropic-ai/claude-code';
             matrix.claude.update = 'npm update -g @anthropic-ai/claude-code';
             matrix.claude.uninstall = 'npm uninstall -g @anthropic-ai/claude-code';
-            matrix.codex.install = 'npm install -g @openai/codex';
-            matrix.codex.update = 'npm update -g @openai/codex';
-            matrix.codex.uninstall = 'npm uninstall -g @openai/codex';
+            matrix.codex.install = `npm install -g ${codexInstallPackage}`;
+            matrix.codex.update = platform === 'termux'
+                ? `npm install -g ${codexInstallPackage}`
+                : `npm update -g ${codexPackage}`;
+            matrix.codex.uninstall = `npm uninstall -g ${codexPackage}`;
             return matrix;
         },
 
-        getInstallCommand(targetId, actionName) {
+        getInstallCommand(targetId, actionName, platformOverride = '') {
             const targetKey = typeof targetId === 'string' ? targetId.trim() : '';
             if (!targetKey) return '';
             const action = this.normalizeInstallAction(actionName);
-            const currentMap = this.buildInstallCommandMatrix(this.installPackageManager);
+            const currentMap = this.buildInstallCommandMatrix(this.installPackageManager, platformOverride);
             const current = currentMap[targetKey] && typeof currentMap[targetKey][action] === 'string'
                 ? currentMap[targetKey][action]
                 : '';

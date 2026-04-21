@@ -157,6 +157,11 @@
     gap: 16px;
 }
 
+/* When showing the "正在加载" notice above the skeleton, keep comfortable spacing. */
+.session-empty + .usage-loading-skeleton {
+    margin-top: 14px;
+}
+
 .usage-skeleton-card {
     position: relative;
     overflow: hidden;

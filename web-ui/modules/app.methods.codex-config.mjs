@@ -132,9 +132,6 @@ export function createCodexConfigMethods(options = {}) {
             await modelsTask;
 
             if (this.currentProvider === name) {
-                if (this.modelsSource === 'error') {
-                    this.showMessage('模型列表获取失败，但已切换提供商；请检查 URL/密钥或手动设置模型', 'error');
-                }
                 if (this.modelsSource === 'remote' && this.models.length > 0 && !this.models.includes(this.currentModel)) {
                     this.currentModel = this.models[0];
                     this.modelsHasCurrent = true;

@@ -39,7 +39,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /onConfigTabPointerDown\('codex', \$event\)/);
     assert.match(html, /onMainTabClick\('sessions', \$event\)/);
     assert.match(html, /onConfigTabClick\('codex', \$event\)/);
-    assert.match(html, /<span class="selector-title">压缩阈值<\/span>/);
+    assert.match(html, /<span class="selector-title">\{\{\s*t\('config\.contextBudget'\)\s*\}\}<\/span>/);
     assert.match(html, /v-model="modelContextWindowInput"/);
     assert.match(html, /v-model="modelAutoCompactTokenLimitInput"/);
     assert.match(html, /@focus="editingCodexBudgetField = 'modelContextWindowInput'"/);
@@ -64,7 +64,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /configTemplateDiffConfirmEnabled/);
     assert.match(html, /sessionTrashCount/);
     assert.match(html, /v-if="taskOrchestrationTabEnabled" class="top-tab"[\s\S]*id="tab-orchestration"/);
-    assert.match(html, /v-if="taskOrchestrationTabEnabled" class="side-section" role="navigation" aria-label="Orchestration"/);
+    assert.match(html, /v-if="taskOrchestrationTabEnabled" class="side-section" role="navigation" :aria-label="t\('side\.orchestration'\)"/);
     assert.match(html, /v-if="taskOrchestrationTabEnabled"[\s\S]*id="panel-orchestration"/);
     assert.match(html, /taskOrchestrationTabEnabled && mainTab === 'orchestration'/);
     assert.match(bundledScript, /taskOrchestrationTabEnabled:\s*false/);
@@ -131,11 +131,11 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /:aria-selected="mainTab === 'usage'"/);
     assert.match(html, /id="panel-usage"/);
     assert.match(html, /v-show="mainTab === 'usage'"/);
-    assert.match(usagePanel, /sessionsUsageLoading && !sessionsUsageList\.length" class="session-empty">正在加载 Usage 统计\.\.\.</);
+    assert.match(usagePanel, /sessionsUsageLoading && !sessionsUsageList\.length" class="session-empty">\{\{\s*t\('usage\.loading'\)\s*\}\}</);
     assert.match(usagePanel, /sessionsUsageError && !sessionsUsageList\.length" class="usage-empty">/);
-    assert.match(usagePanel, /v-else-if="!sessionsUsageList\.length" class="usage-empty">暂无可用于统计的会话数据/);
+    assert.match(usagePanel, /v-else-if="!sessionsUsageList\.length" class="usage-empty">\{\{\s*t\('usage\.empty'\)\s*\}\}/);
     assert.match(usagePanel, /sessionUsageCharts\.modelCoverage\.missingModelSessionsPreview\.length/);
-    assert.match(usagePanel, /仍缺模型名的会话/);
+    assert.match(usagePanel, /\{\{\s*t\('usage\.models\.missingListTitle'\)\s*\}\}/);
     assert.match(html, /data-main-tab="market"/);
     assert.match(html, /onMainTabPointerDown\('market', \$event\)/);
     assert.match(html, /onMainTabClick\('market', \$event\)/);
@@ -150,7 +150,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /:aria-selected="mainTab === 'docs'"/);
     assert.match(html, /id="panel-docs"/);
     assert.match(html, /v-show="mainTab === 'docs'"/);
-    assert.match(html, /CLI 安装文档/);
+    assert.match(html, /\{\{\s*t\('docs\.title'\)\s*\}\}/);
     assert.match(html, /installTargetCards/);
     assert.match(html, /installTroubleshootingTips/);
     assert.doesNotMatch(html, /<span class="selector-title">Skills<\/span>/);
@@ -176,23 +176,23 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /<button type="button" class="market-action-card" @click="openSkillsManager" :disabled="loading \|\| !!initError \|\| skillsMarketBusy">/);
     assert.match(html, /<button type="button" class="market-action-card" @click="scanImportableSkills\(\{ silent: false \}\)" :disabled="loading \|\| !!initError \|\| skillsMarketBusy">/);
     assert.match(html, /<button type="button" class="market-action-card" @click="triggerSkillsZipImport" :disabled="loading \|\| !!initError \|\| skillsMarketBusy">/);
-    assert.match(html, /class="market-target-switch" role="group" aria-label="选择 Skills 安装目标"/);
-    assert.match(html, /class="market-target-switch market-target-switch-compact" role="group" aria-label="选择 Skills 管理目标"/);
-    assert.doesNotMatch(html, /class="market-target-switch" role="tablist" aria-label="选择 Skills 安装目标"/);
-    assert.doesNotMatch(html, /class="market-target-switch market-target-switch-compact" role="tablist" aria-label="选择 Skills 管理目标"/);
-    assert.match(html, /class="side-section" role="navigation" aria-label="Config"/);
-    assert.match(html, /class="side-section" role="navigation" aria-label="会话管理"/);
-    assert.match(html, /class="side-section" role="navigation" aria-label="Orchestration"/);
-    assert.match(html, /class="side-section" role="navigation" aria-label="Skills"/);
-    assert.match(html, /class="side-section" role="navigation" aria-label="Docs"/);
-    assert.match(html, /class="side-section" role="navigation" aria-label="Settings"/);
+    assert.match(html, /class="market-target-switch" role="group" :aria-label="t\('market\.target\.aria'\)"/);
+    assert.match(html, /class="market-target-switch market-target-switch-compact" role="group" :aria-label="t\('modal\.skills\.target\.aria'\)"/);
+    assert.doesNotMatch(html, /class="market-target-switch" role="tablist" :aria-label="t\('market\.target\.aria'\)"/);
+    assert.doesNotMatch(html, /class="market-target-switch market-target-switch-compact" role="tablist" :aria-label="t\('modal\.skills\.target\.aria'\)"/);
+    assert.match(html, /class="side-section" role="navigation" :aria-label="t\('side\.config'\)"/);
+    assert.match(html, /class="side-section" role="navigation" :aria-label="t\('side\.sessions'\)"/);
+    assert.match(html, /class="side-section" role="navigation" :aria-label="t\('side\.orchestration'\)"/);
+    assert.match(html, /class="side-section" role="navigation" :aria-label="t\('side\.skills'\)"/);
+    assert.match(html, /class="side-section" role="navigation" :aria-label="t\('side\.docs'\)"/);
+    assert.match(html, /class="side-section" role="navigation" :aria-label="t\('side\.system'\)"/);
     assert.doesNotMatch(sideRail, /role="tablist"/);
     assert.doesNotMatch(sideRail, /role="tab"/);
     assert.match(sideRail, /id="side-tab-config-codex"[\s\S]*:aria-current="mainTab === 'config' && configMode === 'codex' \? 'page' : null"/);
     assert.match(sideRail, /id="side-tab-docs"[\s\S]*:aria-current="mainTab === 'docs' \? 'page' : null"/);
     assert.match(sideRail, /id="side-tab-settings"[\s\S]*:aria-current="mainTab === 'settings' \? 'page' : null"/);
     assert.match(html, /skillsDefaultRootPath/);
-    assert.match(html, /可直接导入/);
+    assert.match(html, /\{\{\s*skill\.hasSkillFile\s*\?\s*t\('market\.pill\.importableDirect'\)\s*:\s*t\('market\.pill\.importMissing'\)\s*\}\}/);
     assert.doesNotMatch(html, /在线生态目录/);
     assert.doesNotMatch(html, /查看在线目录/);
     assert.doesNotMatch(html, /skillsMarketRemoteCount/);
@@ -219,20 +219,20 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /<div[\s\S]*v-show="settingsTab === 'backup'"[\s\S]*id="settings-panel-backup"[\s\S]*aria-labelledby="settings-tab-backup">/);
     assert.match(html, /<div[\s\S]*v-show="settingsTab === 'trash'"[\s\S]*id="settings-panel-trash"[\s\S]*aria-labelledby="settings-tab-trash">/);
     assert.match(html, /<div[\s\S]*v-show="settingsTab === 'device'"[\s\S]*id="settings-panel-device"[\s\S]*aria-labelledby="settings-tab-device">/);
-    assert.match(html, /id="settings-panel-backup"[\s\S]*?<div class="settings-card-title">分享命令前缀<\/div>/);
+    assert.match(html, /id="settings-panel-backup"[\s\S]*?<div class="settings-card-title">\{\{\s*t\('settings\.sharePrefix\.title'\)\s*\}\}<\/div>/);
     assert.match(html, /id="settings-share-prefix"[\s\S]*class="model-select"[\s\S]*:value="shareCommandPrefix"[\s\S]*@change="setShareCommandPrefix\(\$event\.target\.value\)"/);
     assert.match(html, /<option value="npm start">npm start<\/option>/);
     assert.match(html, /<option value="codexmate">codexmate<\/option>/);
-    assert.match(html, /id="settings-panel-device"[\s\S]*?<div class="settings-card-title">配置重置<\/div>/);
+    assert.match(html, /id="settings-panel-device"[\s\S]*?<div class="settings-card-title">\{\{\s*t\('settings\.reset\.title'\)\s*\}\}<\/div>/);
     assert.match(html, /id="settings-panel-device"[\s\S]*?@click="resetConfig"/);
     assert.doesNotMatch(
         html.match(/id="panel-config-provider"[\s\S]*?<\/template>/)?.[0] || '',
         /<span class="selector-title">配置重置<\/span>/
     );
     assert.match(html, /class="settings-card-actions"/);
-    assert.match(html, /<div class="settings-card-title">会话删除行为<\/div>/);
+    assert.match(html, /<div class="settings-card-title">\{\{\s*t\('settings\.deleteBehavior\.title'\)\s*\}\}<\/div>/);
     assert.match(html, /<input type="checkbox" :checked="sessionTrashEnabled" @change="setSessionTrashEnabled\(\$event\.target\.checked\)">/);
-    assert.match(html, /默认开启。关闭后，会话浏览里的删除会直接永久删除，不再进入回收站。/);
+    assert.match(html, /\{\{\s*t\('settings\.deleteBehavior\.hint'\)\s*\}\}/);
     assert.match(html, /<button class="btn-tool btn-tool-compact" @click="loadSessionTrash\(\{ forceRefresh: true \}\)"/);
     assert.match(html, /<button class="btn-tool btn-tool-compact" @click="clearSessionTrash"/);
     assert.doesNotMatch(html, /<span class="selector-title">会话回收站<\/span>/);
@@ -246,7 +246,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /v-for="item in visibleSessionTrashItems"/);
     assert.match(html, /class="session-source"/);
     assert.match(html, /@click="loadMoreSessionTrashItems"/);
-    assert.match(html, /回收站列表加载失败，请刷新重试/);
+    assert.match(html, /\{\{\s*t\('settings\.trash\.retry'\)\s*\}\}/);
     assert.match(html, /data-main-tab=\"sessions\"/);
     assert.match(html, /data-main-tab=\"market\"/);
     assert.match(html, /data-config-mode=\"codex\"/);
@@ -262,7 +262,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.doesNotMatch(sessionsPanel, /<span v-if="sessionStandaloneError">{{ sessionStandaloneError }}<\/span>/);
     assert.match(
         sessionsPanel,
-        /<div v-else class="session-preview-empty">[\s\S]*?<span>请先在左侧选择一个会话<\/span>[\s\S]*?<\/div>/
+        /<div v-else class="session-preview-empty">[\s\S]*?<span>\{\{\s*t\('sessions\.selectHint'\)\s*\}\}<\/span>[\s\S]*?<\/div>/
     );
     assert.match(
         html,
@@ -282,7 +282,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(usagePanel, /sessionsUsageTimeRange === '7d'/);
     assert.match(usagePanel, /sessionsUsageTimeRange === '30d'/);
     assert.match(usagePanel, /sessionsUsageTimeRange === 'all'/);
-    assert.match(usagePanel, />全部<\/button>/);
+    assert.match(usagePanel, />\{\{\s*t\('usage\.range\.all'\)\s*\}\}<\/button>/);
     assert.match(usagePanel, /sessionsUsageList\.length/);
     assert.match(usagePanel, /loadSessionsUsage\(\{ forceRefresh: true \}\)/);
     assert.match(usagePanel, /sessionUsageSummaryCards/);
@@ -290,7 +290,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(usagePanel, /v-if="card\.note" class="usage-summary-note"/);
     assert.match(usagePanel, /sessionUsageCharts\.usedModels/);
     assert.match(usagePanel, /sessionUsageCharts\.modelCoverage/);
-    assert.match(usagePanel, /当前范围没读到模型名/);
+    assert.match(usagePanel, /\{\{\s*t\('usage\.models\.noneTitle'\)\s*\}\}/);
     assert.match(usagePanel, /class="usage-card-head"/);
     assert.match(usagePanel, /class="usage-model-list"/);
     assert.match(usagePanel, /sessionUsageCharts\.buckets/);
@@ -314,22 +314,25 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert(providerShareButton, 'provider share button should exist');
     assert.match(providerShareButton[0], /:class="\{ loading: providerShareLoading\[provider\.name\], disabled: !shouldAllowProviderShare\(provider\) \}"/);
     assert.match(providerShareButton[0], /:disabled="providerShareLoading\[provider\.name\] \|\| !shouldAllowProviderShare\(provider\)"/);
-    assert.match(providerShareButton[0], /:title="shouldAllowProviderShare\(provider\) \? '分享命令' : '不可分享'"/);
+    assert.match(providerShareButton[0], /:title="shouldAllowProviderShare\(provider\) \? t\('config\.shareCommand'\) : t\('config\.shareDisabled'\)"/);
     assert.doesNotMatch(html, /<span class="selector-title">local 本地端口<\/span>/);
     assert.match(html, /<button class="btn-icon" @click="showModelModal = true" aria-label="Add model" title="添加模型" v-if="modelsSource === 'legacy'">\+<\/button>/);
     assert.match(html, /<button class="btn-icon" @click="showModelListModal = true" aria-label="Manage models" title="管理模型" v-if="modelsSource === 'legacy'">≡<\/button>/);
     assert.match(
         html,
-        /<button[\s\S]*class="card-action-btn"[\s\S]*@click="openHealthCheckDialog\(\{ providerName: provider\.name, locked: true \}\)"[\s\S]*:disabled="displayCurrentProvider !== provider\.name"[\s\S]*:aria-label="`Open health dialog for \$\{provider\.name\}`"[\s\S]*:title="displayCurrentProvider === provider\.name \? '健康聊天测试' : '请先切换到该提供商'"/
+        /<button[\s\S]*class="card-action-btn"[\s\S]*@click="openHealthCheckDialog\(\{ providerName: provider\.name, locked: true \}\)"[\s\S]*:disabled="displayCurrentProvider !== provider\.name"[\s\S]*:aria-label="`Open health dialog for \$\{provider\.name\}`"[\s\S]*:title="displayCurrentProvider === provider\.name \? t\('config\.healthTest'\) : t\('config\.switchProviderFirst'\)"/
     );
     assert.match(html, /<button[\s\S]*?@click="openEditModal\(provider\)"[\s\S]*?:aria-label="`Edit provider \$\{provider\.name\}`"[\s\S]*?:title="shouldShowProviderEdit\(provider\) \? '编辑' : '不可编辑'">/);
     assert.match(html, /<button[\s\S]*?@click="deleteProvider\(provider\.name\)"[\s\S]*?:aria-label="`Delete provider \$\{provider\.name\}`"[\s\S]*?:title="shouldShowProviderDelete\(provider\) \? '删除' : '不可删除'">/);
-    assert.match(html, /<button class="card-action-btn"[^>]*@click="openEditConfigModal\(name\)"[^>]*:aria-label="`Edit Claude config \$\{name\}`"[^>]*title="编辑">/);
-    assert.match(html, /<button class="card-action-btn delete"[^>]*@click="deleteClaudeConfig\(name\)"[^>]*:aria-label="`Delete Claude config \$\{name\}`"[^>]*title="删除">/);
+    assert.match(html, /<button class="card-action-btn"[^>]*@click="openEditConfigModal\(name\)"[^>]*:aria-label="`Edit Claude config \$\{name\}`"[^>]*:title="t\('claude\.action\.edit'\)">/);
+    assert.match(html, /<button class="card-action-btn delete"[^>]*@click="deleteClaudeConfig\(name\)"[^>]*:aria-label="`Delete Claude config \$\{name\}`"[^>]*:title="t\('claude\.action\.delete'\)">/);
     assert.match(html, /<button class="card-action-btn"[^>]*@click="copyClaudeShareCommand\(name\)"[^>]*disabled[^>]*>/);
-    assert.match(html, /<button class="card-action-btn"[^>]*@click="openOpenclawEditModal\(name\)"[^>]*:aria-label="`Edit OpenClaw config \$\{name\}`"[^>]*title="编辑">/);
-    assert.match(html, /<div class="docs-command-row">[\s\S]*<code class="install-command">\{\{ target\.command \}\}<\/code>[\s\S]*<button type="button" class="btn-mini docs-copy-btn"/);
-    assert.match(html, /<button v-if="name !== '默认配置'" class="card-action-btn delete"[^>]*@click="deleteOpenclawConfig\(name\)"[^>]*:aria-label="`Delete OpenClaw config \$\{name\}`"[^>]*title="删除">/);
+    assert.match(html, /<button class="card-action-btn"[^>]*@click="openOpenclawEditModal\(name\)"[^>]*:aria-label="`Edit OpenClaw config \$\{name\}`"[^>]*:title="t\('openclaw\.action\.edit'\)">/);
+    assert.match(
+        html,
+        /<div class="docs-command-row">[\s\S]*<div class="docs-command-box"[\s\S]*<code class="install-command">\{\{ target\.command \}\}<\/code>[\s\S]*<button[\s\S]*class="btn-mini docs-copy-btn"/
+    );
+    assert.match(html, /<button v-if="name !== '默认配置'" class="card-action-btn delete"[^>]*@click="deleteOpenclawConfig\(name\)"[^>]*:aria-label="`Delete OpenClaw config \$\{name\}`"[^>]*:title="t\('openclaw\.action\.delete'\)">/);
     assert.match(modalsBasic, /<div v-if="showAddModal" class="modal-overlay" @click\.self="closeAddModal">/);
     assert.match(modalsBasic, /<div v-if="showModelModal" class="modal-overlay" @click\.self="closeModelModal">/);
     assert.match(modalsBasic, /<div v-if="showClaudeConfigModal" class="modal-overlay" @click\.self="closeClaudeConfigModal">/);
@@ -347,17 +350,17 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.doesNotMatch(modalsBasic, /install-cli-modal-title/);
     assert.doesNotMatch(modalsBasic, /showInstallModal/);
     assert.match(modalsBasic, /<input v-model="newProvider\.key" class="form-input" type="password" placeholder="sk-\.\.\.">/);
-    assert.match(modalsBasic, /<input v-model="editingProvider\.key" class="form-input" type="password" placeholder="留空则保持不变">/);
-    assert.match(modalsBasic, /<input v-model="newClaudeConfig\.apiKey" class="form-input" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-\.\.\.">/);
-    assert.match(modalsBasic, /<input v-model="editingConfig\.apiKey" class="form-input" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-\.\.\.">/);
+    assert.match(modalsBasic, /<input v-model="editingProvider\.key" class="form-input" type="password" :placeholder="t\('placeholder\.keepUnchanged'\)">/);
+    assert.match(modalsBasic, /<input v-model="newClaudeConfig\.apiKey" class="form-input" type="password" autocomplete="off" spellcheck="false" :placeholder="t\('placeholder\.apiKeyExampleClaude'\)">/);
+    assert.match(modalsBasic, /<input v-model="editingConfig\.apiKey" class="form-input" type="password" autocomplete="off" spellcheck="false" :placeholder="t\('placeholder\.apiKeyExampleClaude'\)">/);
     assert.strictEqual([...modalsBasic.matchAll(/type="password"/g)].length, 4);
     assert.match(templateAgentModals, /<div v-if="showConfigTemplateModal" class="modal-overlay" @click\.self="!configTemplateApplying && closeConfigTemplateModal\(\)">/);
     assert.match(templateAgentModals, /<div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="config-template-modal-title">/);
-    assert.match(templateAgentModals, /<div class="modal-title" id="config-template-modal-title">Config 模板编辑器（手动确认应用）<\/div>/);
+    assert.match(templateAgentModals, /<div class="modal-title" id="config-template-modal-title">\{\{\s*t\('modal\.configTemplate\.title'\)\s*\}\}<\/div>/);
     assert.match(templateAgentModals, /<div v-if="showAgentsModal" class="modal-overlay" @click\.self="closeAgentsModal">/);
     assert.match(templateAgentModals, /<div class="modal modal-wide modal-editor agents-modal" role="dialog" aria-modal="true" aria-labelledby="agents-modal-title">/);
     assert.match(templateAgentModals, /<div class="modal-title" id="agents-modal-title">{{ agentsModalTitle }}<\/div>/);
-    assert.match(modalsBasic, /<button type="button" class="btn-remove-model" @click="removeModel\(model\)">删除<\/button>/);
+    assert.match(modalsBasic, /<button type="button" class="btn-remove-model" @click="removeModel\(model\)">\{\{\s*t\('common\.delete'\)\s*\}\}<\/button>/);
     assert.doesNotMatch(modalsBasic, /<span class="btn-remove-model" @click="removeModel\(model\)">删除<\/span>/);
     assert.match(healthCheckModal, /<div v-if="showHealthCheckDialog" class="modal-overlay" @click\.self="closeHealthCheckDialog\(\)">/);
     assert.match(healthCheckModal, /<div class="modal modal-wide health-check-dialog" role="dialog" aria-modal="true" aria-labelledby="health-check-dialog-title">/);

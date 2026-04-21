@@ -7,14 +7,14 @@
                     <div class="selector-section docs-overview-section">
                         <div class="selector-header docs-overview-header">
                             <div>
-                                <span class="selector-title">CLI 安装文档</span>
-                                <div class="skills-panel-note docs-section-note">查看 Claude Code / Codex CLI 命令。</div>
+                                <span class="selector-title">{{ t('docs.title') }}</span>
+                                <div class="skills-panel-note docs-section-note">{{ t('docs.subtitle') }}</div>
                             </div>
                         </div>
 
                         <div class="docs-toolbar-grid">
                             <div class="docs-toolbar-card">
-                                <label class="form-label" for="docs-install-package-manager">包管理器</label>
+                                <label class="form-label" for="docs-install-package-manager">{{ t('common.packageManager') }}</label>
                                 <select id="docs-install-package-manager" class="form-input" v-model="installPackageManager">
                                     <option value="npm">npm</option>
                                     <option value="pnpm">pnpm</option>
@@ -23,12 +23,12 @@
                             </div>
 
                             <div class="docs-toolbar-card docs-toolbar-card-wide">
-                                <label class="form-label">镜像源</label>
+                                <label class="form-label">{{ t('common.mirror') }}</label>
                                 <div class="install-action-tabs">
-                                    <button type="button" class="btn-mini" :class="{ active: installRegistryPreset === 'default' }" @click="setInstallRegistryPreset('default')">官方</button>
+                                    <button type="button" class="btn-mini" :class="{ active: installRegistryPreset === 'default' }" @click="setInstallRegistryPreset('default')">{{ t('common.official') }}</button>
                                     <button type="button" class="btn-mini" :class="{ active: installRegistryPreset === 'npmmirror' }" @click="setInstallRegistryPreset('npmmirror')">npmmirror</button>
-                                    <button type="button" class="btn-mini" :class="{ active: installRegistryPreset === 'tencent' }" @click="setInstallRegistryPreset('tencent')">腾讯云</button>
-                                    <button type="button" class="btn-mini" :class="{ active: installRegistryPreset === 'custom' }" @click="setInstallRegistryPreset('custom')">自定义</button>
+                                    <button type="button" class="btn-mini" :class="{ active: installRegistryPreset === 'tencent' }" @click="setInstallRegistryPreset('tencent')">{{ t('docs.registry.tencent') }}</button>
+                                    <button type="button" class="btn-mini" :class="{ active: installRegistryPreset === 'custom' }" @click="setInstallRegistryPreset('custom')">{{ t('common.custom') }}</button>
                                 </div>
                                 <input
                                     v-if="installRegistryPreset === 'custom'"
@@ -36,39 +36,39 @@
                                     class="form-input install-registry-input"
                                     placeholder="https://registry.example.com">
                                 <div class="form-hint install-registry-hint" v-if="installRegistryPreview">
-                                    命令将附加：--registry={{ installRegistryPreview }}
+                                    {{ t('docs.registryHintPrefix') }} --registry={{ installRegistryPreview }}
                                 </div>
                                 <div class="form-hint install-registry-hint" v-else-if="installRegistryPreset === 'custom'">
-                                    请输入完整 URL（含 http/https），将自动附加到命令。
+                                    {{ t('docs.registryHintCustom') }}
                                 </div>
                             </div>
 
                             <div class="docs-toolbar-card docs-toolbar-card-wide">
-                                <label class="form-label">操作</label>
+                                <label class="form-label">{{ t('common.action') }}</label>
                                 <div class="install-action-tabs">
-                                    <button type="button" class="btn-mini" :class="{ active: installCommandAction === 'install' }" @click="setInstallCommandAction('install')">安装</button>
-                                    <button type="button" class="btn-mini" :class="{ active: installCommandAction === 'update' }" @click="setInstallCommandAction('update')">升级</button>
-                                    <button type="button" class="btn-mini" :class="{ active: installCommandAction === 'uninstall' }" @click="setInstallCommandAction('uninstall')">卸载</button>
+                                    <button type="button" class="btn-mini" :class="{ active: installCommandAction === 'install' }" @click="setInstallCommandAction('install')">{{ t('common.install') }}</button>
+                                    <button type="button" class="btn-mini" :class="{ active: installCommandAction === 'update' }" @click="setInstallCommandAction('update')">{{ t('common.update') }}</button>
+                                    <button type="button" class="btn-mini" :class="{ active: installCommandAction === 'uninstall' }" @click="setInstallCommandAction('uninstall')">{{ t('common.uninstall') }}</button>
                                 </div>
                             </div>
                         </div>
 
                         <div class="docs-summary-strip">
                             <div class="docs-summary-item">
-                                <span class="docs-summary-label">目标数</span>
+                                <span class="docs-summary-label">{{ t('common.targets') }}</span>
                                 <strong class="docs-summary-value">{{ installTargetCards.length }}</strong>
                             </div>
                             <div class="docs-summary-item">
-                                <span class="docs-summary-label">当前包管理器</span>
+                                <span class="docs-summary-label">{{ t('common.currentPm') }}</span>
                                 <strong class="docs-summary-value">{{ String(installPackageManager || 'npm').toUpperCase() }}</strong>
                             </div>
                             <div class="docs-summary-item">
-                                <span class="docs-summary-label">当前操作</span>
-                                <strong class="docs-summary-value">{{ installCommandAction === 'update' ? '升级' : (installCommandAction === 'uninstall' ? '卸载' : '安装') }}</strong>
+                                <span class="docs-summary-label">{{ t('common.currentAction') }}</span>
+                                <strong class="docs-summary-value">{{ installCommandAction === 'update' ? t('common.update') : (installCommandAction === 'uninstall' ? t('common.uninstall') : t('common.install')) }}</strong>
                             </div>
                             <div class="docs-summary-item docs-summary-item-wide">
-                                <span class="docs-summary-label">镜像</span>
-                                <strong class="docs-summary-value">{{ installRegistryPreview || '官方默认' }}</strong>
+                                <span class="docs-summary-label">{{ t('common.mirrorActive') }}</span>
+                                <strong class="docs-summary-value">{{ installRegistryPreview || t('common.defaultOfficial') }}</strong>
                             </div>
                         </div>
                     </div>
@@ -76,8 +76,8 @@
                     <div class="selector-section docs-command-section">
                         <div class="selector-header docs-section-header">
                             <div>
-                                <span class="selector-title">安装命令</span>
-                                <div class="skills-panel-note docs-section-note">命令可直接复制。</div>
+                                <span class="selector-title">{{ t('docs.section.commands') }}</span>
+                                <div class="skills-panel-note docs-section-note">{{ t('docs.section.commandsNote') }}</div>
                             </div>
                         </div>
 
@@ -90,13 +90,30 @@
                                     <div class="docs-command-head">
                                         <div class="install-row-title">{{ target.name }}</div>
                                         <div class="docs-command-meta">
-                                            <span>{{ target.packageName }}</span>
-                                            <span>命令：{{ target.bin }}</span>
+                                            <span class="docs-meta-pill">{{ target.packageName }}</span>
+                                            <span class="docs-meta-pill">bin: {{ target.bin }}</span>
                                         </div>
                                     </div>
                                     <div class="docs-command-row">
-                                        <code class="install-command">{{ target.command }}</code>
-                                        <button type="button" class="btn-mini docs-copy-btn" :disabled="!target.command" @click="copyInstallCommand(target.command)">复制命令</button>
+                                        <div class="docs-command-box" role="group" :aria-label="`${target.name} command`">
+                                            <code class="install-command">{{ target.command }}</code>
+                                            <button
+                                                type="button"
+                                                class="btn-mini docs-copy-btn"
+                                                :disabled="!target.command"
+                                                @click="copyInstallCommand(target.command)">{{ t('common.copy') }}</button>
+                                        </div>
+                                    </div>
+                                    <div
+                                        v-if="target.id === 'codex' && target.termuxCommand && target.termuxCommand !== target.command"
+                                        class="docs-command-row docs-command-row-secondary">
+                                        <div class="docs-command-box" role="group" :aria-label="t('docs.termuxAria')">
+                                            <code class="install-command"><span class="docs-command-prefix">{{ t('docs.termuxLabel') }}</span>{{ target.termuxCommand }}</code>
+                                            <button
+                                                type="button"
+                                                class="btn-mini docs-copy-btn"
+                                                @click="copyInstallCommand(target.termuxCommand)">{{ t('common.copy') }}</button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -106,23 +123,23 @@
                     <div class="selector-section docs-help-section">
                         <div class="selector-header docs-section-header">
                             <div>
-                                <span class="selector-title">常见问题</span>
-                                <div class="skills-panel-note docs-section-note">常见问题见下。</div>
+                                <span class="selector-title">{{ t('docs.section.faq') }}</span>
+                                <div class="skills-panel-note docs-section-note">{{ t('docs.section.faqNote') }}</div>
                             </div>
                         </div>
 
                         <div class="docs-help-grid">
                             <div class="docs-note-card">
-                                <div class="docs-note-title">排障提示</div>
+                                <div class="docs-note-title">{{ t('common.troubleshooting') }}</div>
                                 <ul class="install-help-list docs-help-list">
                                     <li v-for="tip in installTroubleshootingTips" :key="tip">{{ tip }}</li>
                                 </ul>
                             </div>
                             <div class="docs-note-card">
-                                <div class="docs-note-title">规则</div>
+                                <div class="docs-note-title">{{ t('common.rules') }}</div>
                                 <ul class="docs-static-list">
-                                    <li>命令按当前包管理器、镜像与操作生成。</li>
-                                    <li>自定义镜像仅用于安装与升级。</li>
+                                    <li>{{ t('docs.rule.1') }}</li>
+                                    <li>{{ t('docs.rule.2') }}</li>
                                 </ul>
                             </div>
                         </div>

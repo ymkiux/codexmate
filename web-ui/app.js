@@ -29,7 +29,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const app = createApp({
         data() {
             return {
-                mainTab: 'config',
+                lang: 'zh',
+                // 默认选中首个主标签：Docs
+                mainTab: 'docs',
                 configMode: 'codex',
                 currentProvider: '',
                 currentModel: '',
@@ -419,6 +421,15 @@ document.addEventListener('DOMContentLoaded', () => {
         },
 
         mounted() {
+            if (typeof this.initI18n === 'function') {
+                this.initI18n();
+            }
+            if (typeof this.t === 'function') {
+                this.confirmDialogConfirmText = this.t('confirm.ok');
+                this.confirmDialogCancelText = this.t('confirm.cancel');
+                this.agentsModalTitle = this.t('modal.agents.title');
+                this.agentsModalHint = this.t('modal.agents.hint');
+            }
             this.initSessionStandalone();
             this.updateCompactLayoutMode();
             if (!this.taskOrchestrationTabEnabled && this.mainTab === 'orchestration') {
