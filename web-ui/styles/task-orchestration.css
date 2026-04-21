@@ -69,6 +69,13 @@
     margin-top: 0;
 }
 
+.task-section-header .task-header-actions > .btn-tool + .btn-tool,
+.task-section-header .task-header-actions > .btn-tool-compact + .btn-tool,
+.task-section-header .task-header-actions > .btn-tool + .btn-tool-compact,
+.task-section-header .task-header-actions > .btn-tool-compact + .btn-tool-compact {
+    margin-top: 0;
+}
+
 .task-hero-meta-strip {
     display: flex;
     flex-wrap: wrap;
