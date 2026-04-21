@@ -62,10 +62,6 @@
     align-self: flex-start;
 }
 
-.task-hero-actions > .btn-tool-compact {
-    min-width: 108px;
-}
-
 .task-hero-actions > .btn-tool + .btn-tool,
 .task-hero-actions > .btn-tool-compact + .btn-tool,
 .task-hero-actions > .btn-tool + .btn-tool-compact,
@@ -471,11 +467,10 @@
 }
 
 .task-action-row > .btn-tool,
-.task-section-header .settings-tab-actions > .btn-tool-compact,
-.task-action-row-right > .btn-tool,
-.task-detail-toolbar > .btn-tool-compact {
-    min-height: 38px;
-    height: 38px;
+.task-action-row-right > .btn-tool {
+    width: auto;
+    min-height: 36px;
+    height: 36px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -483,7 +478,7 @@
 }
 
 .task-action-preview {
-    min-width: 110px;
+    min-width: 104px;
 }
 
 .task-action-row-right {
@@ -493,7 +488,7 @@
 }
 
 .task-action-row-right-prominent > .btn-tool {
-    min-width: 110px;
+    min-width: 104px;
 }
 
 .task-action-help-prominent,
