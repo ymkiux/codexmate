@@ -12,8 +12,8 @@
 
 ## 如何新建插件
 
-可以从模板开始：
-- `plugins/plugin-template/`
+可以从模板文档开始：
+- `plugins/PLUGIN_TEMPLATE.zh-CN.md`
 
 推荐目录结构：
 - `plugins/<plugin-id>/manifest.mjs` 导出 `pluginMeta`

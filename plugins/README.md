@@ -12,8 +12,8 @@ Example:
 
 ## Creating a new plugin
 
-Start from the scaffold:
-- `plugins/plugin-template/`
+Scaffold doc:
+- `plugins/PLUGIN_TEMPLATE.md`
 
 Recommended layout:
 - `plugins/<plugin-id>/manifest.mjs` exports `pluginMeta`
