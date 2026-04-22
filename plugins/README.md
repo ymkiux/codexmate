@@ -1,11 +1,11 @@
 ## Plugins
 
-该目录用于放置可复用的插件原型实现，便于参考与二次开发。
+This directory hosts reusable plugin prototypes, intended as reference implementations for building additional plugins.
 
-约定（建议）：
-- 每个插件一个子目录：`plugins/<plugin-id>/`
-- 插件目录内按职责拆分：`methods.mjs` / `computed.mjs` / `storage.mjs`
-- Web UI 侧保留薄封装（re-export）以兼容原有引用路径
+Suggested conventions:
+- One plugin per folder: `plugins/<plugin-id>/`
+- Split responsibilities inside the plugin folder: `methods.mjs` / `computed.mjs` / `storage.mjs`
+- Keep thin Web UI wrappers (re-exports) for compatibility with existing import paths
 
-示例：
-- `plugins/prompt-templates/`：Prompt Templates 插件（变量解析、渲染、存储、UI 交互方法）
+Example:
+- `plugins/prompt-templates/`: Prompt Templates plugin (variable extraction/rendering, storage, UI interaction helpers)
