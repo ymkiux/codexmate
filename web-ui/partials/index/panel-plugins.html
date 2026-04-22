@@ -102,10 +102,10 @@
                                                 <label v-for="(name, idx) in promptComposerActiveTemplate.vars" :key="'prompt-compose-var-' + name" class="prompt-var-row">
                                                     <span class="prompt-var-label mono">{{ name }}</span>
                                                     <template v-if="idx === 0">
-                                                        <input ref="promptComposerFirstField" class="form-input prompt-var-input" type="text" :value="promptComposerVarValues[name] || ''" @input="setPromptComposerVarValue(name, $event.target.value)" :placeholder="t('plugins.promptTemplates.vars.valuePlaceholder', { name })">
+                                                        <input ref="promptComposerFirstField" class="form-input prompt-var-input" type="text" :readonly="promptComposerActiveTemplate.isBuiltin" :value="promptComposerVarValues[name] || ''" @input="setPromptComposerVarValue(name, $event.target.value)" :placeholder="t('plugins.promptTemplates.vars.valuePlaceholder', { name })">
                                                     </template>
                                                     <template v-else>
-                                                        <input class="form-input prompt-var-input" type="text" :value="promptComposerVarValues[name] || ''" @input="setPromptComposerVarValue(name, $event.target.value)" :placeholder="t('plugins.promptTemplates.vars.valuePlaceholder', { name })">
+                                                        <input class="form-input prompt-var-input" type="text" :readonly="promptComposerActiveTemplate.isBuiltin" :value="promptComposerVarValues[name] || ''" @input="setPromptComposerVarValue(name, $event.target.value)" :placeholder="t('plugins.promptTemplates.vars.valuePlaceholder', { name })">
                                                     </template>
                                                 </label>
                                             </div>
@@ -206,7 +206,7 @@
                                                     <div v-else class="prompt-vars-grid">
                                                         <label v-for="name in promptTemplateVars" :key="'prompt-var-' + name" class="prompt-var-row">
                                                             <span class="prompt-var-label mono">{{ name }}</span>
-                                                            <input class="form-input prompt-var-input" type="text" :value="promptTemplateVarValues[name] || ''" @input="setPromptVariableValue(name, $event.target.value)" :placeholder="t('plugins.promptTemplates.vars.valuePlaceholder', { name })">
+                                                            <input class="form-input prompt-var-input" type="text" :readonly="promptTemplateDraft.isBuiltin" :value="promptTemplateVarValues[name] || ''" @input="setPromptVariableValue(name, $event.target.value)" :placeholder="t('plugins.promptTemplates.vars.valuePlaceholder', { name })">
                                                         </label>
                                                     </div>
                                                 </div>
