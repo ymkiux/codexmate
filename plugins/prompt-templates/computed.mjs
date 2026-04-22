@@ -96,14 +96,12 @@ function renderTemplate(templateText, values = {}) {
     });
 }
 
-import { pluginMeta as promptTemplatesMeta } from './manifest.mjs';
+import { pluginsRegistry } from '../registry.mjs';
 
 export function createPluginsComputed() {
     return {
         pluginsCatalog() {
-            return [
-                promptTemplatesMeta
-            ];
+            return pluginsRegistry.map((entry) => entry && entry.meta).filter(Boolean);
         },
 
         promptTemplatesList() {
