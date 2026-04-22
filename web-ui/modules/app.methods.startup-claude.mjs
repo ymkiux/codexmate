@@ -34,6 +34,18 @@ export function createStartupClaudeMethods(options = {}) {
                         startupOk = true;
                         this.currentProvider = statusRes.provider;
                         this.currentModel = statusRes.model;
+                        try {
+                            const installRes = await api('install-status');
+                            if (installRes && !installRes.error) {
+                                const targets = Array.isArray(installRes.targets) ? installRes.targets : null;
+                                if (targets) {
+                                    this.installStatusTargets = targets;
+                                }
+                                if (typeof installRes.packageManager === 'string' && typeof this.normalizeInstallPackageManager === 'function') {
+                                    this.installPackageManager = this.normalizeInstallPackageManager(installRes.packageManager);
+                                }
+                            }
+                        } catch (_) {}
                         {
                             const tier = typeof statusRes.serviceTier === 'string'
                                 ? statusRes.serviceTier.trim().toLowerCase()

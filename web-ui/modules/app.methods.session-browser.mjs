@@ -464,21 +464,40 @@ export function createSessionBrowserMethods(options = {}) {
 
         invalidateSessionsUsageData(options = {}) {
             this.sessionsUsageLoadedOnce = false;
+            this.sessionsUsageLoadedLimit = 0;
             this.sessionsUsageError = '';
             if (options.preserveList !== true) {
                 this.sessionsUsageList = [];
             }
         },
 
+        setSessionsUsageTimeRange(nextRange) {
+            const normalized = typeof nextRange === 'string' ? nextRange.trim().toLowerCase() : '';
+            const range = normalized === 'all' ? 'all' : (normalized === '30d' ? '30d' : '7d');
+            this.sessionsUsageTimeRange = range;
+            void this.loadSessionsUsage({ range });
+        },
+
         async loadSessionsUsage(options = {}) {
             if (this.sessionsUsageLoading) return;
+            const normalizedRange = typeof options.range === 'string'
+                ? options.range.trim().toLowerCase()
+                : (typeof this.sessionsUsageTimeRange === 'string' ? this.sessionsUsageTimeRange.trim().toLowerCase() : '');
+            const range = normalizedRange === 'all' ? 'all' : (normalizedRange === '30d' ? '30d' : '7d');
+            const defaultLimit = range === 'all' ? 2000 : (range === '30d' ? 1200 : 600);
+            const rawLimit = Number(options.limit);
+            const limit = Number.isFinite(rawLimit) ? Math.max(1, Math.min(rawLimit, 2000)) : defaultLimit;
+            const loadedLimit = Number(this.sessionsUsageLoadedLimit || 0);
+            if (this.sessionsUsageLoadedOnce && !options.forceRefresh && loadedLimit >= limit) {
+                return;
+            }
             this.sessionsUsageLoading = true;
             this.sessionsUsageError = '';
             let loadSucceeded = false;
             try {
                 const res = await api('list-sessions-usage', {
                     source: 'all',
-                    limit: 2000,
+                    limit,
                     forceRefresh: !!options.forceRefresh
                 });
                 if (res.error) {
@@ -495,6 +514,7 @@ export function createSessionBrowserMethods(options = {}) {
                 this.sessionsUsageLoading = false;
                 if (loadSucceeded) {
                     this.sessionsUsageLoadedOnce = true;
+                    this.sessionsUsageLoadedLimit = limit;
                 }
             }
         },

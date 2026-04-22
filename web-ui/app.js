@@ -161,6 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 sessionsUsageTimeRange: '7d',
                 sessionsUsageList: [],
                 sessionsUsageLoadedOnce: false,
+                sessionsUsageLoadedLimit: 0,
                 sessionsUsageLoading: false,
                 sessionsUsageError: '',
                 sessionsList: [],
@@ -429,6 +430,43 @@ document.addEventListener('DOMContentLoaded', () => {
                 this.confirmDialogCancelText = this.t('confirm.cancel');
                 this.agentsModalTitle = this.t('modal.agents.title');
                 this.agentsModalHint = this.t('modal.agents.hint');
+            }
+            {
+                const NAV_STATE_STORAGE_KEY = 'codexmateNavState.v1';
+                const mainTabSet = new Set(['config', 'sessions', 'usage', 'orchestration', 'market', 'plugins', 'docs', 'settings']);
+                let restored = null;
+                try {
+                    const raw = localStorage.getItem(NAV_STATE_STORAGE_KEY) || '';
+                    restored = raw ? JSON.parse(raw) : null;
+                } catch (_) {
+                    restored = null;
+                }
+                const nextMainTab = restored && typeof restored.mainTab === 'string'
+                    ? restored.mainTab.trim().toLowerCase()
+                    : '';
+                const nextConfigMode = restored && typeof restored.configMode === 'string'
+                    ? restored.configMode.trim().toLowerCase()
+                    : '';
+                if (nextConfigMode && typeof this.switchConfigMode === 'function') {
+                    this.__navStateRestoring = true;
+                    try {
+                        if (nextConfigMode === 'codex' || nextConfigMode === 'claude' || nextConfigMode === 'openclaw') {
+                            this.configMode = nextConfigMode;
+                        }
+                        if (nextMainTab && mainTabSet.has(nextMainTab) && nextMainTab !== this.mainTab) {
+                            this.switchMainTab(nextMainTab);
+                        }
+                    } finally {
+                        this.__navStateRestoring = false;
+                    }
+                } else if (nextMainTab && mainTabSet.has(nextMainTab) && nextMainTab !== this.mainTab) {
+                    this.__navStateRestoring = true;
+                    try {
+                        this.switchMainTab(nextMainTab);
+                    } finally {
+                        this.__navStateRestoring = false;
+                    }
+                }
             }
             this.initSessionStandalone();
             this.updateCompactLayoutMode();

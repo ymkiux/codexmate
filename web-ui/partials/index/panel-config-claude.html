@@ -5,6 +5,26 @@
                     id="panel-config-claude"
                     role="tabpanel"
                     :aria-labelledby="'tab-config-claude'">
+                <template v-if="shouldShowCliInstallPlaceholder('claude')">
+                    <div class="selector-section">
+                        <div class="empty-state">
+                            <div class="empty-state-title">{{ t('cli.missing.title', { name: 'Claude' }) }}</div>
+                            <div class="empty-state-subtitle">{{ t('cli.missing.subtitle', { name: 'Claude' }) }}</div>
+                            <div class="docs-command-row">
+                                <div class="docs-command-box" role="group" :aria-label="t('cli.missing.commandAria', { name: 'Claude' })">
+                                    <code class="install-command">{{ getInstallCommand('claude', 'install') }}</code>
+                                    <button
+                                        type="button"
+                                        class="btn-mini docs-copy-btn"
+                                        :disabled="!getInstallCommand('claude', 'install')"
+                                        @click="copyInstallCommand(getInstallCommand('claude', 'install'))">{{ t('common.copy') }}</button>
+                                </div>
+                            </div>
+                            <button type="button" class="btn-tool btn-tool-compact" @click="mainTab = 'docs'; setInstallCommandAction('install')">{{ t('cli.missing.openDocs') }}</button>
+                        </div>
+                    </div>
+                </template>
+                <template v-else>
                 <!-- 添加提供商按钮 -->
                 <button class="btn-add" @click="openClaudeConfigModal" v-if="!loading && !initError">
                     <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
@@ -135,4 +155,5 @@
                         </div>
                     </div>
                 </div>
+                </template>
             </div>

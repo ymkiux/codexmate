@@ -10,10 +10,10 @@
                             <span class="selector-title">{{ t('usage.overview') }}</span>
                         </div>
                         <div class="usage-range-group" role="group" :aria-label="t('usage.range.aria')">
-                            <button type="button" class="usage-range-btn" :class="{ active: sessionsUsageTimeRange === '7d' }" @click="sessionsUsageTimeRange = '7d'">{{ t('usage.range.7d') }}</button>
-                            <button type="button" class="usage-range-btn" :class="{ active: sessionsUsageTimeRange === '30d' }" @click="sessionsUsageTimeRange = '30d'">{{ t('usage.range.30d') }}</button>
-                            <button type="button" class="usage-range-btn" :class="{ active: sessionsUsageTimeRange === 'all' }" @click="sessionsUsageTimeRange = 'all'">{{ t('usage.range.all') }}</button>
-                            <button type="button" class="usage-range-btn" @click="loadSessionsUsage({ forceRefresh: true })" :disabled="sessionsUsageLoading">{{ sessionsUsageLoading ? t('usage.refreshing') : t('usage.refresh') }}</button>
+                            <button type="button" class="usage-range-btn" :class="{ active: sessionsUsageTimeRange === '7d' }" @click="setSessionsUsageTimeRange('7d')">{{ t('usage.range.7d') }}</button>
+                            <button type="button" class="usage-range-btn" :class="{ active: sessionsUsageTimeRange === '30d' }" @click="setSessionsUsageTimeRange('30d')">{{ t('usage.range.30d') }}</button>
+                            <button type="button" class="usage-range-btn" :class="{ active: sessionsUsageTimeRange === 'all' }" @click="setSessionsUsageTimeRange('all')">{{ t('usage.range.all') }}</button>
+                            <button type="button" class="usage-range-btn" @click="loadSessionsUsage({ forceRefresh: true, range: sessionsUsageTimeRange })" :disabled="sessionsUsageLoading">{{ sessionsUsageLoading ? t('usage.refreshing') : t('usage.refresh') }}</button>
                         </div>
                     </div>
 

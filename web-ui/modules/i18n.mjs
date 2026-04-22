@@ -58,6 +58,10 @@ const DICT = Object.freeze({
         'common.notExistsWillCreateOnApply': '不存在，将在应用时创建',
         'common.notExistsWillCreateOnSave': '不存在，将在保存时创建',
         'common.none': '暂无',
+        'cli.missing.title': '{name} CLI 未安装',
+        'cli.missing.subtitle': '请先安装 {name} CLI 后再继续使用此页面。',
+        'cli.missing.openDocs': '打开安装指南',
+        'cli.missing.commandAria': '{name} CLI 安装命令',
 
         // Brand
         'brand.kicker.workspace': '工作区',
@@ -937,6 +941,10 @@ const DICT = Object.freeze({
         'common.notExistsWillCreateOnApply': 'Not found. Will be created on apply.',
         'common.notExistsWillCreateOnSave': 'Not found. Will be created on save.',
         'common.none': 'None',
+        'cli.missing.title': '{name} CLI not installed',
+        'cli.missing.subtitle': 'Install {name} CLI before using this page.',
+        'cli.missing.openDocs': 'Open install guide',
+        'cli.missing.commandAria': '{name} CLI install command',
 
         // Brand
         'brand.kicker.workspace': 'Workspace',

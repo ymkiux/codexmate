@@ -54,14 +54,18 @@ function readGitProjectFile(ref, relativePath) {
 }
 
 function listGitTreeFiles(ref, relativePath) {
-    const output = execFileSync('git', ['ls-tree', '-r', '--name-only', '-z', ref, '--', relativePath], {
-        cwd: projectRoot,
-        encoding: 'utf8'
-    });
-    return output
-        .split('\0')
-        .map((item) => item.trim())
-        .filter(Boolean);
+    try {
+        const output = execFileSync('git', ['ls-tree', '-r', '--name-only', '-z', ref, '--', relativePath], {
+            cwd: projectRoot,
+            encoding: 'utf8'
+        });
+        return output
+            .split('\0')
+            .map((item) => item.trim())
+            .filter(Boolean);
+    } catch (_) {
+        return [];
+    }
 }
 
 function gitRefExists(ref) {
@@ -86,10 +90,13 @@ function resolveBehaviorParityBaselineRef() {
 
 function createGitWebUiFixture(ref) {
     const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'codexmate-head-web-ui-'));
-    const projectPaths = listGitTreeFiles(ref, WEB_UI_ROOT);
+    const projectPaths = [
+        ...listGitTreeFiles(ref, WEB_UI_ROOT),
+        ...listGitTreeFiles(ref, 'plugins')
+    ];
 
     for (const relativePath of projectPaths) {
-        const targetPath = path.join(fixtureRoot, relativePath.replace(/^web-ui[\\/]/, ''));
+        const targetPath = path.join(fixtureRoot, relativePath);
         fs.mkdirSync(path.dirname(targetPath), { recursive: true });
         fs.writeFileSync(targetPath, readGitProjectFile(ref, relativePath), 'utf8');
     }
@@ -263,7 +270,7 @@ export async function captureGitBundledAppOptions(ref) {
     const fixtureRoot = createGitWebUiFixture(ref);
     try {
         const scriptSource = sourceBundle.readExecutableBundledWebUiScript(
-            path.join(fixtureRoot, HEAD_WEB_UI_ENTRY.replace(/^web-ui[\\/]/, ''))
+            path.join(fixtureRoot, HEAD_WEB_UI_ENTRY)
         );
         return await captureAppOptionsFromScript(scriptSource, `git-${String(ref).replace(/[^\w.-]+/g, '-')}`);
     } finally {
