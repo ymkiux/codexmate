@@ -78,8 +78,8 @@
                                             </select>
 
                                             <div v-if="!promptComposerActiveTemplate" class="plugins-panel-note">{{ t('plugins.promptTemplates.compose.empty') }}</div>
-                                            <div v-else class="plugins-panel-note">{{ t('plugins.promptTemplates.compose.varsHint') }}</div>
-                                            <div class="prompt-compose-actions">
+                                            <div v-else-if="!promptComposerActiveTemplate.isBuiltin" class="plugins-panel-note">{{ t('plugins.promptTemplates.compose.varsHint') }}</div>
+                                            <div v-if="promptComposerActiveTemplate && !promptComposerActiveTemplate.isBuiltin" class="prompt-compose-actions">
                                                 <button
                                                     type="button"
                                                     class="btn-mini"
@@ -92,7 +92,7 @@
                                             <div class="prompt-vars-head">
                                                 <div>
                                                     <div class="prompt-vars-title">{{ t('plugins.promptTemplates.vars.title') }}</div>
-                                                    <div class="plugins-panel-note">{{ t('plugins.promptTemplates.compose.varsHint') }}</div>
+                                                    <div v-if="!promptComposerActiveTemplate.isBuiltin" class="plugins-panel-note">{{ t('plugins.promptTemplates.compose.varsHint') }}</div>
                                                 </div>
                                                 <div class="prompt-editor-actions">
                                                     <button type="button" class="btn-mini" @click="resetPromptComposerVarValues" :disabled="pluginsLoading">{{ t('plugins.promptTemplates.vars.reset') }}</button>
