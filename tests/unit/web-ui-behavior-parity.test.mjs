@@ -330,6 +330,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'openclawPendingAuthProfileUpdates',
         'sessionTrashEnabled',
         'shareCommandPrefix',
+        'sessionsUsageLoadedLimit',
         'taskOrchestrationTabEnabled',
         'taskOrchestration',
         '_taskOrchestrationPollTimer'
@@ -345,6 +346,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'sessionsUsageError',
         'sessionsUsageList',
         'sessionsUsageLoadedOnce',
+        'sessionsUsageLoadedLimit',
         'sessionsUsageLoading',
         'sessionsViewMode',
         'taskOrchestrationTabEnabled',
@@ -430,6 +432,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'isValidProviderNameInput',
         'isValidProviderUrlInput',
         'loadSessionsUsage',
+        'setSessionsUsageTimeRange',
         'onSessionListScroll',
         'normalizeSessionTrashEnabled',
         'normalizeShareCommandPrefix',
@@ -503,7 +506,10 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'usePromptTemplateInComposer',
         'resetPromptComposer',
         'setPromptComposerVarValue',
-        'copyPromptComposerRendered'
+        'copyPromptComposerRendered',
+        'getInstallStatusTarget',
+        'isInstallTargetInstalled',
+        'shouldShowCliInstallPlaceholder'
     );
     const allowedMissingCurrentMethodKeys = [
         'closeInstallModal',
@@ -684,8 +690,10 @@ test('loadAll keeps success transitions aligned with HEAD and stops after startu
         throw new Error(`Unexpected action: ${action}`);
     }, () => headMethods.loadAll.call(headSuccessContext));
 
+    const normalizeLoadAllCalls = (calls) => (Array.isArray(calls) ? calls.filter((item) => item && item.action !== 'install-status') : []);
+
     assert.deepStrictEqual({
-        calls: currentSuccess.calls,
+        calls: normalizeLoadAllCalls(currentSuccess.calls),
         snapshot: {
             loading: currentSuccessContext.loading,
             initError: currentSuccessContext.initError,
@@ -697,10 +705,10 @@ test('loadAll keeps success transitions aligned with HEAD and stops after startu
             modelAutoCompactTokenLimitInput: currentSuccessContext.modelAutoCompactTokenLimitInput,
             providersList: currentSuccessContext.providersList,
             messages: currentSuccessContext.messages,
-            calls: currentSuccessContext.calls
+            calls: normalizeLoadAllCalls(currentSuccessContext.calls)
         }
     }, {
-        calls: headSuccess.calls,
+        calls: normalizeLoadAllCalls(headSuccess.calls),
         snapshot: {
             loading: headSuccessContext.loading,
             initError: headSuccessContext.initError,
@@ -712,7 +720,7 @@ test('loadAll keeps success transitions aligned with HEAD and stops after startu
             modelAutoCompactTokenLimitInput: headSuccessContext.modelAutoCompactTokenLimitInput,
             providersList: headSuccessContext.providersList,
             messages: headSuccessContext.messages,
-            calls: headSuccessContext.calls
+            calls: normalizeLoadAllCalls(headSuccessContext.calls)
         }
     });
 

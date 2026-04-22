@@ -4,6 +4,46 @@ export function createNavigationMethods(options = {}) {
         switchMainTabHelper,
         loadMoreSessionMessagesHelper
     } = options;
+    const NAV_STATE_STORAGE_KEY = 'codexmateNavState.v1';
+    const MAIN_TAB_SET = new Set([
+        'config',
+        'sessions',
+        'usage',
+        'orchestration',
+        'market',
+        'plugins',
+        'docs',
+        'settings'
+    ]);
+    const readNavState = () => {
+        if (typeof localStorage === 'undefined') return null;
+        let raw = '';
+        try {
+            raw = localStorage.getItem(NAV_STATE_STORAGE_KEY) || '';
+        } catch (_) {
+            raw = '';
+        }
+        if (!raw) return null;
+        try {
+            const parsed = JSON.parse(raw);
+            return parsed && typeof parsed === 'object' ? parsed : null;
+        } catch (_) {
+            return null;
+        }
+    };
+    const persistNavState = (vm) => {
+        if (!vm || vm.__navStateRestoring) return;
+        if (typeof localStorage === 'undefined') return;
+        const mainTab = typeof vm.mainTab === 'string' ? vm.mainTab.trim().toLowerCase() : '';
+        const configMode = typeof vm.configMode === 'string' ? vm.configMode.trim().toLowerCase() : '';
+        const snapshot = {
+            mainTab: MAIN_TAB_SET.has(mainTab) ? mainTab : 'docs',
+            configMode: configModeSet && configModeSet.has(configMode) ? configMode : 'codex'
+        };
+        try {
+            localStorage.setItem(NAV_STATE_STORAGE_KEY, JSON.stringify(snapshot));
+        } catch (_) {}
+    };
 
     return {
         switchConfigMode(mode) {
@@ -34,6 +74,7 @@ export function createNavigationMethods(options = {}) {
                 this.scheduleAfterFrame(() => {
                     this.clearMainTabSwitchIntent('config');
                 });
+                persistNavState(this);
                 return;
             }
             this.switchMainTab('config');
@@ -324,6 +365,7 @@ export function createNavigationMethods(options = {}) {
                 switchState.ticket += 1;
                 switchState.pendingTarget = '';
                 const result = switchMainTabHelper.call(this, targetTab);
+                persistNavState(this);
                 this.scheduleAfterFrame(() => {
                     this.clearMainTabSwitchIntent(normalizedTab);
                 });
@@ -338,6 +380,7 @@ export function createNavigationMethods(options = {}) {
                 const pendingTarget = liveState.pendingTarget || targetTab;
                 liveState.pendingTarget = '';
                 switchMainTabHelper.call(this, pendingTarget);
+                persistNavState(this);
                 this.clearMainTabSwitchIntent(normalizedTab);
             });
         },

@@ -156,6 +156,22 @@ export function createInstallMethods() {
 
         setInstallRegistryPreset(presetName) {
             this.installRegistryPreset = this.normalizeInstallRegistryPreset(presetName);
+        },
+
+        getInstallStatusTarget(targetId) {
+            const key = typeof targetId === 'string' ? targetId.trim() : '';
+            if (!key) return null;
+            const list = Array.isArray(this.installStatusTargets) ? this.installStatusTargets : [];
+            return list.find((item) => item && item.id === key) || null;
+        },
+
+        isInstallTargetInstalled(targetId) {
+            const target = this.getInstallStatusTarget(targetId);
+            return !!(target && target.installed === true);
+        },
+
+        shouldShowCliInstallPlaceholder(targetId) {
+            return Array.isArray(this.installStatusTargets) && !this.isInstallTargetInstalled(targetId);
         }
     };
 }

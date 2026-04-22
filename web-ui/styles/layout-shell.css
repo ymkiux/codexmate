@@ -210,11 +210,17 @@ body::after {
     z-index: 2;
     margin-top: auto;
     padding: 12px 10px;
-    background: linear-gradient(180deg, rgba(255, 253, 252, 0.45) 0%, rgba(255, 253, 252, 0.95) 48%, rgba(255, 253, 252, 1) 100%);
+    background: transparent;
     border-top: 1px solid var(--color-border);
-    backdrop-filter: blur(10px);
+    backdrop-filter: none;
     display: flex;
     justify-content: center;
+}
+
+.side-rail-lang .lang-choice {
+    background: rgba(255, 253, 252, 0.9);
+    box-shadow: none;
+    backdrop-filter: none;
 }
 
 .lang-switch {

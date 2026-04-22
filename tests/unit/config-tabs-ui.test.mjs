@@ -284,7 +284,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(usagePanel, /sessionsUsageTimeRange === 'all'/);
     assert.match(usagePanel, />\{\{\s*t\('usage\.range\.all'\)\s*\}\}<\/button>/);
     assert.match(usagePanel, /sessionsUsageList\.length/);
-    assert.match(usagePanel, /loadSessionsUsage\(\{ forceRefresh: true \}\)/);
+    assert.match(usagePanel, /loadSessionsUsage\(\{ forceRefresh: true, range: sessionsUsageTimeRange \}\)/);
     assert.match(usagePanel, /sessionUsageSummaryCards/);
     assert.match(usagePanel, /class="usage-summary-value" :title="card\.title \|\| null"/);
     assert.match(usagePanel, /v-if="card\.note" class="usage-summary-note"/);

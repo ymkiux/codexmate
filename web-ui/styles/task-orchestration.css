@@ -87,6 +87,13 @@
     margin-top: 0;
 }
 
+.task-detail-toolbar > .btn-tool + .btn-tool,
+.task-detail-toolbar > .btn-tool-compact + .btn-tool,
+.task-detail-toolbar > .btn-tool + .btn-tool-compact,
+.task-detail-toolbar > .btn-tool-compact + .btn-tool-compact {
+    margin-top: 0;
+}
+
 .task-hero-meta-strip {
     display: flex;
     flex-wrap: wrap;

@@ -88,6 +88,29 @@
                                             </div>
                                         </div>
 
+                                        <div v-if="promptComposerActiveTemplate && promptComposerActiveTemplate.vars && promptComposerActiveTemplate.vars.length" class="prompt-vars-block">
+                                            <div class="prompt-vars-head">
+                                                <div>
+                                                    <div class="prompt-vars-title">{{ t('plugins.promptTemplates.vars.title') }}</div>
+                                                    <div class="plugins-panel-note">{{ t('plugins.promptTemplates.compose.varsHint') }}</div>
+                                                </div>
+                                                <div class="prompt-editor-actions">
+                                                    <button type="button" class="btn-mini" @click="resetPromptComposerVarValues" :disabled="pluginsLoading">{{ t('plugins.promptTemplates.vars.reset') }}</button>
+                                                </div>
+                                            </div>
+                                            <div class="prompt-vars-grid">
+                                                <label v-for="(name, idx) in promptComposerActiveTemplate.vars" :key="'prompt-compose-var-' + name" class="prompt-var-row">
+                                                    <span class="prompt-var-label mono">{{ name }}</span>
+                                                    <template v-if="idx === 0">
+                                                        <input ref="promptComposerFirstField" class="form-input prompt-var-input" type="text" :value="promptComposerVarValues[name] || ''" @input="setPromptComposerVarValue(name, $event.target.value)" :placeholder="t('plugins.promptTemplates.vars.valuePlaceholder', { name })">
+                                                    </template>
+                                                    <template v-else>
+                                                        <input class="form-input prompt-var-input" type="text" :value="promptComposerVarValues[name] || ''" @input="setPromptComposerVarValue(name, $event.target.value)" :placeholder="t('plugins.promptTemplates.vars.valuePlaceholder', { name })">
+                                                    </template>
+                                                </label>
+                                            </div>
+                                        </div>
+
                                         <div class="prompt-preview-block prompt-compose-preview">
                                             <div class="prompt-vars-head">
                                                 <div>
@@ -183,7 +206,7 @@
                                                     <div v-else class="prompt-vars-grid">
                                                         <label v-for="name in promptTemplateVars" :key="'prompt-var-' + name" class="prompt-var-row">
                                                             <span class="prompt-var-label mono">{{ name }}</span>
-                                                            <input class="form-input prompt-var-input" type="text" :disabled="promptTemplateDraft.isBuiltin" :value="promptTemplateVarValues[name] || ''" @input="setPromptVariableValue(name, $event.target.value)" :placeholder="t('plugins.promptTemplates.vars.valuePlaceholder', { name })">
+                                                            <input class="form-input prompt-var-input" type="text" :value="promptTemplateVarValues[name] || ''" @input="setPromptVariableValue(name, $event.target.value)" :placeholder="t('plugins.promptTemplates.vars.valuePlaceholder', { name })">
                                                         </label>
                                                     </div>
                                                 </div>
