@@ -73,7 +73,7 @@ body::after {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    padding: 14px 10px;
+    padding: 6px;
 }
 
 .side-section + .side-section {
