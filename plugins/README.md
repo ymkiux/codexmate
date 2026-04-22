@@ -9,3 +9,15 @@ Suggested conventions:
 
 Example:
 - `plugins/prompt-templates/`: Prompt Templates plugin (variable extraction/rendering, storage, UI interaction helpers)
+
+## Creating a new plugin
+
+Start from the scaffold:
+- `plugins/plugin-template/`
+
+Recommended layout:
+- `plugins/<plugin-id>/manifest.mjs` exports `pluginMeta`
+- `plugins/<plugin-id>/methods.mjs` exports `createPluginMethods`
+- `plugins/<plugin-id>/computed.mjs` exports `createPluginComputed`
+- `plugins/<plugin-id>/storage.mjs` exports storage helpers
+- `plugins/<plugin-id>/index.mjs` re-exports everything

@@ -9,3 +9,15 @@
 
 示例：
 - `plugins/prompt-templates/`：Prompt Templates 插件（变量解析、渲染、存储、UI 交互方法）
+
+## 如何新建插件
+
+可以从模板开始：
+- `plugins/plugin-template/`
+
+推荐目录结构：
+- `plugins/<plugin-id>/manifest.mjs` 导出 `pluginMeta`
+- `plugins/<plugin-id>/methods.mjs` 导出 `createPluginMethods`
+- `plugins/<plugin-id>/computed.mjs` 导出 `createPluginComputed`
+- `plugins/<plugin-id>/storage.mjs` 导出存储相关 helper
+- `plugins/<plugin-id>/index.mjs` 统一入口 re-export

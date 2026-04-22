@@ -96,17 +96,13 @@ function renderTemplate(templateText, values = {}) {
     });
 }
 
+import { pluginMeta as promptTemplatesMeta } from './manifest.mjs';
+
 export function createPluginsComputed() {
     return {
         pluginsCatalog() {
             return [
-                {
-                    id: 'prompt-templates',
-                    title: 'Prompt Templates',
-                    description: 'Standardized, template-driven prompts with variables and copy/export helpers.',
-                    statusLabel: 'standard',
-                    tone: 'configured'
-                }
+                promptTemplatesMeta
             ];
         },
 
