@@ -208,6 +208,16 @@ export function createPluginsComputed() {
                     || item.vars.some((v) => v.toLowerCase().includes(keyword))
                 );
             });
+        },
+
+        promptComposerMissingVars() {
+            const tpl = this.promptComposerActiveTemplate;
+            if (!tpl || !Array.isArray(tpl.vars) || tpl.vars.length === 0) return [];
+            const values = this.promptComposerVarValues;
+            return tpl.vars.filter((name) => {
+                const raw = values && Object.prototype.hasOwnProperty.call(values, name) ? values[name] : '';
+                return !String(raw || '').trim();
+            });
         }
     };
 }

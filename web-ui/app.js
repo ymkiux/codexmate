@@ -69,6 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Plugins
                 pluginsActiveId: 'prompt-templates',
                 pluginsLoading: false,
+                pluginsError: '',
                 promptTemplatesListRaw: [],
                 promptTemplatesLoadedOnce: false,
                 promptTemplatesKeyword: '',
@@ -447,22 +448,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 const nextConfigMode = restored && typeof restored.configMode === 'string'
                     ? restored.configMode.trim().toLowerCase()
                     : '';
+                let urlMainTab = '';
+                try {
+                    const url = new URL(window.location.href);
+                    if (url.pathname !== '/session') {
+                        urlMainTab = String(url.searchParams.get('tab') || '').trim().toLowerCase();
+                    }
+                } catch (_) {
+                    urlMainTab = '';
+                }
+                const resolvedMainTab = urlMainTab && mainTabSet.has(urlMainTab)
+                    ? urlMainTab
+                    : nextMainTab;
                 if (nextConfigMode && typeof this.switchConfigMode === 'function') {
                     this.__navStateRestoring = true;
                     try {
                         if (nextConfigMode === 'codex' || nextConfigMode === 'claude' || nextConfigMode === 'openclaw') {
                             this.configMode = nextConfigMode;
                         }
-                        if (nextMainTab && mainTabSet.has(nextMainTab) && nextMainTab !== this.mainTab) {
-                            this.switchMainTab(nextMainTab);
+                        if (resolvedMainTab && mainTabSet.has(resolvedMainTab) && resolvedMainTab !== this.mainTab) {
+                            this.switchMainTab(resolvedMainTab);
                         }
                     } finally {
                         this.__navStateRestoring = false;
                     }
-                } else if (nextMainTab && mainTabSet.has(nextMainTab) && nextMainTab !== this.mainTab) {
+                } else if (resolvedMainTab && mainTabSet.has(resolvedMainTab) && resolvedMainTab !== this.mainTab) {
                     this.__navStateRestoring = true;
                     try {
-                        this.switchMainTab(nextMainTab);
+                        this.switchMainTab(resolvedMainTab);
                     } finally {
                         this.__navStateRestoring = false;
                     }

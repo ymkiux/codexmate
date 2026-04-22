@@ -502,6 +502,11 @@
     min-width: 0;
 }
 
+.prompt-var-input.is-missing {
+    border-color: var(--color-error);
+    box-shadow: 0 0 0 1px rgba(196, 69, 54, 0.18);
+}
+
 @media (max-width: 980px) {
     .plugins-layout {
         grid-template-columns: 1fr;

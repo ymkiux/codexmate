@@ -6,6 +6,54 @@ import {
     getPluginEntry
 } from '../registry.mjs';
 
+const COMPOSER_VALUES_STORAGE_KEY = 'codexmate.plugins.promptTemplates.composerValues.v1';
+
+function readComposerValuesFromStorage(storage = localStorage) {
+    if (!storage) return {};
+    let raw = '';
+    try {
+        raw = storage.getItem(COMPOSER_VALUES_STORAGE_KEY) || '';
+    } catch (_) {
+        raw = '';
+    }
+    if (!raw) return {};
+    try {
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+        return parsed;
+    } catch (_) {
+        return {};
+    }
+}
+
+function persistComposerValuesToStorage(map, storage = localStorage) {
+    if (!storage) return false;
+    try {
+        storage.setItem(COMPOSER_VALUES_STORAGE_KEY, JSON.stringify(map && typeof map === 'object' && !Array.isArray(map) ? map : {}));
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+function readComposerValuesForTemplate(templateId) {
+    const id = typeof templateId === 'string' ? templateId.trim() : '';
+    if (!id) return {};
+    const map = readComposerValuesFromStorage(localStorage);
+    const values = map && typeof map === 'object' ? map[id] : null;
+    return values && typeof values === 'object' && !Array.isArray(values) ? values : {};
+}
+
+function persistComposerValuesForTemplate(templateId, values) {
+    const id = typeof templateId === 'string' ? templateId.trim() : '';
+    if (!id) return false;
+    const map = readComposerValuesFromStorage(localStorage);
+    const next = map && typeof map === 'object' && !Array.isArray(map) ? { ...map } : {};
+    const payload = values && typeof values === 'object' && !Array.isArray(values) ? values : {};
+    next[id] = payload;
+    return persistComposerValuesToStorage(next, localStorage);
+}
+
 function createId(prefix = 'tpl') {
     const rand = Math.random().toString(16).slice(2, 10);
     return `${prefix}_${Date.now().toString(16)}_${rand}`;
@@ -32,6 +80,7 @@ export function createPluginsMethods() {
     return {
         resetPromptComposerVarValues() {
             this.promptComposerVarValuesRaw = {};
+            persistComposerValuesForTemplate(this.promptComposerSelectedTemplateId, {});
             if (typeof this.$nextTick === 'function') {
                 this.$nextTick(() => {
                     const first = this.$refs && this.$refs.promptComposerFirstField
@@ -42,12 +91,30 @@ export function createPluginsMethods() {
             }
         },
 
+        focusPromptComposerFirstMissingVar() {
+            const run = () => {
+                const input = document.querySelector('#panel-plugins .prompt-var-input.is-missing');
+                if (!input || typeof input.focus !== 'function') return;
+                try {
+                    if (typeof input.scrollIntoView === 'function') {
+                        input.scrollIntoView({ block: 'center', inline: 'nearest' });
+                    }
+                } catch (_) {}
+                input.focus();
+            };
+            if (typeof this.$nextTick === 'function') {
+                this.$nextTick(run);
+                return;
+            }
+            run();
+        },
+
         selectPromptComposerTemplate(id) {
             const next = typeof id === 'string' ? id.trim() : '';
             if (!next) return;
             if (next === this.promptComposerSelectedTemplateId) return;
             this.promptComposerSelectedTemplateId = next;
-            this.promptComposerVarValuesRaw = {};
+            this.promptComposerVarValuesRaw = readComposerValuesForTemplate(next);
             if (typeof this.$nextTick === 'function') {
                 this.$nextTick(() => {
                     const first = this.$refs && this.$refs.promptComposerFirstField
@@ -149,7 +216,7 @@ export function createPluginsMethods() {
             const next = typeof id === 'string' ? id.trim() : '';
             if (!next) return;
             this.promptComposerSelectedTemplateId = next;
-            this.promptComposerVarValuesRaw = {};
+            this.promptComposerVarValuesRaw = readComposerValuesForTemplate(next);
             this.promptComposerCommand = '';
             this.promptComposerPickerVisible = false;
             this.promptTemplatesMode = 'compose';
@@ -180,6 +247,7 @@ export function createPluginsMethods() {
             const next = { ...current };
             next[key] = value == null ? '' : String(value);
             this.promptComposerVarValuesRaw = next;
+            persistComposerValuesForTemplate(this.promptComposerSelectedTemplateId, next);
         },
 
         async copyPromptComposerRendered() {
@@ -216,6 +284,7 @@ export function createPluginsMethods() {
             if (this.pluginsLoading) return false;
 
             this.pluginsLoading = true;
+            this.pluginsError = '';
             try {
                 const fallbackId = getFirstPluginId();
                 const currentId = typeof this.pluginsActiveId === 'string' ? this.pluginsActiveId.trim() : '';
@@ -228,6 +297,7 @@ export function createPluginsMethods() {
                 if (!entry || typeof entry.loadOverview !== 'function') return true;
                 return await entry.loadOverview(this, { silent, forceRefresh });
             } catch (e) {
+                this.pluginsError = e && e.message ? String(e.message) : 'Failed to load plugins';
                 if (!silent) {
                     this.showMessage(typeof this.t === 'function' ? this.t('toast.plugins.loadFail') : 'Failed to load plugins', 'error');
                 }
