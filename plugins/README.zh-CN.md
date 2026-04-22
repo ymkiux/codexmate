@@ -12,6 +12,9 @@
 
 ## 如何新建插件
 
-可以从模板文档开始：
-- `plugins/PLUGIN_TEMPLATE.zh-CN.md`（中文）
-- `plugins/PLUGIN_TEMPLATE.md`（English）
+推荐目录结构：
+- `plugins/<plugin-id>/manifest.mjs` 导出 `pluginMeta`
+- `plugins/<plugin-id>/methods.mjs` 导出 methods 工厂
+- `plugins/<plugin-id>/computed.mjs` 导出 computed 工厂
+- `plugins/<plugin-id>/storage.mjs` 导出存储相关 helper
+- `plugins/<plugin-id>/index.mjs` 统一入口 re-export

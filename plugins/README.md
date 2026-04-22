@@ -12,6 +12,9 @@ Example:
 
 ## Creating a new plugin
 
-Scaffold docs:
-- `plugins/PLUGIN_TEMPLATE.md` (English)
-- `plugins/PLUGIN_TEMPLATE.zh-CN.md` (中文)
+Recommended layout:
+- `plugins/<plugin-id>/manifest.mjs` exports `pluginMeta`
+- `plugins/<plugin-id>/methods.mjs` exports method factories
+- `plugins/<plugin-id>/computed.mjs` exports computed factories
+- `plugins/<plugin-id>/storage.mjs` exports persistence helpers
+- `plugins/<plugin-id>/index.mjs` re-exports everything as a single entry
