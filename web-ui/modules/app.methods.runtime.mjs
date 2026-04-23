@@ -66,6 +66,8 @@ export function createRuntimeMethods(options = {}) {
         async runClaudeSpeedTest(name, config) {
             if (!name || this.claudeSpeedLoading[name]) return null;
             const baseUrl = config && typeof config.baseUrl === 'string' ? config.baseUrl.trim() : '';
+            const apiKey = config && typeof config.apiKey === 'string' ? config.apiKey.trim() : '';
+            const model = config && typeof config.model === 'string' ? config.model.trim() : '';
             this.claudeSpeedLoading[name] = true;
             try {
                 if (!baseUrl) {
@@ -73,7 +75,22 @@ export function createRuntimeMethods(options = {}) {
                     this.claudeSpeedResults[name] = res;
                     return res;
                 }
-                const res = await api('speed-test', { url: baseUrl });
+                if (!apiKey) {
+                    const res = { ok: false, error: 'Missing API key' };
+                    this.claudeSpeedResults[name] = res;
+                    return res;
+                }
+                if (!model) {
+                    const res = { ok: false, error: 'Missing model' };
+                    this.claudeSpeedResults[name] = res;
+                    return res;
+                }
+                const res = await api('speed-test', {
+                    kind: 'claude',
+                    url: baseUrl,
+                    apiKey,
+                    model
+                });
                 if (res.error) {
                     this.claudeSpeedResults[name] = { ok: false, error: res.error };
                     return { ok: false, error: res.error };

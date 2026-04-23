@@ -61,3 +61,45 @@ test('probeJsonPost retries with family=4 after a retryable network timeout', as
         https.request = originalRequest;
     }
 });
+
+test('probeJsonPost supports custom api key header and merges extra headers', async () => {
+    const originalRequest = https.request;
+    const seenHeaders = [];
+
+    try {
+        https.request = (_parsed, options, callback) => {
+            seenHeaders.push(options.headers || {});
+            const req = new EventEmitter();
+            req.setTimeout = () => {};
+            req.write = () => {};
+            req.end = () => {
+                const res = new EventEmitter();
+                res.statusCode = 200;
+                callback(res);
+                process.nextTick(() => {
+                    res.emit('data', Buffer.from('{"ok":true}'));
+                    res.emit('end');
+                });
+            };
+            return req;
+        };
+
+        const result = await probeJsonPost('https://example.com/v1/messages', { ping: true }, {
+            apiKey: 'sk-demo',
+            apiKeyHeader: 'x-api-key',
+            headers: {
+                'anthropic-version': '2023-06-01'
+            },
+            timeoutMs: 1000,
+            maxBytes: 1024
+        });
+
+        assert.strictEqual(result.ok, true);
+        assert.strictEqual(seenHeaders.length, 1);
+        assert.strictEqual(seenHeaders[0]['x-api-key'], 'sk-demo');
+        assert.strictEqual(seenHeaders[0]['anthropic-version'], '2023-06-01');
+        assert.strictEqual(seenHeaders[0].Authorization, undefined);
+    } finally {
+        https.request = originalRequest;
+    }
+});

@@ -6003,6 +6003,62 @@ function importConfigData(payload, options = {}) {
 function resolveSpeedTestTarget(params) {
     if (!params) return { error: 'Missing params' };
 
+    if (typeof params.kind === 'string' && params.kind.trim() === 'claude') {
+        const baseUrl = typeof params.url === 'string' ? params.url.trim() : '';
+        const apiKey = typeof params.apiKey === 'string' ? params.apiKey.trim() : '';
+        const model = typeof params.model === 'string' ? params.model.trim() : '';
+        if (!baseUrl) {
+            return { error: 'Missing url' };
+        }
+        if (!apiKey) {
+            return { error: 'Missing apiKey' };
+        }
+        if (!model) {
+            return { error: 'Missing model' };
+        }
+        const normalizedBase = baseUrl.replace(/\/+$/, '');
+        const candidates = [];
+        if (normalizedBase.endsWith('/v1')) {
+            candidates.push({
+                method: 'POST',
+                url: `${normalizedBase}/messages`,
+                body: {
+                    model,
+                    max_tokens: 16,
+                    messages: [{ role: 'user', content: 'ping' }]
+                }
+            });
+        } else {
+            candidates.push({
+                method: 'POST',
+                url: `${normalizedBase}/v1/messages`,
+                body: {
+                    model,
+                    max_tokens: 16,
+                    messages: [{ role: 'user', content: 'ping' }]
+                }
+            });
+            candidates.push({
+                method: 'POST',
+                url: `${normalizedBase}/messages`,
+                body: {
+                    model,
+                    max_tokens: 16,
+                    messages: [{ role: 'user', content: 'ping' }]
+                }
+            });
+        }
+        return {
+            kind: 'claude',
+            candidates,
+            apiKey,
+            apiKeyHeader: 'x-api-key',
+            headers: {
+                'anthropic-version': '2023-06-01'
+            }
+        };
+    }
+
     if (params.name) {
         const { config } = readConfigOrVirtualDefault();
         const providers = config.model_providers || {};
@@ -6198,6 +6254,8 @@ function runSpeedTest(targetUrl, apiKey, options = {}) {
     if (method === 'POST') {
         return probeJsonPost(targetUrl, options.body || {}, {
             apiKey,
+            apiKeyHeader: typeof options.apiKeyHeader === 'string' ? options.apiKeyHeader : '',
+            headers: options.headers && typeof options.headers === 'object' ? options.headers : null,
             timeoutMs,
             maxBytes: 256 * 1024
         }).then((result) => ({
@@ -6209,6 +6267,8 @@ function runSpeedTest(targetUrl, apiKey, options = {}) {
     }
     return probeUrl(targetUrl, {
         apiKey,
+        apiKeyHeader: typeof options.apiKeyHeader === 'string' ? options.apiKeyHeader : '',
+        headers: options.headers && typeof options.headers === 'object' ? options.headers : null,
         timeoutMs,
         maxBytes: 256 * 1024
     }).then((result) => ({
@@ -8444,6 +8504,33 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             const target = resolveSpeedTestTarget(params);
                             if (target.error) {
                                 result = { error: target.error };
+                                break;
+                            }
+                            if (target.kind === 'claude' && Array.isArray(target.candidates) && target.candidates.length > 0) {
+                                let finalCandidate = target.candidates[0];
+                                let finalResult = null;
+                                for (let index = 0; index < target.candidates.length; index += 1) {
+                                    const candidate = target.candidates[index];
+                                    const probeResult = await runSpeedTest(candidate.url, target.apiKey, {
+                                        ...candidate,
+                                        apiKeyHeader: target.apiKeyHeader,
+                                        headers: target.headers
+                                    });
+                                    finalCandidate = candidate;
+                                    finalResult = probeResult;
+                                    const shouldTryNext = index < target.candidates.length - 1
+                                        && (!probeResult.ok || probeResult.status === 404);
+                                    if (!shouldTryNext) {
+                                        break;
+                                    }
+                                }
+                                result = {
+                                    ok: !!(finalResult && finalResult.ok),
+                                    status: Number.isFinite(finalResult && finalResult.status) ? finalResult.status : 0,
+                                    durationMs: Number.isFinite(finalResult && finalResult.durationMs) ? finalResult.durationMs : 0,
+                                    error: finalResult && finalResult.ok ? '' : (finalResult && finalResult.error ? finalResult.error : ''),
+                                    url: finalCandidate && finalCandidate.url ? finalCandidate.url : ''
+                                };
                                 break;
                             }
                             result = await runSpeedTest(target.url, target.apiKey, target);
