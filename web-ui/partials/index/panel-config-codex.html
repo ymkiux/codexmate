@@ -163,6 +163,22 @@
                     </button>
                 </div>
 
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">{{ t('config.health.title') }}</span>
+                    </div>
+                    <button class="btn-tool" @click="runHealthCheck" :disabled="healthCheckLoading || loading || !!initError">
+                        {{ healthCheckLoading ? t('config.health.running') : t('config.health.run') }}
+                    </button>
+                    <div class="config-template-hint">{{ t('config.health.hint') }}</div>
+                    <div v-if="healthCheckResult" class="config-template-hint">
+                        {{ healthCheckResult.ok ? t('config.health.ok') : t('config.health.fail') }} · {{ t('config.health.issues', { count: (healthCheckResult.issues || []).length }) }}
+                    </div>
+                    <div v-if="healthCheckResult && (healthCheckResult.issues || []).length" class="config-template-hint">
+                        {{ (healthCheckResult.issues || [])[0].message }}
+                    </div>
+                </div>
+
                 </template>
 
                 <div v-if="!loading && !initError" class="card-list">

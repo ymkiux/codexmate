@@ -324,6 +324,10 @@ test('config template keeps expected config tabs in top and side navigation', ()
     );
     assert.match(
         html,
+        /<button class="btn-tool" @click="runHealthCheck" :disabled="healthCheckLoading \|\| loading \|\| !!initError">/
+    );
+    assert.match(
+        html,
         /<button[\s\S]*class="card-action-btn"[\s\S]*@click="runSpeedTest\(provider\.name, \{ silent: true \}\)"[\s\S]*:aria-label="t\('config\.availabilityTestAria', \{ name: provider\.name \}\)"[\s\S]*:title="t\('config\.availabilityTest'\)"/
     );
     assert.match(html, /<button[\s\S]*?@click="openEditModal\(provider\)"[\s\S]*?:aria-label="`Edit provider \$\{provider\.name\}`"[\s\S]*?:title="shouldShowProviderEdit\(provider\) \? '编辑' : '不可编辑'">/);
