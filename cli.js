@@ -45,7 +45,6 @@ const {
     buildApiProbeUrlCandidates,
     buildModelProbeSpec,
     buildModelProbeSpecs,
-    buildModelConversationSpecs,
     extractModelResponseText,
     normalizeWireApi,
     getSupplementalModelsForBaseUrl,
@@ -6109,155 +6108,6 @@ function resolveSpeedTestTarget(params) {
     return { error: 'Missing name or url' };
 }
 
-function extractApiPayloadErrorMessage(payload) {
-    if (!payload || typeof payload !== 'object') {
-        return '';
-    }
-    if (typeof payload.error === 'string' && payload.error.trim()) {
-        return payload.error.trim();
-    }
-    if (!payload.error || typeof payload.error !== 'object') {
-        return '';
-    }
-    if (typeof payload.error.message === 'string' && payload.error.message.trim()) {
-        return payload.error.message.trim();
-    }
-    if (typeof payload.error.code === 'string' && payload.error.code.trim()) {
-        return payload.error.code.trim();
-    }
-    return '';
-}
-
-function resolveProviderChatTarget(params) {
-    const providerName = typeof (params && params.name) === 'string' ? params.name.trim() : '';
-    const prompt = typeof (params && params.prompt) === 'string' ? params.prompt.trim() : '';
-    if (!providerName) {
-        return { error: 'Provider name is required' };
-    }
-    if (!prompt) {
-        return { error: 'Prompt is required' };
-    }
-
-    const { config } = readConfigOrVirtualDefault();
-    const providers = config.model_providers || {};
-    const provider = providers[providerName];
-    if (!provider || typeof provider !== 'object') {
-        return { error: `Provider not found: ${providerName}` };
-    }
-
-    const baseUrl = typeof provider.base_url === 'string' ? provider.base_url.trim() : '';
-    if (!baseUrl) {
-        return { error: `Provider ${providerName} missing URL` };
-    }
-
-    const currentModels = readCurrentModels();
-    const savedModel = currentModels && typeof currentModels[providerName] === 'string'
-        ? currentModels[providerName].trim()
-        : '';
-    const activeProvider = typeof config.model_provider === 'string' ? config.model_provider.trim() : '';
-    const activeModel = typeof config.model === 'string' ? config.model.trim() : '';
-    const model = savedModel || (activeProvider === providerName ? activeModel : '');
-    if (!model) {
-        return { error: `Provider ${providerName} missing current model` };
-    }
-
-    const specs = buildModelConversationSpecs(provider, model, baseUrl, prompt, {
-        maxOutputTokens: 256
-    });
-    if (!specs.length) {
-        return { error: `Provider ${providerName} missing available conversation endpoint` };
-    }
-
-    return {
-        providerName,
-        provider,
-        model,
-        prompt,
-        specs,
-        apiKey: typeof provider.preferred_auth_method === 'string'
-            ? provider.preferred_auth_method.trim()
-            : ''
-    };
-}
-
-async function runProviderChatCheck(params = {}) {
-    const target = resolveProviderChatTarget(params);
-    if (target.error) {
-        return { ok: false, error: target.error };
-    }
-
-    const timeoutMs = Number.isFinite(params.timeoutMs)
-        ? Math.max(1000, Number(params.timeoutMs))
-        : 30000;
-    let finalSpec = target.specs[0];
-    let result = null;
-
-    for (let index = 0; index < target.specs.length; index += 1) {
-        const candidate = target.specs[index];
-        const probeResult = await probeJsonPost(candidate.url, candidate.body, {
-            apiKey: target.apiKey,
-            timeoutMs,
-            maxBytes: 512 * 1024
-        });
-        finalSpec = candidate;
-        result = probeResult;
-        const status = Number.isFinite(probeResult && probeResult.status) ? probeResult.status : 0;
-        const shouldTryNextCandidate = index < target.specs.length - 1 && status === 404;
-        if (!shouldTryNextCandidate) {
-            break;
-        }
-    }
-
-    if (!result || !result.ok) {
-        return {
-            ok: false,
-            provider: target.providerName,
-            model: target.model,
-            url: finalSpec.url,
-            status: Number.isFinite(result && result.status) ? result.status : 0,
-            durationMs: Number.isFinite(result && result.durationMs) ? result.durationMs : 0,
-            reply: '',
-            rawPreview: '',
-            error: result && result.error ? result.error : 'request failed'
-        };
-    }
-
-    let payload = null;
-    try {
-        payload = result.body ? JSON.parse(result.body) : null;
-    } catch (e) {
-        payload = null;
-    }
-
-    const payloadError = extractApiPayloadErrorMessage(payload);
-    if (result.status >= 400 || payloadError) {
-        return {
-            ok: false,
-            provider: target.providerName,
-            model: target.model,
-            url: finalSpec.url,
-            status: Number.isFinite(result.status) ? result.status : 0,
-            durationMs: Number.isFinite(result.durationMs) ? result.durationMs : 0,
-            reply: '',
-            rawPreview: result.body ? truncateText(result.body, 600) : '',
-            error: payloadError || `HTTP ${result.status}`
-        };
-    }
-
-    const reply = extractModelResponseText(payload);
-    return {
-        ok: true,
-        provider: target.providerName,
-        model: target.model,
-        url: finalSpec.url,
-        status: Number.isFinite(result.status) ? result.status : 0,
-        durationMs: Number.isFinite(result.durationMs) ? result.durationMs : 0,
-        reply,
-        rawPreview: reply ? '' : (result.body ? truncateText(result.body, 600) : ''),
-        error: ''
-    };
-}
-
 function runSpeedTest(targetUrl, apiKey, options = {}) {
     const timeoutMs = Number.isFinite(options.timeoutMs)
         ? Math.max(1000, Number(options.timeoutMs))
@@ -8553,10 +8403,6 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                                 ...target,
                                 timeoutMs: timeoutMs || undefined
                             });
-                            break;
-                        }
-                        case 'provider-chat-check': {
-                            result = await runProviderChatCheck(params || {});
                             break;
                         }
                         case 'openai-bridge-get-provider': {

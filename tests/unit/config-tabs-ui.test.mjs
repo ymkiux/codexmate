@@ -9,7 +9,6 @@ import {
 test('config template keeps expected config tabs in top and side navigation', () => {
     const html = readBundledWebUiHtml();
     const modalsBasic = readProjectFile('web-ui/partials/index/modals-basic.html');
-    const healthCheckModal = readProjectFile('web-ui/partials/index/modal-health-check.html');
     const templateAgentModals = readProjectFile('web-ui/partials/index/modal-config-template-agents.html');
     const openclawModal = readProjectFile('web-ui/partials/index/modal-openclaw-config.html');
     const sessionsPanel = readProjectFile('web-ui/partials/index/panel-sessions.html');
@@ -328,10 +327,6 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /<button class="btn-icon" @click="showModelListModal = true" aria-label="Manage models" title="管理模型" v-if="modelsSource === 'legacy'">≡<\/button>/);
     assert.match(
         html,
-        /<button[\s\S]*class="card-action-btn"[\s\S]*@click="openHealthCheckDialog\(\{ providerName: provider\.name, locked: true \}\)"[\s\S]*:disabled="displayCurrentProvider !== provider\.name"[\s\S]*:aria-label="`Open health dialog for \$\{provider\.name\}`"[\s\S]*:title="displayCurrentProvider === provider\.name \? t\('config\.healthTest'\) : t\('config\.switchProviderFirst'\)"/
-    );
-    assert.match(
-        html,
         /<button class="btn-tool" @click="runHealthCheck" :disabled="healthCheckLoading \|\| loading \|\| !!initError">/
     );
     assert.match(
@@ -378,10 +373,6 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(templateAgentModals, /<div class="modal-title" id="agents-modal-title">{{ agentsModalTitle }}<\/div>/);
     assert.match(modalsBasic, /<button type="button" class="btn-remove-model" @click="removeModel\(model\)">\{\{\s*t\('common\.delete'\)\s*\}\}<\/button>/);
     assert.doesNotMatch(modalsBasic, /<span class="btn-remove-model" @click="removeModel\(model\)">删除<\/span>/);
-    assert.match(healthCheckModal, /<div v-if="showHealthCheckDialog" class="modal-overlay" @click\.self="closeHealthCheckDialog\(\)">/);
-    assert.match(healthCheckModal, /<div class="modal modal-wide health-check-dialog" role="dialog" aria-modal="true" aria-labelledby="health-check-dialog-title">/);
-    assert.match(healthCheckModal, /v-model="healthCheckDialogSelectedProvider"/);
-    assert.match(healthCheckModal, /@click="sendHealthCheckDialogMessage"/);
     assert.match(openclawModal, /<div v-if="showOpenclawConfigModal" class="modal-overlay" @click\.self="!\(openclawSaving \|\| openclawApplying\) && closeOpenclawConfigModal\(\)">/);
     assert.match(openclawModal, /<div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="openclaw-config-modal-title">/);
     assert.match(openclawModal, /<div class="modal-title" id="openclaw-config-modal-title">{{ openclawEditorTitle }}<\/div>/);

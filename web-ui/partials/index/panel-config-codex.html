@@ -220,19 +220,6 @@
                                     </svg>
                                 </button>
                                 <button
-                                    class="card-action-btn"
-                                    @click="openHealthCheckDialog({ providerName: provider.name, locked: true })"
-                                    :disabled="displayCurrentProvider !== provider.name"
-                                    :aria-label="`Open health dialog for ${provider.name}`"
-                                    :title="displayCurrentProvider === provider.name ? t('config.healthTest') : t('config.switchProviderFirst')"
-                                >
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                                        <path d="M8 9h8"/>
-                                        <path d="M8 13h5"/>
-                                    </svg>
-                                </button>
-                                <button
                                     v-if="!provider.readOnly"
                                     class="card-action-btn"
                                     :class="{ loading: providerShareLoading[provider.name], disabled: !shouldAllowProviderShare(provider) }"
