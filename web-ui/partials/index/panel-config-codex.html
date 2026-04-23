@@ -206,11 +206,11 @@
                             </div>
                         </div>
                         <div class="card-trailing">
-                            <span :class="['pill', providerPillConfigured(provider) ? 'configured' : 'empty']">
-                                {{ providerPillText(provider) }}
-                            </span>
                             <span v-if="speedResults[provider.name]" :class="['latency', speedResults[provider.name].ok ? 'ok' : 'error']">
                                 {{ formatLatency(speedResults[provider.name]) }}
+                            </span>
+                            <span :class="['pill', providerPillConfigured(provider) ? 'configured' : 'empty']">
+                                {{ providerPillText(provider) }}
                             </span>
                             <div class="card-actions" @click.stop>
                                 <button

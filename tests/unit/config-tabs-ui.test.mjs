@@ -270,7 +270,15 @@ test('config template keeps expected config tabs in top and side navigation', ()
     );
     assert.match(
         html,
+        /<span v-if="speedResults\[provider\.name\]"[\s\S]*class="\['latency', speedResults\[provider\.name\]\.ok \? 'ok' : 'error'\]"[\s\S]*>\s*\{\{\s*formatLatency\(speedResults\[provider\.name\]\)\s*\}\}\s*<\/span>[\s\S]*<span :class="\['pill', providerPillConfigured\(provider\) \? 'configured' : 'empty'\]">/
+    );
+    assert.match(
+        html,
         /:class="\['card', \{ active: currentClaudeConfig === name \}\]"[\s\S]*@click="applyClaudeConfig\(name\)"[\s\S]*@keydown\.enter\.self\.prevent="applyClaudeConfig\(name\)"[\s\S]*@keydown\.space\.self\.prevent="applyClaudeConfig\(name\)"[\s\S]*tabindex="0"[\s\S]*role="button"[\s\S]*:aria-current="currentClaudeConfig === name \? 'true' : null"/
+    );
+    assert.match(
+        html,
+        /<span v-if="claudeSpeedResults\[name\]"[\s\S]*class="\['latency', claudeSpeedResults\[name\]\.ok \? 'ok' : 'error'\]"[\s\S]*>\s*\{\{\s*formatLatency\(claudeSpeedResults\[name\]\)\s*\}\}\s*<\/span>[\s\S]*<span :class="\['pill', config\.hasKey \? 'configured' : 'empty'\]">/
     );
     assert.match(
         html,

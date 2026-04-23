@@ -125,11 +125,11 @@
                             </div>
                         </div>
                         <div class="card-trailing">
-                            <span :class="['pill', config.hasKey ? 'configured' : 'empty']">
-                                {{ config.hasKey ? t('claude.configured') : t('claude.notConfigured') }}
-                            </span>
                             <span v-if="claudeSpeedResults[name]" :class="['latency', claudeSpeedResults[name].ok ? 'ok' : 'error']">
                                 {{ formatLatency(claudeSpeedResults[name]) }}
+                            </span>
+                            <span :class="['pill', config.hasKey ? 'configured' : 'empty']">
+                                {{ config.hasKey ? t('claude.configured') : t('claude.notConfigured') }}
                             </span>
                             <div class="card-actions" @click.stop>
                                 <button class="card-action-btn" @click="openEditConfigModal(name)" :aria-label="`Edit Claude config ${name}`" :title="t('claude.action.edit')">
