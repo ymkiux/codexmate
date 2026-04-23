@@ -9019,7 +9019,7 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
     const openUrl = `http://${formatHostForUrl(openHost)}:${port}`;
     server.listen(port, host, () => {
         console.log('\n✓ Web UI 已启动');
-        console.log(`  待访问: ${openUrl}`);
+        console.log(`  已打开: ${openUrl}`);
         if (host && host !== openHost) {
             console.log('  监听地址:', host);
         }
