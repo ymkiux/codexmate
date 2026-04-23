@@ -51,7 +51,7 @@
                             <input
                                 class="session-query-input"
                                 v-model="sessionQuery"
-                                @keyup.enter="loadSessions"
+                                @keyup.enter="onSessionFilterChange"
                                 :disabled="sessionsLoading || !isSessionQueryEnabled"
                                 :placeholder="sessionQueryPlaceholder">
                         </div>
@@ -60,7 +60,7 @@
                                 class="session-role-select"
                                 v-model="sessionRoleFilter"
                                 @change="onSessionFilterChange"
-                                disabled>
+                                :disabled="sessionsLoading">
                                 <option value="all">{{ t('sessions.role.all') }}</option>
                                 <option value="user">{{ t('sessions.role.user') }}</option>
                                 <option value="assistant">{{ t('sessions.role.assistant') }}</option>
@@ -70,12 +70,18 @@
                                 class="session-time-select"
                                 v-model="sessionTimePreset"
                                 @change="onSessionFilterChange"
-                                disabled>
+                                :disabled="sessionsLoading">
                                 <option value="all">{{ t('sessions.time.all') }}</option>
                                 <option value="7d">{{ t('sessions.time.7d') }}</option>
                                 <option value="30d">{{ t('sessions.time.30d') }}</option>
                                 <option value="90d">{{ t('sessions.time.90d') }}</option>
                             </select>
+                            <button class="btn-tool btn-tool-compact" type="button" @click="copySessionsFilterShareUrl" :disabled="sessionsLoading">
+                                复制筛选链接
+                            </button>
+                            <button class="btn-tool btn-tool-compact" type="button" @click="clearSessionFilters" :disabled="sessionsLoading">
+                                {{ t('common.resetFilters') }}
+                            </button>
                         </div>
                     </div>
                     <div class="session-toolbar-footer">

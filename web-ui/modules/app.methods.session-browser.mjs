@@ -4,6 +4,14 @@ import {
     normalizeSessionMessageRole,
     normalizeSessionPathFilter
 } from '../logic.mjs';
+import {
+    applySessionsFilterUrlState,
+    buildSessionsFilterShareUrl,
+    normalizeSessionRoleFilter,
+    normalizeSessionTimePreset,
+    readSessionsFilterUrlState,
+    syncSessionsFilterUrl
+} from './sessions-filters-url.mjs';
 
 function isSessionLoadNativeDialogEnabled(vm) {
     if (vm && typeof vm.isSessionLoadNativeDialogEnabled === 'function' && vm.isSessionLoadNativeDialogEnabled !== isSessionLoadNativeDialogEnabled) {
@@ -241,11 +249,22 @@ export function createSessionBrowserMethods(options = {}) {
         },
 
         restoreSessionFilterCache() {
+            const urlState = readSessionsFilterUrlState();
+            if (urlState) {
+                applySessionsFilterUrlState(this, urlState);
+                return;
+            }
             const sourceCache = localStorage.getItem('codexmateSessionFilterSource');
             const pathCache = localStorage.getItem('codexmateSessionPathFilter');
             const cached = buildSessionFilterCacheState(sourceCache, pathCache);
             this.sessionFilterSource = cached.source;
             this.sessionPathFilter = cached.pathFilter;
+            const queryCache = localStorage.getItem('codexmateSessionQuery');
+            const roleCache = localStorage.getItem('codexmateSessionRoleFilter');
+            const timeCache = localStorage.getItem('codexmateSessionTimePreset');
+            this.sessionQuery = typeof queryCache === 'string' ? queryCache : '';
+            this.sessionRoleFilter = normalizeSessionRoleFilter(roleCache);
+            this.sessionTimePreset = normalizeSessionTimePreset(timeCache);
             this.refreshSessionPathOptions(this.sessionFilterSource);
         },
 
@@ -257,6 +276,13 @@ export function createSessionBrowserMethods(options = {}) {
             } else {
                 localStorage.removeItem('codexmateSessionPathFilter');
             }
+            if (this.sessionQuery && isSessionQueryEnabled(this.sessionFilterSource)) {
+                localStorage.setItem('codexmateSessionQuery', this.sessionQuery);
+            } else {
+                localStorage.removeItem('codexmateSessionQuery');
+            }
+            localStorage.setItem('codexmateSessionRoleFilter', normalizeSessionRoleFilter(this.sessionRoleFilter));
+            localStorage.setItem('codexmateSessionTimePreset', normalizeSessionTimePreset(this.sessionTimePreset));
         },
 
         normalizeSessionPinnedMap(raw) {
@@ -389,15 +415,19 @@ export function createSessionBrowserMethods(options = {}) {
         async onSessionSourceChange() {
             this.refreshSessionPathOptions(this.sessionFilterSource);
             this.persistSessionFilterCache();
+            syncSessionsFilterUrl(this);
             await this.loadSessions();
         },
 
         async onSessionPathFilterChange() {
             this.persistSessionFilterCache();
+            syncSessionsFilterUrl(this);
             await this.loadSessions();
         },
 
         async onSessionFilterChange() {
+            this.persistSessionFilterCache();
+            syncSessionsFilterUrl(this);
             await this.loadSessions();
         },
 
@@ -408,7 +438,22 @@ export function createSessionBrowserMethods(options = {}) {
             this.sessionRoleFilter = 'all';
             this.sessionTimePreset = 'all';
             this.persistSessionFilterCache();
+            syncSessionsFilterUrl(this);
             await this.onSessionSourceChange();
+        },
+
+        copySessionsFilterShareUrl() {
+            const url = buildSessionsFilterShareUrl(this);
+            if (!url) {
+                this.showMessage('无法生成链接', 'error');
+                return;
+            }
+            const ok = typeof this.fallbackCopyText === 'function' ? this.fallbackCopyText(url) : false;
+            if (ok) {
+                this.showMessage(typeof this.t === 'function' ? this.t('toast.copy.ok') : 'Copied', 'success');
+                return;
+            }
+            this.showMessage(typeof this.t === 'function' ? this.t('toast.copy.fail') : 'Copy failed', 'error');
         },
 
         normalizeSessionMessage(message) {

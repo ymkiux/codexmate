@@ -37,7 +37,12 @@
                         </aside>
 
                         <section class="plugins-main" :aria-label="t('plugins.main.ariaWorkspace')">
-                            <div v-if="pluginsActiveId === 'prompt-templates'" class="plugins-panel">
+                            <div v-if="pluginsLoading" class="skills-empty-state">{{ t('common.loading') }}</div>
+                            <div v-else-if="pluginsError" class="skills-empty-state">
+                                <div class="plugins-panel-note">{{ pluginsError }}</div>
+                                <button type="button" class="btn-mini" @click="loadPluginsOverview({ forceRefresh: true, silent: false })" :disabled="loading || !!initError || pluginsLoading">{{ t('common.refresh') }}</button>
+                            </div>
+                            <div v-else-if="pluginsActiveId === 'prompt-templates'" class="plugins-panel">
                                 <div class="plugins-panel-head">
                                     <div class="plugins-panel-title">{{ t('plugins.promptTemplates.title') }}</div>
                                     <div class="plugins-panel-subtitle">{{ t('plugins.promptTemplates.subtitle') }}</div>
@@ -93,8 +98,10 @@
                                                 <div>
                                                     <div class="prompt-vars-title">{{ t('plugins.promptTemplates.vars.title') }}</div>
                                                     <div v-if="!promptComposerActiveTemplate.isBuiltin" class="plugins-panel-note">{{ t('plugins.promptTemplates.compose.varsHint') }}</div>
+                                                    <div v-if="promptComposerMissingVars.length" class="plugins-panel-note">未填 {{ promptComposerMissingVars.length }} 项</div>
                                                 </div>
                                                 <div class="prompt-editor-actions">
+                                                    <button v-if="promptComposerMissingVars.length" type="button" class="btn-mini" @click="focusPromptComposerFirstMissingVar" :disabled="pluginsLoading">跳到未填</button>
                                                     <button type="button" class="btn-mini" @click="resetPromptComposerVarValues" :disabled="pluginsLoading">{{ t('plugins.promptTemplates.vars.reset') }}</button>
                                                 </div>
                                             </div>
@@ -102,10 +109,10 @@
                                                 <label v-for="(name, idx) in promptComposerActiveTemplate.vars" :key="'prompt-compose-var-' + name" class="prompt-var-row">
                                                     <span class="prompt-var-label mono">{{ name }}</span>
                                                     <template v-if="idx === 0">
-                                                        <input ref="promptComposerFirstField" class="form-input prompt-var-input" type="text" :readonly="promptComposerActiveTemplate.isBuiltin" :value="promptComposerVarValues[name] || ''" @input="setPromptComposerVarValue(name, $event.target.value)" :placeholder="t('plugins.promptTemplates.vars.valuePlaceholder', { name })">
+                                                        <input ref="promptComposerFirstField" :class="['form-input', 'prompt-var-input', { 'is-missing': promptComposerMissingVars.includes(name) }]" type="text" :value="promptComposerVarValues[name] || ''" @input="setPromptComposerVarValue(name, $event.target.value)" :placeholder="t('plugins.promptTemplates.vars.valuePlaceholder', { name })">
                                                     </template>
                                                     <template v-else>
-                                                        <input class="form-input prompt-var-input" type="text" :readonly="promptComposerActiveTemplate.isBuiltin" :value="promptComposerVarValues[name] || ''" @input="setPromptComposerVarValue(name, $event.target.value)" :placeholder="t('plugins.promptTemplates.vars.valuePlaceholder', { name })">
+                                                        <input :class="['form-input', 'prompt-var-input', { 'is-missing': promptComposerMissingVars.includes(name) }]" type="text" :value="promptComposerVarValues[name] || ''" @input="setPromptComposerVarValue(name, $event.target.value)" :placeholder="t('plugins.promptTemplates.vars.valuePlaceholder', { name })">
                                                     </template>
                                                 </label>
                                             </div>

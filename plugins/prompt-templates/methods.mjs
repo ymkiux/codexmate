@@ -1,7 +1,58 @@
 import {
     persistPromptTemplatesToStorage,
-    readPromptTemplatesFromStorage
 } from './storage.mjs';
+import {
+    getFirstPluginId,
+    getPluginEntry
+} from '../registry.mjs';
+
+const COMPOSER_VALUES_STORAGE_KEY = 'codexmate.plugins.promptTemplates.composerValues.v1';
+
+function readComposerValuesFromStorage(storage = localStorage) {
+    if (!storage) return {};
+    let raw = '';
+    try {
+        raw = storage.getItem(COMPOSER_VALUES_STORAGE_KEY) || '';
+    } catch (_) {
+        raw = '';
+    }
+    if (!raw) return {};
+    try {
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+        return parsed;
+    } catch (_) {
+        return {};
+    }
+}
+
+function persistComposerValuesToStorage(map, storage = localStorage) {
+    if (!storage) return false;
+    try {
+        storage.setItem(COMPOSER_VALUES_STORAGE_KEY, JSON.stringify(map && typeof map === 'object' && !Array.isArray(map) ? map : {}));
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+function readComposerValuesForTemplate(templateId) {
+    const id = typeof templateId === 'string' ? templateId.trim() : '';
+    if (!id) return {};
+    const map = readComposerValuesFromStorage(localStorage);
+    const values = map && typeof map === 'object' ? map[id] : null;
+    return values && typeof values === 'object' && !Array.isArray(values) ? values : {};
+}
+
+function persistComposerValuesForTemplate(templateId, values) {
+    const id = typeof templateId === 'string' ? templateId.trim() : '';
+    if (!id) return false;
+    const map = readComposerValuesFromStorage(localStorage);
+    const next = map && typeof map === 'object' && !Array.isArray(map) ? { ...map } : {};
+    const payload = values && typeof values === 'object' && !Array.isArray(values) ? values : {};
+    next[id] = payload;
+    return persistComposerValuesToStorage(next, localStorage);
+}
 
 function createId(prefix = 'tpl') {
     const rand = Math.random().toString(16).slice(2, 10);
@@ -25,35 +76,11 @@ function normalizePromptTemplateDraft(draft) {
     };
 }
 
-function buildBuiltinCommentPolishTemplate(t) {
-    const tr = (key, fallback, params = null) => (typeof t === 'function' ? t(key, params) : fallback);
-    const line1 = tr('plugins.builtin.commentPolish.line1', '轻微收敛以下代码注释');
-    return {
-        id: 'builtin_comment_polish',
-        name: tr('plugins.builtin.commentPolish.name', '代码注释润色'),
-        description: tr('plugins.builtin.commentPolish.desc', '轻微收敛以下代码注释 {{code}}'),
-        template: [
-            line1,
-            '',
-            '{{code}}'
-        ].join('\n'),
-        createdAt: nowIso(),
-        updatedAt: nowIso(),
-        isBuiltin: true
-    };
-}
-
-function ensureBuiltinTemplates(rawList, builtins) {
-    const list = Array.isArray(rawList) ? rawList.filter(Boolean) : [];
-    const builtinList = Array.isArray(builtins) ? builtins.filter(Boolean) : [];
-    const rest = list.filter((item) => !(item && item.isBuiltin === true));
-    return [...builtinList, ...rest];
-}
-
 export function createPluginsMethods() {
     return {
         resetPromptComposerVarValues() {
             this.promptComposerVarValuesRaw = {};
+            persistComposerValuesForTemplate(this.promptComposerSelectedTemplateId, {});
             if (typeof this.$nextTick === 'function') {
                 this.$nextTick(() => {
                     const first = this.$refs && this.$refs.promptComposerFirstField
@@ -64,12 +91,30 @@ export function createPluginsMethods() {
             }
         },
 
+        focusPromptComposerFirstMissingVar() {
+            const run = () => {
+                const input = document.querySelector('#panel-plugins .prompt-var-input.is-missing');
+                if (!input || typeof input.focus !== 'function') return;
+                try {
+                    if (typeof input.scrollIntoView === 'function') {
+                        input.scrollIntoView({ block: 'center', inline: 'nearest' });
+                    }
+                } catch (_) {}
+                input.focus();
+            };
+            if (typeof this.$nextTick === 'function') {
+                this.$nextTick(run);
+                return;
+            }
+            run();
+        },
+
         selectPromptComposerTemplate(id) {
             const next = typeof id === 'string' ? id.trim() : '';
             if (!next) return;
             if (next === this.promptComposerSelectedTemplateId) return;
             this.promptComposerSelectedTemplateId = next;
-            this.promptComposerVarValuesRaw = {};
+            this.promptComposerVarValuesRaw = readComposerValuesForTemplate(next);
             if (typeof this.$nextTick === 'function') {
                 this.$nextTick(() => {
                     const first = this.$refs && this.$refs.promptComposerFirstField
@@ -171,7 +216,7 @@ export function createPluginsMethods() {
             const next = typeof id === 'string' ? id.trim() : '';
             if (!next) return;
             this.promptComposerSelectedTemplateId = next;
-            this.promptComposerVarValuesRaw = {};
+            this.promptComposerVarValuesRaw = readComposerValuesForTemplate(next);
             this.promptComposerCommand = '';
             this.promptComposerPickerVisible = false;
             this.promptTemplatesMode = 'compose';
@@ -202,6 +247,7 @@ export function createPluginsMethods() {
             const next = { ...current };
             next[key] = value == null ? '' : String(value);
             this.promptComposerVarValuesRaw = next;
+            persistComposerValuesForTemplate(this.promptComposerSelectedTemplateId, next);
         },
 
         async copyPromptComposerRendered() {
@@ -228,6 +274,7 @@ export function createPluginsMethods() {
         selectPlugin(pluginId) {
             const id = typeof pluginId === 'string' ? pluginId.trim() : '';
             if (!id) return;
+            if (!getPluginEntry(id)) return;
             this.pluginsActiveId = id;
         },
 
@@ -236,65 +283,21 @@ export function createPluginsMethods() {
             const forceRefresh = !!(options && options.forceRefresh);
             if (this.pluginsLoading) return false;
 
-            const shouldReload = forceRefresh || this.promptTemplatesLoadedOnce !== true;
-            if (!shouldReload) return true;
-
             this.pluginsLoading = true;
+            this.pluginsError = '';
             try {
-                const t = typeof this.t === 'function' ? this.t : null;
-                const rawList = readPromptTemplatesFromStorage(localStorage);
-                const normalized = ensureBuiltinTemplates(rawList, [buildBuiltinCommentPolishTemplate(t)]);
-                this.promptTemplatesListRaw = normalized;
-                persistPromptTemplatesToStorage(normalized, localStorage);
-
-                this.promptTemplatesLoadedOnce = true;
-                if (!this.pluginsActiveId) {
-                    this.pluginsActiveId = 'prompt-templates';
+                const fallbackId = getFirstPluginId();
+                const currentId = typeof this.pluginsActiveId === 'string' ? this.pluginsActiveId.trim() : '';
+                const resolved = getPluginEntry(currentId) ? currentId : fallbackId;
+                if (resolved && resolved !== currentId) {
+                    this.pluginsActiveId = resolved;
                 }
 
-                if (!this.promptTemplatesMode) {
-                    this.promptTemplatesMode = 'compose';
-                }
-                if (this.promptTemplatesMode !== 'compose' && this.promptTemplatesMode !== 'manage') {
-                    this.promptTemplatesMode = 'compose';
-                }
-                if (this.mainTab === 'plugins') {
-                    this.promptTemplatesMode = 'compose';
-                }
-
-                if (this.mainTab === 'plugins' && this.promptTemplatesMode === 'compose') {
-                    const list = Array.isArray(this.promptTemplatesList) ? this.promptTemplatesList : [];
-                    const exists = list.some((item) => item && item.id === this.promptComposerSelectedTemplateId);
-                    if (!this.promptComposerSelectedTemplateId || !exists) {
-                        this.promptComposerSelectedTemplateId = 'builtin_comment_polish';
-                    }
-                    if (!this.promptComposerVarValuesRaw || typeof this.promptComposerVarValuesRaw !== 'object') {
-                        this.promptComposerVarValuesRaw = {};
-                    }
-                }
-
-                if (this.promptTemplatesMode === 'manage') {
-                    const currentSelected = typeof this.promptTemplateSelectedId === 'string'
-                        ? this.promptTemplateSelectedId
-                        : '';
-                    const first = Array.isArray(this.promptTemplatesList) && this.promptTemplatesList.length
-                        ? this.promptTemplatesList[0]
-                        : null;
-                    if (!currentSelected && first) {
-                        this.selectPromptTemplate(first.id);
-                    }
-                }
-
-                if (this.mainTab === 'plugins' && this.promptTemplatesMode === 'compose' && typeof this.$nextTick === 'function') {
-                    this.$nextTick(() => {
-                        const input = this.$refs && this.$refs.promptComposerCodeInput
-                            ? this.$refs.promptComposerCodeInput
-                            : null;
-                        if (input && typeof input.focus === 'function') input.focus();
-                    });
-                }
-                return true;
+                const entry = getPluginEntry(resolved);
+                if (!entry || typeof entry.loadOverview !== 'function') return true;
+                return await entry.loadOverview(this, { silent, forceRefresh });
             } catch (e) {
+                this.pluginsError = e && e.message ? String(e.message) : 'Failed to load plugins';
                 if (!silent) {
                     this.showMessage(typeof this.t === 'function' ? this.t('toast.plugins.loadFail') : 'Failed to load plugins', 'error');
                 }
