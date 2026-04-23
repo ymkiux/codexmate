@@ -6017,36 +6017,34 @@ function resolveSpeedTestTarget(params) {
             return { error: 'Missing model' };
         }
         const normalizedBase = baseUrl.replace(/\/+$/, '');
+        let parsed = null;
+        try {
+            parsed = new URL(normalizedBase);
+        } catch (_) {
+            return { error: 'Invalid URL' };
+        }
+        const pathname = typeof parsed.pathname === 'string' ? parsed.pathname : '';
+        const trimmedPath = pathname.replace(/\/+$/, '');
+        const isRootPath = !trimmedPath || trimmedPath === '/';
+        const endsWithV1 = trimmedPath.endsWith('/v1');
+        const makeCandidate = (url) => ({
+            method: 'POST',
+            url,
+            body: {
+                model,
+                max_tokens: 16,
+                messages: [{ role: 'user', content: 'ping' }]
+            }
+        });
         const candidates = [];
-        if (normalizedBase.endsWith('/v1')) {
-            candidates.push({
-                method: 'POST',
-                url: `${normalizedBase}/messages`,
-                body: {
-                    model,
-                    max_tokens: 16,
-                    messages: [{ role: 'user', content: 'ping' }]
-                }
-            });
+        if (endsWithV1) {
+            candidates.push(makeCandidate(`${normalizedBase}/messages`));
+        } else if (isRootPath) {
+            candidates.push(makeCandidate(`${normalizedBase}/v1/messages`));
+            candidates.push(makeCandidate(`${normalizedBase}/messages`));
         } else {
-            candidates.push({
-                method: 'POST',
-                url: `${normalizedBase}/v1/messages`,
-                body: {
-                    model,
-                    max_tokens: 16,
-                    messages: [{ role: 'user', content: 'ping' }]
-                }
-            });
-            candidates.push({
-                method: 'POST',
-                url: `${normalizedBase}/messages`,
-                body: {
-                    model,
-                    max_tokens: 16,
-                    messages: [{ role: 'user', content: 'ping' }]
-                }
-            });
+            candidates.push(makeCandidate(`${normalizedBase}/messages`));
+            candidates.push(makeCandidate(`${normalizedBase}/v1/messages`));
         }
         return {
             kind: 'claude',
@@ -6189,8 +6187,8 @@ async function runProviderChatCheck(params = {}) {
         });
         finalSpec = candidate;
         result = probeResult;
-        const shouldTryNextCandidate = index < target.specs.length - 1
-            && (!probeResult.ok || probeResult.status === 404);
+        const status = Number.isFinite(probeResult && probeResult.status) ? probeResult.status : 0;
+        const shouldTryNextCandidate = index < target.specs.length - 1 && status === 404;
         if (!shouldTryNextCandidate) {
             break;
         }
@@ -8518,8 +8516,8 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                                     });
                                     finalCandidate = candidate;
                                     finalResult = probeResult;
-                                    const shouldTryNext = index < target.candidates.length - 1
-                                        && (!probeResult.ok || probeResult.status === 404);
+                                    const status = Number.isFinite(probeResult && probeResult.status) ? probeResult.status : 0;
+                                    const shouldTryNext = index < target.candidates.length - 1 && status === 404;
                                     if (!shouldTryNext) {
                                         break;
                                     }
