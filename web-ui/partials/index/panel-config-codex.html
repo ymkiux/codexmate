@@ -174,12 +174,6 @@
                     <div v-if="healthCheckLoading && healthCheckBatchTotal" class="config-template-hint">
                         {{ t('config.health.progress', { done: healthCheckBatchDone, total: healthCheckBatchTotal, failed: healthCheckBatchFailed }) }}
                     </div>
-                    <div v-if="healthCheckResult" class="config-template-hint">
-                        {{ healthCheckResult.ok ? t('config.health.ok') : t('config.health.fail') }} · {{ t('config.health.issues', { count: (healthCheckResult.issues || []).length }) }}
-                    </div>
-                    <div v-if="healthCheckResult && (healthCheckResult.issues || []).length" class="config-template-hint">
-                        {{ (healthCheckResult.issues || [])[0].message }}
-                    </div>
                 </div>
 
                 </template>
