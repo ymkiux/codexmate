@@ -9019,7 +9019,8 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
     const openUrl = `http://${formatHostForUrl(openHost)}:${port}`;
     server.listen(port, host, () => {
         console.log('\n✓ Web UI 已启动');
-        console.log(`  已打开: ${openUrl}`);
+        const willOpenBrowser = !!openBrowser && !process.env.CODEXMATE_NO_BROWSER;
+        console.log(`  ${willOpenBrowser ? '已打开' : '待访问'}: ${openUrl}`);
         if (host && host !== openHost) {
             console.log('  监听地址:', host);
         }
@@ -9029,9 +9030,8 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
             console.warn('  建议仅在可信网络使用，或改用 --host 127.0.0.1。');
         }
 
-        if (!process.env.CODEXMATE_NO_BROWSER && openBrowser) {
-            const url = openUrl;
-            openBrowserAfterReady(url);
+        if (willOpenBrowser) {
+            openBrowserAfterReady(openUrl);
         }
     });
 
@@ -9142,14 +9142,15 @@ function cmdStart(options = {}) {
         || process.env.CODEXMATE_DEV === '1'
         || process.env.CODEXMATE_DEV === 'true';
 
-    // 禁止自动打开浏览器：仅输出 URL，交由用户自行点击/打开。
+    const shouldOpenBrowser = !options.noBrowser && !process.env.CODEXMATE_NO_BROWSER;
+
     let serverHandle = createWebServer({
         htmlPath,
         assetsDir,
         webDir,
         host,
         port,
-        openBrowser: false
+        openBrowser: shouldOpenBrowser
     });
 
     // 禁止前端变更侦测与自动重启：避免终端输出噪音与访问时短暂 Connection Refused。
