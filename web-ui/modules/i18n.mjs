@@ -6,10 +6,12 @@ const DICT = Object.freeze({
         'lang.zh': '中文',
         'lang.en': 'English',
         'lang.label': '语言',
+        'nav.topTabs.aria': '导航',
 
         // Common
         'common.all': '全部',
         'common.copy': '复制',
+        'common.edit': '编辑',
         'common.install': '安装',
         'common.update': '升级',
         'common.uninstall': '卸载',
@@ -53,6 +55,8 @@ const DICT = Object.freeze({
         'common.selectAll': '全选',
         'common.unselectAll': '取消全选',
         'common.resetFilters': '重置筛选',
+        'common.notEditable': '不可编辑',
+        'common.notDeletable': '不可删除',
         'common.notLoaded': '未加载',
         'common.exists': '已存在',
         'common.notExistsWillCreateOnApply': '不存在，将在应用时创建',
@@ -410,6 +414,7 @@ const DICT = Object.freeze({
         'docs.section.commandsNote': '命令可直接复制。',
         'docs.section.faq': '常见问题',
         'docs.section.faqNote': '常见问题见下。',
+        'docs.command.aria': '{name} 命令',
         'docs.registryHintPrefix': '命令将附加：',
         'docs.registryHintCustom': '请输入完整 URL（含 http/https），将自动附加到命令。',
         'docs.registry.tencent': '腾讯云',
@@ -600,13 +605,19 @@ const DICT = Object.freeze({
         'modal.agents.hint.default': '保存后会写入目标 AGENTS.md（与 config.toml 同级）。',
         'modal.agents.hint.claudeMd': '保存后会写入 ~/.claude/CLAUDE.md。',
         'modal.agents.hint.openclaw': '保存后会写入 OpenClaw Workspace 下的 AGENTS.md。',
+        'modal.agents.title.openclawWorkspaceFile': 'OpenClaw 工作区文件: {fileName}',
+        'modal.agents.hint.openclawWorkspaceFile': '保存后会写入 OpenClaw Workspace 下的 {fileName}。',
         'config.url.unset': '未设 URL',
         'config.badge.system': '系统',
         'config.healthTest': '健康聊天测试',
+        'config.healthTest.aria': '打开健康聊天测试（{name}）',
         'config.switchProviderFirst': '请先切换到该提供商',
         'config.shareCommand': '分享命令',
         'config.shareDisabled': '不可分享'
         ,
+        'config.shareCommand.aria': '分享导入命令',
+        'config.provider.edit.aria': '编辑提供商：{name}',
+        'config.provider.delete.aria': '删除提供商：{name}',
         'app.loadingConfig': '加载配置中...'
         ,
         'common.current': '当前 {value}',
@@ -757,6 +768,7 @@ const DICT = Object.freeze({
         'settings.tab.backup': '备份与导入',
         'settings.tab.trash': '回收站',
         'settings.tab.device': '设备',
+        'settings.tabs.aria': '设置标签页',
         'settings.sharePrefix.title': '分享命令前缀',
         'settings.sharePrefix.meta': '影响 Web UI 里“复制分享命令”的前缀',
         'settings.sharePrefix.label': '前缀',
@@ -878,6 +890,8 @@ const DICT = Object.freeze({
         'claude.action.delete': '删除',
         'claude.action.shareDisabled': '分享导入命令（暂时禁用）'
         ,
+        'claude.action.editAria': '编辑 Claude 配置：{name}',
+        'claude.action.deleteAria': '删除 Claude 配置：{name}',
 
         // OpenClaw config panel
         'openclaw.applyHint': '写入 ~/.openclaw/openclaw.json，支持 JSON5。',
@@ -894,16 +908,21 @@ const DICT = Object.freeze({
         'modal.openclaw.quick.subtitle': '按 3 步完成：填 Provider 和模型，写入编辑器，保存并应用。',
         'modal.openclaw.quick.step2': '点击写入编辑器',
         'modal.openclaw.structured.writeHint': '写入编辑器会重排 JSON，注释可能丢失。'
+        ,
+        'openclaw.action.editAria': '编辑 OpenClaw 配置：{name}',
+        'openclaw.action.deleteAria': '删除 OpenClaw 配置：{name}'
     },
     en: {
         // Global
         'lang.zh': '中文',
         'lang.en': 'English',
         'lang.label': 'Language',
+        'nav.topTabs.aria': 'Navigation',
 
         // Common
         'common.all': 'All',
         'common.copy': 'Copy',
+        'common.edit': 'Edit',
         'common.install': 'Install',
         'common.update': 'Update',
         'common.uninstall': 'Uninstall',
@@ -947,6 +966,8 @@ const DICT = Object.freeze({
         'common.selectAll': 'Select all',
         'common.unselectAll': 'Unselect all',
         'common.resetFilters': 'Reset filters',
+        'common.notEditable': 'Not editable',
+        'common.notDeletable': 'Not deletable',
         'common.notLoaded': 'Not loaded',
         'common.exists': 'Exists',
         'common.notExistsWillCreateOnApply': 'Not found. Will be created on apply.',
@@ -1304,6 +1325,7 @@ const DICT = Object.freeze({
         'docs.section.commandsNote': 'Copy and run directly.',
         'docs.section.faq': 'FAQ',
         'docs.section.faqNote': 'Common issues and tips.',
+        'docs.command.aria': '{name} command',
         'docs.registryHintPrefix': 'Command will append:',
         'docs.registryHintCustom': 'Enter a full URL (http/https) to append as registry.',
         'docs.registry.tencent': 'Tencent Cloud',
@@ -1494,13 +1516,19 @@ const DICT = Object.freeze({
         'modal.agents.hint.default': 'Saved content will be written to AGENTS.md (next to config.toml).',
         'modal.agents.hint.claudeMd': 'Saved content will be written to ~/.claude/CLAUDE.md.',
         'modal.agents.hint.openclaw': 'Saved content will be written to OpenClaw workspace AGENTS.md.',
+        'modal.agents.title.openclawWorkspaceFile': 'OpenClaw workspace file: {fileName}',
+        'modal.agents.hint.openclawWorkspaceFile': 'Saved content will be written to OpenClaw workspace {fileName}.',
         'config.url.unset': 'URL not set',
         'config.badge.system': 'System',
         'config.healthTest': 'Health chat test',
+        'config.healthTest.aria': 'Open health chat test ({name})',
         'config.switchProviderFirst': 'Switch to this provider first',
         'config.shareCommand': 'Share command',
         'config.shareDisabled': 'Not shareable'
         ,
+        'config.shareCommand.aria': 'Share import command',
+        'config.provider.edit.aria': 'Edit provider: {name}',
+        'config.provider.delete.aria': 'Delete provider: {name}',
         'app.loadingConfig': 'Loading configuration...'
         ,
         'common.current': 'Current {value}',
@@ -1651,6 +1679,7 @@ const DICT = Object.freeze({
         'settings.tab.backup': 'Backup & Import',
         'settings.tab.trash': 'Trash',
         'settings.tab.device': 'Device',
+        'settings.tabs.aria': 'Settings tabs',
         'settings.sharePrefix.title': 'Share command prefix',
         'settings.sharePrefix.meta': 'Used as the prefix for “Copy share command” in the Web UI',
         'settings.sharePrefix.label': 'Prefix',
@@ -1772,6 +1801,8 @@ const DICT = Object.freeze({
         'claude.action.delete': 'Delete',
         'claude.action.shareDisabled': 'Share import command (disabled)'
         ,
+        'claude.action.editAria': 'Edit Claude config: {name}',
+        'claude.action.deleteAria': 'Delete Claude config: {name}',
 
         // OpenClaw config panel
         'openclaw.applyHint': 'Writes to ~/.openclaw/openclaw.json (JSON5 supported).',
@@ -1788,6 +1819,9 @@ const DICT = Object.freeze({
         'modal.openclaw.quick.subtitle': '3 steps: fill provider/model, write to editor, save & apply.',
         'modal.openclaw.quick.step2': 'Write to editor',
         'modal.openclaw.structured.writeHint': 'Writing to editor may reformat JSON and drop comments.'
+        ,
+        'openclaw.action.editAria': 'Edit OpenClaw config: {name}',
+        'openclaw.action.deleteAria': 'Delete OpenClaw config: {name}'
     }
 });
 
