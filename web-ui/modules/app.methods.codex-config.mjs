@@ -313,11 +313,50 @@ export function createCodexConfigMethods(options = {}) {
         async runHealthCheck() {
             this.healthCheckLoading = true;
             this.healthCheckResult = null;
+            this.healthCheckBatchTotal = 0;
+            this.healthCheckBatchDone = 0;
+            this.healthCheckBatchFailed = 0;
             let shouldRunClaudeSpeedTests = false;
             try {
-                const res = await api('config-health-check', {
-                    remote: this.configMode === 'codex'
-                });
+                const shouldRunSpeedTests = this.configMode === 'codex';
+                const speedTimeoutMs = shouldRunSpeedTests ? 3500 : 0;
+                const providers = shouldRunSpeedTests
+                    ? (this.providersList || [])
+                        .map((provider) => typeof provider === 'string'
+                            ? provider.trim()
+                            : String((provider && provider.name) || '').trim())
+                        .filter(Boolean)
+                    : [];
+                const currentProvider = String(this.currentProvider || '').trim();
+                const orderedProviders = currentProvider && providers.includes(currentProvider)
+                    ? [currentProvider, ...providers.filter((name) => name !== currentProvider)]
+                    : providers;
+                this.healthCheckBatchTotal = orderedProviders.length;
+
+                const speedTasks = orderedProviders.map((provider) => this.runSpeedTest(provider, { silent: true, timeoutMs: speedTimeoutMs })
+                    .then((result) => {
+                        if (!result || result.ok !== true) {
+                            this.healthCheckBatchFailed += 1;
+                        }
+                        return { name: provider, result };
+                    })
+                    .catch((err) => {
+                        this.healthCheckBatchFailed += 1;
+                        return {
+                            name: provider,
+                            result: { ok: false, error: err && err.message ? err.message : 'Speed test failed' }
+                        };
+                    })
+                    .finally(() => {
+                        this.healthCheckBatchDone += 1;
+                    })
+                );
+
+                const configTask = api('config-health-check', { remote: this.configMode === 'codex' });
+                const [res, pairs] = await Promise.all([
+                    configTask,
+                    Promise.all(speedTasks)
+                ]);
                 if (hasResponseError(res)) {
                     this.healthCheckResult = null;
                     this.showMessage(getResponseMessage(res, '检查失败'), 'error');
@@ -325,38 +364,16 @@ export function createCodexConfigMethods(options = {}) {
                     shouldRunClaudeSpeedTests = true;
                     const issues = Array.isArray(res.issues) ? [...res.issues] : [];
                     let remote = res.remote || null;
-                    {
-                        const providers = (this.providersList || [])
-                            .map((provider) => typeof provider === 'string'
-                                ? provider.trim()
-                                : String((provider && provider.name) || '').trim())
-                            .filter(Boolean);
-                        const tasks = providers.map(provider =>
-                            this.runSpeedTest(provider, { silent: true })
-                                .then(result => ({ name: provider, result }))
-                                .catch(err => ({
-                                    name: provider,
-                                    result: { ok: false, error: err && err.message ? err.message : 'Speed test failed' }
-                                }))
-                        );
-                        const pairs = await Promise.all(tasks);
+                    if (shouldRunSpeedTests) {
                         const results = {};
                         for (const pair of pairs) {
                             results[pair.name] = pair.result || null;
                             const issue = this.buildSpeedTestIssue(pair.name, pair.result);
                             if (issue) issues.push(issue);
                         }
-                        if (remote && typeof remote === 'object') {
-                            remote = {
-                                ...remote,
-                                speedTests: results
-                            };
-                        } else {
-                            remote = {
-                                type: 'speed-test',
-                                speedTests: results
-                            };
-                        }
+                        remote = remote && typeof remote === 'object'
+                            ? { ...remote, speedTests: results }
+                            : { type: 'speed-test', speedTests: results };
                     }
 
                     const ok = issues.length === 0;
@@ -377,6 +394,8 @@ export function createCodexConfigMethods(options = {}) {
                 this.healthCheckResult = null;
                 this.showMessage('检查失败', 'error');
             } finally {
+                this.healthCheckBatchTotal = this.healthCheckBatchTotal || 0;
+                this.healthCheckBatchDone = Math.min(this.healthCheckBatchDone || 0, this.healthCheckBatchTotal || 0);
                 if (shouldRunClaudeSpeedTests && this.configMode === 'claude') {
                     try {
                         const entries = Object.entries(this.claudeConfigs || {});

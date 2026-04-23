@@ -37,7 +37,12 @@ export function createRuntimeMethods(options = {}) {
             const silent = !!options.silent;
             this.speedLoading[name] = true;
             try {
-                const res = await api('speed-test', { name });
+                const timeoutMs = Number.isFinite(options.timeoutMs) ? Math.max(1000, Number(options.timeoutMs)) : 0;
+                const payload = { name };
+                if (timeoutMs) {
+                    payload.timeoutMs = timeoutMs;
+                }
+                const res = await api('speed-test', payload);
                 if (res.error) {
                     this.speedResults[name] = { ok: false, error: res.error };
                     if (!silent) {

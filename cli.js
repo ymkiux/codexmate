@@ -8518,6 +8518,9 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                                 result = { error: target.error };
                                 break;
                             }
+                            const timeoutMs = Number.isFinite(params && params.timeoutMs)
+                                ? Math.max(1000, Number(params.timeoutMs))
+                                : 0;
                             if (Array.isArray(target.candidates) && target.candidates.length > 0) {
                                 let finalCandidate = target.candidates[0];
                                 let finalResult = null;
@@ -8526,7 +8529,8 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                                     const probeResult = await runSpeedTest(candidate.url, target.apiKey, {
                                         ...candidate,
                                         apiKeyHeader: target.apiKeyHeader,
-                                        headers: target.headers
+                                        headers: target.headers,
+                                        timeoutMs: timeoutMs || undefined
                                     });
                                     finalCandidate = candidate;
                                     finalResult = probeResult;
@@ -8545,7 +8549,10 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                                 };
                                 break;
                             }
-                            result = await runSpeedTest(target.url, target.apiKey, target);
+                            result = await runSpeedTest(target.url, target.apiKey, {
+                                ...target,
+                                timeoutMs: timeoutMs || undefined
+                            });
                             break;
                         }
                         case 'provider-chat-check': {
