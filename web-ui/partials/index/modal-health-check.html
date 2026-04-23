@@ -46,7 +46,10 @@
                             <span v-if="item.durationMs">{{ item.durationMs }} ms</span>
                         </div>
                         <div class="health-check-message-text">{{ item.text }}</div>
-                        <pre v-if="item.rawPreview" class="health-check-message-raw">{{ item.rawPreview }}</pre>
+                        <details v-if="item.rawPreview" class="health-check-message-details">
+                            <summary>{{ t('modal.healthCheck.details') }}</summary>
+                            <pre class="health-check-message-raw">{{ item.rawPreview }}</pre>
+                        </details>
                     </div>
                 </div>
 

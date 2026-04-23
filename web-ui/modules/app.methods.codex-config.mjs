@@ -24,6 +24,45 @@ function getResponseMessage(response, fallback) {
     return fallback;
 }
 
+function sanitizeHealthCheckDetail(detail) {
+    const text = String(detail || '').trim();
+    if (!text) return '';
+    const clipped = text.length > 1600 ? `${text.slice(0, 1600)}...` : text;
+    const scrubbed = clipped
+        .replace(/(?:[A-Za-z]:\\|\/)[^\s:]+(?:[\\/][^\s:]+)+(?=:\d+)/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    return scrubbed;
+}
+
+function formatHealthCheckErrorMessage(raw, t, lang) {
+    const detail = sanitizeHealthCheckDetail(raw);
+    const lower = detail.toLowerCase();
+    const isEn = typeof lang === 'string' && lang.trim().toLowerCase() === 'en';
+    const pick = (key, fallbackZh, fallbackEn) => (typeof t === 'function'
+        ? t(key)
+        : (isEn ? fallbackEn : fallbackZh));
+    if (!detail) {
+        return { message: pick('modal.healthCheck.error.unknown', '请求失败：请检查 endpoint、网络与鉴权配置。', 'Request failed. Check endpoint, network, and auth settings.'), detail: '' };
+    }
+    if (/handshake|sslv3|ssl routines|eproto/.test(lower)) {
+        return { message: pick('modal.healthCheck.error.handshake', 'TLS 握手失败：请检查 endpoint 是否支持 HTTPS、证书/协议是否兼容。', 'TLS handshake failed. Check endpoint HTTPS support and certificate/protocol compatibility.'), detail };
+    }
+    if (/self signed|unable to verify|certificate|cert_|tls/.test(lower)) {
+        return { message: pick('modal.healthCheck.error.cert', 'TLS 证书校验失败：可能为自签名证书或证书链不完整。', 'TLS certificate validation failed. The certificate may be self-signed or incomplete.'), detail };
+    }
+    if (/enotfound|eai_again|dns/.test(lower)) {
+        return { message: pick('modal.healthCheck.error.dns', 'DNS 解析失败：请检查域名与网络环境。', 'DNS lookup failed. Check the hostname and network.'), detail };
+    }
+    if (/econnrefused|refused/.test(lower)) {
+        return { message: pick('modal.healthCheck.error.refused', '连接被拒绝：请检查端口是否开放或服务是否在运行。', 'Connection refused. Check whether the service/port is reachable.'), detail };
+    }
+    if (/timeout|timed out|etimedout/.test(lower)) {
+        return { message: pick('modal.healthCheck.error.timeout', '连接超时：请检查网络或 endpoint 是否可达。', 'Request timed out. Check network connectivity or endpoint availability.'), detail };
+    }
+    return { message: pick('modal.healthCheck.error.unknown', '请求失败：请检查 endpoint、网络与鉴权配置。', 'Request failed. Check endpoint, network, and auth settings.'), detail };
+}
+
 export function createCodexConfigMethods(options = {}) {
     const {
         api,
@@ -422,7 +461,9 @@ export function createCodexConfigMethods(options = {}) {
                 this.healthCheckDialogLastResult = res;
 
                 if (hasResponseError(res) || res.ok === false) {
-                    const message = getResponseMessage(res, '健康聊天测试失败');
+                    const rawMessage = getResponseMessage(res, '健康聊天测试失败');
+                    const formatted = formatHealthCheckErrorMessage(rawMessage, this.t, this.lang);
+                    const message = formatted.message || rawMessage;
                     this.healthCheckDialogMessages.push({
                         id: `assistant-${Date.now()}`,
                         role: 'assistant',
@@ -431,7 +472,7 @@ export function createCodexConfigMethods(options = {}) {
                         status: Number.isFinite(res && res.status) ? res.status : 0,
                         durationMs: Number.isFinite(res && res.durationMs) ? res.durationMs : 0,
                         model: typeof (res && res.model) === 'string' ? res.model : '',
-                        rawPreview: typeof (res && res.rawPreview) === 'string' ? res.rawPreview : ''
+                        rawPreview: formatted.detail || (typeof (res && res.rawPreview) === 'string' ? res.rawPreview : '')
                     });
                     this.showMessage(message, 'error');
                     return;
@@ -452,7 +493,9 @@ export function createCodexConfigMethods(options = {}) {
                 });
                 this.healthCheckDialogPrompt = '';
             } catch (e) {
-                const message = e && e.message ? e.message : '健康聊天测试失败';
+                const rawMessage = e && e.message ? e.message : '健康聊天测试失败';
+                const formatted = formatHealthCheckErrorMessage(rawMessage, this.t, this.lang);
+                const message = formatted.message || rawMessage;
                 this.healthCheckDialogMessages.push({
                     id: `assistant-${Date.now()}`,
                     role: 'assistant',
@@ -461,7 +504,7 @@ export function createCodexConfigMethods(options = {}) {
                     status: 0,
                     durationMs: 0,
                     model: '',
-                    rawPreview: ''
+                    rawPreview: formatted.detail
                 });
                 this.healthCheckDialogLastResult = { ok: false, error: message };
                 this.showMessage(message, 'error');

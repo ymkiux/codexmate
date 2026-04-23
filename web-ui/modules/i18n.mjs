@@ -281,7 +281,14 @@ const DICT = Object.freeze({
         'modal.healthCheck.result.fail': '本轮失败',
         'modal.healthCheck.emptyHint': '发一句话，看是否正常回复。',
         'modal.healthCheck.realApiHint': '真实接口，单轮发送，不带历史上下文。',
+        'modal.healthCheck.details': '详情',
         'modal.healthCheck.send': '发送测试',
+        'modal.healthCheck.error.handshake': 'TLS 握手失败：请检查 endpoint 是否支持 HTTPS、证书/协议是否兼容。',
+        'modal.healthCheck.error.cert': 'TLS 证书校验失败：可能为自签名证书或证书链不完整。',
+        'modal.healthCheck.error.timeout': '连接超时：请检查网络或 endpoint 是否可达。',
+        'modal.healthCheck.error.dns': 'DNS 解析失败：请检查域名与网络环境。',
+        'modal.healthCheck.error.refused': '连接被拒绝：请检查端口是否开放或服务是否在运行。',
+        'modal.healthCheck.error.unknown': '请求失败：请检查 endpoint、网络与鉴权配置。',
 
         // Basic modals
         'modal.providerAdd.title': '添加提供商',
@@ -1164,7 +1171,14 @@ const DICT = Object.freeze({
         'modal.healthCheck.result.fail': 'Failed',
         'modal.healthCheck.emptyHint': 'Send a message and see if it replies.',
         'modal.healthCheck.realApiHint': 'Real API call. Single turn, no history.',
+        'modal.healthCheck.details': 'Details',
         'modal.healthCheck.send': 'Send test',
+        'modal.healthCheck.error.handshake': 'TLS handshake failed. Check endpoint HTTPS support and certificate/protocol compatibility.',
+        'modal.healthCheck.error.cert': 'TLS certificate validation failed. The certificate may be self-signed or incomplete.',
+        'modal.healthCheck.error.timeout': 'Request timed out. Check network connectivity or endpoint availability.',
+        'modal.healthCheck.error.dns': 'DNS lookup failed. Check the hostname and network.',
+        'modal.healthCheck.error.refused': 'Connection refused. Check whether the service/port is reachable.',
+        'modal.healthCheck.error.unknown': 'Request failed. Check endpoint, network, and auth settings.',
 
         // Basic modals
         'modal.providerAdd.title': 'Add provider',
