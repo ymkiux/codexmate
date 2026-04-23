@@ -388,7 +388,8 @@ test('sendHealthCheckDialogMessage appends transcript and clears prompt after su
         action: 'provider-chat-check',
         params: {
             name: 'alpha',
-            prompt: 'say ok'
+            prompt: 'say ok',
+            timeoutMs: 10000
         }
     }]);
     assert.strictEqual(context.healthCheckDialogPrompt, '');

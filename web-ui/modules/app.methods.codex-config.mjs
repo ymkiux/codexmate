@@ -456,7 +456,8 @@ export function createCodexConfigMethods(options = {}) {
             try {
                 const res = await api('provider-chat-check', {
                     name: provider,
-                    prompt
+                    prompt,
+                    timeoutMs: 10000
                 });
                 this.healthCheckDialogLastResult = res;
 
