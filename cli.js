@@ -42,7 +42,9 @@ const {
     extractModelNames,
     hasModelsListPayload,
     buildModelsCacheKey,
+    buildApiProbeUrlCandidates,
     buildModelProbeSpec,
+    buildModelProbeSpecs,
     buildModelConversationSpecs,
     extractModelResponseText,
     normalizeWireApi,
@@ -6067,20 +6069,32 @@ function resolveSpeedTestTarget(params) {
         if (!provider.base_url) {
             return { error: 'Provider missing URL' };
         }
-        const currentModel = typeof config.model === 'string' ? config.model.trim() : '';
-        const probeSpec = buildModelProbeSpec(provider, currentModel, provider.base_url);
-        if (probeSpec && probeSpec.url) {
-            return {
-                method: 'POST',
-                url: probeSpec.url,
-                body: probeSpec.body,
-                apiKey: provider.preferred_auth_method || ''
-            };
+        const providerName = String(params.name).trim();
+        const currentModels = readCurrentModels();
+        const selectedModel = typeof currentModels[providerName] === 'string' && currentModels[providerName].trim()
+            ? currentModels[providerName].trim()
+            : (typeof config.model === 'string' ? config.model.trim() : '');
+
+        const apiKey = typeof provider.preferred_auth_method === 'string'
+            ? provider.preferred_auth_method.trim()
+            : '';
+
+        const candidates = [];
+        for (const url of buildApiProbeUrlCandidates(provider.base_url, 'models')) {
+            candidates.push({ method: 'GET', url });
         }
+        for (const spec of buildModelProbeSpecs(provider, selectedModel, provider.base_url)) {
+            if (!spec || !spec.url) continue;
+            candidates.push({ method: 'POST', url: spec.url, body: spec.body });
+        }
+        if (candidates.length === 0) {
+            candidates.push({ method: 'GET', url: provider.base_url });
+        }
+
         return {
-            method: 'GET',
-            url: provider.base_url,
-            apiKey: provider.preferred_auth_method || ''
+            kind: 'provider',
+            candidates,
+            apiKey
         };
     }
 
@@ -8504,7 +8518,7 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                                 result = { error: target.error };
                                 break;
                             }
-                            if (target.kind === 'claude' && Array.isArray(target.candidates) && target.candidates.length > 0) {
+                            if (Array.isArray(target.candidates) && target.candidates.length > 0) {
                                 let finalCandidate = target.candidates[0];
                                 let finalResult = null;
                                 for (let index = 0; index < target.candidates.length; index += 1) {

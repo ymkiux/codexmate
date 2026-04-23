@@ -196,6 +196,18 @@
                             <div class="card-actions" @click.stop>
                                 <button
                                     class="card-action-btn"
+                                    :class="{ loading: speedLoading[provider.name] }"
+                                    :disabled="!!speedLoading[provider.name]"
+                                    @click="runSpeedTest(provider.name, { silent: true })"
+                                    :aria-label="t('config.availabilityTestAria', { name: provider.name })"
+                                    :title="t('config.availabilityTest')"
+                                >
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M13 2L3 14h7l-1 8 12-14h-7l1-6z"/>
+                                    </svg>
+                                </button>
+                                <button
+                                    class="card-action-btn"
                                     @click="openHealthCheckDialog({ providerName: provider.name, locked: true })"
                                     :disabled="displayCurrentProvider !== provider.name"
                                     :aria-label="`Open health dialog for ${provider.name}`"

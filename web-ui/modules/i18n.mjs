@@ -600,6 +600,8 @@ const DICT = Object.freeze({
         'config.badge.system': '系统',
         'config.healthTest': '健康聊天测试',
         'config.switchProviderFirst': '请先切换到该提供商',
+        'config.availabilityTest': '可用性测试',
+        'config.availabilityTestAria': '测试 {name} 可用性',
         'config.shareCommand': '分享命令',
         'config.shareDisabled': '不可分享'
         ,
@@ -1490,6 +1492,8 @@ const DICT = Object.freeze({
         'config.badge.system': 'System',
         'config.healthTest': 'Health chat test',
         'config.switchProviderFirst': 'Switch to this provider first',
+        'config.availabilityTest': 'Availability test',
+        'config.availabilityTestAria': 'Test availability for {name}',
         'config.shareCommand': 'Share command',
         'config.shareDisabled': 'Not shareable'
         ,

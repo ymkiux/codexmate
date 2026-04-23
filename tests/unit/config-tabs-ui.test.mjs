@@ -322,6 +322,10 @@ test('config template keeps expected config tabs in top and side navigation', ()
         html,
         /<button[\s\S]*class="card-action-btn"[\s\S]*@click="openHealthCheckDialog\(\{ providerName: provider\.name, locked: true \}\)"[\s\S]*:disabled="displayCurrentProvider !== provider\.name"[\s\S]*:aria-label="`Open health dialog for \$\{provider\.name\}`"[\s\S]*:title="displayCurrentProvider === provider\.name \? t\('config\.healthTest'\) : t\('config\.switchProviderFirst'\)"/
     );
+    assert.match(
+        html,
+        /<button[\s\S]*class="card-action-btn"[\s\S]*@click="runSpeedTest\(provider\.name, \{ silent: true \}\)"[\s\S]*:aria-label="t\('config\.availabilityTestAria', \{ name: provider\.name \}\)"[\s\S]*:title="t\('config\.availabilityTest'\)"/
+    );
     assert.match(html, /<button[\s\S]*?@click="openEditModal\(provider\)"[\s\S]*?:aria-label="`Edit provider \$\{provider\.name\}`"[\s\S]*?:title="shouldShowProviderEdit\(provider\) \? '编辑' : '不可编辑'">/);
     assert.match(html, /<button[\s\S]*?@click="deleteProvider\(provider\.name\)"[\s\S]*?:aria-label="`Delete provider \$\{provider\.name\}`"[\s\S]*?:title="shouldShowProviderDelete\(provider\) \? '删除' : '不可删除'">/);
     assert.match(html, /<button class="card-action-btn"[^>]*@click="openEditConfigModal\(name\)"[^>]*:aria-label="`Edit Claude config \$\{name\}`"[^>]*:title="t\('claude\.action\.edit'\)">/);
