@@ -28,8 +28,8 @@ test('each builtin plugin has ownership file matched to plugin id', async () => 
     assert.ok(folders.length > 0, 'expected at least one builtin plugin folder');
 
     for (const folder of folders) {
-        const ownershipPath = path.join(pluginsDir, folder, 'ownership.mjs');
-        assert.ok(fs.existsSync(ownershipPath), `missing ownership.mjs for plugin: ${folder}`);
+        const ownershipPath = path.join(pluginsDir, folder, 'plugin-ownership.mjs');
+        assert.ok(fs.existsSync(ownershipPath), `missing plugin-ownership.mjs for plugin: ${folder}`);
 
         const manifestUrl = pathToFileURL(path.join(pluginsDir, folder, 'manifest.mjs')).href;
         const ownershipUrl = pathToFileURL(ownershipPath).href;
@@ -47,4 +47,3 @@ test('each builtin plugin has ownership file matched to plugin id', async () => 
         }
     }
 });
-

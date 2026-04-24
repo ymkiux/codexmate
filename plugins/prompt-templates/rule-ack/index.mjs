@@ -1,4 +1,4 @@
-import { pluginOwnership } from '../ownership.mjs';
+import { ruleAckOwnership } from './ownership.mjs';
 
 export function buildBuiltinRuleAckTemplate(t) {
     const tr = (key, fallback, params = null) => (typeof t === 'function' ? t(key, params) : fallback);
@@ -12,7 +12,7 @@ export function buildBuiltinRuleAckTemplate(t) {
         createdAt: timestamp,
         updatedAt: timestamp,
         isBuiltin: true,
-        createdBy: pluginOwnership.createdBy,
-        maintainers: pluginOwnership.maintainers
+        createdBy: ruleAckOwnership.createdBy,
+        maintainers: ruleAckOwnership.maintainers
     };
 }

@@ -1,4 +1,4 @@
-import { pluginOwnership } from '../ownership.mjs';
+import { commentPolishOwnership } from './ownership.mjs';
 
 export function buildBuiltinCommentPolishTemplate(t) {
     const tr = (key, fallback, params = null) => (typeof t === 'function' ? t(key, params) : fallback);
@@ -16,7 +16,7 @@ export function buildBuiltinCommentPolishTemplate(t) {
         createdAt: timestamp,
         updatedAt: timestamp,
         isBuiltin: true,
-        createdBy: pluginOwnership.createdBy,
-        maintainers: pluginOwnership.maintainers
+        createdBy: commentPolishOwnership.createdBy,
+        maintainers: commentPolishOwnership.maintainers
     };
 }
