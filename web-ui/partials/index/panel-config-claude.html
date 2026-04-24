@@ -89,15 +89,6 @@
 
                 <div class="selector-section">
                     <div class="selector-header">
-                        <span class="selector-title">{{ t('claude.health.title') }}</span>
-                    </div>
-                    <button class="btn-tool" @click="runHealthCheck" :disabled="healthCheckLoading || loading || !!initError">
-                        {{ healthCheckLoading ? t('claude.health.running') : t('claude.health.run') }}
-                    </button>
-                </div>
-
-                <div class="selector-section">
-                    <div class="selector-header">
                         <span class="selector-title">CLAUDE.md</span>
                     </div>
                     <button class="btn-tool" @click="openClaudeMdEditor" :disabled="loading || !!initError || agentsLoading">
@@ -106,6 +97,15 @@
                     <div class="config-template-hint">
                         {{ t('claude.md.hint') }}
                     </div>
+                </div>
+
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">{{ t('claude.health.title') }}</span>
+                    </div>
+                    <button class="btn-tool" @click="runHealthCheck" :disabled="healthCheckLoading || loading || !!initError">
+                        {{ healthCheckLoading ? t('claude.health.running') : t('claude.health.run') }}
+                    </button>
                 </div>
 
                 <div class="card-list">
