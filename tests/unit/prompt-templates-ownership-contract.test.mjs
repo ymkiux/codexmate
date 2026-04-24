@@ -21,11 +21,14 @@ test('prompt template ownership is bound to builtin template id', async () => {
         }
     ];
 
+    const ownershipUrl = pathToFileURL(path.join(pluginRoot, 'ownership.mjs')).href;
+    const ownershipMod = await import(`${ownershipUrl}?t=${Date.now()}`);
+    const templateOwnershipById = ownershipMod && ownershipMod.templateOwnershipById ? ownershipMod.templateOwnershipById : null;
+    assert.ok(templateOwnershipById && typeof templateOwnershipById === 'object');
+
     for (const tpl of templates) {
         const buildUrl = pathToFileURL(path.join(pluginRoot, tpl.folder, 'index.mjs')).href;
-        const ownershipUrl = pathToFileURL(path.join(pluginRoot, tpl.folder, 'ownership.mjs')).href;
-        const ownershipMod = await import(`${ownershipUrl}?t=${Date.now()}`);
-        const ownership = tpl.folder === 'comment-polish' ? ownershipMod.commentPolishOwnership : ownershipMod.ruleAckOwnership;
+        const ownership = templateOwnershipById[tpl.expectedId] || null;
         assert.ok(ownership && typeof ownership === 'object');
         assert.strictEqual(ownership.templateId, tpl.expectedId);
         assert.ok(typeof ownership.createdBy === 'string' && ownership.createdBy.trim());

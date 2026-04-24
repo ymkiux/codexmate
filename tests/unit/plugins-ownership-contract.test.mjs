@@ -28,13 +28,14 @@ test('each builtin plugin has ownership file matched to plugin id', async () => 
     assert.ok(folders.length > 0, 'expected at least one builtin plugin folder');
 
     for (const folder of folders) {
-        const ownershipPath = path.join(pluginsDir, folder, 'plugin-ownership.mjs');
-        assert.ok(fs.existsSync(ownershipPath), `missing plugin-ownership.mjs for plugin: ${folder}`);
+        const ownershipPath = path.join(pluginsDir, folder, 'ownership.mjs');
+        assert.ok(fs.existsSync(ownershipPath), `missing ownership.mjs for plugin: ${folder}`);
 
         const manifestUrl = pathToFileURL(path.join(pluginsDir, folder, 'manifest.mjs')).href;
         const ownershipUrl = pathToFileURL(ownershipPath).href;
         const { pluginMeta } = await import(`${manifestUrl}?t=${Date.now()}`);
-        const { pluginOwnership } = await import(`${ownershipUrl}?t=${Date.now()}`);
+        const mod = await import(`${ownershipUrl}?t=${Date.now()}`);
+        const pluginOwnership = mod && mod.pluginOwnership ? mod.pluginOwnership : null;
 
         assert.ok(pluginMeta && typeof pluginMeta === 'object', `invalid pluginMeta for plugin: ${folder}`);
         assert.strictEqual(pluginMeta.id, folder, `pluginMeta.id must match folder name: ${folder}`);

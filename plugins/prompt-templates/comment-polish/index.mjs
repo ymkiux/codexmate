@@ -1,9 +1,12 @@
-import { commentPolishOwnership } from './ownership.mjs';
+import { templateOwnershipById } from '../ownership.mjs';
 
 export function buildBuiltinCommentPolishTemplate(t) {
     const tr = (key, fallback, params = null) => (typeof t === 'function' ? t(key, params) : fallback);
     const line1 = tr('plugins.builtin.commentPolish.line1', '轻微收敛以下代码注释');
     const timestamp = new Date().toISOString();
+    const ownership = templateOwnershipById && templateOwnershipById.builtin_comment_polish
+        ? templateOwnershipById.builtin_comment_polish
+        : null;
     return {
         id: 'builtin_comment_polish',
         name: tr('plugins.builtin.commentPolish.name', '代码注释润色'),
@@ -16,7 +19,7 @@ export function buildBuiltinCommentPolishTemplate(t) {
         createdAt: timestamp,
         updatedAt: timestamp,
         isBuiltin: true,
-        createdBy: commentPolishOwnership.createdBy,
-        maintainers: commentPolishOwnership.maintainers
+        createdBy: ownership && typeof ownership.createdBy === 'string' ? ownership.createdBy : '',
+        maintainers: ownership && Array.isArray(ownership.maintainers) ? ownership.maintainers : []
     };
 }

@@ -1,4 +1,4 @@
-import { pluginOwnership } from './plugin-ownership.mjs';
+import { pluginOwnership } from './ownership.mjs';
 
 const baseMeta = {
     id: 'prompt-templates',
