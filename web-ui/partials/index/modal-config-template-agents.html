@@ -107,7 +107,7 @@
 
 
                     <div class="form-group">
-                        <label class="form-label">{{ t('modal.agents.contentLabel') }}</label>
+                        <label class="form-label">{{ t(agentsContext === 'claude-md' ? 'modal.agents.contentLabel.claudeMd' : 'modal.agents.contentLabel') }}</label>
                         <div
                             v-if="!agentsLoading && (hasAgentsContentChanged() || agentsDiffVisible)"
                             class="agents-diff-save-alert">
@@ -143,7 +143,7 @@
                             spellcheck="false"
                             :readonly="agentsLoading || agentsSaving"
                             @input="onAgentsContentInput"
-                            :placeholder="t('modal.agents.placeholder')"></textarea>
+                            :placeholder="t(agentsContext === 'claude-md' ? 'modal.agents.placeholder.claudeMd' : 'modal.agents.placeholder')"></textarea>
                         <div class="template-editor-warning">
                             {{ agentsModalHint }}
                             <div class="agents-diff-hint">{{ t('modal.agents.hint.shortcuts') }}</div>
