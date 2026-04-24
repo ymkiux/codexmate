@@ -251,28 +251,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 installCommandAction: 'install',
                 installRegistryPreset: 'default',
                 installRegistryCustom: '',
-                installStatusTargets: [
-                    {
-                        id: 'claude',
-                        name: 'Claude Code CLI',
-                        packageName: '@anthropic-ai/claude-code',
-                        installed: false,
-                        bin: 'claude',
-                        version: '',
-                        commandPath: '',
-                        error: ''
-                    },
-                    {
-                        id: 'codex',
-                        name: 'Codex CLI',
-                        packageName: '@openai/codex',
-                        installed: false,
-                        bin: 'codex',
-                        version: '',
-                        commandPath: '',
-                        error: ''
-                    }
-                ],
+                installStatusTargets: null,
                 newProvider: { name: '', url: '', key: '', useTransform: false },
                 resetConfigLoading: false,
                 editingProvider: { name: '', url: '', key: '', readOnly: false, nonEditable: false },
