@@ -6079,12 +6079,12 @@ function resolveSpeedTestTarget(params) {
             : '';
 
         const candidates = [];
-        for (const url of buildApiProbeUrlCandidates(provider.base_url, 'models')) {
-            candidates.push({ method: 'GET', url });
-        }
         for (const spec of buildModelProbeSpecs(provider, selectedModel, provider.base_url)) {
             if (!spec || !spec.url) continue;
             candidates.push({ method: 'POST', url: spec.url, body: spec.body });
+        }
+        for (const url of buildApiProbeUrlCandidates(provider.base_url, 'models')) {
+            candidates.push({ method: 'GET', url });
         }
         if (candidates.length === 0) {
             candidates.push({ method: 'GET', url: provider.base_url });
