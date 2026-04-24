@@ -77,7 +77,7 @@
                                 <option value="90d">{{ t('sessions.time.90d') }}</option>
                             </select>
                             <button class="btn-tool btn-tool-compact" type="button" @click="copySessionsFilterShareUrl" :disabled="sessionsLoading">
-                                复制筛选链接
+                                {{ t('sessions.filters.copyLink') }}
                             </button>
                             <button class="btn-tool btn-tool-compact" type="button" @click="clearSessionFilters" :disabled="sessionsLoading">
                                 {{ t('common.resetFilters') }}

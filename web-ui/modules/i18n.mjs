@@ -6,10 +6,12 @@ const DICT = Object.freeze({
         'lang.zh': '中文',
         'lang.en': 'English',
         'lang.label': '语言',
+        'nav.topTabs.aria': '导航',
 
         // Common
         'common.all': '全部',
         'common.copy': '复制',
+        'common.edit': '编辑',
         'common.install': '安装',
         'common.update': '升级',
         'common.uninstall': '卸载',
@@ -53,6 +55,8 @@ const DICT = Object.freeze({
         'common.selectAll': '全选',
         'common.unselectAll': '取消全选',
         'common.resetFilters': '重置筛选',
+        'common.notEditable': '不可编辑',
+        'common.notDeletable': '不可删除',
         'common.notLoaded': '未加载',
         'common.exists': '已存在',
         'common.notExistsWillCreateOnApply': '不存在，将在应用时创建',
@@ -194,12 +198,17 @@ const DICT = Object.freeze({
         'plugins.promptTemplates.compose.selectTemplate': '选择模板',
         'plugins.promptTemplates.compose.chooseTemplate': '选择模板',
         'plugins.promptTemplates.compose.chooseTemplateHint': '请选择一个模板开始生成。',
+        'plugins.promptTemplates.compose.builtinSuffix': '（内置）',
         'plugins.promptTemplates.compose.empty': '暂无可用模板。',
         'plugins.promptTemplates.compose.varsHint': '变量填写与新增请在「管理」中进行。',
+        'plugins.promptTemplates.compose.missingCount': '未填 {count} 项',
+        'plugins.promptTemplates.compose.jumpToMissing': '跳到未填',
         'plugins.promptTemplates.compose.goManage': '去管理填写变量',
         'plugins.promptTemplates.compose.outputTitle': '生成结果',
         'plugins.promptTemplates.compose.outputHint': '点“复制”后直接粘贴到 Codex/Claude 输入框。',
+        'plugins.promptTemplates.compose.outputAria': '生成结果（提示词）',
         'plugins.promptTemplates.compose.copy': '复制',
+        'plugins.promptTemplates.manage.searchAria': '搜索模板',
         'plugins.promptTemplates.manage.searchPlaceholder': '搜索模板',
         'plugins.promptTemplates.manage.create': '新建',
         'plugins.promptTemplates.manage.export': '导出',
@@ -212,12 +221,15 @@ const DICT = Object.freeze({
         'plugins.promptTemplates.manage.newTemplateName': '新模板',
         'plugins.promptTemplates.editor.selectHint': '请选择一个模板进行编辑。',
         'plugins.promptTemplates.editor.namePlaceholder': '模板名称',
+        'plugins.promptTemplates.editor.nameAria': '模板名称',
         'plugins.promptTemplates.editor.duplicate': '复制',
         'plugins.promptTemplates.editor.delete': '删除',
         'plugins.promptTemplates.editor.save': '保存',
         'plugins.promptTemplates.editor.builtinReadOnly': '内置模板为只读，不支持编辑/保存/删除/复制。',
         'plugins.promptTemplates.editor.descPlaceholder': '描述（可选）',
+        'plugins.promptTemplates.editor.descAria': '模板描述',
         'plugins.promptTemplates.editor.templateLabel': '模板',
+        'plugins.promptTemplates.editor.templateAria': '模板内容',
         'plugins.promptTemplates.editor.templatePlaceholder': '在这里编写模板。使用 {{var}} 占位符。',
         'plugins.promptTemplates.vars.title': '变量',
         'plugins.promptTemplates.vars.hint': '从模板中检测。填写后可渲染最终提示词。',
@@ -228,6 +240,7 @@ const DICT = Object.freeze({
         'plugins.promptTemplates.preview.title': '预览',
         'plugins.promptTemplates.preview.hint': '渲染结果（缺失变量会替换为空）。',
         'plugins.promptTemplates.preview.copy': '复制',
+        'plugins.promptTemplates.preview.outputAria': '渲染结果（提示词）',
         'plugins.promptTemplates.noPluginSelected': '请先从左侧选择一个插件。',
         'plugins.promptTemplates.varModal.title': '新增变量',
         'plugins.promptTemplates.varModal.nameLabel': '变量名',
@@ -390,6 +403,7 @@ const DICT = Object.freeze({
         'docs.section.commandsNote': '命令可直接复制。',
         'docs.section.faq': '常见问题',
         'docs.section.faqNote': '常见问题见下。',
+        'docs.command.aria': '{name} 命令',
         'docs.registryHintPrefix': '命令将附加：',
         'docs.registryHintCustom': '请输入完整 URL（含 http/https），将自动附加到命令。',
         'docs.registry.tencent': '腾讯云',
@@ -454,6 +468,8 @@ const DICT = Object.freeze({
         'sessions.time.30d': '近 30 天',
         'sessions.time.90d': '近 90 天'
         ,
+        'sessions.filters.copyLink': '复制筛选链接',
+        'sessions.filters.urlBuildFail': '无法生成链接',
         'sessions.roleLabel.user': 'User',
         'sessions.roleLabel.system': 'System',
         'sessions.roleLabel.assistant': 'Assistant'
@@ -580,6 +596,8 @@ const DICT = Object.freeze({
         'modal.agents.contentLabel.claudeMd': 'CLAUDE.md 内容',
         'modal.agents.placeholder.claudeMd': '在这里编辑 CLAUDE.md 内容',
         'modal.agents.hint.openclaw': '保存后会写入 OpenClaw Workspace 下的 AGENTS.md。',
+        'modal.agents.title.openclawWorkspaceFile': 'OpenClaw 工作区文件: {fileName}',
+        'modal.agents.hint.openclawWorkspaceFile': '保存后会写入 OpenClaw Workspace 下的 {fileName}。',
         'config.url.unset': '未设 URL',
         'config.badge.system': '系统',
         'config.availabilityTest': '可用性测试',
@@ -595,6 +613,9 @@ const DICT = Object.freeze({
         'config.shareCommand': '分享命令',
         'config.shareDisabled': '不可分享'
         ,
+        'config.shareCommand.aria': '分享导入命令',
+        'config.provider.edit.aria': '编辑提供商：{name}',
+        'config.provider.delete.aria': '删除提供商：{name}',
         'app.loadingConfig': '加载配置中...'
         ,
         'common.current': '当前 {value}',
@@ -745,6 +766,7 @@ const DICT = Object.freeze({
         'settings.tab.backup': '备份与导入',
         'settings.tab.trash': '回收站',
         'settings.tab.device': '设备',
+        'settings.tabs.aria': '设置标签页',
         'settings.sharePrefix.title': '分享命令前缀',
         'settings.sharePrefix.meta': '影响 Web UI 里“复制分享命令”的前缀',
         'settings.sharePrefix.label': '前缀',
@@ -866,6 +888,8 @@ const DICT = Object.freeze({
         'claude.action.delete': '删除',
         'claude.action.shareDisabled': '分享导入命令（暂时禁用）'
         ,
+        'claude.action.editAria': '编辑 Claude 配置：{name}',
+        'claude.action.deleteAria': '删除 Claude 配置：{name}',
 
         // OpenClaw config panel
         'openclaw.applyHint': '写入 ~/.openclaw/openclaw.json，支持 JSON5。',
@@ -882,16 +906,21 @@ const DICT = Object.freeze({
         'modal.openclaw.quick.subtitle': '按 3 步完成：填 Provider 和模型，写入编辑器，保存并应用。',
         'modal.openclaw.quick.step2': '点击写入编辑器',
         'modal.openclaw.structured.writeHint': '写入编辑器会重排 JSON，注释可能丢失。'
+        ,
+        'openclaw.action.editAria': '编辑 OpenClaw 配置：{name}',
+        'openclaw.action.deleteAria': '删除 OpenClaw 配置：{name}'
     },
     en: {
         // Global
         'lang.zh': '中文',
         'lang.en': 'English',
         'lang.label': 'Language',
+        'nav.topTabs.aria': 'Navigation',
 
         // Common
         'common.all': 'All',
         'common.copy': 'Copy',
+        'common.edit': 'Edit',
         'common.install': 'Install',
         'common.update': 'Update',
         'common.uninstall': 'Uninstall',
@@ -935,6 +964,8 @@ const DICT = Object.freeze({
         'common.selectAll': 'Select all',
         'common.unselectAll': 'Unselect all',
         'common.resetFilters': 'Reset filters',
+        'common.notEditable': 'Not editable',
+        'common.notDeletable': 'Not deletable',
         'common.notLoaded': 'Not loaded',
         'common.exists': 'Exists',
         'common.notExistsWillCreateOnApply': 'Not found. Will be created on apply.',
@@ -1076,12 +1107,17 @@ const DICT = Object.freeze({
         'plugins.promptTemplates.compose.selectTemplate': 'Select template',
         'plugins.promptTemplates.compose.chooseTemplate': 'Choose a template',
         'plugins.promptTemplates.compose.chooseTemplateHint': 'Select a template to start composing.',
+        'plugins.promptTemplates.compose.builtinSuffix': ' (built-in)',
         'plugins.promptTemplates.compose.empty': 'No templates available.',
         'plugins.promptTemplates.compose.varsHint': 'Fill and add variables in “Manage”.',
+        'plugins.promptTemplates.compose.missingCount': '{count} missing',
+        'plugins.promptTemplates.compose.jumpToMissing': 'Jump to missing',
         'plugins.promptTemplates.compose.goManage': 'Manage variables',
         'plugins.promptTemplates.compose.outputTitle': 'Output',
         'plugins.promptTemplates.compose.outputHint': 'Click “Copy” and paste into Codex/Claude.',
+        'plugins.promptTemplates.compose.outputAria': 'Rendered prompt',
         'plugins.promptTemplates.compose.copy': 'Copy',
+        'plugins.promptTemplates.manage.searchAria': 'Search templates',
         'plugins.promptTemplates.manage.searchPlaceholder': 'Search templates',
         'plugins.promptTemplates.manage.create': 'New',
         'plugins.promptTemplates.manage.export': 'Export',
@@ -1094,12 +1130,15 @@ const DICT = Object.freeze({
         'plugins.promptTemplates.manage.newTemplateName': 'New template',
         'plugins.promptTemplates.editor.selectHint': 'Select a template to edit.',
         'plugins.promptTemplates.editor.namePlaceholder': 'Template name',
+        'plugins.promptTemplates.editor.nameAria': 'Template name',
         'plugins.promptTemplates.editor.duplicate': 'Duplicate',
         'plugins.promptTemplates.editor.delete': 'Delete',
         'plugins.promptTemplates.editor.save': 'Save',
         'plugins.promptTemplates.editor.builtinReadOnly': 'Built-in templates are read-only (no edit/save/delete/duplicate).',
         'plugins.promptTemplates.editor.descPlaceholder': 'Description (optional)',
+        'plugins.promptTemplates.editor.descAria': 'Template description',
         'plugins.promptTemplates.editor.templateLabel': 'Template',
+        'plugins.promptTemplates.editor.templateAria': 'Template body',
         'plugins.promptTemplates.editor.templatePlaceholder': 'Write your template here. Use {{var}} placeholders.',
         'plugins.promptTemplates.vars.title': 'Variables',
         'plugins.promptTemplates.vars.hint': 'Detected from the template. Fill them to render the final prompt.',
@@ -1110,6 +1149,7 @@ const DICT = Object.freeze({
         'plugins.promptTemplates.preview.title': 'Preview',
         'plugins.promptTemplates.preview.hint': 'Rendered output (missing vars become empty).',
         'plugins.promptTemplates.preview.copy': 'Copy',
+        'plugins.promptTemplates.preview.outputAria': 'Rendered prompt',
         'plugins.promptTemplates.noPluginSelected': 'Select a plugin from the left panel first.',
         'plugins.promptTemplates.varModal.title': 'Add variable',
         'plugins.promptTemplates.varModal.nameLabel': 'Variable name',
@@ -1272,6 +1312,7 @@ const DICT = Object.freeze({
         'docs.section.commandsNote': 'Copy and run directly.',
         'docs.section.faq': 'FAQ',
         'docs.section.faqNote': 'Common issues and tips.',
+        'docs.command.aria': '{name} command',
         'docs.registryHintPrefix': 'Command will append:',
         'docs.registryHintCustom': 'Enter a full URL (http/https) to append as registry.',
         'docs.registry.tencent': 'Tencent Cloud',
@@ -1336,6 +1377,8 @@ const DICT = Object.freeze({
         'sessions.time.30d': 'Last 30 days',
         'sessions.time.90d': 'Last 90 days'
         ,
+        'sessions.filters.copyLink': 'Copy filter link',
+        'sessions.filters.urlBuildFail': 'Failed to build link',
         'sessions.roleLabel.user': 'User',
         'sessions.roleLabel.system': 'System',
         'sessions.roleLabel.assistant': 'Assistant'
@@ -1462,6 +1505,8 @@ const DICT = Object.freeze({
         'modal.agents.contentLabel.claudeMd': 'CLAUDE.md content',
         'modal.agents.placeholder.claudeMd': 'Edit CLAUDE.md here',
         'modal.agents.hint.openclaw': 'Saved content will be written to OpenClaw workspace AGENTS.md.',
+        'modal.agents.title.openclawWorkspaceFile': 'OpenClaw workspace file: {fileName}',
+        'modal.agents.hint.openclawWorkspaceFile': 'Saved content will be written to OpenClaw workspace {fileName}.',
         'config.url.unset': 'URL not set',
         'config.badge.system': 'System',
         'config.availabilityTest': 'Availability test',
@@ -1477,6 +1522,9 @@ const DICT = Object.freeze({
         'config.shareCommand': 'Share command',
         'config.shareDisabled': 'Not shareable'
         ,
+        'config.shareCommand.aria': 'Share import command',
+        'config.provider.edit.aria': 'Edit provider: {name}',
+        'config.provider.delete.aria': 'Delete provider: {name}',
         'app.loadingConfig': 'Loading configuration...'
         ,
         'common.current': 'Current {value}',
@@ -1627,6 +1675,7 @@ const DICT = Object.freeze({
         'settings.tab.backup': 'Backup & Import',
         'settings.tab.trash': 'Trash',
         'settings.tab.device': 'Device',
+        'settings.tabs.aria': 'Settings tabs',
         'settings.sharePrefix.title': 'Share command prefix',
         'settings.sharePrefix.meta': 'Used as the prefix for “Copy share command” in the Web UI',
         'settings.sharePrefix.label': 'Prefix',
@@ -1748,6 +1797,8 @@ const DICT = Object.freeze({
         'claude.action.delete': 'Delete',
         'claude.action.shareDisabled': 'Share import command (disabled)'
         ,
+        'claude.action.editAria': 'Edit Claude config: {name}',
+        'claude.action.deleteAria': 'Delete Claude config: {name}',
 
         // OpenClaw config panel
         'openclaw.applyHint': 'Writes to ~/.openclaw/openclaw.json (JSON5 supported).',
@@ -1764,6 +1815,9 @@ const DICT = Object.freeze({
         'modal.openclaw.quick.subtitle': '3 steps: fill provider/model, write to editor, save & apply.',
         'modal.openclaw.quick.step2': 'Write to editor',
         'modal.openclaw.structured.writeHint': 'Writing to editor may reformat JSON and drop comments.'
+        ,
+        'openclaw.action.editAria': 'Edit OpenClaw config: {name}',
+        'openclaw.action.deleteAria': 'Delete OpenClaw config: {name}'
     }
 });
 

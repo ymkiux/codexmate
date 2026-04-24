@@ -193,8 +193,8 @@ export function createAgentsMethods(options = {}) {
                 const fileName = (options.fileName || this.openclawWorkspaceFileName || 'AGENTS.md').trim();
                 this.agentsContext = 'openclaw-workspace';
                 this.agentsWorkspaceFileName = fileName;
-                this.agentsModalTitle = `OpenClaw 工作区文件: ${fileName}`;
-                this.agentsModalHint = `保存后会写入 OpenClaw Workspace 下的 ${fileName}。`;
+                this.agentsModalTitle = tr('modal.agents.title.openclawWorkspaceFile', `OpenClaw 工作区文件: ${fileName}`, { fileName });
+                this.agentsModalHint = tr('modal.agents.hint.openclawWorkspaceFile', `保存后会写入 OpenClaw Workspace 下的 ${fileName}。`, { fileName });
                 return;
             }
             this.agentsContext = context === 'openclaw' ? 'openclaw' : 'codex';
@@ -224,13 +224,101 @@ export function createAgentsMethods(options = {}) {
             this._agentsDiffPreviewRequestToken = null;
         },
         handleGlobalKeydown(event) {
-            if (!event || event.key !== 'Escape') {
+            if (!event) {
+                return;
+            }
+            const isCmdLike = !!(event.metaKey || event.ctrlKey);
+            const key = typeof event.key === 'string' ? event.key : '';
+            const isSearchHotkey = isCmdLike && !event.altKey && (key === 'k' || key === 'K');
+            if (isSearchHotkey) {
+                const target = event.target;
+                const tag = target && target.tagName ? String(target.tagName).toUpperCase() : '';
+                const isTypingTarget = !!(
+                    tag === 'INPUT'
+                    || tag === 'TEXTAREA'
+                    || tag === 'SELECT'
+                    || (target && target.isContentEditable)
+                );
+                if (!isTypingTarget) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    try {
+                        const focusSelector = (() => {
+                            if (this.showSkillsModal) return '.skills-filter-row input.form-input';
+                            if (this.mainTab === 'sessions') return '#panel-sessions .session-query-input';
+                            if (this.mainTab === 'plugins' && this.pluginsActiveId === 'prompt-templates' && this.promptTemplatesMode !== 'compose') {
+                                return '#panel-plugins .prompt-templates-toolbar input.form-input';
+                            }
+                            return '';
+                        })();
+                        if (focusSelector) {
+                            const el = document.querySelector(focusSelector);
+                            if (el && typeof el.focus === 'function') {
+                                el.focus();
+                                if (typeof el.select === 'function') {
+                                    el.select();
+                                }
+                            }
+                        }
+                    } catch (_) {}
+                }
+                return;
+            }
+            if (key !== 'Escape') {
                 return;
             }
             if (this.showConfirmDialog) {
                 event.preventDefault();
                 event.stopPropagation();
                 this.resolveConfirmDialog(false);
+                return;
+            }
+            if (this.showSkillsModal && typeof this.closeSkillsModal === 'function') {
+                event.preventDefault();
+                event.stopPropagation();
+                this.closeSkillsModal();
+                return;
+            }
+            if (this.showOpenclawConfigModal && typeof this.closeOpenclawConfigModal === 'function') {
+                event.preventDefault();
+                event.stopPropagation();
+                this.closeOpenclawConfigModal();
+                return;
+            }
+            if (this.showConfigTemplateModal && typeof this.closeConfigTemplateModal === 'function') {
+                event.preventDefault();
+                event.stopPropagation();
+                this.closeConfigTemplateModal();
+                return;
+            }
+            if (this.showEditConfigModal && typeof this.closeEditConfigModal === 'function') {
+                event.preventDefault();
+                event.stopPropagation();
+                this.closeEditConfigModal();
+                return;
+            }
+            if (this.showClaudeConfigModal && typeof this.closeClaudeConfigModal === 'function') {
+                event.preventDefault();
+                event.stopPropagation();
+                this.closeClaudeConfigModal();
+                return;
+            }
+            if (this.showModelModal && typeof this.closeModelModal === 'function') {
+                event.preventDefault();
+                event.stopPropagation();
+                this.closeModelModal();
+                return;
+            }
+            if (this.showAddModal && typeof this.closeAddModal === 'function') {
+                event.preventDefault();
+                event.stopPropagation();
+                this.closeAddModal();
+                return;
+            }
+            if (this.showEditModal && typeof this.closeEditModal === 'function') {
+                event.preventDefault();
+                event.stopPropagation();
+                this.closeEditModal();
                 return;
             }
             if (!this.showAgentsModal) {

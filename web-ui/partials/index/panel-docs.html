@@ -95,7 +95,7 @@
                                         </div>
                                     </div>
                                     <div class="docs-command-row">
-                                        <div class="docs-command-box" role="group" :aria-label="`${target.name} command`">
+                                        <div class="docs-command-box" role="group" :aria-label="t('docs.command.aria', { name: target.name })">
                                             <code class="install-command">{{ target.command }}</code>
                                             <button
                                                 type="button"

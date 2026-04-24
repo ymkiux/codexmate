@@ -445,7 +445,7 @@ export function createSessionBrowserMethods(options = {}) {
         copySessionsFilterShareUrl() {
             const url = buildSessionsFilterShareUrl(this);
             if (!url) {
-                this.showMessage('无法生成链接', 'error');
+                this.showMessage(typeof this.t === 'function' ? this.t('sessions.filters.urlBuildFail') : 'Failed to build link', 'error');
                 return;
             }
             const ok = typeof this.fallbackCopyText === 'function' ? this.fallbackCopyText(url) : false;

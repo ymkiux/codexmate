@@ -78,7 +78,7 @@
                                                 @change="selectPromptComposerTemplate($event.target.value)"
                                                 :disabled="pluginsLoading || !promptTemplatesList.length">
                                                 <option v-for="tpl in promptTemplatesList" :key="'compose-tpl-' + tpl.id" :value="tpl.id">
-                                                    {{ tpl.name }}{{ tpl.isBuiltin ? '（内置）' : '' }}
+                                                    {{ tpl.name }}{{ tpl.isBuiltin ? t('plugins.promptTemplates.compose.builtinSuffix') : '' }}
                                                 </option>
                                             </select>
 
@@ -98,10 +98,10 @@
                                                 <div>
                                                     <div class="prompt-vars-title">{{ t('plugins.promptTemplates.vars.title') }}</div>
                                                     <div v-if="!promptComposerActiveTemplate.isBuiltin" class="plugins-panel-note">{{ t('plugins.promptTemplates.compose.varsHint') }}</div>
-                                                    <div v-if="promptComposerMissingVars.length" class="plugins-panel-note">未填 {{ promptComposerMissingVars.length }} 项</div>
+                                                    <div v-if="promptComposerMissingVars.length" class="plugins-panel-note">{{ t('plugins.promptTemplates.compose.missingCount', { count: promptComposerMissingVars.length }) }}</div>
                                                 </div>
                                                 <div class="prompt-editor-actions">
-                                                    <button v-if="promptComposerMissingVars.length" type="button" class="btn-mini" @click="focusPromptComposerFirstMissingVar" :disabled="pluginsLoading">跳到未填</button>
+                                                    <button v-if="promptComposerMissingVars.length" type="button" class="btn-mini" @click="focusPromptComposerFirstMissingVar" :disabled="pluginsLoading">{{ t('plugins.promptTemplates.compose.jumpToMissing') }}</button>
                                                     <button type="button" class="btn-mini" @click="resetPromptComposerVarValues" :disabled="pluginsLoading">{{ t('plugins.promptTemplates.vars.reset') }}</button>
                                                 </div>
                                             </div>
@@ -126,7 +126,7 @@
                                                 </div>
                                                 <button type="button" class="btn-mini" @click="copyPromptComposerRendered" :disabled="pluginsLoading || !promptComposerRendered">{{ t('plugins.promptTemplates.compose.copy') }}</button>
                                             </div>
-                                            <textarea class="form-input prompt-preview-textarea" :value="promptComposerRendered" rows="10" readonly spellcheck="false" aria-label="Rendered prompt (composer)"></textarea>
+                                            <textarea class="form-input prompt-preview-textarea" :value="promptComposerRendered" rows="10" readonly spellcheck="false" :aria-label="t('plugins.promptTemplates.compose.outputAria')"></textarea>
                                         </div>
                                     </div>
                                 </div>
@@ -138,7 +138,7 @@
                                                 class="form-input"
                                                 type="text"
                                                 v-model.trim="promptTemplatesKeyword"
-                                                aria-label="Search templates"
+                                                :aria-label="t('plugins.promptTemplates.manage.searchAria')"
                                                 :placeholder="t('plugins.promptTemplates.manage.searchPlaceholder')">
                                             <button type="button" class="btn-mini" @click="createPromptTemplate" :disabled="pluginsLoading">{{ t('plugins.promptTemplates.manage.create') }}</button>
                                             <button type="button" class="btn-mini" @click="exportPromptTemplates" :disabled="pluginsLoading || !promptTemplatesList.length">{{ t('plugins.promptTemplates.manage.export') }}</button>
@@ -173,7 +173,7 @@
                                         <template v-else>
                                             <div class="prompt-editor-head">
                                                 <div class="prompt-editor-title-row">
-                                                    <input class="form-input prompt-editor-name" type="text" v-model.trim="promptTemplateDraft.name" :disabled="promptTemplateDraft.isBuiltin" :placeholder="t('plugins.promptTemplates.editor.namePlaceholder')" aria-label="Template name">
+                                                    <input class="form-input prompt-editor-name" type="text" v-model.trim="promptTemplateDraft.name" :disabled="promptTemplateDraft.isBuiltin" :placeholder="t('plugins.promptTemplates.editor.namePlaceholder')" :aria-label="t('plugins.promptTemplates.editor.nameAria')">
                                                     <div v-if="!promptTemplateDraft.isBuiltin" class="prompt-editor-actions">
                                                         <button type="button" class="btn-mini" @click="duplicatePromptTemplate" :disabled="pluginsLoading">{{ t('plugins.promptTemplates.editor.duplicate') }}</button>
                                                         <button type="button" class="btn-mini delete" @click="deletePromptTemplate" :disabled="pluginsLoading">{{ t('plugins.promptTemplates.editor.delete') }}</button>
@@ -183,7 +183,7 @@
                                                 <div v-if="promptTemplateDraft.isBuiltin" class="plugins-panel-note">
                                                     {{ t('plugins.promptTemplates.editor.builtinReadOnly') }}
                                                 </div>
-                                                <input class="form-input" type="text" v-model.trim="promptTemplateDraft.description" :disabled="promptTemplateDraft.isBuiltin" :placeholder="t('plugins.promptTemplates.editor.descPlaceholder')" aria-label="Template description">
+                                                <input class="form-input" type="text" v-model.trim="promptTemplateDraft.description" :disabled="promptTemplateDraft.isBuiltin" :placeholder="t('plugins.promptTemplates.editor.descPlaceholder')" :aria-label="t('plugins.promptTemplates.editor.descAria')">
                                             </div>
 
                                             <div class="prompt-editor-body">
@@ -194,7 +194,7 @@
                                                     :disabled="promptTemplateDraft.isBuiltin"
                                                     rows="10"
                                                     spellcheck="false"
-                                                    aria-label="Template body"
+                                                    :aria-label="t('plugins.promptTemplates.editor.templateAria')"
                                                     :placeholder="t('plugins.promptTemplates.editor.templatePlaceholder')"></textarea>
 
                                                 <div class="prompt-vars-block">
@@ -226,7 +226,7 @@
                                                         </div>
                                                         <button type="button" class="btn-mini" @click="copyRenderedPrompt" :disabled="pluginsLoading">{{ t('plugins.promptTemplates.preview.copy') }}</button>
                                                     </div>
-                                                    <textarea class="form-input prompt-preview-textarea" :value="renderedPrompt" rows="10" readonly spellcheck="false" aria-label="Rendered prompt"></textarea>
+                                                    <textarea class="form-input prompt-preview-textarea" :value="renderedPrompt" rows="10" readonly spellcheck="false" :aria-label="t('plugins.promptTemplates.preview.outputAria')"></textarea>
                                                 </div>
                                             </div>
                                         </template>
