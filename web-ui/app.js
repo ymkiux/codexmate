@@ -65,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showConfigTemplateModal: false,
                 showAgentsModal: false,
                 showSkillsModal: false,
+                showHealthCheckModal: false,
                 // Plugins
                 pluginsActiveId: 'prompt-templates',
                 pluginsLoading: false,

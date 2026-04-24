@@ -384,6 +384,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'healthCheckBatchTotal',
         'healthCheckBatchDone',
         'healthCheckBatchFailed',
+        'showHealthCheckModal',
         'pluginsActiveId',
         'pluginsLoading',
         'pluginsError',

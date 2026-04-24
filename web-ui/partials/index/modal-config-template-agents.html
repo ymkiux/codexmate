@@ -137,11 +137,10 @@
                             </div>
                         </div>
                         <textarea
-                            v-else
                             v-model="agentsContent"
                             class="form-input template-editor"
                             spellcheck="false"
-                            :readonly="agentsLoading || agentsSaving"
+                            :readonly="agentsLoading || agentsSaving || agentsDiffVisible"
                             @input="onAgentsContentInput"
                             :placeholder="t(agentsContext === 'claude-md' ? 'modal.agents.placeholder.claudeMd' : 'modal.agents.placeholder')"></textarea>
                         <div class="template-editor-warning">

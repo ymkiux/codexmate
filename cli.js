@@ -13056,6 +13056,7 @@ async function main() {
         console.log('  codexmate add <名称> <URL> [密钥] [--bridge <openai>]');
         console.log('  codexmate delete <名称>    删除提供商');
         console.log('  codexmate claude <BaseURL> <API密钥> [模型]  写入 Claude Code 配置');
+        console.log('  codexmate auth <list|import|switch|delete|status>  认证管理');
         console.log('  codexmate add-model <模型> 添加模型');
         console.log('  codexmate delete-model <模型> 删除模型');
         console.log('  codexmate workflow <list|get|validate|run|runs>  MCP 工作流中心');

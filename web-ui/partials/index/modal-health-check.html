@@ -1,0 +1,45 @@
+        <div v-if="showHealthCheckModal" class="modal-overlay" @click.self="showHealthCheckModal = false">
+            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="health-check-modal-title">
+                <div class="modal-title" id="health-check-modal-title">{{ t('config.health.title') }}</div>
+
+                <div v-if="!healthCheckResult" class="state-message">{{ t('common.notLoaded') }}</div>
+                <template v-else>
+                    <div class="form-hint">
+                        {{ healthCheckResult.ok ? t('config.health.ok') : t('config.health.fail') }}
+                        <span v-if="healthCheckResult.issues">（{{ t('config.health.issues', { count: healthCheckResult.issues.length }) }}）</span>
+                    </div>
+
+                    <div v-if="healthCheckResult.remote && healthCheckResult.remote.type === 'remote-health-check'" class="form-hint">
+                        {{ healthCheckResult.remote.endpoint || '' }}
+                        <span v-if="healthCheckResult.remote.statusCode"> · {{ healthCheckResult.remote.statusCode }}</span>
+                        <span v-if="healthCheckResult.remote.message"> · {{ healthCheckResult.remote.message }}</span>
+                    </div>
+
+                    <div v-if="healthCheckResult.remote && healthCheckResult.remote.speedTests" class="model-list">
+                        <div
+                            v-for="(result, name) in healthCheckResult.remote.speedTests"
+                            :key="'health-speed-' + name"
+                            class="model-item"
+                        >
+                            <span>{{ name }}</span>
+                            <span v-if="result && result.ok" class="latency ok">{{ formatLatency(result) }}</span>
+                            <span v-else class="latency error">{{ (result && result.error) ? result.error : t('config.health.fail') }}</span>
+                        </div>
+                    </div>
+
+                    <div v-if="healthCheckResult.issues && healthCheckResult.issues.length" class="model-list">
+                        <div
+                            v-for="(issue, index) in healthCheckResult.issues"
+                            :key="issue.code || ('health-issue-' + index)"
+                            class="model-item"
+                        >
+                            <span>{{ issue.message || issue.code || '' }}</span>
+                        </div>
+                    </div>
+                </template>
+
+                <div class="btn-group">
+                    <button class="btn btn-confirm" @click="showHealthCheckModal = false">{{ t('common.close') }}</button>
+                </div>
+            </div>
+        </div>

@@ -206,7 +206,6 @@ npm run reset 79
 | `codexmate delete <name>` | Delete provider |
 | `codexmate claude <BaseURL> <API_KEY> [model]` | Write Claude Code config |
 | `codexmate auth <list\|import\|switch\|delete\|status>` | Auth profile management |
-| `codexmate proxy <status\|set\|apply\|enable\|start\|stop>` | Built-in proxy management |
 | `codexmate workflow <list\|get\|validate\|run\|runs>` | MCP workflow management |
 | `codexmate codex [args...] [--follow-up <text> repeatable]` | Codex CLI passthrough entrypoint (auto-adds `--yolo`, supports queued follow-up appends) |
 | `codexmate qwen [args...]` | Qwen CLI passthrough entrypoint |

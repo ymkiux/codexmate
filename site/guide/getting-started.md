@@ -46,7 +46,6 @@ codexmate switch <provider>
 codexmate use <model>
 codexmate claude <BaseURL> <API_KEY> [model]
 codexmate auth <list|import|switch|delete|status>
-codexmate proxy <status|set|apply|enable|start|stop>
 codexmate workflow <list|get|validate|run|runs>
 codexmate qwen [args...]
 codexmate export-session --source <codex|claude> --session-id <ID>
