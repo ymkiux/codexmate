@@ -2,6 +2,7 @@ import {
     persistPromptTemplatesToStorage,
     readPromptTemplatesFromStorage
 } from './storage.mjs';
+import { pluginOwnership } from './ownership.mjs';
 
 function nowIsoPromptTemplatesOverview() {
     return new Date().toISOString();
@@ -21,7 +22,9 @@ function buildBuiltinCommentPolishTemplate(t) {
         ].join('\n'),
         createdAt: nowIsoPromptTemplatesOverview(),
         updatedAt: nowIsoPromptTemplatesOverview(),
-        isBuiltin: true
+        isBuiltin: true,
+        createdBy: pluginOwnership.createdBy,
+        maintainers: pluginOwnership.maintainers
     };
 }
 
@@ -35,7 +38,9 @@ function buildBuiltinRuleAckTemplate(t) {
         template: line1,
         createdAt: nowIsoPromptTemplatesOverview(),
         updatedAt: nowIsoPromptTemplatesOverview(),
-        isBuiltin: true
+        isBuiltin: true,
+        createdBy: pluginOwnership.createdBy,
+        maintainers: pluginOwnership.maintainers
     };
 }
 

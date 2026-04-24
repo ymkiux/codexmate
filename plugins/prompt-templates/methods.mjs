@@ -72,7 +72,9 @@ function normalizePromptTemplateDraft(draft) {
         template: typeof safe.template === 'string' ? safe.template : '',
         createdAt: typeof safe.createdAt === 'string' ? safe.createdAt : '',
         updatedAt: typeof safe.updatedAt === 'string' ? safe.updatedAt : '',
-        isBuiltin: safe.isBuiltin === true
+        isBuiltin: safe.isBuiltin === true,
+        createdBy: typeof safe.createdBy === 'string' ? safe.createdBy : '',
+        maintainers: Array.isArray(safe.maintainers) ? safe.maintainers : []
     };
 }
 
@@ -322,7 +324,9 @@ export function createPluginsMethods() {
                 template: entry.template,
                 createdAt: entry.createdAt,
                 updatedAt: entry.updatedAt,
-                isBuiltin: entry.isBuiltin === true
+                isBuiltin: entry.isBuiltin === true,
+                createdBy: entry.createdBy || '',
+                maintainers: Array.isArray(entry.maintainers) ? entry.maintainers : []
             };
             this.promptTemplateVarValuesRaw = {};
         },

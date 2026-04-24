@@ -248,6 +248,10 @@ const DICT = Object.freeze({
         'plugins.promptTemplates.varModal.cancel': '取消',
         'plugins.promptTemplates.varModal.add': '添加',
 
+        'plugins.meta.attribution': '创建者：{createdBy} · 维护者：{maintainers}',
+        'plugins.meta.createdBy': '创建者：{createdBy}',
+        'plugins.meta.maintainedBy': '维护者：{maintainers}',
+
         // Built-in prompt templates
         'plugins.builtin.commentPolish.name': '代码注释润色',
         'plugins.builtin.commentPolish.desc': '轻微收敛以下代码注释 {{code}}',
@@ -1162,6 +1166,10 @@ const DICT = Object.freeze({
         'plugins.promptTemplates.varModal.nameLabel': 'Variable name',
         'plugins.promptTemplates.varModal.cancel': 'Cancel',
         'plugins.promptTemplates.varModal.add': 'Add',
+
+        'plugins.meta.attribution': 'Created by {createdBy} · Maintained by {maintainers}',
+        'plugins.meta.createdBy': 'Created by {createdBy}',
+        'plugins.meta.maintainedBy': 'Maintained by {maintainers}',
 
         // Built-in prompt templates
         'plugins.builtin.commentPolish.name': 'Comment polish',

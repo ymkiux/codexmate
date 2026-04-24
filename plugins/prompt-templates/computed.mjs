@@ -7,6 +7,10 @@ function normalizePromptTemplateEntry(item) {
     const updatedAt = typeof safe.updatedAt === 'string' ? safe.updatedAt : '';
     const createdAt = typeof safe.createdAt === 'string' ? safe.createdAt : updatedAt;
     const isBuiltin = safe.isBuiltin === true;
+    const createdBy = typeof safe.createdBy === 'string' ? safe.createdBy.trim() : '';
+    const maintainers = Array.isArray(safe.maintainers)
+        ? safe.maintainers.map((m) => (typeof m === 'string' ? m.trim() : '')).filter(Boolean)
+        : [];
     return {
         id,
         name,
@@ -14,7 +18,9 @@ function normalizePromptTemplateEntry(item) {
         template,
         createdAt,
         updatedAt,
-        isBuiltin
+        isBuiltin,
+        createdBy,
+        maintainers
     };
 }
 
@@ -102,6 +108,30 @@ export function createPluginsComputed() {
     return {
         pluginsCatalog() {
             return pluginsRegistry.map((entry) => entry && entry.meta).filter(Boolean);
+        },
+
+        pluginsActiveMeta() {
+            const id = typeof this.pluginsActiveId === 'string' ? this.pluginsActiveId.trim() : '';
+            const entry = pluginsRegistry.find((item) => item && item.id === id) || null;
+            return entry && entry.meta ? entry.meta : null;
+        },
+
+        pluginsActiveAttribution() {
+            const meta = this.pluginsActiveMeta;
+            if (!meta || typeof meta !== 'object') return '';
+            const createdBy = typeof meta.createdBy === 'string' ? meta.createdBy.trim() : '';
+            const maintainers = Array.isArray(meta.maintainers)
+                ? meta.maintainers.map((m) => (typeof m === 'string' ? m.trim() : '')).filter(Boolean).join(', ')
+                : '';
+            if (!createdBy && !maintainers) return '';
+            if (typeof this.t !== 'function') {
+                if (createdBy && maintainers) return `Created by ${createdBy} · Maintained by ${maintainers}`;
+                if (createdBy) return `Created by ${createdBy}`;
+                return `Maintained by ${maintainers}`;
+            }
+            if (createdBy && maintainers) return this.t('plugins.meta.attribution', { createdBy, maintainers });
+            if (createdBy) return this.t('plugins.meta.createdBy', { createdBy });
+            return this.t('plugins.meta.maintainedBy', { maintainers });
         },
 
         promptTemplatesList() {
