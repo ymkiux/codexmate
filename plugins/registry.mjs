@@ -2,11 +2,7 @@ import { pluginMeta as promptTemplatesMeta } from './prompt-templates/manifest.m
 import { loadPromptTemplatesOverview } from './prompt-templates/overview.mjs';
 
 export const pluginsRegistry = [
-    {
-        id: promptTemplatesMeta.id,
-        meta: promptTemplatesMeta,
-        loadOverview: loadPromptTemplatesOverview
-    }
+    { id: promptTemplatesMeta.id, meta: promptTemplatesMeta, loadOverview: loadPromptTemplatesOverview }
 ];
 
 export function getFirstPluginId() {
@@ -18,4 +14,3 @@ export function getPluginEntry(id) {
     if (!key) return null;
     return pluginsRegistry.find((item) => item && item.id === key) || null;
 }
-
