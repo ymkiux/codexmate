@@ -167,8 +167,7 @@ async function main({ argv = process.argv.slice(2), stdin = process.stdin, stdou
   }
 
   const argPrNumber = resolveArgPrNumber(argv);
-  const prNumber = argPrNumber || await promptForPrNumber({ stdin, stdout });
-  const plan = buildResetPlan({ prNumber });
+  const plan = buildResetPlan({ prNumber: argPrNumber });
   executeResetPlan(plan);
 }
 
