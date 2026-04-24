@@ -25,6 +25,20 @@ function buildBuiltinCommentPolishTemplate(t) {
     };
 }
 
+function buildBuiltinRuleAckTemplate(t) {
+    const tr = (key, fallback, params = null) => (typeof t === 'function' ? t(key, params) : fallback);
+    const line1 = tr('plugins.builtin.ruleAck.line1', '请根据【{{rule}}】，收到请回复');
+    return {
+        id: 'builtin_rule_ack',
+        name: tr('plugins.builtin.ruleAck.name', '规则确认回复'),
+        description: tr('plugins.builtin.ruleAck.desc', '请根据【{{rule}}】，收到请回复'),
+        template: line1,
+        createdAt: nowIsoPromptTemplatesOverview(),
+        updatedAt: nowIsoPromptTemplatesOverview(),
+        isBuiltin: true
+    };
+}
+
 function ensureBuiltinTemplates(rawList, builtins) {
     const list = Array.isArray(rawList) ? rawList.filter(Boolean) : [];
     const builtinList = Array.isArray(builtins) ? builtins.filter(Boolean) : [];
@@ -48,7 +62,10 @@ export async function loadPromptTemplatesOverview(ctx, options = {}) {
 
     const t = typeof app.t === 'function' ? app.t : null;
     const rawList = readPromptTemplatesFromStorage(localStorage);
-    const normalized = ensureBuiltinTemplates(rawList, [buildBuiltinCommentPolishTemplate(t)]);
+    const normalized = ensureBuiltinTemplates(rawList, [
+        buildBuiltinCommentPolishTemplate(t),
+        buildBuiltinRuleAckTemplate(t)
+    ]);
     app.promptTemplatesListRaw = normalized;
     persistPromptTemplatesToStorage(normalized, localStorage);
 

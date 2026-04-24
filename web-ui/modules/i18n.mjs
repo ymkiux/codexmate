@@ -252,6 +252,9 @@ const DICT = Object.freeze({
         'plugins.builtin.commentPolish.name': '代码注释润色',
         'plugins.builtin.commentPolish.desc': '轻微收敛以下代码注释 {{code}}',
         'plugins.builtin.commentPolish.line1': '轻微收敛以下代码注释',
+        'plugins.builtin.ruleAck.name': '规则确认回复',
+        'plugins.builtin.ruleAck.desc': '请根据【{{rule}}】，收到请回复',
+        'plugins.builtin.ruleAck.line1': '请根据【{{rule}}】，收到请回复',
 
         // Toasts
         'toast.copy.empty': '没有可复制内容',
@@ -1164,6 +1167,9 @@ const DICT = Object.freeze({
         'plugins.builtin.commentPolish.name': 'Comment polish',
         'plugins.builtin.commentPolish.desc': 'Polish the following code comments {{code}}',
         'plugins.builtin.commentPolish.line1': 'Polish the following code comments',
+        'plugins.builtin.ruleAck.name': 'Rule acknowledgement',
+        'plugins.builtin.ruleAck.desc': 'Please follow 【{{rule}}】, reply when received',
+        'plugins.builtin.ruleAck.line1': 'Please follow 【{{rule}}】, reply when received',
 
         // Toasts
         'toast.copy.empty': 'Nothing to copy',
