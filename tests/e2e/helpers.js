@@ -7,7 +7,6 @@ const { writeJsonAtomic } = require('../../lib/cli-file-utils');
 const {
     normalizeWireApi,
     buildModelProbeSpec,
-    buildModelConversationSpecs,
     extractModelResponseText
 } = require('../../lib/cli-models-utils');
 
@@ -248,6 +247,5 @@ module.exports = {
     writeJsonAtomic,
     normalizeWireApi,
     buildModelProbeSpec,
-    buildModelConversationSpecs,
     extractModelResponseText
 };

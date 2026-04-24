@@ -42,8 +42,9 @@ const {
     extractModelNames,
     hasModelsListPayload,
     buildModelsCacheKey,
+    buildApiProbeUrlCandidates,
     buildModelProbeSpec,
-    buildModelConversationSpecs,
+    buildModelProbeSpecs,
     extractModelResponseText,
     normalizeWireApi,
     getSupplementalModelsForBaseUrl,
@@ -6003,6 +6004,60 @@ function importConfigData(payload, options = {}) {
 function resolveSpeedTestTarget(params) {
     if (!params) return { error: 'Missing params' };
 
+    if (typeof params.kind === 'string' && params.kind.trim() === 'claude') {
+        const baseUrl = typeof params.url === 'string' ? params.url.trim() : '';
+        const apiKey = typeof params.apiKey === 'string' ? params.apiKey.trim() : '';
+        const model = typeof params.model === 'string' ? params.model.trim() : '';
+        if (!baseUrl) {
+            return { error: 'Missing url' };
+        }
+        if (!apiKey) {
+            return { error: 'Missing apiKey' };
+        }
+        if (!model) {
+            return { error: 'Missing model' };
+        }
+        const normalizedBase = baseUrl.replace(/\/+$/, '');
+        let parsed = null;
+        try {
+            parsed = new URL(normalizedBase);
+        } catch (_) {
+            return { error: 'Invalid URL' };
+        }
+        const pathname = typeof parsed.pathname === 'string' ? parsed.pathname : '';
+        const trimmedPath = pathname.replace(/\/+$/, '');
+        const isRootPath = !trimmedPath || trimmedPath === '/';
+        const endsWithV1 = trimmedPath.endsWith('/v1');
+        const makeCandidate = (url) => ({
+            method: 'POST',
+            url,
+            body: {
+                model,
+                max_tokens: 16,
+                messages: [{ role: 'user', content: 'ping' }]
+            }
+        });
+        const candidates = [];
+        if (endsWithV1) {
+            candidates.push(makeCandidate(`${normalizedBase}/messages`));
+        } else if (isRootPath) {
+            candidates.push(makeCandidate(`${normalizedBase}/v1/messages`));
+            candidates.push(makeCandidate(`${normalizedBase}/messages`));
+        } else {
+            candidates.push(makeCandidate(`${normalizedBase}/messages`));
+            candidates.push(makeCandidate(`${normalizedBase}/v1/messages`));
+        }
+        return {
+            kind: 'claude',
+            candidates,
+            apiKey,
+            apiKeyHeader: 'x-api-key',
+            headers: {
+                'anthropic-version': '2023-06-01'
+            }
+        };
+    }
+
     if (params.name) {
         const { config } = readConfigOrVirtualDefault();
         const providers = config.model_providers || {};
@@ -6013,20 +6068,32 @@ function resolveSpeedTestTarget(params) {
         if (!provider.base_url) {
             return { error: 'Provider missing URL' };
         }
-        const currentModel = typeof config.model === 'string' ? config.model.trim() : '';
-        const probeSpec = buildModelProbeSpec(provider, currentModel, provider.base_url);
-        if (probeSpec && probeSpec.url) {
-            return {
-                method: 'POST',
-                url: probeSpec.url,
-                body: probeSpec.body,
-                apiKey: provider.preferred_auth_method || ''
-            };
+        const providerName = String(params.name).trim();
+        const currentModels = readCurrentModels();
+        const selectedModel = typeof currentModels[providerName] === 'string' && currentModels[providerName].trim()
+            ? currentModels[providerName].trim()
+            : (typeof config.model === 'string' ? config.model.trim() : '');
+
+        const apiKey = typeof provider.preferred_auth_method === 'string'
+            ? provider.preferred_auth_method.trim()
+            : '';
+
+        const candidates = [];
+        for (const spec of buildModelProbeSpecs(provider, selectedModel, provider.base_url)) {
+            if (!spec || !spec.url) continue;
+            candidates.push({ method: 'POST', url: spec.url, body: spec.body });
         }
+        for (const url of buildApiProbeUrlCandidates(provider.base_url, 'models')) {
+            candidates.push({ method: 'GET', url });
+        }
+        if (candidates.length === 0) {
+            candidates.push({ method: 'GET', url: provider.base_url });
+        }
+
         return {
-            method: 'GET',
-            url: provider.base_url,
-            apiKey: provider.preferred_auth_method || ''
+            kind: 'provider',
+            candidates,
+            apiKey
         };
     }
 
@@ -6041,155 +6108,6 @@ function resolveSpeedTestTarget(params) {
     return { error: 'Missing name or url' };
 }
 
-function extractApiPayloadErrorMessage(payload) {
-    if (!payload || typeof payload !== 'object') {
-        return '';
-    }
-    if (typeof payload.error === 'string' && payload.error.trim()) {
-        return payload.error.trim();
-    }
-    if (!payload.error || typeof payload.error !== 'object') {
-        return '';
-    }
-    if (typeof payload.error.message === 'string' && payload.error.message.trim()) {
-        return payload.error.message.trim();
-    }
-    if (typeof payload.error.code === 'string' && payload.error.code.trim()) {
-        return payload.error.code.trim();
-    }
-    return '';
-}
-
-function resolveProviderChatTarget(params) {
-    const providerName = typeof (params && params.name) === 'string' ? params.name.trim() : '';
-    const prompt = typeof (params && params.prompt) === 'string' ? params.prompt.trim() : '';
-    if (!providerName) {
-        return { error: 'Provider name is required' };
-    }
-    if (!prompt) {
-        return { error: 'Prompt is required' };
-    }
-
-    const { config } = readConfigOrVirtualDefault();
-    const providers = config.model_providers || {};
-    const provider = providers[providerName];
-    if (!provider || typeof provider !== 'object') {
-        return { error: `Provider not found: ${providerName}` };
-    }
-
-    const baseUrl = typeof provider.base_url === 'string' ? provider.base_url.trim() : '';
-    if (!baseUrl) {
-        return { error: `Provider ${providerName} missing URL` };
-    }
-
-    const currentModels = readCurrentModels();
-    const savedModel = currentModels && typeof currentModels[providerName] === 'string'
-        ? currentModels[providerName].trim()
-        : '';
-    const activeProvider = typeof config.model_provider === 'string' ? config.model_provider.trim() : '';
-    const activeModel = typeof config.model === 'string' ? config.model.trim() : '';
-    const model = savedModel || (activeProvider === providerName ? activeModel : '');
-    if (!model) {
-        return { error: `Provider ${providerName} missing current model` };
-    }
-
-    const specs = buildModelConversationSpecs(provider, model, baseUrl, prompt, {
-        maxOutputTokens: 256
-    });
-    if (!specs.length) {
-        return { error: `Provider ${providerName} missing available conversation endpoint` };
-    }
-
-    return {
-        providerName,
-        provider,
-        model,
-        prompt,
-        specs,
-        apiKey: typeof provider.preferred_auth_method === 'string'
-            ? provider.preferred_auth_method.trim()
-            : ''
-    };
-}
-
-async function runProviderChatCheck(params = {}) {
-    const target = resolveProviderChatTarget(params);
-    if (target.error) {
-        return { ok: false, error: target.error };
-    }
-
-    const timeoutMs = Number.isFinite(params.timeoutMs)
-        ? Math.max(1000, Number(params.timeoutMs))
-        : 30000;
-    let finalSpec = target.specs[0];
-    let result = null;
-
-    for (let index = 0; index < target.specs.length; index += 1) {
-        const candidate = target.specs[index];
-        const probeResult = await probeJsonPost(candidate.url, candidate.body, {
-            apiKey: target.apiKey,
-            timeoutMs,
-            maxBytes: 512 * 1024
-        });
-        finalSpec = candidate;
-        result = probeResult;
-        const shouldTryNextCandidate = index < target.specs.length - 1
-            && (!probeResult.ok || probeResult.status === 404);
-        if (!shouldTryNextCandidate) {
-            break;
-        }
-    }
-
-    if (!result || !result.ok) {
-        return {
-            ok: false,
-            provider: target.providerName,
-            model: target.model,
-            url: finalSpec.url,
-            status: Number.isFinite(result && result.status) ? result.status : 0,
-            durationMs: Number.isFinite(result && result.durationMs) ? result.durationMs : 0,
-            reply: '',
-            rawPreview: '',
-            error: result && result.error ? result.error : 'request failed'
-        };
-    }
-
-    let payload = null;
-    try {
-        payload = result.body ? JSON.parse(result.body) : null;
-    } catch (e) {
-        payload = null;
-    }
-
-    const payloadError = extractApiPayloadErrorMessage(payload);
-    if (result.status >= 400 || payloadError) {
-        return {
-            ok: false,
-            provider: target.providerName,
-            model: target.model,
-            url: finalSpec.url,
-            status: Number.isFinite(result.status) ? result.status : 0,
-            durationMs: Number.isFinite(result.durationMs) ? result.durationMs : 0,
-            reply: '',
-            rawPreview: result.body ? truncateText(result.body, 600) : '',
-            error: payloadError || `HTTP ${result.status}`
-        };
-    }
-
-    const reply = extractModelResponseText(payload);
-    return {
-        ok: true,
-        provider: target.providerName,
-        model: target.model,
-        url: finalSpec.url,
-        status: Number.isFinite(result.status) ? result.status : 0,
-        durationMs: Number.isFinite(result.durationMs) ? result.durationMs : 0,
-        reply,
-        rawPreview: reply ? '' : (result.body ? truncateText(result.body, 600) : ''),
-        error: ''
-    };
-}
-
 function runSpeedTest(targetUrl, apiKey, options = {}) {
     const timeoutMs = Number.isFinite(options.timeoutMs)
         ? Math.max(1000, Number(options.timeoutMs))
@@ -6198,6 +6116,8 @@ function runSpeedTest(targetUrl, apiKey, options = {}) {
     if (method === 'POST') {
         return probeJsonPost(targetUrl, options.body || {}, {
             apiKey,
+            apiKeyHeader: typeof options.apiKeyHeader === 'string' ? options.apiKeyHeader : '',
+            headers: options.headers && typeof options.headers === 'object' ? options.headers : null,
             timeoutMs,
             maxBytes: 256 * 1024
         }).then((result) => ({
@@ -6209,6 +6129,8 @@ function runSpeedTest(targetUrl, apiKey, options = {}) {
     }
     return probeUrl(targetUrl, {
         apiKey,
+        apiKeyHeader: typeof options.apiKeyHeader === 'string' ? options.apiKeyHeader : '',
+        headers: options.headers && typeof options.headers === 'object' ? options.headers : null,
         timeoutMs,
         maxBytes: 256 * 1024
     }).then((result) => ({
@@ -8446,11 +8368,41 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                                 result = { error: target.error };
                                 break;
                             }
-                            result = await runSpeedTest(target.url, target.apiKey, target);
-                            break;
-                        }
-                        case 'provider-chat-check': {
-                            result = await runProviderChatCheck(params || {});
+                            const timeoutMs = Number.isFinite(params && params.timeoutMs)
+                                ? Math.max(1000, Number(params.timeoutMs))
+                                : 0;
+                            if (Array.isArray(target.candidates) && target.candidates.length > 0) {
+                                let finalCandidate = target.candidates[0];
+                                let finalResult = null;
+                                for (let index = 0; index < target.candidates.length; index += 1) {
+                                    const candidate = target.candidates[index];
+                                    const probeResult = await runSpeedTest(candidate.url, target.apiKey, {
+                                        ...candidate,
+                                        apiKeyHeader: target.apiKeyHeader,
+                                        headers: target.headers,
+                                        timeoutMs: timeoutMs || undefined
+                                    });
+                                    finalCandidate = candidate;
+                                    finalResult = probeResult;
+                                    const status = Number.isFinite(probeResult && probeResult.status) ? probeResult.status : 0;
+                                    const shouldTryNext = index < target.candidates.length - 1 && status === 404;
+                                    if (!shouldTryNext) {
+                                        break;
+                                    }
+                                }
+                                result = {
+                                    ok: !!(finalResult && finalResult.ok),
+                                    status: Number.isFinite(finalResult && finalResult.status) ? finalResult.status : 0,
+                                    durationMs: Number.isFinite(finalResult && finalResult.durationMs) ? finalResult.durationMs : 0,
+                                    error: finalResult && finalResult.ok ? '' : (finalResult && finalResult.error ? finalResult.error : ''),
+                                    url: finalCandidate && finalCandidate.url ? finalCandidate.url : ''
+                                };
+                                break;
+                            }
+                            result = await runSpeedTest(target.url, target.apiKey, {
+                                ...target,
+                                timeoutMs: timeoutMs || undefined
+                            });
                             break;
                         }
                         case 'openai-bridge-get-provider': {
@@ -8913,7 +8865,8 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
     const openUrl = `http://${formatHostForUrl(openHost)}:${port}`;
     server.listen(port, host, () => {
         console.log('\n✓ Web UI 已启动');
-        console.log(`  待访问: ${openUrl}`);
+        const willOpenBrowser = !!openBrowser && !process.env.CODEXMATE_NO_BROWSER;
+        console.log(`  ${willOpenBrowser ? '已打开' : '待访问'}: ${openUrl}`);
         if (host && host !== openHost) {
             console.log('  监听地址:', host);
         }
@@ -8923,9 +8876,8 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
             console.warn('  建议仅在可信网络使用，或改用 --host 127.0.0.1。');
         }
 
-        if (!process.env.CODEXMATE_NO_BROWSER && openBrowser) {
-            const url = openUrl;
-            openBrowserAfterReady(url);
+        if (willOpenBrowser) {
+            openBrowserAfterReady(openUrl);
         }
     });
 
@@ -9036,14 +8988,15 @@ function cmdStart(options = {}) {
         || process.env.CODEXMATE_DEV === '1'
         || process.env.CODEXMATE_DEV === 'true';
 
-    // 禁止自动打开浏览器：仅输出 URL，交由用户自行点击/打开。
+    const shouldOpenBrowser = !options.noBrowser && !process.env.CODEXMATE_NO_BROWSER;
+
     let serverHandle = createWebServer({
         htmlPath,
         assetsDir,
         webDir,
         host,
         port,
-        openBrowser: false
+        openBrowser: shouldOpenBrowser
     });
 
     // 禁止前端变更侦测与自动重启：避免终端输出噪音与访问时短暂 Connection Refused。
@@ -13103,6 +13056,7 @@ async function main() {
         console.log('  codexmate add <名称> <URL> [密钥] [--bridge <openai>]');
         console.log('  codexmate delete <名称>    删除提供商');
         console.log('  codexmate claude <BaseURL> <API密钥> [模型]  写入 Claude Code 配置');
+        console.log('  codexmate auth <list|import|switch|delete|status>  认证管理');
         console.log('  codexmate add-model <模型> 添加模型');
         console.log('  codexmate delete-model <模型> 删除模型');
         console.log('  codexmate workflow <list|get|validate|run|runs>  MCP 工作流中心');

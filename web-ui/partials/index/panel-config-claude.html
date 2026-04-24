@@ -89,15 +89,6 @@
 
                 <div class="selector-section">
                     <div class="selector-header">
-                        <span class="selector-title">{{ t('claude.health.title') }}</span>
-                    </div>
-                    <button class="btn-tool" @click="runHealthCheck" :disabled="healthCheckLoading || loading || !!initError">
-                        {{ healthCheckLoading ? t('claude.health.running') : t('claude.health.run') }}
-                    </button>
-                </div>
-
-                <div class="selector-section">
-                    <div class="selector-header">
                         <span class="selector-title">CLAUDE.md</span>
                     </div>
                     <button class="btn-tool" @click="openClaudeMdEditor" :disabled="loading || !!initError || agentsLoading">
@@ -105,6 +96,30 @@
                     </button>
                     <div class="config-template-hint">
                         {{ t('claude.md.hint') }}
+                    </div>
+                </div>
+
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">{{ t('claude.health.title') }}</span>
+                    </div>
+                    <button class="btn-tool" @click="runHealthCheck" :disabled="healthCheckLoading || loading || !!initError">
+                        {{ healthCheckLoading ? t('claude.health.running') : t('claude.health.run') }}
+                    </button>
+                    <div class="config-template-hint">{{ t('claude.health.hint') }}</div>
+                    <div v-if="healthCheckLoading && healthCheckBatchTotal" class="config-template-hint">
+                        {{ t('claude.health.progress', { done: healthCheckBatchDone, total: healthCheckBatchTotal, failed: healthCheckBatchFailed }) }}
+                    </div>
+                    <div v-if="healthCheckResult && !healthCheckLoading" class="config-template-hint">
+                        {{ healthCheckResult.ok ? t('config.health.ok') : t('config.health.fail') }} · {{ t('config.health.issues', { count: (healthCheckResult.issues || []).length }) }}
+                    </div>
+                    <button v-if="healthCheckResult && !healthCheckLoading" type="button" class="btn-mini" @click="showHealthCheckModal = true">
+                        {{ t('common.detail') }}
+                    </button>
+                    <div v-if="healthCheckResult && !healthCheckLoading && (healthCheckResult.issues || []).length">
+                        <div v-for="(issue, index) in healthCheckResult.issues" :key="issue.code || ('issue-' + index)" class="config-template-hint">
+                            {{ issue.message || issue.code || '' }}<span v-if="issue.suggestion"> · {{ issue.suggestion }}</span>
+                        </div>
                     </div>
                 </div>
 
@@ -125,11 +140,11 @@
                             </div>
                         </div>
                         <div class="card-trailing">
-                            <span :class="['pill', config.hasKey ? 'configured' : 'empty']">
-                                {{ config.hasKey ? t('claude.configured') : t('claude.notConfigured') }}
-                            </span>
                             <span v-if="claudeSpeedResults[name]" :class="['latency', claudeSpeedResults[name].ok ? 'ok' : 'error']">
                                 {{ formatLatency(claudeSpeedResults[name]) }}
+                            </span>
+                            <span :class="['pill', config.hasKey ? 'configured' : 'empty']">
+                                {{ config.hasKey ? t('claude.configured') : t('claude.notConfigured') }}
                             </span>
                             <div class="card-actions" @click.stop>
                                 <button class="card-action-btn" @click="openEditConfigModal(name)" :aria-label="t('claude.action.editAria', { name })" :title="t('claude.action.edit')">

@@ -3,7 +3,6 @@ const {
     assert,
     normalizeWireApi,
     buildModelProbeSpec,
-    buildModelConversationSpecs,
     extractModelResponseText,
     fileMode,
     writeJsonAtomic
@@ -154,24 +153,6 @@ module.exports = async function testHealthAndSpeed(ctx) {
     assert(
         !routedProviderRequests.includes('/project/ym/v1/responses'),
         'speed-test(provider) should not inject /v1 before direct routed responses'
-    );
-
-    const conversationSpecs = buildModelConversationSpecs({ wire_api: 'responses' }, 'e2e-routed', routedProviderUrl, 'hello');
-    assert(Array.isArray(conversationSpecs) && conversationSpecs.length > 0, 'buildModelConversationSpecs should build candidate endpoints');
-    assert(
-        conversationSpecs[0].url === `${routedProviderUrl}/responses`,
-        'buildModelConversationSpecs should keep direct provider routes ahead of /v1 fallback'
-    );
-
-    const conversationResult = await api('provider-chat-check', {
-        name: 'routed',
-        prompt: '请回复连接正常'
-    }, 5000);
-    assert(conversationResult.ok === true, 'provider-chat-check should succeed');
-    assert(conversationResult.reply === 'routed provider is healthy', 'provider-chat-check should parse assistant text');
-    assert(
-        routedProviderRequests.includes('/project/ym/responses'),
-        'provider-chat-check should hit the direct routed responses endpoint'
     );
 
     const parsedText = extractModelResponseText({

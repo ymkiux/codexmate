@@ -190,7 +190,7 @@ npm run reset
 npm run reset 79
 ```
 
-- `npm run reset`: prompt for a PR number; leave it blank to return to default `origin/main`
+- `npm run reset`: reset to default `origin/main`
 - `npm run reset 79`: sync directly to the latest head snapshot of PR `#79`
 - The script also handles local branch switching, workspace cleanup, untracked file cleanup, and final state validation
 
@@ -206,7 +206,6 @@ npm run reset 79
 | `codexmate delete <name>` | Delete provider |
 | `codexmate claude <BaseURL> <API_KEY> [model]` | Write Claude Code config |
 | `codexmate auth <list\|import\|switch\|delete\|status>` | Auth profile management |
-| `codexmate proxy <status\|set\|apply\|enable\|start\|stop>` | Built-in proxy management |
 | `codexmate workflow <list\|get\|validate\|run\|runs>` | MCP workflow management |
 | `codexmate codex [args...] [--follow-up <text> repeatable]` | Codex CLI passthrough entrypoint (auto-adds `--yolo`, supports queued follow-up appends) |
 | `codexmate qwen [args...]` | Qwen CLI passthrough entrypoint |

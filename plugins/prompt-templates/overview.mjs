@@ -29,7 +29,13 @@ function ensureBuiltinTemplates(rawList, builtins) {
     const list = Array.isArray(rawList) ? rawList.filter(Boolean) : [];
     const builtinList = Array.isArray(builtins) ? builtins.filter(Boolean) : [];
     const rest = list.filter((item) => !(item && item.isBuiltin === true));
-    return [...builtinList, ...rest];
+    const overridden = new Set(
+        rest
+            .map((item) => (item && typeof item.id === 'string' ? item.id.trim() : ''))
+            .filter(Boolean)
+    );
+    const resolvedBuiltins = builtinList.filter((item) => !(item && overridden.has(item.id)));
+    return [...resolvedBuiltins, ...rest];
 }
 
 export async function loadPromptTemplatesOverview(ctx, options = {}) {

@@ -274,50 +274,113 @@ export function createCodexConfigMethods(options = {}) {
         async runHealthCheck() {
             this.healthCheckLoading = true;
             this.healthCheckResult = null;
-            let shouldRunClaudeSpeedTests = false;
+            this.healthCheckBatchTotal = 0;
+            this.healthCheckBatchDone = 0;
+            this.healthCheckBatchFailed = 0;
             try {
-                const res = await api('config-health-check', {
-                    remote: this.configMode === 'codex'
-                });
+                if (this.configMode === 'claude') {
+                    const entries = Object.entries(this.claudeConfigs || {});
+                    this.healthCheckBatchTotal = entries.length;
+
+                    const speedTasks = entries.map(([name, config]) => this.runClaudeSpeedTest(name, config)
+                        .then((result) => {
+                            if (!result || result.ok !== true) {
+                                this.healthCheckBatchFailed += 1;
+                            }
+                            return { name, result };
+                        })
+                        .catch((err) => {
+                            this.healthCheckBatchFailed += 1;
+                            return {
+                                name,
+                                result: { ok: false, error: err && err.message ? err.message : 'Speed test failed' }
+                            };
+                        })
+                        .finally(() => {
+                            this.healthCheckBatchDone += 1;
+                        })
+                    );
+
+                    const pairs = await Promise.all(speedTasks);
+                    const results = {};
+                    const issues = [];
+                    for (const pair of pairs) {
+                        results[pair.name] = pair.result || null;
+                        if (typeof this.buildSpeedTestIssue === 'function') {
+                            const issue = this.buildSpeedTestIssue(pair.name, pair.result);
+                            if (issue) issues.push(issue);
+                        }
+                    }
+                    const ok = issues.length === 0 && this.healthCheckBatchFailed === 0;
+                    this.healthCheckResult = {
+                        ok,
+                        issues,
+                        remote: {
+                            type: 'speed-test',
+                            speedTests: results
+                        }
+                    };
+                    if (ok) {
+                        this.showMessage('检查通过', 'success');
+                    }
+                    return;
+                }
+
+                const shouldRunSpeedTests = this.configMode === 'codex';
+                const speedTimeoutMs = shouldRunSpeedTests ? 3500 : 0;
+                const providers = shouldRunSpeedTests
+                    ? (this.providersList || [])
+                        .map((provider) => typeof provider === 'string'
+                            ? provider.trim()
+                            : String((provider && provider.name) || '').trim())
+                        .filter(Boolean)
+                    : [];
+                const currentProvider = String(this.currentProvider || '').trim();
+                const orderedProviders = currentProvider && providers.includes(currentProvider)
+                    ? [currentProvider, ...providers.filter((name) => name !== currentProvider)]
+                    : providers;
+                this.healthCheckBatchTotal = orderedProviders.length;
+
+                const speedTasks = orderedProviders.map((provider) => this.runSpeedTest(provider, { silent: true, timeoutMs: speedTimeoutMs })
+                    .then((result) => {
+                        if (!result || result.ok !== true) {
+                            this.healthCheckBatchFailed += 1;
+                        }
+                        return { name: provider, result };
+                    })
+                    .catch((err) => {
+                        this.healthCheckBatchFailed += 1;
+                        return {
+                            name: provider,
+                            result: { ok: false, error: err && err.message ? err.message : 'Speed test failed' }
+                        };
+                    })
+                    .finally(() => {
+                        this.healthCheckBatchDone += 1;
+                    })
+                );
+
+                const configTask = api('config-health-check', { remote: this.configMode === 'codex' });
+                const [res, pairs] = await Promise.all([
+                    configTask,
+                    Promise.all(speedTasks)
+                ]);
                 if (hasResponseError(res)) {
                     this.healthCheckResult = null;
                     this.showMessage(getResponseMessage(res, '检查失败'), 'error');
                 } else if (res && typeof res === 'object') {
-                    shouldRunClaudeSpeedTests = true;
                     const issues = Array.isArray(res.issues) ? [...res.issues] : [];
                     let remote = res.remote || null;
-                    {
-                        const providers = (this.providersList || [])
-                            .map((provider) => typeof provider === 'string'
-                                ? provider.trim()
-                                : String((provider && provider.name) || '').trim())
-                            .filter(Boolean);
-                        const tasks = providers.map(provider =>
-                            this.runSpeedTest(provider, { silent: true })
-                                .then(result => ({ name: provider, result }))
-                                .catch(err => ({
-                                    name: provider,
-                                    result: { ok: false, error: err && err.message ? err.message : 'Speed test failed' }
-                                }))
-                        );
-                        const pairs = await Promise.all(tasks);
+                    if (shouldRunSpeedTests) {
                         const results = {};
                         for (const pair of pairs) {
                             results[pair.name] = pair.result || null;
                             const issue = this.buildSpeedTestIssue(pair.name, pair.result);
                             if (issue) issues.push(issue);
                         }
-                        if (remote && typeof remote === 'object') {
-                            remote = {
-                                ...remote,
-                                speedTests: results
-                            };
-                        } else {
-                            remote = {
-                                type: 'speed-test',
-                                speedTests: results
-                            };
-                        }
+                        remote = remote && typeof remote === 'object'
+                            ? { ...remote, speedTests: results }
+                            : { type: 'speed-test', speedTests: results };
                     }
 
                     const ok = issues.length === 0;
@@ -338,135 +401,9 @@ export function createCodexConfigMethods(options = {}) {
                 this.healthCheckResult = null;
                 this.showMessage('检查失败', 'error');
             } finally {
-                if (shouldRunClaudeSpeedTests && this.configMode === 'claude') {
-                    try {
-                        const entries = Object.entries(this.claudeConfigs || {});
-                        await Promise.all(entries.map(([name, config]) => this.runClaudeSpeedTest(name, config)));
-                    } catch (e) {}
-                }
+                this.healthCheckBatchTotal = this.healthCheckBatchTotal || 0;
+                this.healthCheckBatchDone = Math.min(this.healthCheckBatchDone || 0, this.healthCheckBatchTotal || 0);
                 this.healthCheckLoading = false;
-            }
-        },
-
-        buildDefaultHealthCheckPrompt() {
-            return '请简短回复：连接正常。';
-        },
-
-        openHealthCheckDialog(options = {}) {
-            const providerName = typeof options.providerName === 'string'
-                ? options.providerName.trim()
-                : '';
-            const locked = !!options.locked && !!providerName;
-            if (locked && providerName && providerName !== String(this.currentProvider || '').trim()) {
-                if (typeof this.showMessage === 'function') {
-                    this.showMessage('请先切换到该提供商再进行健康聊天测试', 'info');
-                }
-                return;
-            }
-            const nextProvider = providerName
-                || String(this.healthCheckDialogSelectedProvider || '').trim()
-                || String(this.currentProvider || '').trim()
-                || String(((this.displayProvidersList || [])[0] || {}).name || '').trim();
-
-            this.showHealthCheckDialog = true;
-            this.healthCheckDialogLockedProvider = locked ? nextProvider : '';
-            this.healthCheckDialogSelectedProvider = nextProvider;
-            this.healthCheckDialogPrompt = this.buildDefaultHealthCheckPrompt();
-            this.healthCheckDialogMessages = [];
-            this.healthCheckDialogLastResult = null;
-        },
-
-        closeHealthCheckDialog(options = {}) {
-            if (this.healthCheckDialogSending && !options.force) {
-                return;
-            }
-            this.showHealthCheckDialog = false;
-            this.healthCheckDialogLockedProvider = '';
-            this.healthCheckDialogSelectedProvider = '';
-            this.healthCheckDialogPrompt = this.buildDefaultHealthCheckPrompt();
-            this.healthCheckDialogMessages = [];
-            this.healthCheckDialogLastResult = null;
-        },
-
-        async sendHealthCheckDialogMessage() {
-            if (this.healthCheckDialogSending) {
-                return;
-            }
-
-            const provider = String(
-                this.healthCheckDialogLockedProvider || this.healthCheckDialogSelectedProvider || ''
-            ).trim();
-            const prompt = String(this.healthCheckDialogPrompt || '').trim();
-            if (!provider) {
-                this.showMessage('请先选择提供商', 'error');
-                return;
-            }
-            if (!prompt) {
-                this.showMessage('请输入消息内容', 'error');
-                return;
-            }
-
-            this.healthCheckDialogMessages.push({
-                id: `user-${Date.now()}`,
-                role: 'user',
-                text: prompt
-            });
-            this.healthCheckDialogSending = true;
-            this.healthCheckDialogLastResult = null;
-
-            try {
-                const res = await api('provider-chat-check', {
-                    name: provider,
-                    prompt
-                });
-                this.healthCheckDialogLastResult = res;
-
-                if (hasResponseError(res) || res.ok === false) {
-                    const message = getResponseMessage(res, '健康聊天测试失败');
-                    this.healthCheckDialogMessages.push({
-                        id: `assistant-${Date.now()}`,
-                        role: 'assistant',
-                        text: message,
-                        ok: false,
-                        status: Number.isFinite(res && res.status) ? res.status : 0,
-                        durationMs: Number.isFinite(res && res.durationMs) ? res.durationMs : 0,
-                        model: typeof (res && res.model) === 'string' ? res.model : '',
-                        rawPreview: typeof (res && res.rawPreview) === 'string' ? res.rawPreview : ''
-                    });
-                    this.showMessage(message, 'error');
-                    return;
-                }
-
-                const reply = typeof res.reply === 'string' && res.reply.trim()
-                    ? res.reply.trim()
-                    : '已收到回复，但未解析到可展示文本。';
-                this.healthCheckDialogMessages.push({
-                    id: `assistant-${Date.now()}`,
-                    role: 'assistant',
-                    text: reply,
-                    ok: true,
-                    status: Number.isFinite(res.status) ? res.status : 0,
-                    durationMs: Number.isFinite(res.durationMs) ? res.durationMs : 0,
-                    model: typeof res.model === 'string' ? res.model : '',
-                    rawPreview: typeof res.rawPreview === 'string' ? res.rawPreview : ''
-                });
-                this.healthCheckDialogPrompt = '';
-            } catch (e) {
-                const message = e && e.message ? e.message : '健康聊天测试失败';
-                this.healthCheckDialogMessages.push({
-                    id: `assistant-${Date.now()}`,
-                    role: 'assistant',
-                    text: message,
-                    ok: false,
-                    status: 0,
-                    durationMs: 0,
-                    model: '',
-                    rawPreview: ''
-                });
-                this.healthCheckDialogLastResult = { ok: false, error: message };
-                this.showMessage(message, 'error');
-            } finally {
-                this.healthCheckDialogSending = false;
             }
         },
 

@@ -361,7 +361,14 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'showInstallModal',
         'sessionListInitialBatchSize',
         'sessionListLoadStep',
-        'sessionListVisibleCount'
+        'sessionListVisibleCount',
+        'showHealthCheckDialog',
+        'healthCheckDialogLastResult',
+        'healthCheckDialogLockedProvider',
+        'healthCheckDialogMessages',
+        'healthCheckDialogPrompt',
+        'healthCheckDialogSelectedProvider',
+        'healthCheckDialogSending'
     ];
     allowedExtraCurrentKeys.push(
         'lang',
@@ -374,6 +381,10 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'configTemplateDiffFingerprint',
         '_configTemplateDiffPreviewRequestToken',
         'configTemplateDiffConfirmEnabled',
+        'healthCheckBatchTotal',
+        'healthCheckBatchDone',
+        'healthCheckBatchFailed',
+        'showHealthCheckModal',
         'pluginsActiveId',
         'pluginsLoading',
         'pluginsError',
@@ -530,7 +541,11 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'scheduleSessionListViewportFill',
         'persistClaudeChatProjectPath',
         'openClaudeChatFromTaskOrchestration',
-        'setSessionListRef'
+        'setSessionListRef',
+        'buildDefaultHealthCheckPrompt',
+        'openHealthCheckDialog',
+        'closeHealthCheckDialog',
+        'sendHealthCheckDialogMessage'
     ];
     if (parityAgainstHead) {
         const allowedExtraMethodKeySet = new Set(allowedExtraCurrentMethodKeys);

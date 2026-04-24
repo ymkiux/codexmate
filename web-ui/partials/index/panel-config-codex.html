@@ -86,7 +86,7 @@
                     </div>
                     <select class="model-select" v-model="serviceTier" @change="onServiceTierChange">
                         <option value="fast">{{ t('config.serviceTier.fast') }}</option>
-                        <option value="standard">standard</option>
+                        <option value="standard">{{ t('config.serviceTier.standard') }}</option>
                     </select>
                     <div class="config-template-hint">
                         {{ t('config.serviceTier.hint', { field: 'service_tier' }) }}
@@ -163,6 +163,30 @@
                     </button>
                 </div>
 
+                <div class="selector-section">
+                    <div class="selector-header">
+                        <span class="selector-title">{{ t('config.health.title') }}</span>
+                    </div>
+                    <button class="btn-tool" @click="runHealthCheck" :disabled="healthCheckLoading || loading || !!initError">
+                        {{ healthCheckLoading ? t('config.health.running') : t('config.health.run') }}
+                    </button>
+                    <div class="config-template-hint">{{ t('config.health.hint') }}</div>
+                    <div v-if="healthCheckLoading && healthCheckBatchTotal" class="config-template-hint">
+                        {{ t('config.health.progress', { done: healthCheckBatchDone, total: healthCheckBatchTotal, failed: healthCheckBatchFailed }) }}
+                    </div>
+                    <div v-if="healthCheckResult && !healthCheckLoading" class="config-template-hint">
+                        {{ healthCheckResult.ok ? t('config.health.ok') : t('config.health.fail') }} · {{ t('config.health.issues', { count: (healthCheckResult.issues || []).length }) }}
+                    </div>
+                    <button v-if="healthCheckResult && !healthCheckLoading" type="button" class="btn-mini" @click="showHealthCheckModal = true">
+                        {{ t('common.detail') }}
+                    </button>
+                    <div v-if="healthCheckResult && !healthCheckLoading && (healthCheckResult.issues || []).length">
+                        <div v-for="(issue, index) in healthCheckResult.issues" :key="issue.code || ('issue-' + index)" class="config-template-hint">
+                            {{ issue.message || issue.code || '' }}<span v-if="issue.suggestion"> · {{ issue.suggestion }}</span>
+                        </div>
+                    </div>
+                </div>
+
                 </template>
 
                 <div v-if="!loading && !initError" class="card-list">
@@ -187,24 +211,23 @@
                             </div>
                         </div>
                         <div class="card-trailing">
-                            <span :class="['pill', providerPillConfigured(provider) ? 'configured' : 'empty']">
-                                {{ providerPillText(provider) }}
-                            </span>
                             <span v-if="speedResults[provider.name]" :class="['latency', speedResults[provider.name].ok ? 'ok' : 'error']">
                                 {{ formatLatency(speedResults[provider.name]) }}
+                            </span>
+                            <span :class="['pill', providerPillConfigured(provider) ? 'configured' : 'empty']">
+                                {{ providerPillText(provider) }}
                             </span>
                             <div class="card-actions" @click.stop>
                                 <button
                                     class="card-action-btn"
-                                    @click="openHealthCheckDialog({ providerName: provider.name, locked: true })"
-                                    :disabled="displayCurrentProvider !== provider.name"
-                                    :aria-label="t('config.healthTest.aria', { name: provider.name })"
-                                    :title="displayCurrentProvider === provider.name ? t('config.healthTest') : t('config.switchProviderFirst')"
+                                    :class="{ loading: speedLoading[provider.name] }"
+                                    :disabled="!!speedLoading[provider.name]"
+                                    @click="runSpeedTest(provider.name, { silent: true })"
+                                    :aria-label="t('config.availabilityTestAria', { name: provider.name })"
+                                    :title="t('config.availabilityTest')"
                                 >
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                                        <path d="M8 9h8"/>
-                                        <path d="M8 13h5"/>
+                                        <path d="M13 2L3 14h7l-1 8 12-14h-7l1-6z"/>
                                     </svg>
                                 </button>
                                 <button

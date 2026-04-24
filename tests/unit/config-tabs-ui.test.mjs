@@ -9,7 +9,6 @@ import {
 test('config template keeps expected config tabs in top and side navigation', () => {
     const html = readBundledWebUiHtml();
     const modalsBasic = readProjectFile('web-ui/partials/index/modals-basic.html');
-    const healthCheckModal = readProjectFile('web-ui/partials/index/modal-health-check.html');
     const templateAgentModals = readProjectFile('web-ui/partials/index/modal-config-template-agents.html');
     const openclawModal = readProjectFile('web-ui/partials/index/modal-openclaw-config.html');
     const sessionsPanel = readProjectFile('web-ui/partials/index/panel-sessions.html');
@@ -270,7 +269,15 @@ test('config template keeps expected config tabs in top and side navigation', ()
     );
     assert.match(
         html,
+        /<span v-if="speedResults\[provider\.name\]"[\s\S]*class="\['latency', speedResults\[provider\.name\]\.ok \? 'ok' : 'error'\]"[\s\S]*>\s*\{\{\s*formatLatency\(speedResults\[provider\.name\]\)\s*\}\}\s*<\/span>[\s\S]*<span :class="\['pill', providerPillConfigured\(provider\) \? 'configured' : 'empty'\]">/
+    );
+    assert.match(
+        html,
         /:class="\['card', \{ active: currentClaudeConfig === name \}\]"[\s\S]*@click="applyClaudeConfig\(name\)"[\s\S]*@keydown\.enter\.self\.prevent="applyClaudeConfig\(name\)"[\s\S]*@keydown\.space\.self\.prevent="applyClaudeConfig\(name\)"[\s\S]*tabindex="0"[\s\S]*role="button"[\s\S]*:aria-current="currentClaudeConfig === name \? 'true' : null"/
+    );
+    assert.match(
+        html,
+        /<span v-if="claudeSpeedResults\[name\]"[\s\S]*class="\['latency', claudeSpeedResults\[name\]\.ok \? 'ok' : 'error'\]"[\s\S]*>\s*\{\{\s*formatLatency\(claudeSpeedResults\[name\]\)\s*\}\}\s*<\/span>[\s\S]*<span :class="\['pill', config\.hasKey \? 'configured' : 'empty'\]">/
     );
     assert.match(
         html,
@@ -320,7 +327,11 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /<button class="btn-icon" @click="showModelListModal = true" :aria-label="t\('modal\.modelManage\.title'\)" :title="t\('modal\.modelManage\.title'\)" v-if="modelsSource === 'legacy'">≡<\/button>/);
     assert.match(
         html,
-        /<button[\s\S]*class="card-action-btn"[\s\S]*@click="openHealthCheckDialog\(\{ providerName: provider\.name, locked: true \}\)"[\s\S]*:disabled="displayCurrentProvider !== provider\.name"[\s\S]*:aria-label="t\('config\.healthTest\.aria', \{ name: provider\.name \}\)"[\s\S]*:title="displayCurrentProvider === provider\.name \? t\('config\.healthTest'\) : t\('config\.switchProviderFirst'\)"/
+        /<button class="btn-tool" @click="runHealthCheck" :disabled="healthCheckLoading \|\| loading \|\| !!initError">/
+    );
+    assert.match(
+        html,
+        /<button[\s\S]*class="card-action-btn"[\s\S]*@click="runSpeedTest\(provider\.name, \{ silent: true \}\)"[\s\S]*:aria-label="t\('config\.availabilityTestAria', \{ name: provider\.name \}\)"[\s\S]*:title="t\('config\.availabilityTest'\)"/
     );
     assert.match(html, /<button[\s\S]*?@click="openEditModal\(provider\)"[\s\S]*?:aria-label="t\('config\.provider\.edit\.aria', \{ name: provider\.name \}\)"[\s\S]*?:title="shouldShowProviderEdit\(provider\) \? t\('common\.edit'\) : t\('common\.notEditable'\)">/);
     assert.match(html, /<button[\s\S]*?@click="deleteProvider\(provider\.name\)"[\s\S]*?:aria-label="t\('config\.provider\.delete\.aria', \{ name: provider\.name \}\)"[\s\S]*?:title="shouldShowProviderDelete\(provider\) \? t\('common\.delete'\) : t\('common\.notDeletable'\)">/);
@@ -362,10 +373,6 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(templateAgentModals, /<div class="modal-title" id="agents-modal-title">{{ agentsModalTitle }}<\/div>/);
     assert.match(modalsBasic, /<button type="button" class="btn-remove-model" @click="removeModel\(model\)">\{\{\s*t\('common\.delete'\)\s*\}\}<\/button>/);
     assert.doesNotMatch(modalsBasic, /<span class="btn-remove-model" @click="removeModel\(model\)">删除<\/span>/);
-    assert.match(healthCheckModal, /<div v-if="showHealthCheckDialog" class="modal-overlay" @click\.self="closeHealthCheckDialog\(\)">/);
-    assert.match(healthCheckModal, /<div class="modal modal-wide health-check-dialog" role="dialog" aria-modal="true" aria-labelledby="health-check-dialog-title">/);
-    assert.match(healthCheckModal, /v-model="healthCheckDialogSelectedProvider"/);
-    assert.match(healthCheckModal, /@click="sendHealthCheckDialogMessage"/);
     assert.match(openclawModal, /<div v-if="showOpenclawConfigModal" class="modal-overlay" @click\.self="!\(openclawSaving \|\| openclawApplying\) && closeOpenclawConfigModal\(\)">/);
     assert.match(openclawModal, /<div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="openclaw-config-modal-title">/);
     assert.match(openclawModal, /<div class="modal-title" id="openclaw-config-modal-title">{{ openclawEditorTitle }}<\/div>/);

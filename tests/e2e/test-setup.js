@@ -55,8 +55,8 @@ module.exports = async function testSetup(ctx) {
     const helpResult = runSync(node, [cliPath], { env });
     assert(helpResult.status === 0, 'help output failed');
     assert(!helpResult.stdout.includes('codexmate proxy'), 'help should not expose removed proxy entry');
-    assert(!helpResult.stdout.includes('codexmate auth'), 'help should not expose removed auth entry');
     assert(!helpResult.stdout.includes('内建代理'), 'help should not mention removed builtin proxy');
+    assert(helpResult.stdout.includes('codexmate auth'), 'help should expose auth entry');
 
     const claudeModel = 'claude-e2e';
     const claudeResult = runSync(node, [cliPath, 'claude', mockProviderUrl, 'sk-claude', claudeModel], { env });
