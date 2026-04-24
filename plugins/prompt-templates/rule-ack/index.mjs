@@ -1,4 +1,4 @@
-import { pluginOwnership } from '../../ownership.mjs';
+import { pluginOwnership } from '../ownership.mjs';
 
 export function buildBuiltinRuleAckTemplate(t) {
     const tr = (key, fallback, params = null) => (typeof t === 'function' ? t(key, params) : fallback);

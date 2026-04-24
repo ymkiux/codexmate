@@ -2,8 +2,8 @@ import {
     persistPromptTemplatesToStorage,
     readPromptTemplatesFromStorage
 } from './storage.mjs';
-import { buildBuiltinCommentPolishTemplate } from './builtins/comment-polish/index.mjs';
-import { buildBuiltinRuleAckTemplate } from './builtins/rule-ack/index.mjs';
+import { buildBuiltinCommentPolishTemplate } from './comment-polish/index.mjs';
+import { buildBuiltinRuleAckTemplate } from './rule-ack/index.mjs';
 
 function ensureBuiltinTemplates(rawList, builtins) {
     const list = Array.isArray(rawList) ? rawList.filter(Boolean) : [];
