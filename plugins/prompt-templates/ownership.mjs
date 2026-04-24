@@ -1,4 +1,4 @@
 export const pluginOwnership = {
-    createdBy: 'SakuraByteCore',
-    maintainers: ['SakuraByteCore']
+    createdBy: 'ymkiux',
+    maintainers: ['ymkiux']
 };
