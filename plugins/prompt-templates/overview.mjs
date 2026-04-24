@@ -2,47 +2,8 @@ import {
     persistPromptTemplatesToStorage,
     readPromptTemplatesFromStorage
 } from './storage.mjs';
-import { pluginOwnership } from './ownership.mjs';
-
-function nowIsoPromptTemplatesOverview() {
-    return new Date().toISOString();
-}
-
-function buildBuiltinCommentPolishTemplate(t) {
-    const tr = (key, fallback, params = null) => (typeof t === 'function' ? t(key, params) : fallback);
-    const line1 = tr('plugins.builtin.commentPolish.line1', '轻微收敛以下代码注释');
-    return {
-        id: 'builtin_comment_polish',
-        name: tr('plugins.builtin.commentPolish.name', '代码注释润色'),
-        description: tr('plugins.builtin.commentPolish.desc', '轻微收敛以下代码注释 {{code}}'),
-        template: [
-            line1,
-            '',
-            '{{code}}'
-        ].join('\n'),
-        createdAt: nowIsoPromptTemplatesOverview(),
-        updatedAt: nowIsoPromptTemplatesOverview(),
-        isBuiltin: true,
-        createdBy: pluginOwnership.createdBy,
-        maintainers: pluginOwnership.maintainers
-    };
-}
-
-function buildBuiltinRuleAckTemplate(t) {
-    const tr = (key, fallback, params = null) => (typeof t === 'function' ? t(key, params) : fallback);
-    const line1 = tr('plugins.builtin.ruleAck.line1', '请根据【{{rule}}】，收到请回复');
-    return {
-        id: 'builtin_rule_ack',
-        name: tr('plugins.builtin.ruleAck.name', '规则确认回复'),
-        description: tr('plugins.builtin.ruleAck.desc', '请根据【{{rule}}】，收到请回复'),
-        template: line1,
-        createdAt: nowIsoPromptTemplatesOverview(),
-        updatedAt: nowIsoPromptTemplatesOverview(),
-        isBuiltin: true,
-        createdBy: pluginOwnership.createdBy,
-        maintainers: pluginOwnership.maintainers
-    };
-}
+import { buildBuiltinCommentPolishTemplate } from './builtins/comment-polish/index.mjs';
+import { buildBuiltinRuleAckTemplate } from './builtins/rule-ack/index.mjs';
 
 function ensureBuiltinTemplates(rawList, builtins) {
     const list = Array.isArray(rawList) ? rawList.filter(Boolean) : [];
