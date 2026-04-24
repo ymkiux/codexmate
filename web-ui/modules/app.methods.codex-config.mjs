@@ -277,8 +277,55 @@ export function createCodexConfigMethods(options = {}) {
             this.healthCheckBatchTotal = 0;
             this.healthCheckBatchDone = 0;
             this.healthCheckBatchFailed = 0;
-            let shouldRunClaudeSpeedTests = false;
             try {
+                if (this.configMode === 'claude') {
+                    const entries = Object.entries(this.claudeConfigs || {});
+                    this.healthCheckBatchTotal = entries.length;
+
+                    const speedTasks = entries.map(([name, config]) => this.runClaudeSpeedTest(name, config)
+                        .then((result) => {
+                            if (!result || result.ok !== true) {
+                                this.healthCheckBatchFailed += 1;
+                            }
+                            return { name, result };
+                        })
+                        .catch((err) => {
+                            this.healthCheckBatchFailed += 1;
+                            return {
+                                name,
+                                result: { ok: false, error: err && err.message ? err.message : 'Speed test failed' }
+                            };
+                        })
+                        .finally(() => {
+                            this.healthCheckBatchDone += 1;
+                        })
+                    );
+
+                    const pairs = await Promise.all(speedTasks);
+                    const results = {};
+                    const issues = [];
+                    for (const pair of pairs) {
+                        results[pair.name] = pair.result || null;
+                        if (typeof this.buildSpeedTestIssue === 'function') {
+                            const issue = this.buildSpeedTestIssue(pair.name, pair.result);
+                            if (issue) issues.push(issue);
+                        }
+                    }
+                    const ok = issues.length === 0 && this.healthCheckBatchFailed === 0;
+                    this.healthCheckResult = {
+                        ok,
+                        issues,
+                        remote: {
+                            type: 'speed-test',
+                            speedTests: results
+                        }
+                    };
+                    if (ok) {
+                        this.showMessage('检查通过', 'success');
+                    }
+                    return;
+                }
+
                 const shouldRunSpeedTests = this.configMode === 'codex';
                 const speedTimeoutMs = shouldRunSpeedTests ? 3500 : 0;
                 const providers = shouldRunSpeedTests
@@ -322,7 +369,6 @@ export function createCodexConfigMethods(options = {}) {
                     this.healthCheckResult = null;
                     this.showMessage(getResponseMessage(res, '检查失败'), 'error');
                 } else if (res && typeof res === 'object') {
-                    shouldRunClaudeSpeedTests = true;
                     const issues = Array.isArray(res.issues) ? [...res.issues] : [];
                     let remote = res.remote || null;
                     if (shouldRunSpeedTests) {
@@ -357,12 +403,6 @@ export function createCodexConfigMethods(options = {}) {
             } finally {
                 this.healthCheckBatchTotal = this.healthCheckBatchTotal || 0;
                 this.healthCheckBatchDone = Math.min(this.healthCheckBatchDone || 0, this.healthCheckBatchTotal || 0);
-                if (shouldRunClaudeSpeedTests && this.configMode === 'claude') {
-                    try {
-                        const entries = Object.entries(this.claudeConfigs || {});
-                        await Promise.all(entries.map(([name, config]) => this.runClaudeSpeedTest(name, config)));
-                    } catch (e) {}
-                }
                 this.healthCheckLoading = false;
             }
         },

@@ -244,23 +244,17 @@ test('runHealthCheck skips Claude speed tests when the primary health check alre
         showMessage(message, type) {
             this.shownMessages.push({ message, type });
         },
-        async runSpeedTest() {
-            throw new Error('speed tests should be skipped when health check already failed');
-        },
         async runClaudeSpeedTest() {
             claudeSpeedTestCalls += 1;
+            return { ok: false, error: 'timeout' };
         }
     };
 
     await methods.runHealthCheck.call(context);
 
     assert.strictEqual(context.healthCheckLoading, false);
-    assert.strictEqual(context.healthCheckResult, null);
-    assert.strictEqual(claudeSpeedTestCalls, 0);
-    assert.deepStrictEqual(context.shownMessages, [{
-        message: 'health failed',
-        type: 'error'
-    }]);
+    assert.strictEqual(claudeSpeedTestCalls, 1);
+    assert.strictEqual(context.healthCheckResult.ok, false);
 });
 
 test('runHealthCheck preserves backend remote health result while appending speed test summaries', async () => {

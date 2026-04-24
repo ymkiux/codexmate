@@ -106,6 +106,10 @@
                     <button class="btn-tool" @click="runHealthCheck" :disabled="healthCheckLoading || loading || !!initError">
                         {{ healthCheckLoading ? t('claude.health.running') : t('claude.health.run') }}
                     </button>
+                    <div class="config-template-hint">{{ t('claude.health.hint') }}</div>
+                    <div v-if="healthCheckLoading && healthCheckBatchTotal" class="config-template-hint">
+                        {{ t('claude.health.progress', { done: healthCheckBatchDone, total: healthCheckBatchTotal, failed: healthCheckBatchFailed }) }}
+                    </div>
                 </div>
 
                 <div class="card-list">
