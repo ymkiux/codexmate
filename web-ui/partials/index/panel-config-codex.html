@@ -86,7 +86,7 @@
                     </div>
                     <select class="model-select" v-model="serviceTier" @change="onServiceTierChange">
                         <option value="fast">{{ t('config.serviceTier.fast') }}</option>
-                        <option value="standard">standard</option>
+                        <option value="standard">{{ t('config.serviceTier.standard') }}</option>
                     </select>
                     <div class="config-template-hint">
                         {{ t('config.serviceTier.hint', { field: 'service_tier' }) }}

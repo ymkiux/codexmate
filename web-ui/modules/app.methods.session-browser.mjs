@@ -442,12 +442,19 @@ export function createSessionBrowserMethods(options = {}) {
             await this.onSessionSourceChange();
         },
 
-        copySessionsFilterShareUrl() {
+        async copySessionsFilterShareUrl() {
             const url = buildSessionsFilterShareUrl(this);
             if (!url) {
                 this.showMessage(typeof this.t === 'function' ? this.t('sessions.filters.urlBuildFail') : 'Failed to build link', 'error');
                 return;
             }
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(url);
+                    this.showMessage(typeof this.t === 'function' ? this.t('toast.copy.ok') : 'Copied', 'success');
+                    return;
+                }
+            } catch (_) {}
             const ok = typeof this.fallbackCopyText === 'function' ? this.fallbackCopyText(url) : false;
             if (ok) {
                 this.showMessage(typeof this.t === 'function' ? this.t('toast.copy.ok') : 'Copied', 'success');

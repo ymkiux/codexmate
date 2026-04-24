@@ -37,7 +37,7 @@ export function createDashboardComputed() {
         },
         displayProvidersList() {
             const list = Array.isArray(this.providersList) ? this.providersList : [];
-            return list.filter((item) => String(item && item.name ? item.name : '').trim().toLowerCase() !== 'codexmate-proxy');
+            return list;
         },
         installTargetCards() {
             const targets = Array.isArray(this.installStatusTargets) ? this.installStatusTargets : [];

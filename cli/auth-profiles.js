@@ -28,12 +28,17 @@ function createAuthProfileController(deps = {}) {
     function normalizeAuthProfileName(value) {
         const raw = typeof value === 'string' ? value.trim() : '';
         if (!raw) return '';
-        const sanitized = raw
+        return raw.slice(0, 120);
+    }
+
+    function sanitizeAuthProfileFileStem(value) {
+        const raw = typeof value === 'string' ? value.trim() : '';
+        if (!raw) return '';
+        return raw
             .replace(/[\\/:*?"<>|]/g, '-')
             .replace(/\s+/g, '-')
             .replace(/^-+|-+$/g, '')
             .slice(0, 120);
-        return sanitized;
     }
 
     function normalizeAuthRegistry(raw) {
@@ -46,7 +51,7 @@ function createAuthProfileController(deps = {}) {
             version: 1,
             current: typeof raw.current === 'string' ? raw.current.trim() : '',
             items: items.map((item) => ({
-                name: normalizeAuthProfileName(item.name) || item.name.trim(),
+                name: item.name.trim(),
                 fileName: typeof item.fileName === 'string' ? path.basename(item.fileName) : '',
                 type: typeof item.type === 'string' ? item.type : '',
                 email: typeof item.email === 'string' ? item.email : '',
@@ -135,13 +140,24 @@ function createAuthProfileController(deps = {}) {
         const sourceFile = typeof options.sourceFile === 'string' ? options.sourceFile : '';
         const preferredName = normalizeAuthProfileName(options.name || '');
         const profileName = preferredName || getAuthProfileNameFallback(safePayload, sourceFile);
-        const fileName = `${profileName}.json`;
-        const profilePath = path.join(AUTH_PROFILES_DIR, fileName);
+        let fileStem = sanitizeAuthProfileFileStem(profileName) || sanitizeAuthProfileFileStem(sourceFile) || `auth-${Date.now()}`;
+
+        const registry = readAuthRegistry();
+        const existed = registry.items.find((item) => item && item.name === profileName);
+        if (existed && existed.fileName) {
+            fileStem = path.basename(existed.fileName, path.extname(existed.fileName));
+        }
+
+        let fileName = `${fileStem}.json`;
+        let profilePath = path.join(AUTH_PROFILES_DIR, fileName);
+        if (!existed && fs.existsSync(profilePath)) {
+            fileStem = `${fileStem}-${Date.now().toString(16).slice(-6)}`;
+            fileName = `${fileStem}.json`;
+            profilePath = path.join(AUTH_PROFILES_DIR, fileName);
+        }
 
         ensureDir(AUTH_PROFILES_DIR);
         writeJsonAtomic(profilePath, safePayload);
-
-        const registry = readAuthRegistry();
         const meta = buildAuthProfileSummary(profileName, safePayload, fileName);
         meta.importedAt = toIsoTime(Date.now());
         meta.sourceFile = sourceFile || '';
