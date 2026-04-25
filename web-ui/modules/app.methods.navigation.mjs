@@ -24,7 +24,7 @@ export function createNavigationMethods(options = {}) {
         let ok = true;
         try {
             if (typeof vm.runHealthCheck === 'function') {
-                await vm.runHealthCheck({ silent: true, forceRefresh });
+                await vm.runHealthCheck({ doctor: true, silent: true, forceRefresh });
             }
             vm.__doctorLoadedOnce = true;
             return true;

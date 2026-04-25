@@ -145,7 +145,7 @@
                                             v-else-if="action.type === 'run-check'"
                                             type="button"
                                             class="btn-tool btn-tool-compact"
-                                            @click="runHealthCheck({ forceRefresh: true })"
+                                            @click="runHealthCheck({ doctor: true, forceRefresh: true })"
                                             :disabled="healthCheckLoading">
                                             {{ t('dashboard.doctor.runChecks') }}
                                         </button>

@@ -536,7 +536,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (!this.__doctorLoadedOnce) {
                             this.__doctorLoadedOnce = true;
                             if (typeof this.runHealthCheck === 'function') {
-                                void this.runHealthCheck({ silent: true });
+                                void this.runHealthCheck({ doctor: true, silent: true });
                             }
                         }
                     }
