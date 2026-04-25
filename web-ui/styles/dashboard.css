@@ -92,6 +92,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
+    justify-content: center;
 }
 
 .doctor-status-chip {
@@ -104,6 +105,8 @@
     background: rgba(255, 255, 255, 0.78);
     font-size: var(--font-size-caption);
     color: var(--color-text-secondary);
+    justify-content: center;
+    text-align: center;
 }
 
 .doctor-status-chip strong {
@@ -135,6 +138,7 @@
     border: 1px solid var(--color-border-soft);
     padding: 12px 12px 10px;
     background: rgba(255, 255, 255, 0.78);
+    text-align: center;
 }
 
 .doctor-health-result.ok {
@@ -153,6 +157,7 @@
     font-weight: var(--font-weight-secondary);
     color: var(--color-text-primary);
     margin-bottom: 8px;
+    text-align: center;
 }
 
 .doctor-health-issues {
@@ -160,6 +165,7 @@
     flex-direction: column;
     gap: 6px;
     font-size: var(--font-size-caption);
+    align-items: center;
 }
 
 .doctor-health-issue {
@@ -170,6 +176,9 @@
     color: var(--color-text-secondary);
     overflow-wrap: anywhere;
     word-break: break-word;
+    text-align: center;
+    width: 100%;
+    max-width: 720px;
 }
 
 @media (max-width: 520px) {
