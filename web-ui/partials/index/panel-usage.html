@@ -14,6 +14,7 @@
                             <button type="button" class="usage-range-btn" :class="{ active: sessionsUsageTimeRange === '30d' }" @click="setSessionsUsageTimeRange('30d')">{{ t('usage.range.30d') }}</button>
                             <button type="button" class="usage-range-btn" :class="{ active: sessionsUsageTimeRange === 'all' }" @click="setSessionsUsageTimeRange('all')">{{ t('usage.range.all') }}</button>
                             <button type="button" class="usage-range-btn" @click="loadSessionsUsage({ forceRefresh: true, range: sessionsUsageTimeRange })" :disabled="sessionsUsageLoading">{{ sessionsUsageLoading ? t('usage.refreshing') : t('usage.refresh') }}</button>
+                            <button type="button" class="usage-range-btn" @click="switchMainTab('dashboard')">{{ t('dashboard.doctor.title') }}</button>
                         </div>
                     </div>
 

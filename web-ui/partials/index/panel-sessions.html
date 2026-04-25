@@ -28,6 +28,9 @@
                             <button class="btn-tool btn-tool-compact" @click="loadSessions({ forceRefresh: true })" :disabled="sessionsLoading">
                                 {{ sessionsLoading ? t('sessions.refreshing') : t('sessions.refresh') }}
                             </button>
+                            <button class="btn-tool btn-tool-compact" type="button" @click="switchMainTab('dashboard')">
+                                {{ t('dashboard.doctor.title') }}
+                            </button>
                         </div>
                     </div>
                     <div class="session-toolbar">

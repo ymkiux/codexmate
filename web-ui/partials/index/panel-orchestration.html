@@ -19,6 +19,9 @@
                                 <button type="button" class="btn-tool btn-tool-compact" @click="resetTaskOrchestrationDraft()" :disabled="taskOrchestration.running || taskOrchestration.queueAdding || taskOrchestration.planning">
                                     {{ t('orchestration.draft.reset') }}
                                 </button>
+                                <button type="button" class="btn-tool btn-tool-compact" @click="switchMainTab('dashboard')" :disabled="loading || !!initError">
+                                    {{ t('dashboard.doctor.title') }}
+                                </button>
                             </div>
                         </div>
                         <div v-if="taskOrchestrationQueueStats.running || taskOrchestrationQueueStats.queued || taskOrchestration.runs.length" class="task-hero-meta-strip" :aria-label="t('orchestration.summary.aria')">
