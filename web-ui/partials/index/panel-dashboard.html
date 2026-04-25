@@ -1,0 +1,186 @@
+                <div
+                    v-show="mainTab === 'dashboard'"
+                    class="mode-content"
+                    id="panel-dashboard"
+                    role="tabpanel"
+                    :aria-labelledby="'tab-dashboard'">
+                    <div class="selector-section doctor-hero">
+                        <div class="selector-header">
+                            <span class="selector-title">{{ t('dashboard.doctor.title') }}</span>
+                            <div class="selector-actions">
+                                <button
+                                    class="btn-tool btn-tool-compact"
+                                    @click="runHealthCheck"
+                                    :disabled="loading || !!initError || healthCheckLoading">
+                                    {{ healthCheckLoading ? t('dashboard.doctor.checking') : t('dashboard.doctor.runChecks') }}
+                                </button>
+                            </div>
+                        </div>
+                        <div class="doctor-grid">
+                            <button type="button" class="doctor-card" @click="switchMainTab('config')" :disabled="loading || !!initError">
+                                <div class="doctor-card-title">{{ t('dashboard.card.config') }}</div>
+                                <div class="doctor-card-meta">
+                                    <span>{{ inspectorConfigModeLabel }}</span>
+                                    <span>·</span>
+                                    <span>{{ inspectorCurrentConfigLabel }}</span>
+                                </div>
+                                <div class="doctor-card-kv">
+                                    <span>{{ t('dashboard.kv.model') }}</span>
+                                    <span>{{ inspectorCurrentModelLabel }}</span>
+                                </div>
+                            </button>
+                            <button type="button" class="doctor-card" @click="switchMainTab('sessions')" :disabled="loading || !!initError">
+                                <div class="doctor-card-title">{{ t('dashboard.card.sessions') }}</div>
+                                <div class="doctor-card-meta">
+                                    <span>{{ sessionsLoading ? t('dashboard.state.loading') : (sessionsLoadedOnce ? t('dashboard.state.ready') : t('dashboard.state.idle')) }}</span>
+                                    <span>·</span>
+                                    <span>{{ t('dashboard.sessions.count', { count: sessionsList.length }) }}</span>
+                                </div>
+                                <div class="doctor-card-kv" v-if="activeSessionDetailError">
+                                    <span>{{ t('dashboard.kv.issue') }}</span>
+                                    <span class="doctor-kv-error">{{ activeSessionDetailError }}</span>
+                                </div>
+                                <div class="doctor-card-kv" v-else>
+                                    <span>{{ t('dashboard.kv.active') }}</span>
+                                    <span>{{ activeSession ? (activeSession.title || activeSession.sessionId) : t('dashboard.none') }}</span>
+                                </div>
+                            </button>
+                            <button type="button" class="doctor-card" @click="switchMainTab('usage')" :disabled="loading || !!initError">
+                                <div class="doctor-card-title">{{ t('dashboard.card.usage') }}</div>
+                                <div class="doctor-card-meta">
+                                    <span>{{ sessionsUsageLoading ? t('dashboard.state.loading') : (sessionsUsageLoadedOnce ? t('dashboard.state.ready') : t('dashboard.state.idle')) }}</span>
+                                    <span>·</span>
+                                    <span>{{ t('dashboard.usage.range', { value: (sessionsUsageTimeRange === 'all' ? t('usage.range.all') : (sessionsUsageTimeRange === '30d' ? t('usage.range.30d.short') : t('usage.range.7d.short'))) }) }}</span>
+                                </div>
+                                <div class="doctor-card-kv" v-if="sessionsUsageError">
+                                    <span>{{ t('dashboard.kv.issue') }}</span>
+                                    <span class="doctor-kv-error">{{ sessionsUsageError }}</span>
+                                </div>
+                                <div class="doctor-card-kv" v-else>
+                                    <span>{{ t('dashboard.kv.sessions') }}</span>
+                                    <span>{{ sessionUsageSummaryCards[0] ? sessionUsageSummaryCards[0].value : 0 }}</span>
+                                </div>
+                                <div class="doctor-card-kv"
+                                    v-if="sessionsUsageLoadedOnce
+                                        && sessionsUsageList.filter(session => !(session && typeof session.model === 'string' && session.model.trim())).length">
+                                    <span>{{ t('dashboard.kv.missingModel') }}</span>
+                                    <span>{{ sessionsUsageList.filter(session => !(session && typeof session.model === 'string' && session.model.trim())).length }}</span>
+                                </div>
+                            </button>
+                            <button
+                                v-if="taskOrchestrationTabEnabled"
+                                type="button"
+                                class="doctor-card"
+                                @click="switchMainTab('orchestration')"
+                                :disabled="loading || !!initError">
+                                <div class="doctor-card-title">{{ t('dashboard.card.tasks') }}</div>
+                                <div class="doctor-card-meta">
+                                    <span>{{ taskOrchestration && taskOrchestration.loading ? t('dashboard.state.loading') : t('dashboard.state.ready') }}</span>
+                                    <span>·</span>
+                                    <span>{{ t('dashboard.tasks.queue', { running: taskOrchestrationQueueStats.running, queued: taskOrchestrationQueueStats.queued }) }}</span>
+                                </div>
+                                <div class="doctor-card-kv" v-if="taskOrchestration && taskOrchestration.planIssues && taskOrchestration.planIssues.length">
+                                    <span>{{ t('dashboard.kv.blockers') }}</span>
+                                    <span>{{ taskOrchestration.planIssues.length }}</span>
+                                </div>
+                                <div class="doctor-card-kv" v-else>
+                                    <span>{{ t('dashboard.kv.runs') }}</span>
+                                    <span>{{ taskOrchestration && taskOrchestration.runs ? taskOrchestration.runs.length : 0 }}</span>
+                                </div>
+                            </button>
+                            <button type="button" class="doctor-card" @click="switchMainTab('market')" :disabled="loading || !!initError">
+                                <div class="doctor-card-title">{{ t('dashboard.card.skills') }}</div>
+                                <div class="doctor-card-meta">
+                                    <span>{{ skillsMarketBusy ? t('dashboard.state.loading') : t('dashboard.state.ready') }}</span>
+                                    <span>·</span>
+                                    <span>{{ t('dashboard.skills.count', { installed: skillsList.length, importable: skillsImportList.length }) }}</span>
+                                </div>
+                                <div class="doctor-card-kv">
+                                    <span>{{ t('dashboard.kv.target') }}</span>
+                                    <span>{{ skillsTargetLabel }}</span>
+                                </div>
+                                <div class="doctor-card-kv" v-if="skillsRootPath">
+                                    <span>{{ t('dashboard.kv.root') }}</span>
+                                    <span>{{ skillsRootPath }}</span>
+                                </div>
+                            </button>
+                        </div>
+                        <div class="doctor-status-row">
+                            <div class="doctor-status-chip" :class="inspectorHealthTone">
+                                <span>{{ t('dashboard.status.health') }}</span>
+                                <strong>{{ inspectorHealthStatus }}</strong>
+                            </div>
+                            <div class="doctor-status-chip">
+                                <span>{{ t('dashboard.status.busy') }}</span>
+                                <strong>{{ inspectorBusyStatus }}</strong>
+                            </div>
+                            <div class="doctor-status-chip">
+                                <span>{{ t('dashboard.status.models') }}</span>
+                                <strong>{{ inspectorModelLoadStatus }}</strong>
+                            </div>
+                        </div>
+                        <div v-if="healthCheckResult" class="doctor-health-result" :class="healthCheckResult.ok ? 'ok' : 'error'">
+                            <div class="doctor-health-title">
+                                {{ healthCheckResult.ok ? t('dashboard.health.ok') : t('dashboard.health.fail') }}
+                                <span v-if="healthCheckResult.issues && healthCheckResult.issues.length">（{{ t('dashboard.health.issues', { count: healthCheckResult.issues.length }) }}）</span>
+                            </div>
+                        </div>
+                        <div v-if="healthCheckResult && healthCheckResult.report && healthCheckResult.report.issues && healthCheckResult.report.issues.length" class="doctor-action-list">
+                            <div v-for="issue in healthCheckResult.report.issues" :key="issue.id" class="doctor-action-card">
+                                <div class="doctor-action-head">
+                                    <div class="doctor-action-title">{{ issue.problem || (issue.problemKey ? t(issue.problemKey, issue.problemParams) : '') }}</div>
+                                    <div :class="['doctor-action-severity', issue.severity]">{{ issue.severityLabel || issue.severity }}</div>
+                                </div>
+                                <div class="doctor-action-impact">{{ issue.impact || (issue.impactKey ? t(issue.impactKey, issue.impactParams) : '') }}</div>
+                                <div v-if="issue.actions && issue.actions.length" class="doctor-action-buttons">
+                                    <template v-for="(action, index) in issue.actions" :key="issue.id + '-action-' + index">
+                                        <button
+                                            v-if="action.type === 'navigate'"
+                                            type="button"
+                                            class="btn-tool btn-tool-compact"
+                                            @click="switchMainTab(action.target)">
+                                            {{ action.label || (action.labelKey ? t(action.labelKey, action.labelParams) : t('dashboard.doctor.open')) }}
+                                        </button>
+                                        <button
+                                            v-else-if="action.type === 'run-check'"
+                                            type="button"
+                                            class="btn-tool btn-tool-compact"
+                                            @click="runHealthCheck({ doctor: true, forceRefresh: true })"
+                                            :disabled="healthCheckLoading">
+                                            {{ t('dashboard.doctor.runChecks') }}
+                                        </button>
+                                        <button
+                                            v-else-if="action.type === 'export'"
+                                            type="button"
+                                            class="btn-tool btn-tool-compact"
+                                            @click="healthCheckResult && healthCheckResult.report
+                                                ? (action.format === 'md'
+                                                    ? downloadTextFile('codexmate-doctor.md', String(healthCheckResult.markdown || ''), 'text/markdown;charset=utf-8')
+                                                    : downloadTextFile('codexmate-doctor.json', JSON.stringify(healthCheckResult.report, null, 2), 'application/json;charset=utf-8'))
+                                                : null">
+                                            {{ action.format === 'md' ? t('dashboard.doctor.export.md') : t('dashboard.doctor.export.json') }}
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                            <div class="doctor-action-footer">
+                                <button
+                                    type="button"
+                                    class="btn-tool btn-tool-compact"
+                                    @click="healthCheckResult && healthCheckResult.report
+                                        ? downloadTextFile('codexmate-doctor.json', JSON.stringify(healthCheckResult.report, null, 2), 'application/json;charset=utf-8')
+                                        : null">
+                                    {{ t('dashboard.doctor.export.json') }}
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn-tool btn-tool-compact"
+                                    @click="healthCheckResult && healthCheckResult.report
+                                        ? downloadTextFile('codexmate-doctor.md', String(healthCheckResult.markdown || ''), 'text/markdown;charset=utf-8')
+                                        : null">
+                                    {{ t('dashboard.doctor.export.md') }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>

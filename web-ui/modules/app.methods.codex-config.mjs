@@ -271,13 +271,59 @@ export function createCodexConfigMethods(options = {}) {
             });
         },
 
-        async runHealthCheck() {
+        async runHealthCheck(options = {}) {
             this.healthCheckLoading = true;
             this.healthCheckResult = null;
             this.healthCheckBatchTotal = 0;
             this.healthCheckBatchDone = 0;
             this.healthCheckBatchFailed = 0;
             try {
+                const silent = !!(options && options.silent);
+                const forceRefresh = !!(options && options.forceRefresh);
+                const useDoctor = !!(options && options.doctor);
+                if (useDoctor) {
+                    const res = await api('doctor', {
+                        lang: this.lang,
+                        remote: true,
+                        range: this.sessionsUsageTimeRange,
+                        targetApp: this.skillsTargetApp,
+                        includeUsage: true,
+                        includeTasks: true,
+                        includeSkills: true,
+                        includeInstall: true,
+                        forceRefresh
+                    });
+                    if (hasResponseError(res)) {
+                        this.healthCheckResult = null;
+                        if (!silent) {
+                            this.showMessage(getResponseMessage(res, '检查失败'), 'error');
+                        }
+                        return;
+                    }
+                    if (res && typeof res === 'object') {
+                        this.healthCheckResult = res;
+                        const report = res.report && typeof res.report === 'object' ? res.report : null;
+                        const summary = report && report.summary && typeof report.summary === 'object' ? report.summary : null;
+                        const total = summary && Number.isFinite(Number(summary.total))
+                            ? Math.max(0, Math.floor(Number(summary.total)))
+                            : (Array.isArray(res.issues) ? res.issues.length : 0);
+                        const errors = summary && Number.isFinite(Number(summary.error)) ? Math.max(0, Math.floor(Number(summary.error))) : 0;
+                        const warns = summary && Number.isFinite(Number(summary.warn)) ? Math.max(0, Math.floor(Number(summary.warn))) : 0;
+                        this.healthCheckBatchTotal = total;
+                        this.healthCheckBatchDone = total;
+                        this.healthCheckBatchFailed = errors + warns;
+                        if (!silent && res.ok) {
+                            this.showMessage('检查通过', 'success');
+                        }
+                        return;
+                    }
+                    this.healthCheckResult = null;
+                    if (!silent) {
+                        this.showMessage('检查失败', 'error');
+                    }
+                    return;
+                }
+
                 if (this.configMode === 'claude') {
                     const entries = Object.entries(this.claudeConfigs || {});
                     this.healthCheckBatchTotal = entries.length;
@@ -320,7 +366,7 @@ export function createCodexConfigMethods(options = {}) {
                             speedTests: results
                         }
                     };
-                    if (ok) {
+                    if (ok && !silent) {
                         this.showMessage('检查通过', 'success');
                     }
                     return;
@@ -367,7 +413,9 @@ export function createCodexConfigMethods(options = {}) {
                 ]);
                 if (hasResponseError(res)) {
                     this.healthCheckResult = null;
-                    this.showMessage(getResponseMessage(res, '检查失败'), 'error');
+                    if (!silent) {
+                        this.showMessage(getResponseMessage(res, '检查失败'), 'error');
+                    }
                 } else if (res && typeof res === 'object') {
                     const issues = Array.isArray(res.issues) ? [...res.issues] : [];
                     let remote = res.remote || null;
@@ -390,16 +438,20 @@ export function createCodexConfigMethods(options = {}) {
                         issues,
                         remote
                     };
-                    if (ok) {
+                    if (ok && !silent) {
                         this.showMessage('检查通过', 'success');
                     }
                 } else {
                     this.healthCheckResult = null;
-                    this.showMessage('检查失败', 'error');
+                    if (!silent) {
+                        this.showMessage('检查失败', 'error');
+                    }
                 }
             } catch (e) {
                 this.healthCheckResult = null;
-                this.showMessage('检查失败', 'error');
+                if (!(options && options.silent)) {
+                    this.showMessage('检查失败', 'error');
+                }
             } finally {
                 this.healthCheckBatchTotal = this.healthCheckBatchTotal || 0;
                 this.healthCheckBatchDone = Math.min(this.healthCheckBatchDone || 0, this.healthCheckBatchTotal || 0);

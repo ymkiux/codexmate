@@ -59,39 +59,39 @@ export function createDashboardComputed() {
         },
         inspectorBusyStatus() {
             const tasks = [];
-            if (this.loading) tasks.push('初始化');
-            if (this.sessionsLoading) tasks.push('会话加载');
-            if (this.codexModelsLoading || this.claudeModelsLoading) tasks.push('模型加载');
-            if (this.codexApplying || this.configTemplateApplying || this.openclawApplying) tasks.push('配置应用');
-            if (this.agentsSaving) tasks.push('AGENTS 保存');
-            if (this.skillsLoading || this.skillsDeleting || this.skillsScanningImports || this.skillsImporting || this.skillsZipImporting || this.skillsExporting) tasks.push('Skills 管理');
+            if (this.loading) tasks.push(this.t('dashboard.busy.init'));
+            if (this.sessionsLoading) tasks.push(this.t('dashboard.busy.sessions'));
+            if (this.codexModelsLoading || this.claudeModelsLoading) tasks.push(this.t('dashboard.busy.models'));
+            if (this.codexApplying || this.configTemplateApplying || this.openclawApplying) tasks.push(this.t('dashboard.busy.configApply'));
+            if (this.agentsSaving) tasks.push(this.t('dashboard.busy.agents'));
+            if (this.skillsLoading || this.skillsDeleting || this.skillsScanningImports || this.skillsImporting || this.skillsZipImporting || this.skillsExporting) tasks.push(this.t('dashboard.busy.skills'));
             if (this.taskOrchestration && (this.taskOrchestration.loading || this.taskOrchestration.planning || this.taskOrchestration.running || this.taskOrchestration.queueAdding || this.taskOrchestration.queueStarting || this.taskOrchestration.retrying || this.taskOrchestration.selectedRunLoading)) {
-                tasks.push('任务编排');
+                tasks.push(this.t('dashboard.busy.tasks'));
             }
-            return tasks.length ? tasks.join(' / ') : '空闲';
+            return tasks.length ? tasks.join(' / ') : this.t('dashboard.busy.idle');
         },
         inspectorMessageSummary() {
             const value = typeof this.message === 'string' ? this.message.trim() : '';
-            return value || '暂无提示';
+            return value || this.t('dashboard.message.none');
         },
         inspectorSessionSourceLabel() {
-            if (this.sessionFilterSource === 'codex') return 'Codex';
-            if (this.sessionFilterSource === 'claude') return 'Claude Code';
-            return '全部';
+            if (this.sessionFilterSource === 'codex') return this.t('dashboard.sessionSource.codex');
+            if (this.sessionFilterSource === 'claude') return this.t('dashboard.sessionSource.claude');
+            return this.t('dashboard.sessionSource.all');
         },
         inspectorSessionPathLabel() {
             const value = typeof this.sessionPathFilter === 'string' ? this.sessionPathFilter.trim() : '';
-            return value || '全部路径';
+            return value || this.t('dashboard.sessionPath.all');
         },
         inspectorSessionQueryLabel() {
-            if (!this.isSessionQueryEnabled) return '当前来源不支持';
+            if (!this.isSessionQueryEnabled) return this.t('dashboard.sessionQuery.unsupported');
             const value = typeof this.sessionQuery === 'string' ? this.sessionQuery.trim() : '';
-            return value || '未设置';
+            return value || this.t('dashboard.sessionQuery.unset');
         },
         inspectorHealthStatus() {
-            if (this.initError) return '读取失败';
-            if (this.loading) return '初始化中';
-            return '正常';
+            if (this.initError) return this.t('dashboard.healthStatus.failRead');
+            if (this.loading) return this.t('dashboard.healthStatus.initializing');
+            return this.t('dashboard.healthStatus.ok');
         },
         inspectorHealthTone() {
             if (this.initError) return 'error';
@@ -100,12 +100,12 @@ export function createDashboardComputed() {
         },
         inspectorModelLoadStatus() {
             if (this.codexModelsLoading || this.claudeModelsLoading) {
-                return '加载中';
+                return this.t('dashboard.modelStatus.loading');
             }
             if (this.modelsSource === 'error' || this.claudeModelsSource === 'error') {
-                return '加载异常';
+                return this.t('dashboard.modelStatus.error');
             }
-            return '正常';
+            return this.t('dashboard.modelStatus.ok');
         },
         installTroubleshootingTips() {
             const platform = this.resolveInstallPlatform();

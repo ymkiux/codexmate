@@ -6,6 +6,7 @@ export function createNavigationMethods(options = {}) {
     } = options;
     const NAV_STATE_STORAGE_KEY = 'codexmateNavState.v1';
     const MAIN_TAB_SET = new Set([
+        'dashboard',
         'config',
         'sessions',
         'usage',
@@ -15,6 +16,29 @@ export function createNavigationMethods(options = {}) {
         'docs',
         'settings'
     ]);
+    const loadDoctorOverview = async (vm, options = {}) => {
+        if (!vm || typeof vm !== 'object') return false;
+        if (vm.__doctorLoading) return false;
+        const forceRefresh = !!(options && options.forceRefresh);
+        vm.__doctorLoading = true;
+        let ok = true;
+        try {
+            if (typeof vm.runHealthCheck === 'function') {
+                await vm.runHealthCheck({ doctor: true, silent: true, forceRefresh });
+            }
+            vm.__doctorLoadedOnce = true;
+            return true;
+        } catch (_) {
+            ok = false;
+            vm.__doctorLoadedOnce = true;
+            return false;
+        } finally {
+            vm.__doctorLoading = false;
+            if (!ok) {
+                vm.__doctorLoadedOnce = true;
+            }
+        }
+    };
     const readNavState = () => {
         if (typeof localStorage === 'undefined') return null;
         let raw = '';
@@ -37,7 +61,7 @@ export function createNavigationMethods(options = {}) {
         const mainTab = typeof vm.mainTab === 'string' ? vm.mainTab.trim().toLowerCase() : '';
         const configMode = typeof vm.configMode === 'string' ? vm.configMode.trim().toLowerCase() : '';
         const snapshot = {
-            mainTab: MAIN_TAB_SET.has(mainTab) ? mainTab : 'docs',
+            mainTab: MAIN_TAB_SET.has(mainTab) ? mainTab : 'dashboard',
             configMode: configModeSet && configModeSet.has(configMode) ? configMode : 'codex'
         };
         try {
@@ -341,6 +365,9 @@ export function createNavigationMethods(options = {}) {
             if (targetTab === previousTab) {
                 switchState.ticket += 1;
                 switchState.pendingTarget = '';
+                if (targetTab === 'dashboard' && !this.__doctorLoadedOnce) {
+                    void loadDoctorOverview(this);
+                }
                 if (
                     targetTab === 'sessions'
                     && typeof this.prepareSessionTabRender === 'function'
@@ -366,6 +393,9 @@ export function createNavigationMethods(options = {}) {
                 switchState.pendingTarget = '';
                 const result = switchMainTabHelper.call(this, targetTab);
                 persistNavState(this);
+                if (targetTab === 'dashboard') {
+                    void loadDoctorOverview(this);
+                }
                 this.scheduleAfterFrame(() => {
                     this.clearMainTabSwitchIntent(normalizedTab);
                 });
@@ -381,6 +411,9 @@ export function createNavigationMethods(options = {}) {
                 liveState.pendingTarget = '';
                 switchMainTabHelper.call(this, pendingTarget);
                 persistNavState(this);
+                if (pendingTarget === 'dashboard') {
+                    void loadDoctorOverview(this);
+                }
                 this.clearMainTabSwitchIntent(normalizedTab);
             });
         },

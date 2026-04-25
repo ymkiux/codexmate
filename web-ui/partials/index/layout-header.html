@@ -1,6 +1,16 @@
     <div id="app" class="container" v-cloak>
         <div v-if="!sessionStandalone" class="top-tabs" role="tablist" :aria-label="t('nav.topTabs.aria')">
             <button class="top-tab"
+                id="tab-dashboard"
+                role="tab"
+                data-main-tab="dashboard"
+                :tabindex="mainTab === 'dashboard' ? 0 : -1"
+                :aria-selected="mainTab === 'dashboard'"
+                aria-controls="panel-dashboard"
+                :class="{ active: isMainTabNavActive('dashboard') }"
+                @pointerdown="onMainTabPointerDown('dashboard', $event)"
+                @click="onMainTabClick('dashboard', $event)">{{ t('tab.dashboard') }}</button>
+            <button class="top-tab"
                 id="tab-docs"
                 role="tab"
                 data-main-tab="docs"
@@ -11,38 +21,16 @@
                 @pointerdown="onMainTabPointerDown('docs', $event)"
                 @click="onMainTabClick('docs', $event)">{{ t('tab.docs') }}</button>
             <button class="top-tab"
-                id="tab-config-codex"
+                id="tab-config"
                 role="tab"
                 data-main-tab="config"
-                data-config-mode="codex"
-                :tabindex="mainTab === 'config' && configMode === 'codex' ? 0 : -1"
-                :aria-selected="mainTab === 'config' && configMode === 'codex'"
-                aria-controls="panel-config-provider"
-                :class="{ active: isConfigModeNavActive('codex') }"
-                @pointerdown="onConfigTabPointerDown('codex', $event)"
-                @click="onConfigTabClick('codex', $event)">{{ t('tab.config.codex') }}</button>
-            <button class="top-tab"
-                id="tab-config-claude"
-                role="tab"
-                data-main-tab="config"
-                data-config-mode="claude"
-                :tabindex="mainTab === 'config' && configMode === 'claude' ? 0 : -1"
-                :aria-selected="mainTab === 'config' && configMode === 'claude'"
-                aria-controls="panel-config-claude"
-                :class="{ active: isConfigModeNavActive('claude') }"
-                @pointerdown="onConfigTabPointerDown('claude', $event)"
-                @click="onConfigTabClick('claude', $event)">{{ t('tab.config.claude') }}</button>
-            <button class="top-tab"
-                id="tab-config-openclaw"
-                role="tab"
-                data-main-tab="config"
-                data-config-mode="openclaw"
-                :tabindex="mainTab === 'config' && configMode === 'openclaw' ? 0 : -1"
-                :aria-selected="mainTab === 'config' && configMode === 'openclaw'"
-                aria-controls="panel-config-openclaw"
-                :class="{ active: isConfigModeNavActive('openclaw') }"
-                @pointerdown="onConfigTabPointerDown('openclaw', $event)"
-                @click="onConfigTabClick('openclaw', $event)">{{ t('tab.config.openclaw') }}</button>
+                :data-config-mode="configMode"
+                :tabindex="mainTab === 'config' ? 0 : -1"
+                :aria-selected="mainTab === 'config'"
+                :aria-controls="configMode === 'claude' ? 'panel-config-claude' : (configMode === 'openclaw' ? 'panel-config-openclaw' : 'panel-config-provider')"
+                :class="{ active: isMainTabNavActive('config') }"
+                @pointerdown="onMainTabPointerDown('config', $event)"
+                @click="onMainTabClick('config', $event)">{{ t('tab.config') }}</button>
             <button class="top-tab"
                 id="tab-sessions"
                 role="tab"
@@ -136,6 +124,22 @@
                 </div>
 
                 <div class="side-rail-nav">
+                <div class="side-section" role="navigation" :aria-label="t('side.overview')">
+                    <div class="side-section-title">{{ t('side.overview') }}</div>
+                    <button
+                        id="side-tab-dashboard"
+                        data-main-tab="dashboard"
+                        :aria-current="mainTab === 'dashboard' ? 'page' : null"
+                        :class="['side-item', { active: isMainTabNavActive('dashboard') }]"
+                        @pointerdown="onMainTabPointerDown('dashboard', $event)"
+                        @click="onMainTabClick('dashboard', $event)">
+                        <div class="side-item-title">{{ t('side.overview.doctor') }}</div>
+                        <div class="side-item-meta">
+                            <span>{{ t('side.overview.doctor.meta') }}</span>
+                            <span>{{ inspectorHealthStatus }}</span>
+                        </div>
+                    </button>
+                </div>
                 <div class="side-section" role="navigation" :aria-label="t('side.docs')">
                     <div class="side-section-title">{{ t('side.docs') }}</div>
                     <button

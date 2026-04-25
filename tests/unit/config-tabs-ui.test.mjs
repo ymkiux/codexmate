@@ -20,13 +20,16 @@ test('config template keeps expected config tabs in top and side navigation', ()
     const taskOrchestrationStyles = readProjectFile('web-ui/styles/task-orchestration.css');
     const bundledStyles = readBundledWebUiCss();
     const sideRail = html.match(/<aside class="side-rail"[\s\S]*?<\/aside>/)?.[0] || '';
-    const topTabModes = [...html.matchAll(/id="tab-config-([a-z]+)"/g)]
-        .map((match) => match[1]);
     const sideTabModes = [...html.matchAll(/id="side-tab-config-([a-z]+)"/g)]
         .map((match) => match[1]);
 
-    assert.deepStrictEqual(topTabModes, ['codex', 'claude', 'openclaw']);
     assert.deepStrictEqual(sideTabModes, ['codex', 'claude', 'openclaw']);
+    assert.match(html, /id="tab-dashboard"/);
+    assert.match(html, /id="tab-config"/);
+    assert.match(html, /:data-config-mode="configMode"/);
+    assert.doesNotMatch(html, /id="tab-config-codex"/);
+    assert.doesNotMatch(html, /id="tab-config-claude"/);
+    assert.doesNotMatch(html, /id="tab-config-openclaw"/);
     assert.match(html, /activeProviderBridgeHint/);
     assert.match(html, /isProviderConfigMode/);
     assert.match(html, /provider-fast-switch-select/);
@@ -185,6 +188,9 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /class="side-section" role="navigation" :aria-label="t\('side\.skills'\)"/);
     assert.match(html, /class="side-section" role="navigation" :aria-label="t\('side\.docs'\)"/);
     assert.match(html, /class="side-section" role="navigation" :aria-label="t\('side\.system'\)"/);
+    assert.match(html, /class="segmented-control"[\s\S]*@click="switchConfigMode\('codex'\)"/);
+    assert.match(html, /class="segmented-control"[\s\S]*@click="switchConfigMode\('claude'\)"/);
+    assert.match(html, /class="segmented-control"[\s\S]*@click="switchConfigMode\('openclaw'\)"/);
     assert.doesNotMatch(sideRail, /role="tablist"/);
     assert.doesNotMatch(sideRail, /role="tab"/);
     assert.match(sideRail, /id="side-tab-config-codex"[\s\S]*:aria-current="mainTab === 'config' && configMode === 'codex' \? 'page' : null"/);
@@ -307,7 +313,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /class="pin-icon"/);
     assert.match(html, /:aria-selected="mainTab === 'sessions'"/);
     assert.match(html, /:aria-selected="mainTab === 'usage'"/);
-    assert.match(html, /:aria-selected="mainTab === 'config' && configMode === 'codex'"/);
+    assert.match(html, /:aria-selected="mainTab === 'config'"/);
     assert.match(html, /v-for="session in visibleSessionsList"/);
     assert.match(html, /<div[\s\S]*v-if="sessionListRenderEnabled"[\s\S]*class="session-list"/);
     assert.match(html, /:ref="setSessionListRef"/);

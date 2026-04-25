@@ -30,8 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
         data() {
             return {
                 lang: 'zh',
-                // 默认选中首个主标签：Docs
-                mainTab: 'docs',
+                mainTab: 'dashboard',
                 configMode: 'codex',
                 currentProvider: '',
                 currentModel: '',
@@ -410,7 +409,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             {
                 const NAV_STATE_STORAGE_KEY = 'codexmateNavState.v1';
-                const mainTabSet = new Set(['config', 'sessions', 'usage', 'orchestration', 'market', 'plugins', 'docs', 'settings']);
+                const mainTabSet = new Set(['dashboard', 'config', 'sessions', 'usage', 'orchestration', 'market', 'plugins', 'docs', 'settings']);
                 let restored = null;
                 try {
                     const raw = localStorage.getItem(NAV_STATE_STORAGE_KEY) || '';
@@ -532,6 +531,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     const startupOk = await this.loadAll();
                     if (!startupOk) {
                         return;
+                    }
+                    if (this.mainTab === 'dashboard') {
+                        if (!this.__doctorLoadedOnce) {
+                            this.__doctorLoadedOnce = true;
+                            if (typeof this.runHealthCheck === 'function') {
+                                void this.runHealthCheck({ doctor: true, silent: true });
+                            }
+                        }
                     }
                     void this.refreshClaudeSelectionFromSettings({ silent: true });
                     void this.syncDefaultOpenclawConfigEntry({ silent: true });
