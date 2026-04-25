@@ -154,9 +154,11 @@
                                             type="button"
                                             class="btn-tool btn-tool-compact"
                                             @click="healthCheckResult && healthCheckResult.report
-                                                ? downloadTextFile('codexmate-doctor.json', JSON.stringify(healthCheckResult.report, null, 2), 'application/json;charset=utf-8')
+                                                ? (action.format === 'md'
+                                                    ? downloadTextFile('codexmate-doctor.md', String(healthCheckResult.markdown || ''), 'text/markdown;charset=utf-8')
+                                                    : downloadTextFile('codexmate-doctor.json', JSON.stringify(healthCheckResult.report, null, 2), 'application/json;charset=utf-8'))
                                                 : null">
-                                            {{ t('dashboard.doctor.export') }}
+                                            {{ action.format === 'md' ? t('dashboard.doctor.export.md') : t('dashboard.doctor.export.json') }}
                                         </button>
                                     </template>
                                 </div>
@@ -168,7 +170,15 @@
                                     @click="healthCheckResult && healthCheckResult.report
                                         ? downloadTextFile('codexmate-doctor.json', JSON.stringify(healthCheckResult.report, null, 2), 'application/json;charset=utf-8')
                                         : null">
-                                    {{ t('dashboard.doctor.export') }}
+                                    {{ t('dashboard.doctor.export.json') }}
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn-tool btn-tool-compact"
+                                    @click="healthCheckResult && healthCheckResult.report
+                                        ? downloadTextFile('codexmate-doctor.md', String(healthCheckResult.markdown || ''), 'text/markdown;charset=utf-8')
+                                        : null">
+                                    {{ t('dashboard.doctor.export.md') }}
                                 </button>
                             </div>
                         </div>

@@ -5,10 +5,12 @@ function normalizeSeverity(value) {
     return 'info';
 }
 
-function buildIssue(id, severity, problem, impact, actions = [], data = null) {
+function buildIssue(id, severity, problem, impact, actions = [], data = null, meta = null) {
+    const safeMeta = meta && typeof meta === 'object' ? meta : {};
     return {
         id: String(id || '').trim() || 'unknown',
         severity: normalizeSeverity(severity),
+        area: typeof safeMeta.area === 'string' && safeMeta.area.trim() ? safeMeta.area.trim() : 'Doctor',
         problem: String(problem || '').trim(),
         impact: String(impact || '').trim(),
         actions: Array.isArray(actions) ? actions : [],
@@ -82,8 +84,121 @@ function summarizeTaskIssues(taskOverview) {
 function buildDefaultActions() {
     return [
         buildAction('run-check', { id: 'doctor' }),
-        buildAction('export', { format: 'json' })
+        buildAction('export', { format: 'json' }),
+        buildAction('export', { format: 'md' })
     ];
+}
+
+function ensureBaseActions(actions = []) {
+    const list = Array.isArray(actions) ? [...actions] : [];
+    const hasRun = list.some((item) => item && item.type === 'run-check');
+    const hasExportJson = list.some((item) => item && item.type === 'export' && item.format === 'json');
+    const hasExportMd = list.some((item) => item && item.type === 'export' && (item.format === 'md' || item.format === 'markdown'));
+    if (!hasRun) {
+        list.push(buildAction('run-check', { id: 'doctor' }));
+    }
+    if (!hasExportJson) {
+        list.push(buildAction('export', { format: 'json' }));
+    }
+    if (!hasExportMd) {
+        list.push(buildAction('export', { format: 'md' }));
+    }
+    return list;
+}
+
+function severityRank(severity) {
+    const normalized = normalizeSeverity(severity);
+    if (normalized === 'error') return 0;
+    if (normalized === 'warn') return 1;
+    return 2;
+}
+
+function issuePriorityRank(id) {
+    const order = [
+        'config-not-ready',
+        'provider-unreachable',
+        'config-health-failed',
+        'usage-error',
+        'tasks-error',
+        'tasks-failed',
+        'skills-error',
+        'skills-root-missing',
+        'skills-missing-files',
+        'usage-missing-model'
+    ];
+    const key = String(id || '').trim();
+    const index = order.indexOf(key);
+    return index >= 0 ? index : 999;
+}
+
+function sortIssues(issues = []) {
+    const list = Array.isArray(issues) ? [...issues] : [];
+    list.sort((a, b) => {
+        const rankA = severityRank(a && a.severity);
+        const rankB = severityRank(b && b.severity);
+        if (rankA !== rankB) return rankA - rankB;
+        const priA = issuePriorityRank(a && a.id);
+        const priB = issuePriorityRank(b && b.id);
+        if (priA !== priB) return priA - priB;
+        const idA = String(a && a.id || '');
+        const idB = String(b && b.id || '');
+        return idA.localeCompare(idB, 'en-US');
+    });
+    return list;
+}
+
+function renderDoctorMarkdown(report) {
+    const safe = report && typeof report === 'object' ? report : {};
+    const summary = safe.summary && typeof safe.summary === 'object' ? safe.summary : { total: 0, error: 0, warn: 0, info: 0 };
+    const issues = Array.isArray(safe.issues) ? safe.issues : [];
+    const lines = [];
+    lines.push('# Codexmate Doctor Report');
+    lines.push('');
+    lines.push(`- Generated: ${safe.generatedAt || ''}`);
+    lines.push(`- Status: ${safe.ok ? 'OK' : 'NOT OK'}`);
+    lines.push(`- Issues: total ${summary.total || 0} (error ${summary.error || 0}, warn ${summary.warn || 0}, info ${summary.info || 0})`);
+    lines.push('');
+    if (!issues.length) {
+        lines.push('No actionable issues found.');
+        lines.push('');
+        return lines.join('\n');
+    }
+    lines.push('## Issues');
+    lines.push('');
+    for (const issue of issues) {
+        if (!issue || typeof issue !== 'object') continue;
+        const header = `### [${String(issue.severity || '').toUpperCase()}] ${issue.problem || issue.id || ''}`;
+        lines.push(header);
+        if (issue.area) {
+            lines.push(`- Area: ${issue.area}`);
+        }
+        if (issue.impact) {
+            lines.push(`- Impact: ${issue.impact}`);
+        }
+        const actions = Array.isArray(issue.actions) ? issue.actions : [];
+        if (actions.length) {
+            lines.push('- Actions:');
+            for (const action of actions) {
+                if (!action || typeof action !== 'object') continue;
+                if (action.type === 'navigate') {
+                    lines.push(`  - Open: ${action.label || action.target || ''}`);
+                    continue;
+                }
+                if (action.type === 'run-check') {
+                    lines.push('  - Re-check: run doctor again');
+                    continue;
+                }
+                if (action.type === 'export') {
+                    const fmt = action.format === 'md' ? 'md' : 'json';
+                    lines.push(`  - Export: doctor.${fmt}`);
+                    continue;
+                }
+                lines.push(`  - ${action.type}`);
+            }
+        }
+        lines.push('');
+    }
+    return lines.join('\n');
 }
 
 async function buildDoctorReport(params = {}, deps = {}) {
@@ -124,24 +239,41 @@ async function buildDoctorReport(params = {}, deps = {}) {
         try {
             const range = typeof options.range === 'string' ? options.range.trim().toLowerCase() : '';
             const limit = range === 'all' ? 2000 : (range === '30d' ? 1200 : 600);
+            const sessions = await listSessionUsage({
+                source: 'all',
+                limit
+            });
+            const summary = summarizeUsageIssues(sessions);
             sources.usage = {
-                sessions: await listSessionUsage({
-                    source: 'all',
-                    limit
-                }),
-                range: range === 'all' ? 'all' : (range === '30d' ? '30d' : '7d')
+                range: range === 'all' ? 'all' : (range === '30d' ? '30d' : '7d'),
+                summary,
+                sample: (Array.isArray(sessions) ? sessions : [])
+                    .slice(0, 10)
+                    .map((session) => ({
+                        source: session && session.source ? session.source : '',
+                        sessionId: session && session.sessionId ? session.sessionId : '',
+                        updatedAt: session && session.updatedAt ? session.updatedAt : '',
+                        model: session && session.model ? session.model : '',
+                        provider: session && session.provider ? session.provider : '',
+                        messageCount: session && session.messageCount ? session.messageCount : 0,
+                        totalTokens: session && session.totalTokens ? session.totalTokens : 0
+                    }))
             };
         } catch (e) {
-            sources.usage = { error: e && e.message ? e.message : 'usage probe failed', sessions: [], range: '7d' };
+            sources.usage = { error: e && e.message ? e.message : 'usage probe failed', range: '7d', summary: { total: 0, missingModel: 0 } };
         }
     }
 
     if (buildTaskOverviewPayload && options.includeTasks !== false) {
         try {
-            sources.tasks = buildTaskOverviewPayload({
+            const overview = buildTaskOverviewPayload({
                 queueLimit: 20,
                 runLimit: 20
             });
+            sources.tasks = {
+                summary: summarizeTaskIssues(overview),
+                warnings: Array.isArray(overview && overview.warnings) ? overview.warnings : []
+            };
         } catch (e) {
             sources.tasks = { error: e && e.message ? e.message : 'task overview failed' };
         }
@@ -152,8 +284,9 @@ async function buildDoctorReport(params = {}, deps = {}) {
             ? options.targetApp.trim().toLowerCase()
             : 'codex';
         try {
-            sources.skills = listSkills({ targetApp });
-            sources.skills.targetApp = targetApp;
+            const raw = listSkills({ targetApp });
+            const summary = summarizeSkillsIssues(raw);
+            sources.skills = { targetApp, summary };
         } catch (e) {
             sources.skills = { error: e && e.message ? e.message : 'skills probe failed', targetApp };
         }
@@ -169,14 +302,14 @@ async function buildDoctorReport(params = {}, deps = {}) {
             'error',
             '配置文件未就绪',
             '可能导致 provider/model 无法读取，模型列表与请求将不可用。',
-            [
-                buildAction('navigate', { target: 'config', label: '打开 Config' }),
-                ...baseActions
-            ],
+            ensureBaseActions([
+                buildAction('navigate', { target: 'config', label: '打开 Config' })
+            ].concat(baseActions)),
             {
                 configErrorType: status.configErrorType || '',
                 configNotice: status.configNotice || ''
-            }
+            },
+            { area: 'Config' }
         ));
     }
 
@@ -192,11 +325,12 @@ async function buildDoctorReport(params = {}, deps = {}) {
                 'error',
                 remoteIssue.message || 'Provider 不可用',
                 impact,
-                [
-                    buildAction('navigate', { target: 'config', label: '检查 Provider 配置' }),
-                    ...baseActions
-                ],
+                ensureBaseActions([
+                    buildAction('navigate', { target: 'config', label: '检查 Provider 配置' })
+                ].concat(baseActions)),
                 { code: remoteIssue.code || '', statusCode: remoteIssue.statusCode || 0 }
+                ,
+                { area: 'Config' }
             ));
         } else if (Array.isArray(configHealth.issues) && configHealth.issues.length) {
             issues.push(buildIssue(
@@ -204,11 +338,11 @@ async function buildDoctorReport(params = {}, deps = {}) {
                 'warn',
                 '配置健康检查未通过',
                 '可能导致部分功能不可用或行为不符合预期。',
-                [
-                    buildAction('navigate', { target: 'config', label: '打开 Config' }),
-                    ...baseActions
-                ],
-                { issueCount: configHealth.issues.length }
+                ensureBaseActions([
+                    buildAction('navigate', { target: 'config', label: '打开 Config' })
+                ].concat(baseActions)),
+                { issueCount: configHealth.issues.length },
+                { area: 'Config' }
             ));
         }
     }
@@ -220,26 +354,28 @@ async function buildDoctorReport(params = {}, deps = {}) {
                 'warn',
                 'Usage 统计异常',
                 'Usage 页面可能无法展示趋势/汇总，Doctor 的用量诊断也会缺失。',
-                [
-                    buildAction('navigate', { target: 'usage', label: '打开 Usage' }),
-                    ...baseActions
-                ],
+                ensureBaseActions([
+                    buildAction('navigate', { target: 'usage', label: '打开 Usage' })
+                ].concat(baseActions)),
                 { error: sources.usage.error }
+                ,
+                { area: 'Observe' }
             ));
         } else {
-            const summary = summarizeUsageIssues(sources.usage.sessions);
-            if (summary.missingModel > 0) {
+            const summary = sources.usage.summary && typeof sources.usage.summary === 'object' ? sources.usage.summary : { total: 0, missingModel: 0 };
+            if (Number(summary.missingModel || 0) > 0) {
                 issues.push(buildIssue(
                     'usage-missing-model',
                     'info',
                     '部分会话缺少模型信息',
                     '会导致用量归因与成本估算不准确。',
-                    [
+                    ensureBaseActions([
                         buildAction('navigate', { target: 'usage', label: '打开 Usage' }),
-                        buildAction('navigate', { target: 'sessions', label: '打开 Sessions' }),
-                        ...baseActions
-                    ],
+                        buildAction('navigate', { target: 'sessions', label: '打开 Sessions' })
+                    ].concat(baseActions)),
                     summary
+                    ,
+                    { area: 'Observe' }
                 ));
             }
         }
@@ -252,26 +388,28 @@ async function buildDoctorReport(params = {}, deps = {}) {
                 'warn',
                 'Tasks 状态读取失败',
                 '可能导致编排队列/运行记录无法展示。',
-                [
-                    buildAction('navigate', { target: 'orchestration', label: '打开 Tasks' }),
-                    ...baseActions
-                ],
+                ensureBaseActions([
+                    buildAction('navigate', { target: 'orchestration', label: '打开 Tasks' })
+                ].concat(baseActions)),
                 { error: sources.tasks.error }
+                ,
+                { area: 'Operate' }
             ));
         } else {
-            const summary = summarizeTaskIssues(sources.tasks);
-            if (summary.failed > 0) {
+            const summary = sources.tasks.summary && typeof sources.tasks.summary === 'object'
+                ? sources.tasks.summary
+                : summarizeTaskIssues(sources.tasks);
+            if (Number(summary.failed || 0) > 0) {
                 issues.push(buildIssue(
                     'tasks-failed',
                     'warn',
                     '存在失败的任务运行',
                     '可能导致自动化流水线中断，需要查看日志并重试或修复输入。',
-                    [
-                        buildAction('navigate', { target: 'orchestration', label: '查看 Tasks / Logs' }),
-                        ...baseActions
-                    ],
+                    ensureBaseActions([
+                        buildAction('navigate', { target: 'orchestration', label: '查看 Tasks / Logs' })
+                    ].concat(baseActions)),
                     {
-                        failed: summary.failed,
+                        failed: summary.failed || 0,
                         latestFailed: summary.latestFailed
                             ? {
                                 runId: summary.latestFailed.runId || '',
@@ -280,6 +418,8 @@ async function buildDoctorReport(params = {}, deps = {}) {
                             }
                             : null
                     }
+                    ,
+                    { area: 'Operate' }
                 ));
             }
         }
@@ -292,25 +432,29 @@ async function buildDoctorReport(params = {}, deps = {}) {
                 'warn',
                 'Skills 列表读取失败',
                 '会导致 Skills 页面无法正常展示或安装。',
-                [
-                    buildAction('navigate', { target: 'market', label: '打开 Skills' }),
-                    ...baseActions
-                ],
+                ensureBaseActions([
+                    buildAction('navigate', { target: 'market', label: '打开 Skills' })
+                ].concat(baseActions)),
                 { error: sources.skills.error }
+                ,
+                { area: 'Reuse' }
             ));
         } else {
-            const summary = summarizeSkillsIssues(sources.skills);
+            const summary = sources.skills.summary && typeof sources.skills.summary === 'object'
+                ? sources.skills.summary
+                : summarizeSkillsIssues(sources.skills);
             if (!summary.exists) {
                 issues.push(buildIssue(
                     'skills-root-missing',
                     'info',
                     'Skills 目录不存在',
                     '会导致 Skills 安装/扫描为空；可在 Settings/Docs 按指引初始化目录。',
-                    [
-                        buildAction('navigate', { target: 'market', label: '打开 Skills' }),
-                        ...baseActions
-                    ],
+                    ensureBaseActions([
+                        buildAction('navigate', { target: 'market', label: '打开 Skills' })
+                    ].concat(baseActions)),
                     summary
+                    ,
+                    { area: 'Reuse' }
                 ));
             } else if (summary.missing > 0) {
                 issues.push(buildIssue(
@@ -318,29 +462,31 @@ async function buildDoctorReport(params = {}, deps = {}) {
                     'info',
                     '存在缺失 skill.json 的技能',
                     '会导致部分技能无法被运行或同步。',
-                    [
-                        buildAction('navigate', { target: 'market', label: '打开 Skills' }),
-                        ...baseActions
-                    ],
+                    ensureBaseActions([
+                        buildAction('navigate', { target: 'market', label: '打开 Skills' })
+                    ].concat(baseActions)),
                     summary
+                    ,
+                    { area: 'Reuse' }
                 ));
             }
         }
     }
 
-    const hasError = issues.some((item) => item && item.severity === 'error');
+    const sortedIssues = sortIssues(issues);
+    const hasError = sortedIssues.some((item) => item && item.severity === 'error');
     const report = {
         schema: 1,
         generatedAt: now,
         ok: !hasError,
-        issues,
+        issues: sortedIssues,
         sources
     };
     report.summary = {
-        total: issues.length,
-        error: issues.filter((item) => item.severity === 'error').length,
-        warn: issues.filter((item) => item.severity === 'warn').length,
-        info: issues.filter((item) => item.severity === 'info').length
+        total: sortedIssues.length,
+        error: sortedIssues.filter((item) => item.severity === 'error').length,
+        warn: sortedIssues.filter((item) => item.severity === 'warn').length,
+        info: sortedIssues.filter((item) => item.severity === 'info').length
     };
     return report;
 }
@@ -369,6 +515,6 @@ function buildDoctorLegacyPayload(report) {
 module.exports = {
     buildDoctorReport,
     buildDoctorLegacyPayload,
+    renderDoctorMarkdown,
     buildAction
 };
-

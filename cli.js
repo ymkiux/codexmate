@@ -75,7 +75,7 @@ const {
     executeTaskPlan
 } = require('./lib/task-orchestrator');
 const { buildConfigHealthReport: buildConfigHealthReportCore } = require('./cli/config-health');
-const { buildDoctorReport, buildDoctorLegacyPayload } = require('./cli/doctor-core');
+const { buildDoctorReport, buildDoctorLegacyPayload, renderDoctorMarkdown } = require('./cli/doctor-core');
 const {
     createAuthProfileController
 } = require('./cli/auth-profiles');
@@ -6417,21 +6417,40 @@ function cmdStatus() {
 
 function parseDoctorCommandArgs(argv = []) {
     const options = {
-        json: false,
+        format: 'json',
         range: '7d',
         targetApp: 'codex',
         remote: true,
         includeInstall: true,
         includeUsage: true,
         includeTasks: true,
-        includeSkills: true
+        includeSkills: true,
+        output: ''
     };
     let cursor = 0;
     while (cursor < argv.length) {
         const token = String(argv[cursor] || '');
         if (token === '--json') {
-            options.json = true;
+            options.format = 'json';
             cursor += 1;
+            continue;
+        }
+        if (token === '--format') {
+            const value = String(argv[cursor + 1] || '').trim().toLowerCase();
+            if (!value || value.startsWith('--')) {
+                throw new Error('错误: --format 需要一个值（json/md）');
+            }
+            options.format = value === 'md' || value === 'markdown' ? 'md' : 'json';
+            cursor += 2;
+            continue;
+        }
+        if (token === '--output') {
+            const value = String(argv[cursor + 1] || '').trim();
+            if (!value || value.startsWith('--')) {
+                throw new Error('错误: --output 需要一个值（文件路径）');
+            }
+            options.output = value;
+            cursor += 2;
             continue;
         }
         if (token === '--range') {
@@ -6478,8 +6497,15 @@ async function cmdDoctor(argv = []) {
             buildTaskOverviewPayload,
             listSkills
         });
-        const json = JSON.stringify(report, null, 2);
-        process.stdout.write(json + '\n');
+        const format = options.format === 'md' ? 'md' : 'json';
+        const text = format === 'md'
+            ? renderDoctorMarkdown(report)
+            : JSON.stringify(report, null, 2);
+        if (options.output) {
+            fs.writeFileSync(options.output, text);
+        } else {
+            process.stdout.write(text + '\n');
+        }
     } catch (e) {
         console.error('错误:', e && e.message ? e.message : e);
         process.exitCode = 1;
@@ -8345,6 +8371,7 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                                     listSkills
                                 });
                                 result = buildDoctorLegacyPayload(report);
+                                result.markdown = renderDoctorMarkdown(report);
                             }
                             break;
                         case 'get-agents-file':
@@ -13134,7 +13161,7 @@ async function main() {
         console.log('\nCodex Mate - Codex 提供商管理工具');
         console.log('\n用法:');
         console.log('  codexmate status           显示当前状态');
-        console.log('  codexmate doctor [--json]  输出诊断报告（JSON）');
+        console.log('  codexmate doctor [--format json|md] [--output <PATH>]  输出诊断报告');
         console.log('  codexmate setup            交互式配置向导');
         console.log('  codexmate list             列出所有提供商');
         console.log('  codexmate models           列出所有模型');
