@@ -5,12 +5,215 @@ function normalizeSeverity(value) {
     return 'info';
 }
 
+function normalizeLang(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (!normalized) return '';
+    if (normalized === 'zh' || normalized.startsWith('zh-') || normalized.startsWith('zh_') || normalized.includes('chinese')) {
+        return 'zh';
+    }
+    return 'en';
+}
+
+const DOCTOR_I18N = Object.freeze({
+    en: Object.freeze({
+        severity: Object.freeze({
+            error: 'Error',
+            warn: 'Warning',
+            info: 'Info'
+        }),
+        area: Object.freeze({
+            Doctor: 'Doctor',
+            Config: 'Config',
+            Observe: 'Observe',
+            Operate: 'Operate',
+            Reuse: 'Reuse'
+        }),
+        issue: Object.freeze({
+            configNotReady: Object.freeze({
+                problem: 'Config is not ready',
+                impact: 'Provider/model cannot be read; model listing and requests may fail.'
+            }),
+            providerUnreachable: Object.freeze({
+                impactAuth: 'Auth failure will cause model listing and chat requests to return 401/403.',
+                impactNetwork: 'Unreachable provider will cause model listing and chat requests to fail or timeout.',
+                message: Object.freeze({
+                    'remote-model-probe-unreachable': 'Provider unreachable',
+                    'remote-model-probe-auth-failed': 'Provider auth failed',
+                    'remote-model-probe-not-found': 'Provider endpoint returned 404',
+                    'remote-model-probe-http-error': 'Provider returned HTTP error',
+                    'remote-model-probe-error': 'Provider probe failed'
+                })
+            }),
+            configHealthFailed: Object.freeze({
+                problem: 'Config health check failed',
+                impact: 'Some features may be unavailable or behave unexpectedly.'
+            }),
+            usageError: Object.freeze({
+                problem: 'Usage aggregation failed',
+                impact: 'Usage charts and summaries may be unavailable; Doctor usage diagnostics will be incomplete.'
+            }),
+            usageMissingModel: Object.freeze({
+                problem: 'Some sessions miss model metadata',
+                impact: 'Usage attribution and cost estimates may be inaccurate.'
+            }),
+            tasksError: Object.freeze({
+                problem: 'Task overview failed',
+                impact: 'Task queue and run history may be unavailable.'
+            }),
+            tasksFailed: Object.freeze({
+                problem: 'Failed task runs detected',
+                impact: 'Automation pipelines may be blocked; inspect logs and retry after fixing inputs.'
+            }),
+            skillsError: Object.freeze({
+                problem: 'Skills listing failed',
+                impact: 'Skills marketplace may be unavailable.'
+            }),
+            skillsRootMissing: Object.freeze({
+                problem: 'Skills directory is missing',
+                impact: 'Skills install/scan will be empty; create the directory via Settings/Docs.'
+            }),
+            skillsMissingFiles: Object.freeze({
+                problem: 'Some skills are missing skill.json',
+                impact: 'Those skills may not run or sync properly.'
+            })
+        }),
+        action: Object.freeze({
+            openConfig: 'Open Config',
+            checkProvider: 'Check provider config',
+            openUsage: 'Open Usage',
+            openSessions: 'Open Sessions',
+            openTasks: 'Open Tasks',
+            viewTaskLogs: 'View Tasks / Logs',
+            openSkills: 'Open Skills'
+        }),
+        markdown: Object.freeze({
+            title: 'Codexmate Doctor Report',
+            generated: 'Generated',
+            status: 'Status',
+            statusOk: 'OK',
+            statusNotOk: 'NOT OK',
+            issues: 'Issues',
+            noIssues: 'No actionable issues found.',
+            issuesTitle: 'Issues',
+            area: 'Area',
+            impact: 'Impact',
+            actions: 'Actions',
+            open: 'Open',
+            recheck: 'Re-check: run doctor again',
+            export: Object.freeze({
+                json: 'Export: doctor.json',
+                md: 'Export: doctor.md'
+            })
+        })
+    }),
+    zh: Object.freeze({
+        severity: Object.freeze({
+            error: '严重',
+            warn: '警告',
+            info: '提示'
+        }),
+        area: Object.freeze({
+            Doctor: 'Doctor',
+            Config: '配置',
+            Observe: '观测',
+            Operate: '操作',
+            Reuse: '复用'
+        }),
+        issue: Object.freeze({
+            configNotReady: Object.freeze({
+                problem: '配置文件未就绪',
+                impact: '可能导致 provider/model 无法读取，模型列表与请求将不可用。'
+            }),
+            providerUnreachable: Object.freeze({
+                impactAuth: '鉴权失败会导致模型列表/对话请求返回 401/403。',
+                impactNetwork: '远端不可达会导致模型列表/对话请求失败或超时。',
+                message: Object.freeze({
+                    'remote-model-probe-unreachable': 'Provider 不可达',
+                    'remote-model-probe-auth-failed': 'Provider 鉴权失败',
+                    'remote-model-probe-not-found': 'Provider 返回 404',
+                    'remote-model-probe-http-error': 'Provider 返回 HTTP 错误',
+                    'remote-model-probe-error': 'Provider 探测失败'
+                })
+            }),
+            configHealthFailed: Object.freeze({
+                problem: '配置健康检查未通过',
+                impact: '可能导致部分功能不可用或行为不符合预期。'
+            }),
+            usageError: Object.freeze({
+                problem: 'Usage 统计异常',
+                impact: 'Usage 页面可能无法展示趋势/汇总，Doctor 的用量诊断也会缺失。'
+            }),
+            usageMissingModel: Object.freeze({
+                problem: '部分会话缺少模型信息',
+                impact: '会导致用量归因与成本估算不准确。'
+            }),
+            tasksError: Object.freeze({
+                problem: 'Tasks 状态读取失败',
+                impact: '可能导致编排队列/运行记录无法展示。'
+            }),
+            tasksFailed: Object.freeze({
+                problem: '存在失败的任务运行',
+                impact: '可能导致自动化流水线中断，需要查看日志并重试或修复输入。'
+            }),
+            skillsError: Object.freeze({
+                problem: 'Skills 列表读取失败',
+                impact: '会导致 Skills 页面无法正常展示或安装。'
+            }),
+            skillsRootMissing: Object.freeze({
+                problem: 'Skills 目录不存在',
+                impact: '会导致 Skills 安装/扫描为空；可在 Settings/Docs 按指引初始化目录。'
+            }),
+            skillsMissingFiles: Object.freeze({
+                problem: '存在缺失 skill.json 的技能',
+                impact: '会导致部分技能无法被运行或同步。'
+            })
+        }),
+        action: Object.freeze({
+            openConfig: '打开 Config',
+            checkProvider: '检查 Provider 配置',
+            openUsage: '打开 Usage',
+            openSessions: '打开 Sessions',
+            openTasks: '打开 Tasks',
+            viewTaskLogs: '查看 Tasks / Logs',
+            openSkills: '打开 Skills'
+        }),
+        markdown: Object.freeze({
+            title: 'Codexmate Doctor 报告',
+            generated: '生成时间',
+            status: '状态',
+            statusOk: '通过',
+            statusNotOk: '未通过',
+            issues: '问题数',
+            noIssues: '暂无可操作问题。',
+            issuesTitle: '问题列表',
+            area: '模块',
+            impact: '影响',
+            actions: '动作',
+            open: '打开',
+            recheck: '复检：重新运行 doctor',
+            export: Object.freeze({
+                json: '导出：doctor.json',
+                md: '导出：doctor.md'
+            })
+        })
+    })
+});
+
+function getI18n(lang) {
+    const normalized = normalizeLang(lang);
+    if (normalized === 'en') return DOCTOR_I18N.en;
+    if (normalized === 'zh') return DOCTOR_I18N.zh;
+    return DOCTOR_I18N.zh;
+}
+
 function buildIssue(id, severity, problem, impact, actions = [], data = null, meta = null) {
     const safeMeta = meta && typeof meta === 'object' ? meta : {};
     return {
         id: String(id || '').trim() || 'unknown',
         severity: normalizeSeverity(severity),
+        areaKey: typeof safeMeta.areaKey === 'string' && safeMeta.areaKey.trim() ? safeMeta.areaKey.trim() : 'Doctor',
         area: typeof safeMeta.area === 'string' && safeMeta.area.trim() ? safeMeta.area.trim() : 'Doctor',
+        severityLabel: typeof safeMeta.severityLabel === 'string' && safeMeta.severityLabel.trim() ? safeMeta.severityLabel.trim() : '',
         problem: String(problem || '').trim(),
         impact: String(impact || '').trim(),
         actions: Array.isArray(actions) ? actions : [],
@@ -149,48 +352,50 @@ function sortIssues(issues = []) {
 
 function renderDoctorMarkdown(report) {
     const safe = report && typeof report === 'object' ? report : {};
+    const i18n = getI18n(safe.lang);
     const summary = safe.summary && typeof safe.summary === 'object' ? safe.summary : { total: 0, error: 0, warn: 0, info: 0 };
     const issues = Array.isArray(safe.issues) ? safe.issues : [];
     const lines = [];
-    lines.push('# Codexmate Doctor Report');
+    lines.push(`# ${i18n.markdown.title}`);
     lines.push('');
-    lines.push(`- Generated: ${safe.generatedAt || ''}`);
-    lines.push(`- Status: ${safe.ok ? 'OK' : 'NOT OK'}`);
-    lines.push(`- Issues: total ${summary.total || 0} (error ${summary.error || 0}, warn ${summary.warn || 0}, info ${summary.info || 0})`);
+    lines.push(`- ${i18n.markdown.generated}: ${safe.generatedAt || ''}`);
+    lines.push(`- ${i18n.markdown.status}: ${safe.ok ? i18n.markdown.statusOk : i18n.markdown.statusNotOk}`);
+    lines.push(`- ${i18n.markdown.issues}: ${summary.total || 0} (${i18n.severity.error} ${summary.error || 0}, ${i18n.severity.warn} ${summary.warn || 0}, ${i18n.severity.info} ${summary.info || 0})`);
     lines.push('');
     if (!issues.length) {
-        lines.push('No actionable issues found.');
+        lines.push(i18n.markdown.noIssues);
         lines.push('');
         return lines.join('\n');
     }
-    lines.push('## Issues');
+    lines.push(`## ${i18n.markdown.issuesTitle}`);
     lines.push('');
     for (const issue of issues) {
         if (!issue || typeof issue !== 'object') continue;
-        const header = `### [${String(issue.severity || '').toUpperCase()}] ${issue.problem || issue.id || ''}`;
+        const severityLabel = issue.severityLabel || (i18n.severity[normalizeSeverity(issue.severity)] || String(issue.severity || '').toUpperCase());
+        const header = `### [${severityLabel}] ${issue.problem || issue.id || ''}`;
         lines.push(header);
         if (issue.area) {
-            lines.push(`- Area: ${issue.area}`);
+            lines.push(`- ${i18n.markdown.area}: ${issue.area}`);
         }
         if (issue.impact) {
-            lines.push(`- Impact: ${issue.impact}`);
+            lines.push(`- ${i18n.markdown.impact}: ${issue.impact}`);
         }
         const actions = Array.isArray(issue.actions) ? issue.actions : [];
         if (actions.length) {
-            lines.push('- Actions:');
+            lines.push(`- ${i18n.markdown.actions}:`);
             for (const action of actions) {
                 if (!action || typeof action !== 'object') continue;
                 if (action.type === 'navigate') {
-                    lines.push(`  - Open: ${action.label || action.target || ''}`);
+                    lines.push(`  - ${i18n.markdown.open}: ${action.label || action.target || ''}`);
                     continue;
                 }
                 if (action.type === 'run-check') {
-                    lines.push('  - Re-check: run doctor again');
+                    lines.push(`  - ${i18n.markdown.recheck}`);
                     continue;
                 }
                 if (action.type === 'export') {
                     const fmt = action.format === 'md' ? 'md' : 'json';
-                    lines.push(`  - Export: doctor.${fmt}`);
+                    lines.push(`  - ${fmt === 'md' ? i18n.markdown.export.md : i18n.markdown.export.json}`);
                     continue;
                 }
                 lines.push(`  - ${action.type}`);
@@ -201,8 +406,31 @@ function renderDoctorMarkdown(report) {
     return lines.join('\n');
 }
 
+function decorateIssue(issue, lang) {
+    if (!issue || typeof issue !== 'object') return issue;
+    const i18n = getI18n(lang);
+    const areaKey = typeof issue.areaKey === 'string' && issue.areaKey.trim() ? issue.areaKey.trim() : 'Doctor';
+    issue.areaKey = areaKey;
+    issue.area = i18n.area[areaKey] || areaKey;
+    issue.severity = normalizeSeverity(issue.severity);
+    issue.severityLabel = i18n.severity[issue.severity] || issue.severityLabel || issue.severity;
+    return issue;
+}
+
+function resolveProviderProblemText(i18n, remoteIssue) {
+    const code = remoteIssue && typeof remoteIssue.code === 'string' ? remoteIssue.code : '';
+    const mapped = code && i18n.issue.providerUnreachable.message
+        ? i18n.issue.providerUnreachable.message[code]
+        : '';
+    if (mapped) return mapped;
+    const fallback = i18n === DOCTOR_I18N.en ? 'Provider unreachable' : 'Provider 不可用';
+    return fallback;
+}
+
 async function buildDoctorReport(params = {}, deps = {}) {
     const options = params && typeof params === 'object' ? params : {};
+    const resolvedLang = normalizeLang(options.lang) || normalizeLang(process.env.LANG) || 'zh';
+    const i18n = getI18n(resolvedLang);
     const now = new Date().toISOString();
     const getStatusPayload = typeof deps.getStatusPayload === 'function' ? deps.getStatusPayload : () => null;
     const buildInstallStatusReport = typeof deps.buildInstallStatusReport === 'function' ? deps.buildInstallStatusReport : () => null;
@@ -300,16 +528,16 @@ async function buildDoctorReport(params = {}, deps = {}) {
         issues.push(buildIssue(
             'config-not-ready',
             'error',
-            '配置文件未就绪',
-            '可能导致 provider/model 无法读取，模型列表与请求将不可用。',
+            i18n.issue.configNotReady.problem,
+            i18n.issue.configNotReady.impact,
             ensureBaseActions([
-                buildAction('navigate', { target: 'config', label: '打开 Config' })
+                buildAction('navigate', { target: 'config', label: i18n.action.openConfig })
             ].concat(baseActions)),
             {
                 configErrorType: status.configErrorType || '',
                 configNotice: status.configNotice || ''
             },
-            { area: 'Config' }
+            { areaKey: 'Config' }
         ));
     }
 
@@ -318,31 +546,31 @@ async function buildDoctorReport(params = {}, deps = {}) {
         const remoteIssue = findConfigHealthRemoteIssue(configHealth.issues || []);
         if (remoteIssue) {
             const impact = remoteIssue.code === 'remote-model-probe-auth-failed'
-                ? '鉴权失败会导致模型列表/对话请求返回 401/403。'
-                : '远端不可达会导致模型列表/对话请求失败或超时。';
+                ? i18n.issue.providerUnreachable.impactAuth
+                : i18n.issue.providerUnreachable.impactNetwork;
             issues.push(buildIssue(
                 'provider-unreachable',
                 'error',
-                remoteIssue.message || 'Provider 不可用',
+                resolveProviderProblemText(i18n, remoteIssue),
                 impact,
                 ensureBaseActions([
-                    buildAction('navigate', { target: 'config', label: '检查 Provider 配置' })
+                    buildAction('navigate', { target: 'config', label: i18n.action.checkProvider })
                 ].concat(baseActions)),
                 { code: remoteIssue.code || '', statusCode: remoteIssue.statusCode || 0 }
                 ,
-                { area: 'Config' }
+                { areaKey: 'Config' }
             ));
         } else if (Array.isArray(configHealth.issues) && configHealth.issues.length) {
             issues.push(buildIssue(
                 'config-health-failed',
                 'warn',
-                '配置健康检查未通过',
-                '可能导致部分功能不可用或行为不符合预期。',
+                i18n.issue.configHealthFailed.problem,
+                i18n.issue.configHealthFailed.impact,
                 ensureBaseActions([
-                    buildAction('navigate', { target: 'config', label: '打开 Config' })
+                    buildAction('navigate', { target: 'config', label: i18n.action.openConfig })
                 ].concat(baseActions)),
                 { issueCount: configHealth.issues.length },
-                { area: 'Config' }
+                { areaKey: 'Config' }
             ));
         }
     }
@@ -352,14 +580,14 @@ async function buildDoctorReport(params = {}, deps = {}) {
             issues.push(buildIssue(
                 'usage-error',
                 'warn',
-                'Usage 统计异常',
-                'Usage 页面可能无法展示趋势/汇总，Doctor 的用量诊断也会缺失。',
+                i18n.issue.usageError.problem,
+                i18n.issue.usageError.impact,
                 ensureBaseActions([
-                    buildAction('navigate', { target: 'usage', label: '打开 Usage' })
+                    buildAction('navigate', { target: 'usage', label: i18n.action.openUsage })
                 ].concat(baseActions)),
                 { error: sources.usage.error }
                 ,
-                { area: 'Observe' }
+                { areaKey: 'Observe' }
             ));
         } else {
             const summary = sources.usage.summary && typeof sources.usage.summary === 'object' ? sources.usage.summary : { total: 0, missingModel: 0 };
@@ -367,15 +595,15 @@ async function buildDoctorReport(params = {}, deps = {}) {
                 issues.push(buildIssue(
                     'usage-missing-model',
                     'info',
-                    '部分会话缺少模型信息',
-                    '会导致用量归因与成本估算不准确。',
+                    i18n.issue.usageMissingModel.problem,
+                    i18n.issue.usageMissingModel.impact,
                     ensureBaseActions([
-                        buildAction('navigate', { target: 'usage', label: '打开 Usage' }),
-                        buildAction('navigate', { target: 'sessions', label: '打开 Sessions' })
+                        buildAction('navigate', { target: 'usage', label: i18n.action.openUsage }),
+                        buildAction('navigate', { target: 'sessions', label: i18n.action.openSessions })
                     ].concat(baseActions)),
                     summary
                     ,
-                    { area: 'Observe' }
+                    { areaKey: 'Observe' }
                 ));
             }
         }
@@ -386,14 +614,14 @@ async function buildDoctorReport(params = {}, deps = {}) {
             issues.push(buildIssue(
                 'tasks-error',
                 'warn',
-                'Tasks 状态读取失败',
-                '可能导致编排队列/运行记录无法展示。',
+                i18n.issue.tasksError.problem,
+                i18n.issue.tasksError.impact,
                 ensureBaseActions([
-                    buildAction('navigate', { target: 'orchestration', label: '打开 Tasks' })
+                    buildAction('navigate', { target: 'orchestration', label: i18n.action.openTasks })
                 ].concat(baseActions)),
                 { error: sources.tasks.error }
                 ,
-                { area: 'Operate' }
+                { areaKey: 'Operate' }
             ));
         } else {
             const summary = sources.tasks.summary && typeof sources.tasks.summary === 'object'
@@ -403,10 +631,10 @@ async function buildDoctorReport(params = {}, deps = {}) {
                 issues.push(buildIssue(
                     'tasks-failed',
                     'warn',
-                    '存在失败的任务运行',
-                    '可能导致自动化流水线中断，需要查看日志并重试或修复输入。',
+                    i18n.issue.tasksFailed.problem,
+                    i18n.issue.tasksFailed.impact,
                     ensureBaseActions([
-                        buildAction('navigate', { target: 'orchestration', label: '查看 Tasks / Logs' })
+                        buildAction('navigate', { target: 'orchestration', label: i18n.action.viewTaskLogs })
                     ].concat(baseActions)),
                     {
                         failed: summary.failed || 0,
@@ -419,7 +647,7 @@ async function buildDoctorReport(params = {}, deps = {}) {
                             : null
                     }
                     ,
-                    { area: 'Operate' }
+                    { areaKey: 'Operate' }
                 ));
             }
         }
@@ -430,14 +658,14 @@ async function buildDoctorReport(params = {}, deps = {}) {
             issues.push(buildIssue(
                 'skills-error',
                 'warn',
-                'Skills 列表读取失败',
-                '会导致 Skills 页面无法正常展示或安装。',
+                i18n.issue.skillsError.problem,
+                i18n.issue.skillsError.impact,
                 ensureBaseActions([
-                    buildAction('navigate', { target: 'market', label: '打开 Skills' })
+                    buildAction('navigate', { target: 'market', label: i18n.action.openSkills })
                 ].concat(baseActions)),
                 { error: sources.skills.error }
                 ,
-                { area: 'Reuse' }
+                { areaKey: 'Reuse' }
             ));
         } else {
             const summary = sources.skills.summary && typeof sources.skills.summary === 'object'
@@ -447,37 +675,39 @@ async function buildDoctorReport(params = {}, deps = {}) {
                 issues.push(buildIssue(
                     'skills-root-missing',
                     'info',
-                    'Skills 目录不存在',
-                    '会导致 Skills 安装/扫描为空；可在 Settings/Docs 按指引初始化目录。',
+                    i18n.issue.skillsRootMissing.problem,
+                    i18n.issue.skillsRootMissing.impact,
                     ensureBaseActions([
-                        buildAction('navigate', { target: 'market', label: '打开 Skills' })
+                        buildAction('navigate', { target: 'market', label: i18n.action.openSkills })
                     ].concat(baseActions)),
                     summary
                     ,
-                    { area: 'Reuse' }
+                    { areaKey: 'Reuse' }
                 ));
             } else if (summary.missing > 0) {
                 issues.push(buildIssue(
                     'skills-missing-files',
                     'info',
-                    '存在缺失 skill.json 的技能',
-                    '会导致部分技能无法被运行或同步。',
+                    i18n.issue.skillsMissingFiles.problem,
+                    i18n.issue.skillsMissingFiles.impact,
                     ensureBaseActions([
-                        buildAction('navigate', { target: 'market', label: '打开 Skills' })
+                        buildAction('navigate', { target: 'market', label: i18n.action.openSkills })
                     ].concat(baseActions)),
                     summary
                     ,
-                    { area: 'Reuse' }
+                    { areaKey: 'Reuse' }
                 ));
             }
         }
     }
 
     const sortedIssues = sortIssues(issues);
+    sortedIssues.forEach((issue) => decorateIssue(issue, resolvedLang));
     const hasError = sortedIssues.some((item) => item && item.severity === 'error');
     const report = {
         schema: 1,
         generatedAt: now,
+        lang: resolvedLang,
         ok: !hasError,
         issues: sortedIssues,
         sources

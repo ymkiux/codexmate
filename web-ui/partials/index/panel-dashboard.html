@@ -129,7 +129,7 @@
                             <div v-for="issue in healthCheckResult.report.issues" :key="issue.id" class="doctor-action-card">
                                 <div class="doctor-action-head">
                                     <div class="doctor-action-title">{{ issue.problem }}</div>
-                                    <div :class="['doctor-action-severity', issue.severity]">{{ issue.severity }}</div>
+                                    <div :class="['doctor-action-severity', issue.severity]">{{ issue.severityLabel || issue.severity }}</div>
                                 </div>
                                 <div class="doctor-action-impact">{{ issue.impact }}</div>
                                 <div v-if="issue.actions && issue.actions.length" class="doctor-action-buttons">

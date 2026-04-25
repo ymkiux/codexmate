@@ -281,6 +281,7 @@ export function createCodexConfigMethods(options = {}) {
                 const silent = !!(options && options.silent);
                 const forceRefresh = !!(options && options.forceRefresh);
                 const res = await api('doctor', {
+                    lang: this.lang,
                     remote: true,
                     range: this.sessionsUsageTimeRange,
                     targetApp: this.skillsTargetApp,

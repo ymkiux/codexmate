@@ -6418,6 +6418,7 @@ function cmdStatus() {
 function parseDoctorCommandArgs(argv = []) {
     const options = {
         format: 'json',
+        lang: '',
         range: '7d',
         targetApp: 'codex',
         remote: true,
@@ -6450,6 +6451,15 @@ function parseDoctorCommandArgs(argv = []) {
                 throw new Error('错误: --output 需要一个值（文件路径）');
             }
             options.output = value;
+            cursor += 2;
+            continue;
+        }
+        if (token === '--lang') {
+            const value = String(argv[cursor + 1] || '').trim().toLowerCase();
+            if (!value || value.startsWith('--')) {
+                throw new Error('错误: --lang 需要一个值（zh/en）');
+            }
+            options.lang = value === 'en' ? 'en' : 'zh';
             cursor += 2;
             continue;
         }
@@ -13161,7 +13171,7 @@ async function main() {
         console.log('\nCodex Mate - Codex 提供商管理工具');
         console.log('\n用法:');
         console.log('  codexmate status           显示当前状态');
-        console.log('  codexmate doctor [--format json|md] [--output <PATH>]  输出诊断报告');
+        console.log('  codexmate doctor [--format json|md] [--lang zh|en] [--output <PATH>]  输出诊断报告');
         console.log('  codexmate setup            交互式配置向导');
         console.log('  codexmate list             列出所有提供商');
         console.log('  codexmate models           列出所有模型');
