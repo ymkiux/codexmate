@@ -239,6 +239,7 @@
     display: grid;
     grid-template-columns: 2fr 1fr;
     gap: 16px;
+    align-items: start;
 }
 
 .usage-card {
@@ -511,6 +512,7 @@
 
 .usage-list-top-paths {
     max-height: 140px;
+    gap: 6px;
 }
 
 .usage-list-scroll::-webkit-scrollbar {
