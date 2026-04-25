@@ -183,6 +183,90 @@
     max-width: 720px;
 }
 
+.doctor-action-list {
+    margin-top: 14px;
+    display: grid;
+    gap: 10px;
+}
+
+.doctor-action-card {
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border-soft);
+    background: rgba(255, 255, 255, 0.78);
+    padding: 12px;
+    overflow: hidden;
+    text-align: center;
+}
+
+.doctor-action-head {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.doctor-action-title {
+    font-weight: var(--font-weight-secondary);
+    color: var(--color-text-primary);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+.doctor-action-severity {
+    font-size: var(--font-size-caption);
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--color-border-soft);
+    background: rgba(255, 255, 255, 0.85);
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+}
+
+.doctor-action-severity.error {
+    border-color: rgba(220, 95, 108, 0.28);
+    background: rgba(220, 95, 108, 0.08);
+    color: #8a2f36;
+}
+
+.doctor-action-severity.warn {
+    border-color: rgba(246, 211, 106, 0.45);
+    background: rgba(246, 211, 106, 0.16);
+    color: #6f4b00;
+}
+
+.doctor-action-severity.info {
+    border-color: rgba(126, 163, 215, 0.35);
+    background: rgba(126, 163, 215, 0.14);
+    color: #1f3d62;
+}
+
+.doctor-action-impact {
+    font-size: var(--font-size-caption);
+    color: var(--color-text-secondary);
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    max-width: 920px;
+    margin: 0 auto 10px;
+}
+
+.doctor-action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+}
+
+.doctor-action-footer {
+    display: flex;
+    justify-content: center;
+    margin-top: 2px;
+}
+
 @media (max-width: 520px) {
     .doctor-card-kv {
         grid-template-columns: 76px minmax(0, 1fr);

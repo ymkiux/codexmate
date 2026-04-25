@@ -253,8 +253,8 @@ test('runHealthCheck skips Claude speed tests when the primary health check alre
     await methods.runHealthCheck.call(context);
 
     assert.strictEqual(context.healthCheckLoading, false);
-    assert.strictEqual(claudeSpeedTestCalls, 1);
-    assert.strictEqual(context.healthCheckResult.ok, false);
+    assert.strictEqual(claudeSpeedTestCalls, 0);
+    assert.strictEqual(context.healthCheckResult, null);
 });
 
 test('runHealthCheck preserves backend remote health result while appending speed test summaries', async () => {
@@ -269,6 +269,14 @@ test('runHealthCheck preserves backend remote health result while appending spee
                 statusCode: 200,
                 ok: true,
                 message: 'ok'
+            },
+            report: {
+                schema: 1,
+                generatedAt: new Date().toISOString(),
+                ok: true,
+                summary: { total: 0, error: 0, warn: 0, info: 0 },
+                issues: [],
+                sources: {}
             }
         }),
         getProviderConfigModeMeta() {
@@ -300,10 +308,7 @@ test('runHealthCheck preserves backend remote health result while appending spee
     assert.strictEqual(context.healthCheckLoading, false);
     assert.strictEqual(context.healthCheckResult.remote.type, 'remote-health-check');
     assert.strictEqual(context.healthCheckResult.remote.statusCode, 200);
-    assert.deepStrictEqual(context.healthCheckResult.remote.speedTests, {
-        alpha: { ok: true, durationMs: 10, status: 200 },
-        beta: { ok: true, durationMs: 20, status: 200 }
-    });
+    assert.deepStrictEqual(context.healthCheckResult.remote.speedTests, undefined);
 });
 
 test('applyCodexConfigDirect keeps the successful apply result when only the refresh fails', async () => {

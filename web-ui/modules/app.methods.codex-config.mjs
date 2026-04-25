@@ -271,135 +271,54 @@ export function createCodexConfigMethods(options = {}) {
             });
         },
 
-        async runHealthCheck() {
+        async runHealthCheck(options = {}) {
             this.healthCheckLoading = true;
             this.healthCheckResult = null;
             this.healthCheckBatchTotal = 0;
             this.healthCheckBatchDone = 0;
             this.healthCheckBatchFailed = 0;
             try {
-                if (this.configMode === 'claude') {
-                    const entries = Object.entries(this.claudeConfigs || {});
-                    this.healthCheckBatchTotal = entries.length;
-
-                    const speedTasks = entries.map(([name, config]) => this.runClaudeSpeedTest(name, config)
-                        .then((result) => {
-                            if (!result || result.ok !== true) {
-                                this.healthCheckBatchFailed += 1;
-                            }
-                            return { name, result };
-                        })
-                        .catch((err) => {
-                            this.healthCheckBatchFailed += 1;
-                            return {
-                                name,
-                                result: { ok: false, error: err && err.message ? err.message : 'Speed test failed' }
-                            };
-                        })
-                        .finally(() => {
-                            this.healthCheckBatchDone += 1;
-                        })
-                    );
-
-                    const pairs = await Promise.all(speedTasks);
-                    const results = {};
-                    const issues = [];
-                    for (const pair of pairs) {
-                        results[pair.name] = pair.result || null;
-                        if (typeof this.buildSpeedTestIssue === 'function') {
-                            const issue = this.buildSpeedTestIssue(pair.name, pair.result);
-                            if (issue) issues.push(issue);
-                        }
-                    }
-                    const ok = issues.length === 0 && this.healthCheckBatchFailed === 0;
-                    this.healthCheckResult = {
-                        ok,
-                        issues,
-                        remote: {
-                            type: 'speed-test',
-                            speedTests: results
-                        }
-                    };
-                    if (ok) {
-                        this.showMessage('检查通过', 'success');
-                    }
-                    return;
-                }
-
-                const shouldRunSpeedTests = this.configMode === 'codex';
-                const speedTimeoutMs = shouldRunSpeedTests ? 3500 : 0;
-                const providers = shouldRunSpeedTests
-                    ? (this.providersList || [])
-                        .map((provider) => typeof provider === 'string'
-                            ? provider.trim()
-                            : String((provider && provider.name) || '').trim())
-                        .filter(Boolean)
-                    : [];
-                const currentProvider = String(this.currentProvider || '').trim();
-                const orderedProviders = currentProvider && providers.includes(currentProvider)
-                    ? [currentProvider, ...providers.filter((name) => name !== currentProvider)]
-                    : providers;
-                this.healthCheckBatchTotal = orderedProviders.length;
-
-                const speedTasks = orderedProviders.map((provider) => this.runSpeedTest(provider, { silent: true, timeoutMs: speedTimeoutMs })
-                    .then((result) => {
-                        if (!result || result.ok !== true) {
-                            this.healthCheckBatchFailed += 1;
-                        }
-                        return { name: provider, result };
-                    })
-                    .catch((err) => {
-                        this.healthCheckBatchFailed += 1;
-                        return {
-                            name: provider,
-                            result: { ok: false, error: err && err.message ? err.message : 'Speed test failed' }
-                        };
-                    })
-                    .finally(() => {
-                        this.healthCheckBatchDone += 1;
-                    })
-                );
-
-                const configTask = api('config-health-check', { remote: this.configMode === 'codex' });
-                const [res, pairs] = await Promise.all([
-                    configTask,
-                    Promise.all(speedTasks)
-                ]);
+                const silent = !!(options && options.silent);
+                const forceRefresh = !!(options && options.forceRefresh);
+                const res = await api('doctor', {
+                    remote: true,
+                    range: this.sessionsUsageTimeRange,
+                    targetApp: this.skillsTargetApp,
+                    includeUsage: true,
+                    includeTasks: true,
+                    includeSkills: true,
+                    includeInstall: true,
+                    forceRefresh
+                });
                 if (hasResponseError(res)) {
                     this.healthCheckResult = null;
-                    this.showMessage(getResponseMessage(res, '检查失败'), 'error');
-                } else if (res && typeof res === 'object') {
-                    const issues = Array.isArray(res.issues) ? [...res.issues] : [];
-                    let remote = res.remote || null;
-                    if (shouldRunSpeedTests) {
-                        const results = {};
-                        for (const pair of pairs) {
-                            results[pair.name] = pair.result || null;
-                            const issue = this.buildSpeedTestIssue(pair.name, pair.result);
-                            if (issue) issues.push(issue);
-                        }
-                        remote = remote && typeof remote === 'object'
-                            ? { ...remote, speedTests: results }
-                            : { type: 'speed-test', speedTests: results };
+                    if (!silent) {
+                        this.showMessage(getResponseMessage(res, '检查失败'), 'error');
                     }
-
-                    const ok = issues.length === 0;
-                    this.healthCheckResult = {
-                        ...res,
-                        ok,
-                        issues,
-                        remote
-                    };
-                    if (ok) {
+                } else if (res && typeof res === 'object') {
+                    this.healthCheckResult = res;
+                    const report = res.report && typeof res.report === 'object' ? res.report : null;
+                    const summary = report && report.summary && typeof report.summary === 'object' ? report.summary : null;
+                    const total = summary && Number.isFinite(Number(summary.total)) ? Math.max(0, Math.floor(Number(summary.total))) : (Array.isArray(res.issues) ? res.issues.length : 0);
+                    const errors = summary && Number.isFinite(Number(summary.error)) ? Math.max(0, Math.floor(Number(summary.error))) : 0;
+                    const warns = summary && Number.isFinite(Number(summary.warn)) ? Math.max(0, Math.floor(Number(summary.warn))) : 0;
+                    this.healthCheckBatchTotal = total;
+                    this.healthCheckBatchDone = total;
+                    this.healthCheckBatchFailed = errors + warns;
+                    if (!silent && res.ok) {
                         this.showMessage('检查通过', 'success');
                     }
                 } else {
                     this.healthCheckResult = null;
-                    this.showMessage('检查失败', 'error');
+                    if (!silent) {
+                        this.showMessage('检查失败', 'error');
+                    }
                 }
             } catch (e) {
                 this.healthCheckResult = null;
-                this.showMessage('检查失败', 'error');
+                if (!(options && options.silent)) {
+                    this.showMessage('检查失败', 'error');
+                }
             } finally {
                 this.healthCheckBatchTotal = this.healthCheckBatchTotal || 0;
                 this.healthCheckBatchDone = Math.min(this.healthCheckBatchDone || 0, this.healthCheckBatchTotal || 0);

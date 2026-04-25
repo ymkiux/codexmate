@@ -23,17 +23,8 @@ export function createNavigationMethods(options = {}) {
         vm.__doctorLoading = true;
         let ok = true;
         try {
-            if (typeof vm.loadSessions === 'function' && (forceRefresh || !vm.sessionsLoadedOnce)) {
-                await vm.loadSessions({ forceRefresh });
-            }
-            if (typeof vm.loadSessionsUsage === 'function' && (forceRefresh || !vm.sessionsUsageLoadedOnce)) {
-                await vm.loadSessionsUsage({ forceRefresh, range: vm.sessionsUsageTimeRange, preserveList: true });
-            }
-            if (vm.taskOrchestrationTabEnabled === true && typeof vm.loadTaskOrchestrationOverview === 'function') {
-                await vm.loadTaskOrchestrationOverview({ forceRefresh, includeDetail: true });
-            }
-            if (typeof vm.loadSkillsMarketOverview === 'function') {
-                await vm.loadSkillsMarketOverview({ forceRefresh, silent: true });
+            if (typeof vm.runHealthCheck === 'function') {
+                await vm.runHealthCheck({ silent: true, forceRefresh });
             }
             vm.__doctorLoadedOnce = true;
             return true;

@@ -75,6 +75,7 @@ const {
     executeTaskPlan
 } = require('./lib/task-orchestrator');
 const { buildConfigHealthReport: buildConfigHealthReportCore } = require('./cli/config-health');
+const { buildDoctorReport, buildDoctorLegacyPayload } = require('./cli/doctor-core');
 const {
     createAuthProfileController
 } = require('./cli/auth-profiles');
@@ -6414,6 +6415,77 @@ function cmdStatus() {
     console.log();
 }
 
+function parseDoctorCommandArgs(argv = []) {
+    const options = {
+        json: false,
+        range: '7d',
+        targetApp: 'codex',
+        remote: true,
+        includeInstall: true,
+        includeUsage: true,
+        includeTasks: true,
+        includeSkills: true
+    };
+    let cursor = 0;
+    while (cursor < argv.length) {
+        const token = String(argv[cursor] || '');
+        if (token === '--json') {
+            options.json = true;
+            cursor += 1;
+            continue;
+        }
+        if (token === '--range') {
+            const value = String(argv[cursor + 1] || '').trim().toLowerCase();
+            if (!value || value.startsWith('--')) {
+                throw new Error('错误: --range 需要一个值（7d/30d/all）');
+            }
+            options.range = value === 'all' ? 'all' : (value === '30d' ? '30d' : '7d');
+            cursor += 2;
+            continue;
+        }
+        if (token === '--target-app') {
+            const value = String(argv[cursor + 1] || '').trim().toLowerCase();
+            if (!value || value.startsWith('--')) {
+                throw new Error('错误: --target-app 需要一个值（codex/claude）');
+            }
+            options.targetApp = value === 'claude' ? 'claude' : 'codex';
+            cursor += 2;
+            continue;
+        }
+        if (token === '--no-remote') {
+            options.remote = false;
+            cursor += 1;
+            continue;
+        }
+        if (token === '--no-install') {
+            options.includeInstall = false;
+            cursor += 1;
+            continue;
+        }
+        cursor += 1;
+    }
+    return options;
+}
+
+async function cmdDoctor(argv = []) {
+    try {
+        const options = parseDoctorCommandArgs(argv);
+        const report = await buildDoctorReport(options, {
+            getStatusPayload: buildMcpStatusPayload,
+            buildInstallStatusReport,
+            buildConfigHealthReport,
+            listSessionUsage,
+            buildTaskOverviewPayload,
+            listSkills
+        });
+        const json = JSON.stringify(report, null, 2);
+        process.stdout.write(json + '\n');
+    } catch (e) {
+        console.error('错误:', e && e.message ? e.message : e);
+        process.exitCode = 1;
+    }
+}
+
 // 列出所有提供商
 function cmdList() {
     const configResult = readConfigOrVirtualDefault();
@@ -8260,6 +8332,20 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             break;
                         case 'config-health-check':
                             result = await buildConfigHealthReport(params || {});
+                            break;
+                        case 'doctor':
+                            {
+                                const doctorParams = isPlainObject(params) ? params : {};
+                                const report = await buildDoctorReport(doctorParams, {
+                                    getStatusPayload: buildMcpStatusPayload,
+                                    buildInstallStatusReport,
+                                    buildConfigHealthReport,
+                                    listSessionUsage,
+                                    buildTaskOverviewPayload,
+                                    listSkills
+                                });
+                                result = buildDoctorLegacyPayload(report);
+                            }
                             break;
                         case 'get-agents-file':
                             result = readAgentsFile(params || {});
@@ -13048,6 +13134,7 @@ async function main() {
         console.log('\nCodex Mate - Codex 提供商管理工具');
         console.log('\n用法:');
         console.log('  codexmate status           显示当前状态');
+        console.log('  codexmate doctor [--json]  输出诊断报告（JSON）');
         console.log('  codexmate setup            交互式配置向导');
         console.log('  codexmate list             列出所有提供商');
         console.log('  codexmate models           列出所有模型');
@@ -13109,6 +13196,7 @@ async function main() {
     switch (command) {
         case '__task-worker': await cmdTaskWorker(args.slice(1)); break;
         case 'status': cmdStatus(); break;
+        case 'doctor': await cmdDoctor(args.slice(1)); break;
         case 'setup': await cmdSetup(); break;
         case 'list': cmdList(); break;
         case 'models': await cmdModels(); break;

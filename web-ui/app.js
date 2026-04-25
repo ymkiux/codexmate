@@ -535,17 +535,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (this.mainTab === 'dashboard') {
                         if (!this.__doctorLoadedOnce) {
                             this.__doctorLoadedOnce = true;
-                            if (typeof this.loadSessions === 'function' && !this.sessionsLoadedOnce) {
-                                void this.loadSessions();
-                            }
-                            if (typeof this.loadSessionsUsage === 'function' && !this.sessionsUsageLoadedOnce) {
-                                void this.loadSessionsUsage({ range: this.sessionsUsageTimeRange, preserveList: true });
-                            }
-                            if (this.taskOrchestrationTabEnabled === true && typeof this.loadTaskOrchestrationOverview === 'function') {
-                                void this.loadTaskOrchestrationOverview({ includeDetail: true });
-                            }
-                            if (typeof this.loadSkillsMarketOverview === 'function') {
-                                void this.loadSkillsMarketOverview({ silent: true });
+                            if (typeof this.runHealthCheck === 'function') {
+                                void this.runHealthCheck({ silent: true });
                             }
                         }
                     }

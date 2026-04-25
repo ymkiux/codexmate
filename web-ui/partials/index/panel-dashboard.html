@@ -119,57 +119,57 @@
                                 <strong>{{ inspectorModelLoadStatus }}</strong>
                             </div>
                         </div>
-                        <div
-                            v-if="initError
-                                || sessionsUsageError
-                                || activeSessionDetailError
-                                || pluginsError
-                                || modelsSource === 'error'
-                                || claudeModelsSource === 'error'
-                                || (taskOrchestration && (taskOrchestration.lastError || taskOrchestration.selectedRunError || (taskOrchestration.planIssues && taskOrchestration.planIssues.length)))
-                                || (typeof message === 'string' && message.trim())"
-                            class="doctor-health-result error">
-                            <div class="doctor-health-title">
-                                {{
-                                    t('dashboard.issues.title', {
-                                        count:
-                                            (initError ? 1 : 0)
-                                            + (modelsSource === 'error' ? 1 : 0)
-                                            + (claudeModelsSource === 'error' ? 1 : 0)
-                                            + (sessionsUsageError ? 1 : 0)
-                                            + (activeSessionDetailError ? 1 : 0)
-                                            + (pluginsError ? 1 : 0)
-                                            + (taskOrchestration && taskOrchestration.lastError ? 1 : 0)
-                                            + (taskOrchestration && taskOrchestration.selectedRunError ? 1 : 0)
-                                            + (taskOrchestration && taskOrchestration.planIssues && taskOrchestration.planIssues.length ? 1 : 0)
-                                            + (typeof message === 'string' && message.trim() ? 1 : 0)
-                                    })
-                                }}
-                            </div>
-                            <div class="doctor-health-issues">
-                                <div v-if="initError" class="doctor-health-issue">{{ initError }}</div>
-                                <div v-if="modelsSource === 'error'" class="doctor-health-issue">Codex 模型列表加载异常</div>
-                                <div v-if="claudeModelsSource === 'error'" class="doctor-health-issue">Claude 模型列表加载异常</div>
-                                <div v-if="sessionsUsageError" class="doctor-health-issue">{{ sessionsUsageError }}</div>
-                                <div v-if="activeSessionDetailError" class="doctor-health-issue">{{ activeSessionDetailError }}</div>
-                                <div v-if="pluginsError" class="doctor-health-issue">{{ pluginsError }}</div>
-                                <div v-if="taskOrchestration && taskOrchestration.lastError" class="doctor-health-issue">{{ taskOrchestration.lastError }}</div>
-                                <div v-if="taskOrchestration && taskOrchestration.selectedRunError" class="doctor-health-issue">{{ taskOrchestration.selectedRunError }}</div>
-                                <div v-if="taskOrchestration && taskOrchestration.planIssues && taskOrchestration.planIssues.length" class="doctor-health-issue">
-                                    任务计划存在 {{ taskOrchestration.planIssues.length }} 条阻塞项
-                                </div>
-                                <div v-if="typeof message === 'string' && message.trim()" class="doctor-health-issue">{{ message }}</div>
-                            </div>
-                        </div>
                         <div v-if="healthCheckResult" class="doctor-health-result" :class="healthCheckResult.ok ? 'ok' : 'error'">
                             <div class="doctor-health-title">
                                 {{ healthCheckResult.ok ? t('dashboard.health.ok') : t('dashboard.health.fail') }}
                                 <span v-if="healthCheckResult.issues && healthCheckResult.issues.length">（{{ t('dashboard.health.issues', { count: healthCheckResult.issues.length }) }}）</span>
                             </div>
-                            <div v-if="healthCheckResult.issues && healthCheckResult.issues.length" class="doctor-health-issues">
-                                <div v-for="(issue, index) in healthCheckResult.issues" :key="issue.code || ('doctor-issue-' + index)" class="doctor-health-issue">
-                                    {{ issue.message || issue.code || '' }}
+                        </div>
+                        <div v-if="healthCheckResult && healthCheckResult.report && healthCheckResult.report.issues && healthCheckResult.report.issues.length" class="doctor-action-list">
+                            <div v-for="issue in healthCheckResult.report.issues" :key="issue.id" class="doctor-action-card">
+                                <div class="doctor-action-head">
+                                    <div class="doctor-action-title">{{ issue.problem }}</div>
+                                    <div :class="['doctor-action-severity', issue.severity]">{{ issue.severity }}</div>
                                 </div>
+                                <div class="doctor-action-impact">{{ issue.impact }}</div>
+                                <div v-if="issue.actions && issue.actions.length" class="doctor-action-buttons">
+                                    <template v-for="(action, index) in issue.actions" :key="issue.id + '-action-' + index">
+                                        <button
+                                            v-if="action.type === 'navigate'"
+                                            type="button"
+                                            class="btn-tool btn-tool-compact"
+                                            @click="switchMainTab(action.target)">
+                                            {{ action.label || t('dashboard.doctor.open') }}
+                                        </button>
+                                        <button
+                                            v-else-if="action.type === 'run-check'"
+                                            type="button"
+                                            class="btn-tool btn-tool-compact"
+                                            @click="runHealthCheck({ forceRefresh: true })"
+                                            :disabled="healthCheckLoading">
+                                            {{ t('dashboard.doctor.runChecks') }}
+                                        </button>
+                                        <button
+                                            v-else-if="action.type === 'export'"
+                                            type="button"
+                                            class="btn-tool btn-tool-compact"
+                                            @click="healthCheckResult && healthCheckResult.report
+                                                ? downloadTextFile('codexmate-doctor.json', JSON.stringify(healthCheckResult.report, null, 2), 'application/json;charset=utf-8')
+                                                : null">
+                                            {{ t('dashboard.doctor.export') }}
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                            <div class="doctor-action-footer">
+                                <button
+                                    type="button"
+                                    class="btn-tool btn-tool-compact"
+                                    @click="healthCheckResult && healthCheckResult.report
+                                        ? downloadTextFile('codexmate-doctor.json', JSON.stringify(healthCheckResult.report, null, 2), 'application/json;charset=utf-8')
+                                        : null">
+                                    {{ t('dashboard.doctor.export') }}
+                                </button>
                             </div>
                         </div>
                     </div>
