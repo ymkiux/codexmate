@@ -4,7 +4,12 @@
                         class="mode-content mode-cards"
                         id="panel-config-provider"
                         role="tabpanel"
-                        :aria-labelledby="'tab-config-' + configMode">
+                        :aria-labelledby="forceCompactLayout ? 'tab-config' : ('side-tab-config-' + configMode)">
+                <div v-if="forceCompactLayout && !sessionStandalone" class="segmented-control">
+                    <button type="button" :class="['segment', { active: configMode === 'codex' }]" @click="switchConfigMode('codex')">{{ t('tab.config.codex') }}</button>
+                    <button type="button" :class="['segment', { active: configMode === 'claude' }]" @click="switchConfigMode('claude')">{{ t('tab.config.claude') }}</button>
+                    <button type="button" :class="['segment', { active: configMode === 'openclaw' }]" @click="switchConfigMode('openclaw')">{{ t('tab.config.openclaw') }}</button>
+                </div>
                 <template v-if="isCodexConfigMode && shouldShowCliInstallPlaceholder('codex')">
                     <div class="selector-section">
                         <div class="empty-state">

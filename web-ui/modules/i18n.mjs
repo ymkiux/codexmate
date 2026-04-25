@@ -121,6 +121,7 @@ const DICT = Object.freeze({
         // Top tabs
         'tab.dashboard': '概览',
         'tab.docs': '文档',
+        'tab.config': '配置',
         'tab.config.codex': 'Codex',
         'tab.config.claude': 'Claude',
         'tab.config.openclaw': 'OpenClaw',
@@ -1078,6 +1079,7 @@ const DICT = Object.freeze({
         // Top tabs
         'tab.dashboard': 'Dashboard',
         'tab.docs': 'Docs',
+        'tab.config': 'Config',
         'tab.config.codex': 'Codex',
         'tab.config.claude': 'Claude',
         'tab.config.openclaw': 'OpenClaw',
