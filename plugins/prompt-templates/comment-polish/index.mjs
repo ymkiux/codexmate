@@ -1,4 +1,4 @@
-import { templateOwnershipById } from '../ownership.mjs';
+import { pluginOwnership, templateOwnershipById } from '../ownership.mjs';
 
 export function buildBuiltinCommentPolishTemplate(t) {
     const tr = (key, fallback, params = null) => (typeof t === 'function' ? t(key, params) : fallback);
@@ -6,7 +6,7 @@ export function buildBuiltinCommentPolishTemplate(t) {
     const timestamp = new Date().toISOString();
     const ownership = templateOwnershipById && templateOwnershipById.builtin_comment_polish
         ? templateOwnershipById.builtin_comment_polish
-        : null;
+        : pluginOwnership;
     return {
         id: 'builtin_comment_polish',
         name: tr('plugins.builtin.commentPolish.name', '代码注释润色'),

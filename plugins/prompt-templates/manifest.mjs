@@ -8,10 +8,6 @@ const baseMeta = {
     tone: 'configured'
 };
 
-if (pluginOwnership && pluginOwnership.pluginId && pluginOwnership.pluginId !== baseMeta.id) {
-    throw new Error(`ownership.mjs pluginId mismatch: expected ${baseMeta.id}, got ${pluginOwnership.pluginId}`);
-}
-
 export const pluginMeta = {
     ...baseMeta,
     createdBy: pluginOwnership && typeof pluginOwnership.createdBy === 'string' ? pluginOwnership.createdBy : '',

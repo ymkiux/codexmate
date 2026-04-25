@@ -1,4 +1,4 @@
-import { templateOwnershipById } from '../ownership.mjs';
+import { pluginOwnership, templateOwnershipById } from '../ownership.mjs';
 
 export function buildBuiltinRuleAckTemplate(t) {
     const tr = (key, fallback, params = null) => (typeof t === 'function' ? t(key, params) : fallback);
@@ -6,7 +6,7 @@ export function buildBuiltinRuleAckTemplate(t) {
     const timestamp = new Date().toISOString();
     const ownership = templateOwnershipById && templateOwnershipById.builtin_rule_ack
         ? templateOwnershipById.builtin_rule_ack
-        : null;
+        : pluginOwnership;
     return {
         id: 'builtin_rule_ack',
         name: tr('plugins.builtin.ruleAck.name', '规则确认回复'),
