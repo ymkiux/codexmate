@@ -45,6 +45,7 @@
                             <div v-else-if="pluginsActiveId === 'prompt-templates'" class="plugins-panel">
                                 <div class="plugins-panel-head">
                                     <div class="plugins-panel-title">{{ t('plugins.promptTemplates.title') }}</div>
+                                    <div v-if="pluginsActiveAttribution" class="plugins-panel-note">{{ pluginsActiveAttribution }}</div>
                                 </div>
 
                                 <div class="prompt-templates-modebar" role="tablist" :aria-label="t('plugins.promptTemplates.mode.aria')">
@@ -67,6 +68,9 @@
                                         <div class="prompt-compose-selected">
                                             <div class="prompt-compose-selected-title">{{ (promptComposerActiveTemplate && promptComposerActiveTemplate.name) ? promptComposerActiveTemplate.name : t('plugins.promptTemplates.compose.chooseTemplate') }}</div>
                                             <div class="prompt-compose-selected-meta">{{ (promptComposerActiveTemplate && promptComposerActiveTemplate.description) ? promptComposerActiveTemplate.description : t('plugins.promptTemplates.compose.chooseTemplateHint') }}</div>
+                                            <div v-if="promptComposerActiveTemplate && promptComposerActiveTemplate.isBuiltin && (promptComposerActiveTemplate.createdBy || (promptComposerActiveTemplate.maintainers && promptComposerActiveTemplate.maintainers.length))" class="plugins-panel-note">
+                                                {{ t('plugins.meta.attribution', { createdBy: promptComposerActiveTemplate.createdBy || '', maintainers: (promptComposerActiveTemplate.maintainers || []).join(', ') }) }}
+                                            </div>
                                         </div>
 
                                         <div class="prompt-compose-form">
@@ -181,6 +185,9 @@
                                                 </div>
                                                 <div v-if="promptTemplateDraft.isBuiltin" class="plugins-panel-note">
                                                     {{ t('plugins.promptTemplates.editor.builtinReadOnly') }}
+                                                </div>
+                                                <div v-if="promptTemplateDraft.isBuiltin && (promptTemplateDraft.createdBy || (promptTemplateDraft.maintainers && promptTemplateDraft.maintainers.length))" class="plugins-panel-note">
+                                                    {{ t('plugins.meta.attribution', { createdBy: promptTemplateDraft.createdBy || '', maintainers: (promptTemplateDraft.maintainers || []).join(', ') }) }}
                                                 </div>
                                                 <input class="form-input" type="text" v-model.trim="promptTemplateDraft.description" :disabled="promptTemplateDraft.isBuiltin" :placeholder="t('plugins.promptTemplates.editor.descPlaceholder')" :aria-label="t('plugins.promptTemplates.editor.descAria')">
                                             </div>

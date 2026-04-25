@@ -2,28 +2,8 @@ import {
     persistPromptTemplatesToStorage,
     readPromptTemplatesFromStorage
 } from './storage.mjs';
-
-function nowIsoPromptTemplatesOverview() {
-    return new Date().toISOString();
-}
-
-function buildBuiltinCommentPolishTemplate(t) {
-    const tr = (key, fallback, params = null) => (typeof t === 'function' ? t(key, params) : fallback);
-    const line1 = tr('plugins.builtin.commentPolish.line1', '轻微收敛以下代码注释');
-    return {
-        id: 'builtin_comment_polish',
-        name: tr('plugins.builtin.commentPolish.name', '代码注释润色'),
-        description: tr('plugins.builtin.commentPolish.desc', '轻微收敛以下代码注释 {{code}}'),
-        template: [
-            line1,
-            '',
-            '{{code}}'
-        ].join('\n'),
-        createdAt: nowIsoPromptTemplatesOverview(),
-        updatedAt: nowIsoPromptTemplatesOverview(),
-        isBuiltin: true
-    };
-}
+import { buildBuiltinCommentPolishTemplate } from './comment-polish/index.mjs';
+import { buildBuiltinRuleAckTemplate } from './rule-ack/index.mjs';
 
 function ensureBuiltinTemplates(rawList, builtins) {
     const list = Array.isArray(rawList) ? rawList.filter(Boolean) : [];
@@ -48,7 +28,10 @@ export async function loadPromptTemplatesOverview(ctx, options = {}) {
 
     const t = typeof app.t === 'function' ? app.t : null;
     const rawList = readPromptTemplatesFromStorage(localStorage);
-    const normalized = ensureBuiltinTemplates(rawList, [buildBuiltinCommentPolishTemplate(t)]);
+    const normalized = ensureBuiltinTemplates(rawList, [
+        buildBuiltinCommentPolishTemplate(t),
+        buildBuiltinRuleAckTemplate(t)
+    ]);
     app.promptTemplatesListRaw = normalized;
     persistPromptTemplatesToStorage(normalized, localStorage);
 

@@ -1,16 +1,11 @@
 #!/usr/bin/env node
 /**
- * Interactive reset workflow:
- * - blank input => reset working tree to origin/main
- * - PR number   => fetch PR snapshot and reset local branch to that PR head
- * - always discard local changes, clean untracked files/dirs, and validate
- *   the final branch / commit / clean-tree state
- *
- * Cross-platform: requires Node.js and git in PATH.
+ * Reset workflow:
+ * - no args => reset working tree to origin/main
+ * - PR number arg => fetch PR snapshot and reset local branch to that PR head
  */
 
 const { execSync } = require('child_process');
-const readline = require('readline');
 
 const DEFAULT_REMOTE = 'origin';
 const DEFAULT_MAIN_BRANCH = 'main';
@@ -140,25 +135,7 @@ function resolveArgPrNumber(argv = process.argv.slice(2)) {
   return normalizePrNumberInput(first || '');
 }
 
-function promptForPrNumber({ stdin = process.stdin, stdout = process.stdout } = {}) {
-  if (!stdin || !stdout || stdin.isTTY === false || stdout.isTTY === false) {
-    return Promise.resolve('');
-  }
-
-  return new Promise((resolve, reject) => {
-    const rl = readline.createInterface({ input: stdin, output: stdout });
-    rl.question('PR 编号（留空则重置到 origin/main）: ', (answer) => {
-      rl.close();
-      try {
-        resolve(normalizePrNumberInput(answer));
-      } catch (err) {
-        reject(err);
-      }
-    });
-  });
-}
-
-async function main({ argv = process.argv.slice(2), stdin = process.stdin, stdout = process.stdout } = {}) {
+async function main({ argv = process.argv.slice(2) } = {}) {
   try {
     run('git rev-parse --is-inside-work-tree', { stdio: 'ignore' });
   } catch (err) {
@@ -187,6 +164,5 @@ module.exports = {
   validateFinalState,
   executeResetPlan,
   resolveArgPrNumber,
-  promptForPrNumber,
   main
 };
