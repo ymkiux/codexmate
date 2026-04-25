@@ -128,10 +128,10 @@
                         <div v-if="healthCheckResult && healthCheckResult.report && healthCheckResult.report.issues && healthCheckResult.report.issues.length" class="doctor-action-list">
                             <div v-for="issue in healthCheckResult.report.issues" :key="issue.id" class="doctor-action-card">
                                 <div class="doctor-action-head">
-                                    <div class="doctor-action-title">{{ issue.problem }}</div>
+                                    <div class="doctor-action-title">{{ issue.problem || (issue.problemKey ? t(issue.problemKey, issue.problemParams) : '') }}</div>
                                     <div :class="['doctor-action-severity', issue.severity]">{{ issue.severityLabel || issue.severity }}</div>
                                 </div>
-                                <div class="doctor-action-impact">{{ issue.impact }}</div>
+                                <div class="doctor-action-impact">{{ issue.impact || (issue.impactKey ? t(issue.impactKey, issue.impactParams) : '') }}</div>
                                 <div v-if="issue.actions && issue.actions.length" class="doctor-action-buttons">
                                     <template v-for="(action, index) in issue.actions" :key="issue.id + '-action-' + index">
                                         <button
@@ -139,7 +139,7 @@
                                             type="button"
                                             class="btn-tool btn-tool-compact"
                                             @click="switchMainTab(action.target)">
-                                            {{ action.label || t('dashboard.doctor.open') }}
+                                            {{ action.label || (action.labelKey ? t(action.labelKey, action.labelParams) : t('dashboard.doctor.open')) }}
                                         </button>
                                         <button
                                             v-else-if="action.type === 'run-check'"

@@ -214,9 +214,16 @@ function buildIssue(id, severity, problem, impact, actions = [], data = null, me
         areaKey: typeof safeMeta.areaKey === 'string' && safeMeta.areaKey.trim() ? safeMeta.areaKey.trim() : 'Doctor',
         area: typeof safeMeta.area === 'string' && safeMeta.area.trim() ? safeMeta.area.trim() : 'Doctor',
         severityLabel: typeof safeMeta.severityLabel === 'string' && safeMeta.severityLabel.trim() ? safeMeta.severityLabel.trim() : '',
+        problemKey: typeof safeMeta.problemKey === 'string' && safeMeta.problemKey.trim() ? safeMeta.problemKey.trim() : '',
+        problemParams: safeMeta.problemParams && typeof safeMeta.problemParams === 'object' ? safeMeta.problemParams : null,
+        impactKey: typeof safeMeta.impactKey === 'string' && safeMeta.impactKey.trim() ? safeMeta.impactKey.trim() : '',
+        impactParams: safeMeta.impactParams && typeof safeMeta.impactParams === 'object' ? safeMeta.impactParams : null,
+        impactTags: Array.isArray(safeMeta.impactTags) ? safeMeta.impactTags.filter(Boolean) : [],
+        impactScope: typeof safeMeta.impactScope === 'string' && safeMeta.impactScope.trim() ? safeMeta.impactScope.trim() : '',
         problem: String(problem || '').trim(),
         impact: String(impact || '').trim(),
         actions: Array.isArray(actions) ? actions : [],
+        evidence: data && typeof data === 'object' ? data : null,
         data: data && typeof data === 'object' ? data : null
     };
 }
@@ -427,6 +434,85 @@ function resolveProviderProblemText(i18n, remoteIssue) {
     return fallback;
 }
 
+function buildNavigateAction(target, labelKey, label, labelParams = null) {
+    return buildAction('navigate', {
+        target,
+        labelKey: String(labelKey || '').trim(),
+        labelParams: labelParams && typeof labelParams === 'object' ? labelParams : null,
+        label: String(label || '').trim()
+    });
+}
+
+function buildIssueKeyMap() {
+    return {
+        configNotReady: {
+            problemKey: 'doctor.issue.configNotReady.problem',
+            impactKey: 'doctor.issue.configNotReady.impact'
+        },
+        providerUnreachable: {
+            problemKeyPrefix: 'doctor.issue.providerUnreachable.problem.',
+            impactAuthKey: 'doctor.issue.providerUnreachable.impactAuth',
+            impactNetworkKey: 'doctor.issue.providerUnreachable.impactNetwork'
+        },
+        configHealthFailed: {
+            problemKey: 'doctor.issue.configHealthFailed.problem',
+            impactKey: 'doctor.issue.configHealthFailed.impact'
+        },
+        usageError: {
+            problemKey: 'doctor.issue.usageError.problem',
+            impactKey: 'doctor.issue.usageError.impact'
+        },
+        usageMissingModel: {
+            problemKey: 'doctor.issue.usageMissingModel.problem',
+            impactKey: 'doctor.issue.usageMissingModel.impact'
+        },
+        tasksError: {
+            problemKey: 'doctor.issue.tasksError.problem',
+            impactKey: 'doctor.issue.tasksError.impact'
+        },
+        tasksFailed: {
+            problemKey: 'doctor.issue.tasksFailed.problem',
+            impactKey: 'doctor.issue.tasksFailed.impact'
+        },
+        skillsError: {
+            problemKey: 'doctor.issue.skillsError.problem',
+            impactKey: 'doctor.issue.skillsError.impact'
+        },
+        skillsRootMissing: {
+            problemKey: 'doctor.issue.skillsRootMissing.problem',
+            impactKey: 'doctor.issue.skillsRootMissing.impact'
+        },
+        skillsMissingFiles: {
+            problemKey: 'doctor.issue.skillsMissingFiles.problem',
+            impactKey: 'doctor.issue.skillsMissingFiles.impact'
+        }
+    };
+}
+
+const ISSUE_KEYS = Object.freeze(buildIssueKeyMap());
+
+function resolveProviderProblemKey(code) {
+    const normalized = String(code || '').trim();
+    const suffix = normalized || 'unknown';
+    return `${ISSUE_KEYS.providerUnreachable.problemKeyPrefix}${suffix}`;
+}
+
+function runChecks(context, checks = []) {
+    const list = Array.isArray(checks) ? checks : [];
+    const issues = [];
+    for (const check of list) {
+        if (typeof check !== 'function') continue;
+        const result = check(context);
+        if (!result) continue;
+        if (Array.isArray(result)) {
+            issues.push(...result.filter(Boolean));
+            continue;
+        }
+        issues.push(result);
+    }
+    return issues;
+}
+
 async function buildDoctorReport(params = {}, deps = {}) {
     const options = params && typeof params === 'object' ? params : {};
     const resolvedLang = normalizeLang(options.lang) || normalizeLang(process.env.LANG) || 'zh';
@@ -520,186 +606,253 @@ async function buildDoctorReport(params = {}, deps = {}) {
         }
     }
 
-    const issues = [];
     const status = sources.status && typeof sources.status === 'object' ? sources.status : {};
     const baseActions = buildDefaultActions();
+    const context = {
+        options,
+        sources,
+        status,
+        baseActions,
+        i18n
+    };
 
-    if (status.configReady === false || (typeof status.configErrorType === 'string' && status.configErrorType.trim())) {
-        issues.push(buildIssue(
-            'config-not-ready',
-            'error',
-            i18n.issue.configNotReady.problem,
-            i18n.issue.configNotReady.impact,
-            ensureBaseActions([
-                buildAction('navigate', { target: 'config', label: i18n.action.openConfig })
-            ].concat(baseActions)),
-            {
-                configErrorType: status.configErrorType || '',
-                configNotice: status.configNotice || ''
-            },
-            { areaKey: 'Config' }
-        ));
-    }
-
-    const configHealth = sources.configHealth && typeof sources.configHealth === 'object' ? sources.configHealth : null;
-    if (configHealth && configHealth.ok === false) {
-        const remoteIssue = findConfigHealthRemoteIssue(configHealth.issues || []);
-        if (remoteIssue) {
-            const impact = remoteIssue.code === 'remote-model-probe-auth-failed'
-                ? i18n.issue.providerUnreachable.impactAuth
-                : i18n.issue.providerUnreachable.impactNetwork;
-            issues.push(buildIssue(
-                'provider-unreachable',
+    const issues = runChecks(context, [
+        (ctx) => {
+            if (ctx.status.configReady !== false && !(typeof ctx.status.configErrorType === 'string' && ctx.status.configErrorType.trim())) {
+                return null;
+            }
+            return buildIssue(
+                'config-not-ready',
                 'error',
-                resolveProviderProblemText(i18n, remoteIssue),
-                impact,
+                ctx.i18n.issue.configNotReady.problem,
+                ctx.i18n.issue.configNotReady.impact,
                 ensureBaseActions([
-                    buildAction('navigate', { target: 'config', label: i18n.action.checkProvider })
-                ].concat(baseActions)),
-                { code: remoteIssue.code || '', statusCode: remoteIssue.statusCode || 0 }
-                ,
-                { areaKey: 'Config' }
-            ));
-        } else if (Array.isArray(configHealth.issues) && configHealth.issues.length) {
-            issues.push(buildIssue(
-                'config-health-failed',
-                'warn',
-                i18n.issue.configHealthFailed.problem,
-                i18n.issue.configHealthFailed.impact,
-                ensureBaseActions([
-                    buildAction('navigate', { target: 'config', label: i18n.action.openConfig })
-                ].concat(baseActions)),
-                { issueCount: configHealth.issues.length },
-                { areaKey: 'Config' }
-            ));
-        }
-    }
-
-    if (sources.usage && typeof sources.usage === 'object') {
-        if (sources.usage.error) {
-            issues.push(buildIssue(
-                'usage-error',
-                'warn',
-                i18n.issue.usageError.problem,
-                i18n.issue.usageError.impact,
-                ensureBaseActions([
-                    buildAction('navigate', { target: 'usage', label: i18n.action.openUsage })
-                ].concat(baseActions)),
-                { error: sources.usage.error }
-                ,
-                { areaKey: 'Observe' }
-            ));
-        } else {
-            const summary = sources.usage.summary && typeof sources.usage.summary === 'object' ? sources.usage.summary : { total: 0, missingModel: 0 };
-            if (Number(summary.missingModel || 0) > 0) {
-                issues.push(buildIssue(
-                    'usage-missing-model',
-                    'info',
-                    i18n.issue.usageMissingModel.problem,
-                    i18n.issue.usageMissingModel.impact,
-                    ensureBaseActions([
-                        buildAction('navigate', { target: 'usage', label: i18n.action.openUsage }),
-                        buildAction('navigate', { target: 'sessions', label: i18n.action.openSessions })
-                    ].concat(baseActions)),
-                    summary
-                    ,
-                    { areaKey: 'Observe' }
-                ));
+                    buildNavigateAction('config', 'doctor.action.openConfig', ctx.i18n.action.openConfig)
+                ].concat(ctx.baseActions)),
+                {
+                    configErrorType: ctx.status.configErrorType || '',
+                    configNotice: ctx.status.configNotice || ''
+                },
+                {
+                    areaKey: 'Config',
+                    problemKey: ISSUE_KEYS.configNotReady.problemKey,
+                    impactKey: ISSUE_KEYS.configNotReady.impactKey,
+                    impactTags: ['blocked'],
+                    impactScope: 'config'
+                }
+            );
+        },
+        (ctx) => {
+            const configHealth = ctx.sources.configHealth && typeof ctx.sources.configHealth === 'object' ? ctx.sources.configHealth : null;
+            if (!configHealth || configHealth.ok !== false) {
+                return null;
             }
-        }
-    }
-
-    if (sources.tasks && typeof sources.tasks === 'object') {
-        if (sources.tasks.error) {
-            issues.push(buildIssue(
-                'tasks-error',
-                'warn',
-                i18n.issue.tasksError.problem,
-                i18n.issue.tasksError.impact,
-                ensureBaseActions([
-                    buildAction('navigate', { target: 'orchestration', label: i18n.action.openTasks })
-                ].concat(baseActions)),
-                { error: sources.tasks.error }
-                ,
-                { areaKey: 'Operate' }
-            ));
-        } else {
-            const summary = sources.tasks.summary && typeof sources.tasks.summary === 'object'
-                ? sources.tasks.summary
-                : summarizeTaskIssues(sources.tasks);
-            if (Number(summary.failed || 0) > 0) {
-                issues.push(buildIssue(
-                    'tasks-failed',
-                    'warn',
-                    i18n.issue.tasksFailed.problem,
-                    i18n.issue.tasksFailed.impact,
+            const remoteIssue = findConfigHealthRemoteIssue(configHealth.issues || []);
+            if (remoteIssue) {
+                const impactKey = remoteIssue.code === 'remote-model-probe-auth-failed'
+                    ? ISSUE_KEYS.providerUnreachable.impactAuthKey
+                    : ISSUE_KEYS.providerUnreachable.impactNetworkKey;
+                const impact = remoteIssue.code === 'remote-model-probe-auth-failed'
+                    ? ctx.i18n.issue.providerUnreachable.impactAuth
+                    : ctx.i18n.issue.providerUnreachable.impactNetwork;
+                return buildIssue(
+                    'provider-unreachable',
+                    'error',
+                    resolveProviderProblemText(ctx.i18n, remoteIssue),
+                    impact,
                     ensureBaseActions([
-                        buildAction('navigate', { target: 'orchestration', label: i18n.action.viewTaskLogs })
-                    ].concat(baseActions)),
+                        buildNavigateAction('config', 'doctor.action.checkProvider', ctx.i18n.action.checkProvider)
+                    ].concat(ctx.baseActions)),
+                    { code: remoteIssue.code || '', statusCode: remoteIssue.statusCode || 0 },
                     {
-                        failed: summary.failed || 0,
-                        latestFailed: summary.latestFailed
-                            ? {
-                                runId: summary.latestFailed.runId || '',
-                                status: summary.latestFailed.status || '',
-                                error: summary.latestFailed.error || ''
-                            }
-                            : null
+                        areaKey: 'Config',
+                        problemKey: resolveProviderProblemKey(remoteIssue.code),
+                        impactKey,
+                        impactTags: ['blocked', 'network'],
+                        impactScope: 'provider'
                     }
-                    ,
-                    { areaKey: 'Operate' }
-                ));
+                );
             }
-        }
-    }
-
-    if (sources.skills && typeof sources.skills === 'object') {
-        if (sources.skills.error) {
-            issues.push(buildIssue(
-                'skills-error',
-                'warn',
-                i18n.issue.skillsError.problem,
-                i18n.issue.skillsError.impact,
+            if (Array.isArray(configHealth.issues) && configHealth.issues.length) {
+                return buildIssue(
+                    'config-health-failed',
+                    'warn',
+                    ctx.i18n.issue.configHealthFailed.problem,
+                    ctx.i18n.issue.configHealthFailed.impact,
+                    ensureBaseActions([
+                        buildNavigateAction('config', 'doctor.action.openConfig', ctx.i18n.action.openConfig)
+                    ].concat(ctx.baseActions)),
+                    { issueCount: configHealth.issues.length },
+                    {
+                        areaKey: 'Config',
+                        problemKey: ISSUE_KEYS.configHealthFailed.problemKey,
+                        impactKey: ISSUE_KEYS.configHealthFailed.impactKey,
+                        impactTags: ['degraded'],
+                        impactScope: 'config'
+                    }
+                );
+            }
+            return null;
+        },
+        (ctx) => {
+            if (!ctx.sources.usage || typeof ctx.sources.usage !== 'object') return null;
+            if (ctx.sources.usage.error) {
+                return buildIssue(
+                    'usage-error',
+                    'warn',
+                    ctx.i18n.issue.usageError.problem,
+                    ctx.i18n.issue.usageError.impact,
+                    ensureBaseActions([
+                        buildNavigateAction('usage', 'doctor.action.openUsage', ctx.i18n.action.openUsage)
+                    ].concat(ctx.baseActions)),
+                    { error: ctx.sources.usage.error },
+                    {
+                        areaKey: 'Observe',
+                        problemKey: ISSUE_KEYS.usageError.problemKey,
+                        impactKey: ISSUE_KEYS.usageError.impactKey,
+                        impactTags: ['degraded'],
+                        impactScope: 'observe'
+                    }
+                );
+            }
+            const summary = ctx.sources.usage.summary && typeof ctx.sources.usage.summary === 'object' ? ctx.sources.usage.summary : { total: 0, missingModel: 0 };
+            if (Number(summary.missingModel || 0) <= 0) return null;
+            return buildIssue(
+                'usage-missing-model',
+                'info',
+                ctx.i18n.issue.usageMissingModel.problem,
+                ctx.i18n.issue.usageMissingModel.impact,
                 ensureBaseActions([
-                    buildAction('navigate', { target: 'market', label: i18n.action.openSkills })
-                ].concat(baseActions)),
-                { error: sources.skills.error }
-                ,
-                { areaKey: 'Reuse' }
-            ));
-        } else {
-            const summary = sources.skills.summary && typeof sources.skills.summary === 'object'
-                ? sources.skills.summary
-                : summarizeSkillsIssues(sources.skills);
+                    buildNavigateAction('usage', 'doctor.action.openUsage', ctx.i18n.action.openUsage),
+                    buildNavigateAction('sessions', 'doctor.action.openSessions', ctx.i18n.action.openSessions)
+                ].concat(ctx.baseActions)),
+                summary,
+                {
+                    areaKey: 'Observe',
+                    problemKey: ISSUE_KEYS.usageMissingModel.problemKey,
+                    impactKey: ISSUE_KEYS.usageMissingModel.impactKey,
+                    impactTags: ['data-quality'],
+                    impactScope: 'observe'
+                }
+            );
+        },
+        (ctx) => {
+            if (!ctx.sources.tasks || typeof ctx.sources.tasks !== 'object') return null;
+            if (ctx.sources.tasks.error) {
+                return buildIssue(
+                    'tasks-error',
+                    'warn',
+                    ctx.i18n.issue.tasksError.problem,
+                    ctx.i18n.issue.tasksError.impact,
+                    ensureBaseActions([
+                        buildNavigateAction('orchestration', 'doctor.action.openTasks', ctx.i18n.action.openTasks)
+                    ].concat(ctx.baseActions)),
+                    { error: ctx.sources.tasks.error },
+                    {
+                        areaKey: 'Operate',
+                        problemKey: ISSUE_KEYS.tasksError.problemKey,
+                        impactKey: ISSUE_KEYS.tasksError.impactKey,
+                        impactTags: ['degraded'],
+                        impactScope: 'operate'
+                    }
+                );
+            }
+            const summary = ctx.sources.tasks.summary && typeof ctx.sources.tasks.summary === 'object'
+                ? ctx.sources.tasks.summary
+                : summarizeTaskIssues(ctx.sources.tasks);
+            if (Number(summary.failed || 0) <= 0) return null;
+            return buildIssue(
+                'tasks-failed',
+                'warn',
+                ctx.i18n.issue.tasksFailed.problem,
+                ctx.i18n.issue.tasksFailed.impact,
+                ensureBaseActions([
+                    buildNavigateAction('orchestration', 'doctor.action.viewTaskLogs', ctx.i18n.action.viewTaskLogs)
+                ].concat(ctx.baseActions)),
+                {
+                    failed: summary.failed || 0,
+                    latestFailed: summary.latestFailed
+                        ? {
+                            runId: summary.latestFailed.runId || '',
+                            status: summary.latestFailed.status || '',
+                            error: summary.latestFailed.error || ''
+                        }
+                        : null
+                },
+                {
+                    areaKey: 'Operate',
+                    problemKey: ISSUE_KEYS.tasksFailed.problemKey,
+                    impactKey: ISSUE_KEYS.tasksFailed.impactKey,
+                    impactTags: ['blocked'],
+                    impactScope: 'operate'
+                }
+            );
+        },
+        (ctx) => {
+            if (!ctx.sources.skills || typeof ctx.sources.skills !== 'object') return null;
+            if (ctx.sources.skills.error) {
+                return buildIssue(
+                    'skills-error',
+                    'warn',
+                    ctx.i18n.issue.skillsError.problem,
+                    ctx.i18n.issue.skillsError.impact,
+                    ensureBaseActions([
+                        buildNavigateAction('market', 'doctor.action.openSkills', ctx.i18n.action.openSkills)
+                    ].concat(ctx.baseActions)),
+                    { error: ctx.sources.skills.error },
+                    {
+                        areaKey: 'Reuse',
+                        problemKey: ISSUE_KEYS.skillsError.problemKey,
+                        impactKey: ISSUE_KEYS.skillsError.impactKey,
+                        impactTags: ['degraded'],
+                        impactScope: 'reuse'
+                    }
+                );
+            }
+            const summary = ctx.sources.skills.summary && typeof ctx.sources.skills.summary === 'object'
+                ? ctx.sources.skills.summary
+                : summarizeSkillsIssues(ctx.sources.skills);
             if (!summary.exists) {
-                issues.push(buildIssue(
+                return buildIssue(
                     'skills-root-missing',
                     'info',
-                    i18n.issue.skillsRootMissing.problem,
-                    i18n.issue.skillsRootMissing.impact,
+                    ctx.i18n.issue.skillsRootMissing.problem,
+                    ctx.i18n.issue.skillsRootMissing.impact,
                     ensureBaseActions([
-                        buildAction('navigate', { target: 'market', label: i18n.action.openSkills })
-                    ].concat(baseActions)),
-                    summary
-                    ,
-                    { areaKey: 'Reuse' }
-                ));
-            } else if (summary.missing > 0) {
-                issues.push(buildIssue(
+                        buildNavigateAction('market', 'doctor.action.openSkills', ctx.i18n.action.openSkills)
+                    ].concat(ctx.baseActions)),
+                    summary,
+                    {
+                        areaKey: 'Reuse',
+                        problemKey: ISSUE_KEYS.skillsRootMissing.problemKey,
+                        impactKey: ISSUE_KEYS.skillsRootMissing.impactKey,
+                        impactTags: ['degraded'],
+                        impactScope: 'reuse'
+                    }
+                );
+            }
+            if (Number(summary.missing || 0) > 0) {
+                return buildIssue(
                     'skills-missing-files',
                     'info',
-                    i18n.issue.skillsMissingFiles.problem,
-                    i18n.issue.skillsMissingFiles.impact,
+                    ctx.i18n.issue.skillsMissingFiles.problem,
+                    ctx.i18n.issue.skillsMissingFiles.impact,
                     ensureBaseActions([
-                        buildAction('navigate', { target: 'market', label: i18n.action.openSkills })
-                    ].concat(baseActions)),
-                    summary
-                    ,
-                    { areaKey: 'Reuse' }
-                ));
+                        buildNavigateAction('market', 'doctor.action.openSkills', ctx.i18n.action.openSkills)
+                    ].concat(ctx.baseActions)),
+                    summary,
+                    {
+                        areaKey: 'Reuse',
+                        problemKey: ISSUE_KEYS.skillsMissingFiles.problemKey,
+                        impactKey: ISSUE_KEYS.skillsMissingFiles.impactKey,
+                        impactTags: ['data-quality'],
+                        impactScope: 'reuse'
+                    }
+                );
             }
+            return null;
         }
-    }
+    ]);
 
     const sortedIssues = sortIssues(issues);
     sortedIssues.forEach((issue) => decorateIssue(issue, resolvedLang));
