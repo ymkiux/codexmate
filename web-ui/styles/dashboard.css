@@ -20,6 +20,8 @@
     flex-direction: column;
     gap: 8px;
     min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 .doctor-card:disabled {
@@ -34,12 +36,22 @@
 }
 
 .doctor-card-meta {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     gap: 6px;
     font-size: var(--font-size-caption);
     color: var(--color-text-tertiary);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.doctor-card-meta span {
+    min-width: 0;
+}
+
+.doctor-card-meta span:not(:nth-child(2)) {
+    flex: 1 1 auto;
     overflow: hidden;
     text-overflow: ellipsis;
 }
@@ -51,10 +63,21 @@
     align-items: baseline;
     font-size: var(--font-size-caption);
     color: var(--color-text-secondary);
+    min-width: 0;
 }
 
 .doctor-card-kv > span:first-child {
     color: var(--color-text-tertiary);
+}
+
+.doctor-card-kv > span:nth-child(2) {
+    min-width: 0;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .doctor-kv-error {
@@ -145,6 +168,8 @@
     border: 1px solid rgba(220, 95, 108, 0.2);
     background: rgba(255, 255, 255, 0.75);
     color: var(--color-text-secondary);
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 @media (max-width: 520px) {
@@ -152,4 +177,3 @@
         grid-template-columns: 76px minmax(0, 1fr);
     }
 }
-
