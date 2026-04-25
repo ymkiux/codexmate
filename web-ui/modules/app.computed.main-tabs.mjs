@@ -136,6 +136,7 @@ function createTaskDraftReadiness(metrics) {
 export function createMainTabsComputed() {
     return {
         mainTabKicker() {
+            if (this.mainTab === 'dashboard') return this.t('kicker.dashboard');
             if (this.mainTab === 'config') return this.t('kicker.config');
             if (this.mainTab === 'sessions') return this.t('kicker.sessions');
             if (this.mainTab === 'usage') return this.t('kicker.usage');
@@ -146,6 +147,7 @@ export function createMainTabsComputed() {
             return this.t('kicker.settings');
         },
         mainTabTitle() {
+            if (this.mainTab === 'dashboard') return this.t('title.dashboard');
             if (this.mainTab === 'config') return this.t('title.config');
             if (this.mainTab === 'sessions') return this.t('title.sessions');
             if (this.mainTab === 'usage') return this.t('title.usage');
@@ -156,6 +158,7 @@ export function createMainTabsComputed() {
             return this.t('title.settings');
         },
         mainTabSubtitle() {
+            if (this.mainTab === 'dashboard') return this.t('subtitle.dashboard');
             if (this.mainTab === 'config') return this.t('subtitle.config');
             if (this.mainTab === 'sessions') return this.t('subtitle.sessions');
             if (this.mainTab === 'usage') return this.t('subtitle.usage');

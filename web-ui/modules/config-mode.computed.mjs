@@ -47,6 +47,7 @@ export function createConfigModeComputed() {
             return `${this.activeProviderModeLabel} 当前复用 Codex Provider / Model 管理链路。`;
         },
         inspectorMainTabLabel() {
+            if (this.mainTab === 'dashboard') return '概览';
             if (this.mainTab === 'config') return '配置中心';
             if (this.mainTab === 'sessions') return '会话浏览';
             if (this.mainTab === 'usage') return 'Usage';

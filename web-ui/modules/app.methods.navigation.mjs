@@ -6,6 +6,7 @@ export function createNavigationMethods(options = {}) {
     } = options;
     const NAV_STATE_STORAGE_KEY = 'codexmateNavState.v1';
     const MAIN_TAB_SET = new Set([
+        'dashboard',
         'config',
         'sessions',
         'usage',
@@ -37,7 +38,7 @@ export function createNavigationMethods(options = {}) {
         const mainTab = typeof vm.mainTab === 'string' ? vm.mainTab.trim().toLowerCase() : '';
         const configMode = typeof vm.configMode === 'string' ? vm.configMode.trim().toLowerCase() : '';
         const snapshot = {
-            mainTab: MAIN_TAB_SET.has(mainTab) ? mainTab : 'docs',
+            mainTab: MAIN_TAB_SET.has(mainTab) ? mainTab : 'dashboard',
             configMode: configModeSet && configModeSet.has(configMode) ? configMode : 'codex'
         };
         try {

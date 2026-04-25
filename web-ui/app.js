@@ -30,8 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
         data() {
             return {
                 lang: 'zh',
-                // 默认选中首个主标签：Docs
-                mainTab: 'docs',
+                mainTab: 'dashboard',
                 configMode: 'codex',
                 currentProvider: '',
                 currentModel: '',

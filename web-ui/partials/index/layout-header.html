@@ -1,6 +1,16 @@
     <div id="app" class="container" v-cloak>
         <div v-if="!sessionStandalone" class="top-tabs" role="tablist" :aria-label="t('nav.topTabs.aria')">
             <button class="top-tab"
+                id="tab-dashboard"
+                role="tab"
+                data-main-tab="dashboard"
+                :tabindex="mainTab === 'dashboard' ? 0 : -1"
+                :aria-selected="mainTab === 'dashboard'"
+                aria-controls="panel-dashboard"
+                :class="{ active: isMainTabNavActive('dashboard') }"
+                @pointerdown="onMainTabPointerDown('dashboard', $event)"
+                @click="onMainTabClick('dashboard', $event)">{{ t('tab.dashboard') }}</button>
+            <button class="top-tab"
                 id="tab-docs"
                 role="tab"
                 data-main-tab="docs"
@@ -136,6 +146,22 @@
                 </div>
 
                 <div class="side-rail-nav">
+                <div class="side-section" role="navigation" :aria-label="t('side.overview')">
+                    <div class="side-section-title">{{ t('side.overview') }}</div>
+                    <button
+                        id="side-tab-dashboard"
+                        data-main-tab="dashboard"
+                        :aria-current="mainTab === 'dashboard' ? 'page' : null"
+                        :class="['side-item', { active: isMainTabNavActive('dashboard') }]"
+                        @pointerdown="onMainTabPointerDown('dashboard', $event)"
+                        @click="onMainTabClick('dashboard', $event)">
+                        <div class="side-item-title">{{ t('side.overview.doctor') }}</div>
+                        <div class="side-item-meta">
+                            <span>{{ t('side.overview.doctor.meta') }}</span>
+                            <span>{{ inspectorHealthStatus }}</span>
+                        </div>
+                    </button>
+                </div>
                 <div class="side-section" role="navigation" :aria-label="t('side.docs')">
                     <div class="side-section-title">{{ t('side.docs') }}</div>
                     <button

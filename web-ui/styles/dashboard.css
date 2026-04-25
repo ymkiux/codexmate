@@ -1,0 +1,155 @@
+.doctor-hero {
+    margin-top: 0;
+}
+
+.doctor-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+}
+
+.doctor-card {
+    text-align: left;
+    padding: 14px 14px 12px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border-soft);
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.92) 0%, rgba(246, 240, 232, 0.9) 100%);
+    box-shadow: var(--shadow-subtle);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.doctor-card:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.doctor-card-title {
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-title);
+    color: var(--color-text-primary);
+}
+
+.doctor-card-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--font-size-caption);
+    color: var(--color-text-tertiary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.doctor-card-kv {
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 8px;
+    align-items: baseline;
+    font-size: var(--font-size-caption);
+    color: var(--color-text-secondary);
+}
+
+.doctor-card-kv > span:first-child {
+    color: var(--color-text-tertiary);
+}
+
+.doctor-kv-error {
+    color: #8a2f36;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.doctor-status-row {
+    margin-top: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.doctor-status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--color-border-soft);
+    background: rgba(255, 255, 255, 0.78);
+    font-size: var(--font-size-caption);
+    color: var(--color-text-secondary);
+}
+
+.doctor-status-chip strong {
+    color: var(--color-text-primary);
+    font-weight: var(--font-weight-secondary);
+}
+
+.doctor-status-chip.ok {
+    border-color: rgba(57, 181, 97, 0.25);
+    background: rgba(57, 181, 97, 0.08);
+    color: #2b6a3b;
+}
+
+.doctor-status-chip.warn {
+    border-color: rgba(246, 211, 106, 0.45);
+    background: rgba(246, 211, 106, 0.16);
+    color: #6f4b00;
+}
+
+.doctor-status-chip.error {
+    border-color: rgba(220, 95, 108, 0.28);
+    background: rgba(220, 95, 108, 0.08);
+    color: #8a2f36;
+}
+
+.doctor-health-result {
+    margin-top: 14px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border-soft);
+    padding: 12px 12px 10px;
+    background: rgba(255, 255, 255, 0.78);
+}
+
+.doctor-health-result.ok {
+    border-color: rgba(57, 181, 97, 0.25);
+    background: rgba(57, 181, 97, 0.08);
+    color: #2b6a3b;
+}
+
+.doctor-health-result.error {
+    border-color: rgba(220, 95, 108, 0.28);
+    background: rgba(220, 95, 108, 0.08);
+    color: #8a2f36;
+}
+
+.doctor-health-title {
+    font-weight: var(--font-weight-secondary);
+    color: var(--color-text-primary);
+    margin-bottom: 8px;
+}
+
+.doctor-health-issues {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: var(--font-size-caption);
+}
+
+.doctor-health-issue {
+    padding: 8px 10px;
+    border-radius: 12px;
+    border: 1px solid rgba(220, 95, 108, 0.2);
+    background: rgba(255, 255, 255, 0.75);
+    color: var(--color-text-secondary);
+}
+
+@media (max-width: 520px) {
+    .doctor-card-kv {
+        grid-template-columns: 76px minmax(0, 1fr);
+    }
+}
+

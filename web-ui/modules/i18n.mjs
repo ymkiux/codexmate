@@ -119,6 +119,7 @@ const DICT = Object.freeze({
         'label.model': '模型：',
 
         // Top tabs
+        'tab.dashboard': '概览',
         'tab.docs': '文档',
         'tab.config.codex': 'Codex',
         'tab.config.claude': 'Claude',
@@ -131,6 +132,7 @@ const DICT = Object.freeze({
         'tab.settings': '设置',
 
         // Side rail section titles
+        'side.overview': '概览',
         'side.docs': '文档',
         'side.config': '配置',
         'side.sessions': '会话',
@@ -140,6 +142,8 @@ const DICT = Object.freeze({
         'side.skills': 'Skills',
 
         // Side rail items
+        'side.overview.doctor': 'Doctor 面板',
+        'side.overview.doctor.meta': '总览 / 诊断 / 跳转',
         'side.docs.cliInstall': 'CLI 安装',
         'side.docs.cliInstall.meta': '安装 / 升级 / 卸载',
         'side.config.codex': 'Codex',
@@ -156,6 +160,7 @@ const DICT = Object.freeze({
         'side.system.settings.meta': '数据 / 备份',
 
         // Header titles
+        'kicker.dashboard': 'Doctor',
         'kicker.config': 'Configuration',
         'kicker.sessions': 'Sessions',
         'kicker.usage': 'Usage',
@@ -165,6 +170,7 @@ const DICT = Object.freeze({
         'kicker.docs': 'Docs',
         'kicker.settings': 'Settings',
 
+        'title.dashboard': 'Dashboard / Doctor',
         'title.config': '本地配置控制台',
         'title.sessions': '会话与导出',
         'title.usage': '本地用量与趋势',
@@ -174,6 +180,7 @@ const DICT = Object.freeze({
         'title.docs': 'CLI 安装与文档',
         'title.settings': '系统与数据设置',
 
+        'subtitle.dashboard': '聚合状态与诊断入口。',
         'subtitle.config': '管理本地配置与模型。',
         'subtitle.sessions': '浏览与导出会话。',
         'subtitle.usage': '查看近 7 / 30 天用量。',
@@ -183,6 +190,37 @@ const DICT = Object.freeze({
         'subtitle.docs': '查看 CLI 安装命令与排障。',
         'subtitle.settings': '管理下载、目录与回收站。'
         ,
+        'dashboard.doctor.title': 'Doctor',
+        'dashboard.doctor.runChecks': '运行检查',
+        'dashboard.doctor.checking': '检查中...',
+        'dashboard.card.config': '配置',
+        'dashboard.card.sessions': '会话',
+        'dashboard.card.usage': '用量',
+        'dashboard.card.tasks': '任务',
+        'dashboard.card.skills': 'Skills',
+        'dashboard.kv.model': '模型',
+        'dashboard.kv.issue': '异常',
+        'dashboard.kv.active': '当前',
+        'dashboard.kv.sessions': '会话数',
+        'dashboard.kv.missingModel': '缺失模型',
+        'dashboard.kv.blockers': '阻塞',
+        'dashboard.kv.runs': '运行',
+        'dashboard.kv.target': '目标',
+        'dashboard.kv.root': '目录',
+        'dashboard.status.health': '健康',
+        'dashboard.status.busy': '忙闲',
+        'dashboard.status.models': '模型',
+        'dashboard.health.ok': '检查通过',
+        'dashboard.health.fail': '检查失败',
+        'dashboard.health.issues': '{count} 条问题',
+        'dashboard.state.loading': '加载中',
+        'dashboard.state.ready': '就绪',
+        'dashboard.state.idle': '未加载',
+        'dashboard.none': '无',
+        'dashboard.sessions.count': '{count} 条会话',
+        'dashboard.usage.range': '范围 {value}',
+        'dashboard.tasks.queue': 'run {running} / queue {queued}',
+        'dashboard.skills.count': 'installed {installed} / import {importable}',
 
         // Plugins panel
         'plugins.sidebar.title': 'Plugins',
@@ -1038,6 +1076,7 @@ const DICT = Object.freeze({
         'label.model': 'Model:',
 
         // Top tabs
+        'tab.dashboard': 'Dashboard',
         'tab.docs': 'Docs',
         'tab.config.codex': 'Codex',
         'tab.config.claude': 'Claude',
@@ -1050,6 +1089,7 @@ const DICT = Object.freeze({
         'tab.settings': 'Settings',
 
         // Side rail section titles
+        'side.overview': 'Overview',
         'side.docs': 'Docs',
         'side.config': 'Config',
         'side.sessions': 'Sessions',
@@ -1059,6 +1099,8 @@ const DICT = Object.freeze({
         'side.skills': 'Skills',
 
         // Side rail items
+        'side.overview.doctor': 'Doctor',
+        'side.overview.doctor.meta': 'Overview / Diagnostics',
         'side.docs.cliInstall': 'CLI Install',
         'side.docs.cliInstall.meta': 'Install / Update / Uninstall',
         'side.config.codex': 'Codex',
@@ -1075,6 +1117,7 @@ const DICT = Object.freeze({
         'side.system.settings.meta': 'Data / Backup',
 
         // Header titles
+        'kicker.dashboard': 'Doctor',
         'kicker.config': 'Configuration',
         'kicker.sessions': 'Sessions',
         'kicker.usage': 'Usage',
@@ -1084,6 +1127,7 @@ const DICT = Object.freeze({
         'kicker.docs': 'Docs',
         'kicker.settings': 'Settings',
 
+        'title.dashboard': 'Dashboard / Doctor',
         'title.config': 'Local Configuration Console',
         'title.sessions': 'Sessions & Export',
         'title.usage': 'Local Usage & Trends',
@@ -1093,6 +1137,7 @@ const DICT = Object.freeze({
         'title.docs': 'CLI Install & Docs',
         'title.settings': 'System & Data Settings',
 
+        'subtitle.dashboard': 'Aggregate status and diagnostics.',
         'subtitle.config': 'Manage local configs and models.',
         'subtitle.sessions': 'Browse and export sessions.',
         'subtitle.usage': 'View usage for the last 7/30 days.',
@@ -1102,6 +1147,37 @@ const DICT = Object.freeze({
         'subtitle.docs': 'CLI install commands and troubleshooting.',
         'subtitle.settings': 'Manage downloads, directories, and trash.'
         ,
+        'dashboard.doctor.title': 'Doctor',
+        'dashboard.doctor.runChecks': 'Run checks',
+        'dashboard.doctor.checking': 'Checking...',
+        'dashboard.card.config': 'Config',
+        'dashboard.card.sessions': 'Sessions',
+        'dashboard.card.usage': 'Usage',
+        'dashboard.card.tasks': 'Tasks',
+        'dashboard.card.skills': 'Skills',
+        'dashboard.kv.model': 'Model',
+        'dashboard.kv.issue': 'Issue',
+        'dashboard.kv.active': 'Active',
+        'dashboard.kv.sessions': 'Sessions',
+        'dashboard.kv.missingModel': 'Missing model',
+        'dashboard.kv.blockers': 'Blockers',
+        'dashboard.kv.runs': 'Runs',
+        'dashboard.kv.target': 'Target',
+        'dashboard.kv.root': 'Root',
+        'dashboard.status.health': 'Health',
+        'dashboard.status.busy': 'Busy',
+        'dashboard.status.models': 'Models',
+        'dashboard.health.ok': 'Checks passed',
+        'dashboard.health.fail': 'Checks failed',
+        'dashboard.health.issues': '{count} issues',
+        'dashboard.state.loading': 'Loading',
+        'dashboard.state.ready': 'Ready',
+        'dashboard.state.idle': 'Idle',
+        'dashboard.none': 'None',
+        'dashboard.sessions.count': '{count} sessions',
+        'dashboard.usage.range': 'Range {value}',
+        'dashboard.tasks.queue': 'run {running} / queue {queued}',
+        'dashboard.skills.count': 'installed {installed} / import {importable}',
 
         // Plugins panel
         'plugins.sidebar.title': 'Plugins',
