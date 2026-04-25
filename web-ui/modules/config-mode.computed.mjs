@@ -57,7 +57,6 @@ export function createConfigModeComputed() {
             return '未知';
         },
         inspectorConfigModeLabel() {
-            if (this.mainTab !== 'config') return '--';
             const providerMeta = getProviderConfigModeMeta(this.configMode);
             if (providerMeta) return providerMeta.label;
             if (this.configMode === 'claude') return 'Claude Code';
@@ -65,7 +64,6 @@ export function createConfigModeComputed() {
             return '未选择';
         },
         inspectorCurrentConfigLabel() {
-            if (this.mainTab !== 'config') return '--';
             if (getProviderConfigModeMeta(this.configMode)) {
                 const provider = typeof this.currentProvider === 'string' ? this.currentProvider.trim() : '';
                 return provider || '未选择';
@@ -81,7 +79,6 @@ export function createConfigModeComputed() {
             return '未选择';
         },
         inspectorCurrentModelLabel() {
-            if (this.mainTab !== 'config') return '--';
             if (getProviderConfigModeMeta(this.configMode)) {
                 const model = typeof this.currentModel === 'string' ? this.currentModel.trim() : '';
                 return model || '未选择';

@@ -16,6 +16,38 @@ export function createNavigationMethods(options = {}) {
         'docs',
         'settings'
     ]);
+    const loadDoctorOverview = async (vm, options = {}) => {
+        if (!vm || typeof vm !== 'object') return false;
+        if (vm.__doctorLoading) return false;
+        const forceRefresh = !!(options && options.forceRefresh);
+        vm.__doctorLoading = true;
+        let ok = true;
+        try {
+            if (typeof vm.loadSessions === 'function' && (forceRefresh || !vm.sessionsLoadedOnce)) {
+                await vm.loadSessions({ forceRefresh });
+            }
+            if (typeof vm.loadSessionsUsage === 'function' && (forceRefresh || !vm.sessionsUsageLoadedOnce)) {
+                await vm.loadSessionsUsage({ forceRefresh, range: vm.sessionsUsageTimeRange, preserveList: true });
+            }
+            if (vm.taskOrchestrationTabEnabled === true && typeof vm.loadTaskOrchestrationOverview === 'function') {
+                await vm.loadTaskOrchestrationOverview({ forceRefresh, includeDetail: true });
+            }
+            if (typeof vm.loadSkillsMarketOverview === 'function') {
+                await vm.loadSkillsMarketOverview({ forceRefresh, silent: true });
+            }
+            vm.__doctorLoadedOnce = true;
+            return true;
+        } catch (_) {
+            ok = false;
+            vm.__doctorLoadedOnce = true;
+            return false;
+        } finally {
+            vm.__doctorLoading = false;
+            if (!ok) {
+                vm.__doctorLoadedOnce = true;
+            }
+        }
+    };
     const readNavState = () => {
         if (typeof localStorage === 'undefined') return null;
         let raw = '';
@@ -342,6 +374,9 @@ export function createNavigationMethods(options = {}) {
             if (targetTab === previousTab) {
                 switchState.ticket += 1;
                 switchState.pendingTarget = '';
+                if (targetTab === 'dashboard' && !this.__doctorLoadedOnce) {
+                    void loadDoctorOverview(this);
+                }
                 if (
                     targetTab === 'sessions'
                     && typeof this.prepareSessionTabRender === 'function'
@@ -367,6 +402,9 @@ export function createNavigationMethods(options = {}) {
                 switchState.pendingTarget = '';
                 const result = switchMainTabHelper.call(this, targetTab);
                 persistNavState(this);
+                if (targetTab === 'dashboard') {
+                    void loadDoctorOverview(this);
+                }
                 this.scheduleAfterFrame(() => {
                     this.clearMainTabSwitchIntent(normalizedTab);
                 });
@@ -382,6 +420,9 @@ export function createNavigationMethods(options = {}) {
                 liveState.pendingTarget = '';
                 switchMainTabHelper.call(this, pendingTarget);
                 persistNavState(this);
+                if (pendingTarget === 'dashboard') {
+                    void loadDoctorOverview(this);
+                }
                 this.clearMainTabSwitchIntent(normalizedTab);
             });
         },

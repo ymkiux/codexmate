@@ -409,7 +409,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             {
                 const NAV_STATE_STORAGE_KEY = 'codexmateNavState.v1';
-                const mainTabSet = new Set(['config', 'sessions', 'usage', 'orchestration', 'market', 'plugins', 'docs', 'settings']);
+                const mainTabSet = new Set(['dashboard', 'config', 'sessions', 'usage', 'orchestration', 'market', 'plugins', 'docs', 'settings']);
                 let restored = null;
                 try {
                     const raw = localStorage.getItem(NAV_STATE_STORAGE_KEY) || '';
@@ -531,6 +531,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     const startupOk = await this.loadAll();
                     if (!startupOk) {
                         return;
+                    }
+                    if (this.mainTab === 'dashboard') {
+                        if (!this.__doctorLoadedOnce) {
+                            this.__doctorLoadedOnce = true;
+                            if (typeof this.loadSessions === 'function' && !this.sessionsLoadedOnce) {
+                                void this.loadSessions();
+                            }
+                            if (typeof this.loadSessionsUsage === 'function' && !this.sessionsUsageLoadedOnce) {
+                                void this.loadSessionsUsage({ range: this.sessionsUsageTimeRange, preserveList: true });
+                            }
+                            if (this.taskOrchestrationTabEnabled === true && typeof this.loadTaskOrchestrationOverview === 'function') {
+                                void this.loadTaskOrchestrationOverview({ includeDetail: true });
+                            }
+                            if (typeof this.loadSkillsMarketOverview === 'function') {
+                                void this.loadSkillsMarketOverview({ silent: true });
+                            }
+                        }
                     }
                     void this.refreshClaudeSelectionFromSettings({ silent: true });
                     void this.syncDefaultOpenclawConfigEntry({ silent: true });

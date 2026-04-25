@@ -60,9 +60,11 @@
                                     <span>{{ t('dashboard.kv.sessions') }}</span>
                                     <span>{{ sessionUsageSummaryCards[0] ? sessionUsageSummaryCards[0].value : 0 }}</span>
                                 </div>
-                                <div class="doctor-card-kv" v-if="sessionsUsageLoadedOnce && sessionUsageCharts && sessionUsageCharts.modelCoverage && sessionUsageCharts.modelCoverage.missingModelSessions">
+                                <div class="doctor-card-kv"
+                                    v-if="sessionsUsageLoadedOnce
+                                        && sessionsUsageList.filter(session => !(session && typeof session.model === 'string' && session.model.trim())).length">
                                     <span>{{ t('dashboard.kv.missingModel') }}</span>
-                                    <span>{{ sessionUsageCharts.modelCoverage.missingModelSessions }}</span>
+                                    <span>{{ sessionsUsageList.filter(session => !(session && typeof session.model === 'string' && session.model.trim())).length }}</span>
                                 </div>
                             </button>
                             <button
@@ -115,6 +117,48 @@
                             <div class="doctor-status-chip">
                                 <span>{{ t('dashboard.status.models') }}</span>
                                 <strong>{{ inspectorModelLoadStatus }}</strong>
+                            </div>
+                        </div>
+                        <div
+                            v-if="initError
+                                || sessionsUsageError
+                                || activeSessionDetailError
+                                || pluginsError
+                                || modelsSource === 'error'
+                                || claudeModelsSource === 'error'
+                                || (taskOrchestration && (taskOrchestration.lastError || taskOrchestration.selectedRunError || (taskOrchestration.planIssues && taskOrchestration.planIssues.length)))
+                                || (typeof message === 'string' && message.trim())"
+                            class="doctor-health-result error">
+                            <div class="doctor-health-title">
+                                {{
+                                    t('dashboard.issues.title', {
+                                        count:
+                                            (initError ? 1 : 0)
+                                            + (modelsSource === 'error' ? 1 : 0)
+                                            + (claudeModelsSource === 'error' ? 1 : 0)
+                                            + (sessionsUsageError ? 1 : 0)
+                                            + (activeSessionDetailError ? 1 : 0)
+                                            + (pluginsError ? 1 : 0)
+                                            + (taskOrchestration && taskOrchestration.lastError ? 1 : 0)
+                                            + (taskOrchestration && taskOrchestration.selectedRunError ? 1 : 0)
+                                            + (taskOrchestration && taskOrchestration.planIssues && taskOrchestration.planIssues.length ? 1 : 0)
+                                            + (typeof message === 'string' && message.trim() ? 1 : 0)
+                                    })
+                                }}
+                            </div>
+                            <div class="doctor-health-issues">
+                                <div v-if="initError" class="doctor-health-issue">{{ initError }}</div>
+                                <div v-if="modelsSource === 'error'" class="doctor-health-issue">Codex 模型列表加载异常</div>
+                                <div v-if="claudeModelsSource === 'error'" class="doctor-health-issue">Claude 模型列表加载异常</div>
+                                <div v-if="sessionsUsageError" class="doctor-health-issue">{{ sessionsUsageError }}</div>
+                                <div v-if="activeSessionDetailError" class="doctor-health-issue">{{ activeSessionDetailError }}</div>
+                                <div v-if="pluginsError" class="doctor-health-issue">{{ pluginsError }}</div>
+                                <div v-if="taskOrchestration && taskOrchestration.lastError" class="doctor-health-issue">{{ taskOrchestration.lastError }}</div>
+                                <div v-if="taskOrchestration && taskOrchestration.selectedRunError" class="doctor-health-issue">{{ taskOrchestration.selectedRunError }}</div>
+                                <div v-if="taskOrchestration && taskOrchestration.planIssues && taskOrchestration.planIssues.length" class="doctor-health-issue">
+                                    任务计划存在 {{ taskOrchestration.planIssues.length }} 条阻塞项
+                                </div>
+                                <div v-if="typeof message === 'string' && message.trim()" class="doctor-health-issue">{{ message }}</div>
                             </div>
                         </div>
                         <div v-if="healthCheckResult" class="doctor-health-result" :class="healthCheckResult.ok ? 'ok' : 'error'">
