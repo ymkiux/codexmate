@@ -6,56 +6,52 @@ const https = require('https');
 const { isValidHttpUrl } = require('../lib/cli-utils');
 const { MAX_SKILLS_ZIP_UPLOAD_SIZE, importSkillsFromZipFile } = require('./skills');
 
-function resolveGithubArchiveZipUrl(inputUrl) {
+function parseGithubRepoFromUrl(inputUrl) {
     const raw = typeof inputUrl === 'string' ? inputUrl.trim() : '';
-    if (!raw) return '';
+    if (!raw) return null;
     let parsed;
     try {
         parsed = new URL(raw);
     } catch (_) {
-        return '';
+        return null;
     }
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        return '';
+        return null;
     }
     if (parsed.hostname !== 'github.com') {
-        return '';
+        return null;
     }
     const parts = parsed.pathname.split('/').filter(Boolean);
-    if (parts.length < 2) return '';
+    if (parts.length < 2) return null;
     const owner = parts[0];
-    const repo = (parts[1] || '').endsWith('.git') ? parts[1].slice(0, -4) : parts[1];
-    if (!owner || !repo) return '';
-    let ref = 'main';
-    if (parts[2] === 'tree' && parts[3]) {
-        ref = parts[3];
-    }
-    return `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/archive/refs/heads/${encodeURIComponent(ref)}.zip`;
+    const repoPart = parts[1] || '';
+    const repo = repoPart.endsWith('.git') ? repoPart.slice(0, -4) : repoPart;
+    if (!owner || !repo) return null;
+    const ref = parts[2] === 'tree' && parts[3]
+        ? parts.slice(3).join('/')
+        : '';
+    return { owner, repo, ref };
+}
+
+function buildGithubArchiveZipBase(repoInfo) {
+    if (!repoInfo || !repoInfo.owner || !repoInfo.repo) return '';
+    return `https://github.com/${encodeURIComponent(repoInfo.owner)}/${encodeURIComponent(repoInfo.repo)}/archive/refs`;
+}
+
+function resolveGithubArchiveZipUrl(inputUrl) {
+    const repoInfo = parseGithubRepoFromUrl(inputUrl);
+    if (!repoInfo) return '';
+    const base = buildGithubArchiveZipBase(repoInfo);
+    const ref = repoInfo.ref || 'main';
+    return `${base}/heads/${encodeURIComponent(ref)}.zip`;
 }
 
 function buildGithubArchiveZipCandidates(inputUrl) {
-    const raw = typeof inputUrl === 'string' ? inputUrl.trim() : '';
-    if (!raw) return [];
-    let parsed;
-    try {
-        parsed = new URL(raw);
-    } catch (_) {
-        return [];
-    }
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        return [];
-    }
-    if (parsed.hostname !== 'github.com') {
-        return [];
-    }
-    const parts = parsed.pathname.split('/').filter(Boolean);
-    if (parts.length < 2) return [];
-    const owner = parts[0];
-    const repo = (parts[1] || '').endsWith('.git') ? parts[1].slice(0, -4) : parts[1];
-    if (!owner || !repo) return [];
-    const base = `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/archive/refs`;
-    if (parts[2] === 'tree' && parts[3]) {
-        const ref = encodeURIComponent(parts[3]);
+    const repoInfo = parseGithubRepoFromUrl(inputUrl);
+    if (!repoInfo) return [];
+    const base = buildGithubArchiveZipBase(repoInfo);
+    if (repoInfo.ref) {
+        const ref = encodeURIComponent(repoInfo.ref);
         return [
             `${base}/heads/${ref}.zip`,
             `${base}/tags/${ref}.zip`
@@ -209,19 +205,19 @@ function parseImportSkillsCommandArgs(argv = []) {
     let cursor = 0;
     while (cursor < argv.length) {
         const token = String(argv[cursor] || '');
-        if (token && !token.startsWith('--') && !options.url) {
-            options.url = token.trim();
-            cursor += 1;
-            continue;
-        }
         if (token === '--help' || token === '-h') {
             options.help = true;
             cursor += 1;
             continue;
         }
+        if (token && !token.startsWith('-') && !options.url) {
+            options.url = token.trim();
+            cursor += 1;
+            continue;
+        }
         if (token === '--target-app') {
             const value = String(argv[cursor + 1] || '').trim().toLowerCase();
-            if (!value || value.startsWith('--')) {
+            if (!value || value.startsWith('-')) {
                 throw new Error('错误: --target-app 需要一个值（codex/claude）');
             }
             options.targetApp = value === 'claude' ? 'claude' : 'codex';
@@ -230,7 +226,7 @@ function parseImportSkillsCommandArgs(argv = []) {
         }
         if (token === '--name') {
             const value = String(argv[cursor + 1] || '').trim();
-            if (!value || value.startsWith('--')) {
+            if (!value || value.startsWith('-')) {
                 throw new Error('错误: --name 需要一个值');
             }
             options.name = value;
@@ -246,7 +242,10 @@ function parseImportSkillsCommandArgs(argv = []) {
             cursor += 2;
             continue;
         }
-        cursor += 1;
+        if (token.startsWith('-')) {
+            throw new Error(`错误: 未知参数: ${token}`);
+        }
+        throw new Error(`错误: 多余参数: ${token}`);
     }
     return options;
 }
@@ -313,6 +312,7 @@ async function cmdImportSkills(argv = []) {
 }
 
 module.exports = {
+    parseGithubRepoFromUrl,
     resolveGithubArchiveZipUrl,
     buildGithubArchiveZipCandidates,
     cmdImportSkills
