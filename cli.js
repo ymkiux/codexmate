@@ -6513,6 +6513,7 @@ async function cmdDoctor(argv = []) {
             ? renderDoctorMarkdown(report)
             : JSON.stringify(report, null, 2);
         if (options.output) {
+            ensureDir(path.dirname(options.output));
             fs.writeFileSync(options.output, text);
         } else {
             process.stdout.write(text + '\n');
