@@ -127,6 +127,7 @@ const {
     deleteSkills,
     deleteCodexSkills
 } = require('./cli/skills');
+const { cmdImportSkills: cmdImportSkillsFromUrl } = require('./cli/import-skills-url');
 const {
     getFileStatSafe,
     isBootstrapLikeText,
@@ -6516,6 +6517,15 @@ async function cmdDoctor(argv = []) {
         } else {
             process.stdout.write(text + '\n');
         }
+    } catch (e) {
+        console.error('错误:', e && e.message ? e.message : e);
+        process.exitCode = 1;
+    }
+}
+
+async function cmdImportSkills(argv = []) {
+    try {
+        await cmdImportSkillsFromUrl(argv);
     } catch (e) {
         console.error('错误:', e && e.message ? e.message : e);
         process.exitCode = 1;
@@ -13172,6 +13182,7 @@ async function main() {
         console.log('\n用法:');
         console.log('  codexmate status           显示当前状态');
         console.log('  codexmate doctor [--format json|md] [--lang zh|en] [--output <PATH>]  输出诊断报告');
+        console.log('  codexmate import-skills <URL> [--target-app codex|claude] [--name <NAME>] [--timeout-ms <MS>]  从 URL 导入 skills');
         console.log('  codexmate setup            交互式配置向导');
         console.log('  codexmate list             列出所有提供商');
         console.log('  codexmate models           列出所有模型');
@@ -13234,6 +13245,7 @@ async function main() {
         case '__task-worker': await cmdTaskWorker(args.slice(1)); break;
         case 'status': cmdStatus(); break;
         case 'doctor': await cmdDoctor(args.slice(1)); break;
+        case 'import-skills': await cmdImportSkills(args.slice(1)); break;
         case 'setup': await cmdSetup(); break;
         case 'list': cmdList(); break;
         case 'models': await cmdModels(); break;
