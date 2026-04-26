@@ -2,7 +2,7 @@ import assert from 'assert';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
-const { resolveGithubArchiveZipUrl, buildGithubArchiveZipCandidates } = require('../../cli/import-skills-url');
+const { resolveGithubArchiveZipUrl, buildGithubArchiveZipCandidates, cmdImportSkills } = require('../../cli/import-skills-url');
 
 assert.equal(
     resolveGithubArchiveZipUrl('https://github.com/foo/bar'),
@@ -32,3 +32,13 @@ assert.deepEqual(buildGithubArchiveZipCandidates('https://github.com/foo/bar/tre
     'https://github.com/foo/bar/archive/refs/tags/dev.zip'
 ]);
 assert.deepEqual(buildGithubArchiveZipCandidates('https://example.com/foo/bar'), []);
+
+let captured = '';
+const originalWrite = process.stdout.write;
+process.stdout.write = (chunk) => {
+    captured += String(chunk || '');
+    return true;
+};
+await cmdImportSkills(['--help']);
+process.stdout.write = originalWrite;
+assert.ok(captured.includes('codexmate import-skills'));

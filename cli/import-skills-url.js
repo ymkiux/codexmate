@@ -78,6 +78,14 @@ function redactUrlForLog(inputUrl) {
     }
 }
 
+function extractHttpStatusFromError(err) {
+    const message = err && err.message ? String(err.message) : '';
+    const matched = message.match(/\bHTTP\s+(\d{3})\b/);
+    if (!matched) return 0;
+    const value = Number(matched[1]);
+    return Number.isFinite(value) ? value : 0;
+}
+
 function downloadUrlToFile(targetUrl, filePath, options = {}) {
     const maxBytes = Number.isFinite(options.maxBytes) && options.maxBytes > 0
         ? Math.floor(options.maxBytes)
@@ -181,14 +189,6 @@ function downloadUrlToFile(targetUrl, filePath, options = {}) {
     });
 }
 
-function extractHttpStatusFromError(err) {
-    const message = err && err.message ? String(err.message) : '';
-    const matched = message.match(/\bHTTP\s+(\d{3})\b/);
-    if (!matched) return 0;
-    const value = Number(matched[1]);
-    return Number.isFinite(value) ? value : 0;
-}
-
 function printImportSkillsUsage() {
     process.stdout.write('\n用法:\n');
     process.stdout.write('  codexmate import-skills <URL> [--target-app codex|claude] [--name <NAME>] [--timeout-ms <MS>]\n');
@@ -261,12 +261,8 @@ async function cmdImportSkills(argv = []) {
         printImportSkillsUsage();
         throw new Error('错误: 缺少 URL（例如: https://github.com/<owner>/<repo>/archive/refs/heads/main.zip）');
     }
-
-    const candidates = [];
-    const githubCandidates = buildGithubArchiveZipCandidates(options.url);
-    if (githubCandidates.length) {
-        candidates.push(...githubCandidates);
-    } else {
+    const candidates = buildGithubArchiveZipCandidates(options.url);
+    if (!candidates.length) {
         const resolvedGithubUrl = resolveGithubArchiveZipUrl(options.url);
         candidates.push(resolvedGithubUrl || options.url);
     }
@@ -277,9 +273,9 @@ async function cmdImportSkills(argv = []) {
 
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codexmate-skills-url-'));
     const zipPath = path.join(tempDir, 'skills.zip');
-    let lastError = null;
     let finalUrl = uniqueCandidates[0];
     try {
+        let lastError = null;
         for (const candidateUrl of uniqueCandidates) {
             finalUrl = candidateUrl;
             console.log(`\n[Skills] Download: ${redactUrlForLog(candidateUrl)}`);
@@ -293,8 +289,7 @@ async function cmdImportSkills(argv = []) {
                 break;
             } catch (e) {
                 lastError = e;
-                const status = extractHttpStatusFromError(e);
-                if (status === 404) {
+                if (extractHttpStatusFromError(e) === 404) {
                     continue;
                 }
                 throw e;
