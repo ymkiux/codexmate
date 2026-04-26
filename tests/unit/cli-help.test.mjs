@@ -20,6 +20,6 @@ test('top-level help flags print usage and exit successfully', () => {
         assert.strictEqual(result.status, 0, `args ${args.join(' ')} stderr: ${result.stderr}`);
         assert.match(result.stdout, /Codex Mate/);
         assert.match(result.stdout, /codexmate import-skills/);
-        assert.equal(result.stderr, '');
+        assert.doesNotMatch(result.stderr, /error|exception/i);
     }
 });

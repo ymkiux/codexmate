@@ -39,7 +39,11 @@ assert.equal(
 );
 assert.equal(
     resolveGithubArchiveZipUrl('https://github.com/foo/bar/tree/feature/x'),
-    'https://github.com/foo/bar/archive/refs/heads/feature%2Fx.zip'
+    'https://github.com/foo/bar/archive/refs/heads/feature/x.zip'
+);
+assert.equal(
+    resolveGithubArchiveZipUrl('https://github.com/foo/bar/tree/release candidate/x'),
+    'https://github.com/foo/bar/archive/refs/heads/release%20candidate/x.zip'
 );
 assert.equal(resolveGithubArchiveZipUrl('https://example.com/foo/bar.zip'), '');
 assert.equal(resolveGithubArchiveZipUrl('not a url'), '');
@@ -53,8 +57,12 @@ assert.deepEqual(buildGithubArchiveZipCandidates('https://github.com/foo/bar/tre
     'https://github.com/foo/bar/archive/refs/tags/dev.zip'
 ]);
 assert.deepEqual(buildGithubArchiveZipCandidates('https://github.com/foo/bar/tree/feature/x'), [
-    'https://github.com/foo/bar/archive/refs/heads/feature%2Fx.zip',
-    'https://github.com/foo/bar/archive/refs/tags/feature%2Fx.zip'
+    'https://github.com/foo/bar/archive/refs/heads/feature/x.zip',
+    'https://github.com/foo/bar/archive/refs/tags/feature/x.zip'
+]);
+assert.deepEqual(buildGithubArchiveZipCandidates('https://github.com/foo/bar/tree/release candidate/x'), [
+    'https://github.com/foo/bar/archive/refs/heads/release%20candidate/x.zip',
+    'https://github.com/foo/bar/archive/refs/tags/release%20candidate/x.zip'
 ]);
 assert.deepEqual(buildGithubArchiveZipCandidates('https://github.com/foo/bar.git'), [
     'https://github.com/foo/bar/archive/refs/heads/main.zip',

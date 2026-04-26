@@ -6,6 +6,14 @@ const https = require('https');
 const { isValidHttpUrl } = require('../lib/cli-utils');
 const { MAX_SKILLS_ZIP_UPLOAD_SIZE, importSkillsFromZipFile } = require('./skills');
 
+function decodeUrlPathPart(part) {
+    try {
+        return decodeURIComponent(part);
+    } catch (_) {
+        return part;
+    }
+}
+
 function parseGithubRepoFromUrl(inputUrl) {
     const raw = typeof inputUrl === 'string' ? inputUrl.trim() : '';
     if (!raw) return null;
@@ -21,7 +29,7 @@ function parseGithubRepoFromUrl(inputUrl) {
     if (parsed.hostname !== 'github.com') {
         return null;
     }
-    const parts = parsed.pathname.split('/').filter(Boolean);
+    const parts = parsed.pathname.split('/').filter(Boolean).map(decodeUrlPathPart);
     if (parts.length < 2) return null;
     const owner = parts[0];
     const repoPart = parts[1] || '';
@@ -38,12 +46,19 @@ function buildGithubArchiveZipBase(repoInfo) {
     return `https://github.com/${encodeURIComponent(repoInfo.owner)}/${encodeURIComponent(repoInfo.repo)}/archive/refs`;
 }
 
+function encodeGithubRefPath(ref) {
+    return String(ref || '')
+        .split('/')
+        .map(part => encodeURIComponent(part))
+        .join('/');
+}
+
 function resolveGithubArchiveZipUrl(inputUrl) {
     const repoInfo = parseGithubRepoFromUrl(inputUrl);
     if (!repoInfo) return '';
     const base = buildGithubArchiveZipBase(repoInfo);
     const ref = repoInfo.ref || 'main';
-    return `${base}/heads/${encodeURIComponent(ref)}.zip`;
+    return `${base}/heads/${encodeGithubRefPath(ref)}.zip`;
 }
 
 function buildGithubArchiveZipCandidates(inputUrl) {
@@ -51,7 +66,7 @@ function buildGithubArchiveZipCandidates(inputUrl) {
     if (!repoInfo) return [];
     const base = buildGithubArchiveZipBase(repoInfo);
     if (repoInfo.ref) {
-        const ref = encodeURIComponent(repoInfo.ref);
+        const ref = encodeGithubRefPath(repoInfo.ref);
         return [
             `${base}/heads/${ref}.zip`,
             `${base}/tags/${ref}.zip`
@@ -256,7 +271,7 @@ async function cmdImportSkills(argv = []) {
         printImportSkillsUsage();
         return;
     }
-    if (!options.url || options.url.trim().startsWith('--')) {
+    if (!options.url) {
         printImportSkillsUsage();
         throw new Error('错误: 缺少 URL（例如: https://github.com/<owner>/<repo>/archive/refs/heads/main.zip）');
     }
