@@ -1,6 +1,8 @@
 import {
     persistPromptTemplatesToStorage,
-    readPromptTemplatesFromStorage
+    readPromptTemplatesFromStorage,
+    readPromptTemplateSelectedIdFromStorage,
+    persistPromptTemplateSelectedIdToStorage
 } from './storage.mjs';
 import { buildBuiltinCommentPolishTemplate } from './comment-polish/index.mjs';
 import { buildBuiltinRuleAckTemplate } from './rule-ack/index.mjs';
@@ -49,10 +51,15 @@ export async function loadPromptTemplatesOverview(ctx, options = {}) {
 
     if (app.mainTab === 'plugins' && app.promptTemplatesMode === 'compose') {
         const list = Array.isArray(app.promptTemplatesList) ? app.promptTemplatesList : [];
+        const storedSelected = readPromptTemplateSelectedIdFromStorage(localStorage);
         const exists = list.some((item) => item && item.id === app.promptComposerSelectedTemplateId);
-        if (!app.promptComposerSelectedTemplateId || !exists) {
+        const storedExists = storedSelected ? list.some((item) => item && item.id === storedSelected) : false;
+        if (storedExists && storedSelected !== app.promptComposerSelectedTemplateId) {
+            app.promptComposerSelectedTemplateId = storedSelected;
+        } else if (!app.promptComposerSelectedTemplateId || !exists) {
             app.promptComposerSelectedTemplateId = 'builtin_comment_polish';
         }
+        persistPromptTemplateSelectedIdToStorage(app.promptComposerSelectedTemplateId, localStorage);
         if (!app.promptComposerVarValuesRaw || typeof app.promptComposerVarValuesRaw !== 'object') {
             app.promptComposerVarValuesRaw = {};
         }

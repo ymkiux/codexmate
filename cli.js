@@ -4158,12 +4158,14 @@ async function listAllSessions(params = {}) {
     const queryTokens = expandSessionQueryTokens(normalizeQueryTokens(params.query));
     const hasQuery = queryTokens.length > 0;
     const browseLightweight = params.browseLightweight === true && !hasQuery && !hasPathFilter;
-    const cacheKey = hasQuery ? '' : `${browseLightweight ? 'browse' : 'default'}:${source}:${limit}:${normalizedPathFilter}`;
-    if (!hasQuery) {
-        const cached = getSessionListCache(cacheKey, forceRefresh);
-        if (cached) {
-            return cached;
-        }
+    const queryKeyRaw = typeof params.query === 'string' ? params.query.trim() : '';
+    const queryKey = queryKeyRaw.length > 240 ? queryKeyRaw.slice(0, 240) : queryKeyRaw;
+    const cacheKey = hasQuery
+        ? `query:${source}:${limit}:${normalizedPathFilter}:${params.queryMode || ''}:${params.queryScope || ''}:${params.roleFilter || ''}:${Number(params.contentScanLimit) || ''}:${Number(params.contentScanBytes) || ''}:${queryKey}`
+        : `${browseLightweight ? 'browse' : 'default'}:${source}:${limit}:${normalizedPathFilter}`;
+    const cached = getSessionListCache(cacheKey, forceRefresh);
+    if (cached) {
+        return cached;
     }
 
     const scanOptions = hasPathFilter
@@ -4204,9 +4206,7 @@ async function listAllSessions(params = {}) {
         });
     }
     result = mergeAndLimitSessions(result, limit);
-    if (!hasQuery) {
-        setSessionListCache(cacheKey, result);
-    }
+    setSessionListCache(cacheKey, result);
     return result;
 }
 

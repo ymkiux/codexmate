@@ -1,5 +1,6 @@
 import {
     persistPromptTemplatesToStorage,
+    persistPromptTemplateSelectedIdToStorage
 } from './storage.mjs';
 import {
     getFirstPluginId,
@@ -116,6 +117,7 @@ export function createPluginsMethods() {
             if (!next) return;
             if (next === this.promptComposerSelectedTemplateId) return;
             this.promptComposerSelectedTemplateId = next;
+            persistPromptTemplateSelectedIdToStorage(next, localStorage);
             this.promptComposerVarValuesRaw = readComposerValuesForTemplate(next);
             if (typeof this.$nextTick === 'function') {
                 this.$nextTick(() => {
@@ -218,6 +220,7 @@ export function createPluginsMethods() {
             const next = typeof id === 'string' ? id.trim() : '';
             if (!next) return;
             this.promptComposerSelectedTemplateId = next;
+            persistPromptTemplateSelectedIdToStorage(next, localStorage);
             this.promptComposerVarValuesRaw = readComposerValuesForTemplate(next);
             this.promptComposerCommand = '';
             this.promptComposerPickerVisible = false;
@@ -235,6 +238,7 @@ export function createPluginsMethods() {
         resetPromptComposer() {
             this.promptComposerCommand = '';
             this.promptComposerSelectedTemplateId = '';
+            persistPromptTemplateSelectedIdToStorage('', localStorage);
             this.promptComposerVarValuesRaw = {};
             this.promptComposerPickerVisible = false;
             this.promptComposerPickerKeyword = '';

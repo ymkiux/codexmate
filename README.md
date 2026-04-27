@@ -60,9 +60,11 @@ It works on local files directly and does not require cloud hosting. The skills 
 - Unified Codex + Claude session list
 - Local session pinning with persistent pinned state and pinned-first ordering
 - Keyword/source/cwd filters
+- Fast search UX: short-lived query result caching to avoid rescanning on each keystroke
 - Usage subview with 7d / 30d session trends, message trends, source share, and top paths
 - Markdown export
-- Session-level and message-level delete (supports batch)
+- Session-level and message-level delete (supports batch), with a local recycle bin for restore/purge
+- Large-session preview optimization (fast tail preview path)
 
 **Skills Market**
 - Switch the skills install target between Codex and Claude Code
