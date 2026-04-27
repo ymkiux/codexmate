@@ -6513,6 +6513,7 @@ async function cmdDoctor(argv = []) {
             ? renderDoctorMarkdown(report)
             : JSON.stringify(report, null, 2);
         if (options.output) {
+            ensureDir(path.dirname(options.output));
             fs.writeFileSync(options.output, text);
         } else {
             process.stdout.write(text + '\n');
@@ -13162,6 +13163,37 @@ async function cmdMcp(args = []) {
     });
 }
 
+function printMainHelp() {
+    console.log('\nCodex Mate - Codex 提供商管理工具');
+    console.log('\n用法:');
+    console.log('  codexmate status           显示当前状态');
+    console.log('  codexmate doctor [--format json|md] [--lang zh|en] [--output <PATH>]  输出诊断报告');
+    console.log('  codexmate import-skills <URL> [--target-app codex|claude] [--name <NAME>] [--timeout-ms <MS>]  从 URL 导入 skills');
+    console.log('  codexmate setup            交互式配置向导');
+    console.log('  codexmate list             列出所有提供商');
+    console.log('  codexmate models           列出所有模型');
+    console.log('  codexmate switch <名称>    切换提供商');
+    console.log('  codexmate use <模型>       切换模型');
+    console.log('  codexmate add <名称> <URL> [密钥] [--bridge <openai>]');
+    console.log('  codexmate delete <名称>    删除提供商');
+    console.log('  codexmate claude <BaseURL> <API密钥> [模型]  写入 Claude Code 配置');
+    console.log('  codexmate auth <list|import|switch|delete|status>  认证管理');
+    console.log('  codexmate add-model <模型> 添加模型');
+    console.log('  codexmate delete-model <模型> 删除模型');
+    console.log('  codexmate workflow <list|get|validate|run|runs>  MCP 工作流中心');
+    console.log('  codexmate task <plan|run|runs|queue|retry|cancel|logs>  本地任务编排');
+    console.log('  codexmate run [--host <HOST>] [--no-browser]    启动 Web 界面');
+    console.log('  codexmate codex [参数...] [--follow-up <文本>|--queued-follow-up <文本> 可重复]  等同于 codex --yolo');
+    console.log('    注: follow-up 自动排队仅支持 linux/android/netbsd/openbsd/darwin/freebsd 且 stdin 必须是 TTY，其他平台会报错');
+    console.log('  codexmate qwen [参数...]   等同于 qwen --yolo');
+    console.log('  codexmate mcp [serve] [--transport stdio] [--allow-write|--read-only]');
+    console.log('  codexmate export-session --source <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]');
+    console.log('  codexmate zip <路径> [--max:级别]  压缩（系统 zip 优先，其次 zip-lib）');
+    console.log('  codexmate unzip <zip文件> [输出目录]  解压（zip-lib）');
+    console.log('  codexmate unzip-ext <zip目录> [输出目录] [--ext:后缀[,后缀...]] [--no-recursive]  批量提取 ZIP 指定后缀文件（默认递归）');
+    console.log('');
+}
+
 // ============================================================================
 // 主程序
 // ============================================================================
@@ -13177,35 +13209,8 @@ async function main() {
         }
     }
 
-    if (args.length === 0) {
-        console.log('\nCodex Mate - Codex 提供商管理工具');
-        console.log('\n用法:');
-        console.log('  codexmate status           显示当前状态');
-        console.log('  codexmate doctor [--format json|md] [--lang zh|en] [--output <PATH>]  输出诊断报告');
-        console.log('  codexmate import-skills <URL> [--target-app codex|claude] [--name <NAME>] [--timeout-ms <MS>]  从 URL 导入 skills');
-        console.log('  codexmate setup            交互式配置向导');
-        console.log('  codexmate list             列出所有提供商');
-        console.log('  codexmate models           列出所有模型');
-        console.log('  codexmate switch <名称>    切换提供商');
-        console.log('  codexmate use <模型>       切换模型');
-        console.log('  codexmate add <名称> <URL> [密钥] [--bridge <openai>]');
-        console.log('  codexmate delete <名称>    删除提供商');
-        console.log('  codexmate claude <BaseURL> <API密钥> [模型]  写入 Claude Code 配置');
-        console.log('  codexmate auth <list|import|switch|delete|status>  认证管理');
-        console.log('  codexmate add-model <模型> 添加模型');
-        console.log('  codexmate delete-model <模型> 删除模型');
-        console.log('  codexmate workflow <list|get|validate|run|runs>  MCP 工作流中心');
-        console.log('  codexmate task <plan|run|runs|queue|retry|cancel|logs>  本地任务编排');
-        console.log('  codexmate run [--host <HOST>] [--no-browser]    启动 Web 界面');
-        console.log('  codexmate codex [参数...] [--follow-up <文本>|--queued-follow-up <文本> 可重复]  等同于 codex --yolo');
-        console.log('    注: follow-up 自动排队仅支持 linux/android/netbsd/openbsd/darwin/freebsd 且 stdin 必须是 TTY，其他平台会报错');
-        console.log('  codexmate qwen [参数...]   等同于 qwen --yolo');
-        console.log('  codexmate mcp [serve] [--transport stdio] [--allow-write|--read-only]');
-        console.log('  codexmate export-session --source <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]');
-        console.log('  codexmate zip <路径> [--max:级别]  压缩（系统 zip 优先，其次 zip-lib）');
-        console.log('  codexmate unzip <zip文件> [输出目录]  解压（zip-lib）');
-        console.log('  codexmate unzip-ext <zip目录> [输出目录] [--ext:后缀[,后缀...]] [--no-recursive]  批量提取 ZIP 指定后缀文件（默认递归）');
-        console.log('');
+    if (args.length === 0 || command === '--help' || command === '-h' || command === 'help') {
+        printMainHelp();
         process.exit(0);
     }
 

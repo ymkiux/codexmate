@@ -6,31 +6,76 @@ const https = require('https');
 const { isValidHttpUrl } = require('../lib/cli-utils');
 const { MAX_SKILLS_ZIP_UPLOAD_SIZE, importSkillsFromZipFile } = require('./skills');
 
-function resolveGithubArchiveZipUrl(inputUrl) {
+function decodeUrlPathPart(part) {
+    try {
+        return decodeURIComponent(part);
+    } catch (_) {
+        return part;
+    }
+}
+
+function parseGithubRepoFromUrl(inputUrl) {
     const raw = typeof inputUrl === 'string' ? inputUrl.trim() : '';
-    if (!raw) return '';
+    if (!raw) return null;
     let parsed;
     try {
         parsed = new URL(raw);
     } catch (_) {
-        return '';
+        return null;
     }
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        return '';
+        return null;
     }
     if (parsed.hostname !== 'github.com') {
-        return '';
+        return null;
     }
-    const parts = parsed.pathname.split('/').filter(Boolean);
-    if (parts.length < 2) return '';
+    const parts = parsed.pathname.split('/').filter(Boolean).map(decodeUrlPathPart);
+    if (parts.length < 2) return null;
     const owner = parts[0];
-    const repo = (parts[1] || '').endsWith('.git') ? parts[1].slice(0, -4) : parts[1];
-    if (!owner || !repo) return '';
-    let ref = 'main';
-    if (parts[2] === 'tree' && parts[3]) {
-        ref = parts[3];
+    const repoPart = parts[1] || '';
+    const repo = repoPart.endsWith('.git') ? repoPart.slice(0, -4) : repoPart;
+    if (!owner || !repo) return null;
+    const ref = parts[2] === 'tree' && parts[3]
+        ? parts.slice(3).join('/')
+        : '';
+    return { owner, repo, ref };
+}
+
+function buildGithubArchiveZipBase(repoInfo) {
+    if (!repoInfo || !repoInfo.owner || !repoInfo.repo) return '';
+    return `https://github.com/${encodeURIComponent(repoInfo.owner)}/${encodeURIComponent(repoInfo.repo)}/archive/refs`;
+}
+
+function encodeGithubRefPath(ref) {
+    return String(ref || '')
+        .split('/')
+        .map(part => encodeURIComponent(part))
+        .join('/');
+}
+
+function resolveGithubArchiveZipUrl(inputUrl) {
+    const repoInfo = parseGithubRepoFromUrl(inputUrl);
+    if (!repoInfo) return '';
+    const base = buildGithubArchiveZipBase(repoInfo);
+    const ref = repoInfo.ref || 'main';
+    return `${base}/heads/${encodeGithubRefPath(ref)}.zip`;
+}
+
+function buildGithubArchiveZipCandidates(inputUrl) {
+    const repoInfo = parseGithubRepoFromUrl(inputUrl);
+    if (!repoInfo) return [];
+    const base = buildGithubArchiveZipBase(repoInfo);
+    if (repoInfo.ref) {
+        const ref = encodeGithubRefPath(repoInfo.ref);
+        return [
+            `${base}/heads/${ref}.zip`,
+            `${base}/tags/${ref}.zip`
+        ];
     }
-    return `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/archive/refs/heads/${encodeURIComponent(ref)}.zip`;
+    return [
+        `${base}/heads/main.zip`,
+        `${base}/heads/master.zip`
+    ];
 }
 
 function redactUrlForLog(inputUrl) {
@@ -42,6 +87,14 @@ function redactUrlForLog(inputUrl) {
     } catch (_) {
         return raw;
     }
+}
+
+function extractHttpStatusFromError(err) {
+    const message = err && err.message ? String(err.message) : '';
+    const matched = message.match(/\bHTTP\s+(\d{3})\b/);
+    if (!matched) return 0;
+    const value = Number(matched[1]);
+    return Number.isFinite(value) ? value : 0;
 }
 
 function downloadUrlToFile(targetUrl, filePath, options = {}) {
@@ -147,22 +200,39 @@ function downloadUrlToFile(targetUrl, filePath, options = {}) {
     });
 }
 
+function printImportSkillsUsage() {
+    process.stdout.write('\n用法:\n');
+    process.stdout.write('  codexmate import-skills <URL> [--target-app codex|claude] [--name <NAME>] [--timeout-ms <MS>]\n');
+    process.stdout.write('\n示例:\n');
+    process.stdout.write('  codexmate import-skills https://github.com/<owner>/<repo>\n');
+    process.stdout.write('  codexmate import-skills https://github.com/<owner>/<repo>/tree/dev\n');
+    process.stdout.write('  codexmate import-skills https://github.com/<owner>/<repo>/archive/refs/heads/main.zip\n');
+}
+
 function parseImportSkillsCommandArgs(argv = []) {
     const options = {
         url: '',
         targetApp: 'codex',
         name: '',
-        timeoutMs: 30000
+        timeoutMs: 30000,
+        help: false
     };
-    if (argv[0] && !String(argv[0]).startsWith('--')) {
-        options.url = String(argv[0]).trim();
-    }
-    let cursor = 1;
+    let cursor = 0;
     while (cursor < argv.length) {
         const token = String(argv[cursor] || '');
+        if (token === '--help' || token === '-h') {
+            options.help = true;
+            cursor += 1;
+            continue;
+        }
+        if (token && !token.startsWith('-') && !options.url) {
+            options.url = token.trim();
+            cursor += 1;
+            continue;
+        }
         if (token === '--target-app') {
             const value = String(argv[cursor + 1] || '').trim().toLowerCase();
-            if (!value || value.startsWith('--')) {
+            if (!value || value.startsWith('-')) {
                 throw new Error('错误: --target-app 需要一个值（codex/claude）');
             }
             options.targetApp = value === 'claude' ? 'claude' : 'codex';
@@ -171,7 +241,7 @@ function parseImportSkillsCommandArgs(argv = []) {
         }
         if (token === '--name') {
             const value = String(argv[cursor + 1] || '').trim();
-            if (!value || value.startsWith('--')) {
+            if (!value || value.startsWith('-')) {
                 throw new Error('错误: --name 需要一个值');
             }
             options.name = value;
@@ -187,42 +257,78 @@ function parseImportSkillsCommandArgs(argv = []) {
             cursor += 2;
             continue;
         }
-        cursor += 1;
-    }
-    if (!options.url) {
-        throw new Error('错误: 缺少 URL（例如: https://github.com/<owner>/<repo>/archive/refs/heads/main.zip）');
+        if (token.startsWith('-')) {
+            throw new Error(`错误: 未知参数: ${token}`);
+        }
+        throw new Error(`错误: 多余参数: ${token}`);
     }
     return options;
 }
 
 async function cmdImportSkills(argv = []) {
     const options = parseImportSkillsCommandArgs(argv);
-    const resolvedGithubUrl = resolveGithubArchiveZipUrl(options.url);
-    const zipUrl = resolvedGithubUrl || options.url;
-    if (!isValidHttpUrl(zipUrl)) {
+    if (options.help) {
+        printImportSkillsUsage();
+        return;
+    }
+    if (!options.url) {
+        printImportSkillsUsage();
+        throw new Error('错误: 缺少 URL（例如: https://github.com/<owner>/<repo>/archive/refs/heads/main.zip）');
+    }
+    const candidates = buildGithubArchiveZipCandidates(options.url);
+    if (!candidates.length) {
+        const resolvedGithubUrl = resolveGithubArchiveZipUrl(options.url);
+        candidates.push(resolvedGithubUrl || options.url);
+    }
+    const uniqueCandidates = Array.from(new Set(candidates.filter(Boolean)));
+    if (!uniqueCandidates.length || !uniqueCandidates.every(isValidHttpUrl)) {
         throw new Error('错误: URL 非法（仅支持 http/https）');
     }
 
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codexmate-skills-url-'));
     const zipPath = path.join(tempDir, 'skills.zip');
-    const fallbackName = options.name || path.basename(new URL(zipUrl).pathname) || 'skills.zip';
-
-    console.log(`\n[Skills] Download: ${redactUrlForLog(zipUrl)}`);
-    await downloadUrlToFile(zipUrl, zipPath, {
-        maxBytes: MAX_SKILLS_ZIP_UPLOAD_SIZE,
-        timeoutMs: options.timeoutMs,
-        maxRedirects: 5
-    });
-    const result = await importSkillsFromZipFile(zipPath, {
-        tempDir,
-        targetApp: options.targetApp,
-        fallbackName
-    });
-    process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+    let finalUrl = uniqueCandidates[0];
+    try {
+        let lastError = null;
+        for (const candidateUrl of uniqueCandidates) {
+            finalUrl = candidateUrl;
+            console.log(`\n[Skills] Download: ${redactUrlForLog(candidateUrl)}`);
+            try {
+                await downloadUrlToFile(candidateUrl, zipPath, {
+                    maxBytes: MAX_SKILLS_ZIP_UPLOAD_SIZE,
+                    timeoutMs: options.timeoutMs,
+                    maxRedirects: 5
+                });
+                lastError = null;
+                break;
+            } catch (e) {
+                lastError = e;
+                if (extractHttpStatusFromError(e) === 404) {
+                    continue;
+                }
+                throw e;
+            }
+        }
+        if (lastError) {
+            throw lastError;
+        }
+        const fallbackName = options.name || path.basename(new URL(finalUrl).pathname) || 'skills.zip';
+        const result = await importSkillsFromZipFile(zipPath, {
+            tempDir,
+            targetApp: options.targetApp,
+            fallbackName
+        });
+        process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+    } finally {
+        try {
+            fs.rmSync(tempDir, { recursive: true, force: true });
+        } catch (_) {}
+    }
 }
 
 module.exports = {
+    parseGithubRepoFromUrl,
     resolveGithubArchiveZipUrl,
+    buildGithubArchiveZipCandidates,
     cmdImportSkills
 };
-
