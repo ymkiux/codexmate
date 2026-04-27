@@ -315,7 +315,7 @@ body::after {
     color: var(--color-text-muted);
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    padding: 0 8px;
+    padding: 0 6px;
     margin-bottom: 8px;
 }
 
