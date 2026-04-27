@@ -360,10 +360,16 @@
 }
 
 .selector-header .btn-tool-compact {
-    padding: 3px 7px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    min-width: 0;
+    padding: 2px 6px;
     font-size: 10px;
     line-height: 1;
     box-shadow: none;
-    min-height: 24px;
+    height: 22px;
+    min-height: 22px;
     white-space: nowrap;
 }
