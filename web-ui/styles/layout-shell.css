@@ -336,6 +336,10 @@ body::after {
     position: relative;
 }
 
+#side-tab-docs {
+    padding: 6px 10px;
+}
+
 .side-item::before {
     content: "";
     position: absolute;
