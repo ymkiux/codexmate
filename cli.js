@@ -10,6 +10,7 @@ const yauzl = require('yauzl');
 const { exec, execSync, spawn, spawnSync } = require('child_process');
 const http = require('http');
 const https = require('https');
+const net = require('net');
 const readline = require('readline');
 const {
     expandHomePath,
@@ -285,7 +286,7 @@ const HTTPS_KEEP_ALIVE_AGENT = new https.Agent({ keepAlive: true });
 
 const openaiBridgeHandler = createOpenaiBridgeHttpHandler({
     settingsFile: OPENAI_BRIDGE_SETTINGS_FILE,
-    expectedToken: 'codexmate',
+    expectedToken: typeof process.env.CODEXMATE_HTTP_TOKEN === 'string' ? process.env.CODEXMATE_HTTP_TOKEN.trim() : '',
     maxBodySize: MAX_API_BODY_SIZE,
     httpAgent: HTTP_KEEP_ALIVE_AGENT,
     httpsAgent: HTTPS_KEEP_ALIVE_AGENT
@@ -7313,12 +7314,57 @@ function cmdClaude(baseUrl, apiKey, model, silent = false) {
 }
 
 function commandExists(command, args = '') {
-    try {
-        execSync(`${command} ${args}`, { stdio: 'ignore', shell: process.platform === 'win32' });
-        return true;
-    } catch (e) {
+    const cmd = typeof command === 'string' ? command.trim() : '';
+    const argText = typeof args === 'string' ? args.trim() : '';
+    if (!cmd || cmd.includes('\0') || /[\r\n]/.test(cmd)) {
         return false;
     }
+    const argv = argText ? argText.split(/\s+/g).filter(Boolean) : [];
+    const hasSeparators = cmd.includes('/') || cmd.includes('\\');
+    const useShell = process.platform === 'win32' && !hasSeparators;
+    if (useShell) {
+        if (!/^[A-Za-z0-9._-]+$/.test(cmd)) return false;
+        if (argText && /[\r\n;&|<>`$]/.test(argText)) return false;
+    }
+    try {
+        const probe = spawnSync(cmd, argv, {
+            stdio: 'ignore',
+            windowsHide: true,
+            timeout: 5000,
+            shell: useShell
+        });
+        return probe.status === 0;
+    } catch (_) {
+        return false;
+    }
+}
+
+function isPrivateNetworkHost(hostname) {
+    const host = typeof hostname === 'string' ? hostname.trim().toLowerCase() : '';
+    if (!host) return true;
+    if (host === 'localhost') return true;
+    const ipVer = net.isIP(host);
+    if (!ipVer) {
+        return false;
+    }
+    if (ipVer === 4) {
+        const parts = host.split('.').map((x) => parseInt(x, 10));
+        if (parts.length !== 4 || parts.some((x) => !Number.isFinite(x))) return true;
+        const [a, b] = parts;
+        if (a === 10) return true;
+        if (a === 127) return true;
+        if (a === 169 && b === 254) return true;
+        if (a === 192 && b === 168) return true;
+        if (a === 172 && b >= 16 && b <= 31) return true;
+        return false;
+    }
+    if (ipVer === 6) {
+        if (host === '::1') return true;
+        if (host.startsWith('fe80:')) return true;
+        if (host.startsWith('fc') || host.startsWith('fd')) return true;
+        return false;
+    }
+    return false;
 }
 
 function detectPreferredPackageManager() {
@@ -7956,7 +8002,7 @@ function writeJsonResponse(res, statusCode, payload) {
 function readJsonRequestBody(req, res, options = {}) {
     const maxBytes = Number.isFinite(options.maxBytes) ? Math.max(1024, Math.floor(options.maxBytes)) : MAX_API_BODY_SIZE;
     return new Promise((resolve) => {
-        let body = '';
+        const chunks = [];
         let bodySize = 0;
         let bodyTooLarge = false;
         req.on('data', (chunk) => {
@@ -7971,17 +8017,110 @@ function readJsonRequestBody(req, res, options = {}) {
                 resolve({ ok: false, error: 'payload-too-large' });
                 return;
             }
-            body += chunk;
+            chunks.push(chunk);
         });
         req.on('end', () => {
             if (bodyTooLarge) return;
+            const rawBuffer = chunks.length ? Buffer.concat(chunks) : Buffer.alloc(0);
+            const rawText = rawBuffer.length ? rawBuffer.toString('utf-8') : '';
             try {
-                resolve({ ok: true, body: JSON.parse(body || '{}') });
+                resolve({ ok: true, body: JSON.parse(rawText || '{}'), rawText, rawBuffer });
             } catch (error) {
                 resolve({ ok: false, error: error && error.message ? error.message : 'invalid json' });
             }
         });
     });
+}
+
+function isLoopbackRemoteAddress(value) {
+    const addr = typeof value === 'string' ? value.trim() : '';
+    if (!addr) return false;
+    if (addr === '127.0.0.1' || addr === '::1') return true;
+    if (addr === '::ffff:127.0.0.1') return true;
+    return false;
+}
+
+function extractRequestToken(req) {
+    const headers = req && req.headers && typeof req.headers === 'object' ? req.headers : {};
+    const rawAuth = typeof headers.authorization === 'string' ? headers.authorization.trim() : '';
+    if (rawAuth) {
+        const match = rawAuth.match(/^bearer\s+(.+)$/i);
+        if (match && match[1]) return match[1].trim();
+        return rawAuth;
+    }
+    const raw = typeof headers['x-codexmate-token'] === 'string' ? headers['x-codexmate-token'].trim() : '';
+    return raw;
+}
+
+function readServerToken() {
+    const raw = typeof process.env.CODEXMATE_HTTP_TOKEN === 'string' ? process.env.CODEXMATE_HTTP_TOKEN.trim() : '';
+    return raw;
+}
+
+function assertRequestAuthorized(req, res) {
+    const remoteAddr = req && req.socket ? req.socket.remoteAddress : '';
+    if (isLoopbackRemoteAddress(remoteAddr)) {
+        return { ok: true, mode: 'loopback' };
+    }
+    const expected = readServerToken();
+    if (!expected) {
+        writeJsonResponse(res, 403, {
+            error: 'Remote access is disabled (set CODEXMATE_HTTP_TOKEN or use --host 127.0.0.1)'
+        });
+        return { ok: false, mode: 'missing-token' };
+    }
+    const actual = extractRequestToken(req);
+    if (!actual || actual !== expected) {
+        writeJsonResponse(res, 401, { error: 'Unauthorized' });
+        return { ok: false, mode: 'unauthorized' };
+    }
+    return { ok: true, mode: 'token' };
+}
+
+const g_webhookDeliveryCache = new Map();
+
+function pruneWebhookDeliveryCache() {
+    const now = Date.now();
+    for (const [key, expiresAt] of g_webhookDeliveryCache.entries()) {
+        if (now >= expiresAt) {
+            g_webhookDeliveryCache.delete(key);
+        }
+    }
+}
+
+function rememberWebhookDeliveryId(value, ttlMs = 10 * 60 * 1000) {
+    const id = typeof value === 'string' ? value.trim() : '';
+    if (!id) return { ok: true, seen: false };
+    pruneWebhookDeliveryCache();
+    if (g_webhookDeliveryCache.has(id)) {
+        return { ok: true, seen: true };
+    }
+    g_webhookDeliveryCache.set(id, Date.now() + ttlMs);
+    while (g_webhookDeliveryCache.size > 2000) {
+        const firstKey = g_webhookDeliveryCache.keys().next().value;
+        if (!firstKey) break;
+        g_webhookDeliveryCache.delete(firstKey);
+    }
+    return { ok: true, seen: false };
+}
+
+function safeTimingEqual(a, b) {
+    try {
+        const ba = Buffer.isBuffer(a) ? a : Buffer.from(String(a || ''), 'utf-8');
+        const bb = Buffer.isBuffer(b) ? b : Buffer.from(String(b || ''), 'utf-8');
+        if (ba.length !== bb.length) return false;
+        return crypto.timingSafeEqual(ba, bb);
+    } catch (_) {
+        return false;
+    }
+}
+
+function verifyGithubWebhookSignature(secret, signatureHeader, rawBuffer) {
+    const key = typeof secret === 'string' ? secret : '';
+    const signature = typeof signatureHeader === 'string' ? signatureHeader.trim() : '';
+    if (!key || !signature || !signature.startsWith('sha256=')) return false;
+    const expected = 'sha256=' + crypto.createHmac('sha256', key).update(rawBuffer || Buffer.alloc(0)).digest('hex');
+    return safeTimingEqual(signature, expected);
 }
 
 async function handleAutomationHook(req, res, source) {
@@ -7990,12 +8129,56 @@ async function handleAutomationHook(req, res, source) {
         writeJsonResponse(res, 405, { error: 'Method Not Allowed' });
         return;
     }
+    const deliveryId = typeof (req.headers || {})['x-github-delivery'] === 'string'
+        ? String(req.headers['x-github-delivery'] || '')
+        : (typeof (req.headers || {})['x-gitlab-event-uuid'] === 'string' ? String(req.headers['x-gitlab-event-uuid'] || '') : '');
+    const remember = rememberWebhookDeliveryId(deliveryId);
+    if (remember.seen) {
+        writeJsonResponse(res, 200, { ok: true, deduped: true });
+        return;
+    }
     const parsedBody = await readJsonRequestBody(req, res);
     if (!parsedBody.ok) {
         if (parsedBody.error !== 'payload-too-large') {
             writeJsonResponse(res, 400, { error: parsedBody.error || 'invalid request body' });
         }
         return;
+    }
+    const remoteAddr = req && req.socket ? req.socket.remoteAddress : '';
+    const isLoopback = !remoteAddr || isLoopbackRemoteAddress(remoteAddr);
+    const normalizedSource = typeof source === 'string' ? source.trim().toLowerCase() : '';
+    if (normalizedSource === 'github') {
+        const secret = typeof process.env.CODEXMATE_GITHUB_WEBHOOK_SECRET === 'string'
+            ? process.env.CODEXMATE_GITHUB_WEBHOOK_SECRET
+            : '';
+        if (!secret && !isLoopback) {
+            writeJsonResponse(res, 403, { error: 'Remote GitHub webhook is disabled (set CODEXMATE_GITHUB_WEBHOOK_SECRET)' });
+            return;
+        }
+        if (secret) {
+            const signature = (req.headers || {})['x-hub-signature-256'];
+            if (!verifyGithubWebhookSignature(secret, signature, parsedBody.rawBuffer)) {
+                writeJsonResponse(res, 401, { error: 'Invalid webhook signature' });
+                return;
+            }
+        }
+    } else if (normalizedSource === 'gitlab') {
+        const secret = typeof process.env.CODEXMATE_GITLAB_WEBHOOK_SECRET === 'string'
+            ? process.env.CODEXMATE_GITLAB_WEBHOOK_SECRET.trim()
+            : '';
+        if (!secret && !isLoopback) {
+            writeJsonResponse(res, 403, { error: 'Remote GitLab webhook is disabled (set CODEXMATE_GITLAB_WEBHOOK_SECRET)' });
+            return;
+        }
+        if (secret) {
+            const tokenHeader = typeof (req.headers || {})['x-gitlab-token'] === 'string'
+                ? String(req.headers['x-gitlab-token']).trim()
+                : '';
+            if (!tokenHeader || tokenHeader !== secret) {
+                writeJsonResponse(res, 401, { error: 'Invalid webhook token' });
+                return;
+            }
+        }
     }
     const payload = parsedBody.body && typeof parsedBody.body === 'object' ? parsedBody.body : {};
     const eventKey = buildAutomationEventKey(source, req.headers || {}, payload);
@@ -8346,8 +8529,49 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
 
     const server = http.createServer((req, res) => {
         const requestPath = (req.url || '/').split('?')[0];
+        const sendJson = (statusCode, payload) => {
+            const body = JSON.stringify(payload || {}, null, 2);
+            res.writeHead(statusCode, {
+                'Content-Type': 'application/json; charset=utf-8',
+                'Content-Length': Buffer.byteLength(body, 'utf-8')
+            });
+            res.end(body, 'utf-8');
+        };
         if (typeof openaiBridgeHandler === 'function' && openaiBridgeHandler(req, res)) {
             return;
+        }
+        if (
+            requestPath === '/api'
+            || requestPath.startsWith('/api/import-')
+            || requestPath.startsWith('/hooks/')
+            || requestPath.startsWith('/download/')
+        ) {
+            const remoteAddr = req && req.socket ? req.socket.remoteAddress : '';
+            const isLoopback = !remoteAddr
+                || remoteAddr === '127.0.0.1'
+                || remoteAddr === '::1'
+                || remoteAddr === '::ffff:127.0.0.1';
+            if (!isLoopback) {
+                const expected = typeof process.env.CODEXMATE_HTTP_TOKEN === 'string'
+                    ? process.env.CODEXMATE_HTTP_TOKEN.trim()
+                    : '';
+                if (!expected) {
+                    sendJson(403, {
+                        error: 'Remote access is disabled (set CODEXMATE_HTTP_TOKEN or use --host 127.0.0.1)'
+                    });
+                    return;
+                }
+                const headers = req && req.headers && typeof req.headers === 'object' ? req.headers : {};
+                const rawAuth = typeof headers.authorization === 'string' ? headers.authorization.trim() : '';
+                const match = rawAuth ? rawAuth.match(/^bearer\s+(.+)$/i) : null;
+                const actual = match && match[1]
+                    ? match[1].trim()
+                    : (rawAuth ? rawAuth : (typeof headers['x-codexmate-token'] === 'string' ? String(headers['x-codexmate-token']).trim() : ''));
+                if (!actual || actual !== expected) {
+                    sendJson(401, { error: 'Unauthorized' });
+                    return;
+                }
+            }
         }
         if (requestPath === '/api/import-skills-zip') {
             void handleImportSkillsZipUpload(req, res);
@@ -8364,6 +8588,11 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
             return;
         }
         if (requestPath === '/api') {
+            const method = (req.method ? String(req.method) : 'POST').toUpperCase();
+            if (method !== 'POST') {
+                sendJson(405, { error: 'Method Not Allowed' });
+                return;
+            }
             let body = '';
             let bodySize = 0;
             let bodyTooLarge = false;
@@ -8372,7 +8601,7 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                 bodySize += chunk.length;
                 if (bodySize > MAX_API_BODY_SIZE) {
                     bodyTooLarge = true;
-                    writeJsonResponse(res, 413, {
+                    sendJson(413, {
                         error: `请求体过大（>${Math.floor(MAX_API_BODY_SIZE / 1024 / 1024)}MB）`
                     });
                     req.destroy();
@@ -8383,7 +8612,7 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
             req.on('end', async () => {
                 if (bodyTooLarge) return;
                 try {
-                    const { action, params } = JSON.parse(body);
+                    const { action, params } = JSON.parse(body || '{}');
                     let result;
 
                     switch (action) {
@@ -8452,6 +8681,20 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                                 if (!baseUrl) {
                                     result = { error: 'Base URL is required' };
                                 } else {
+                                    const remoteAddr = req && req.socket ? req.socket.remoteAddress : '';
+                                    const requesterIsLoopback = !remoteAddr
+                                        || remoteAddr === '127.0.0.1'
+                                        || remoteAddr === '::1'
+                                        || remoteAddr === '::ffff:127.0.0.1';
+                                    if (!requesterIsLoopback) {
+                                        try {
+                                            const parsedUrl = new URL(baseUrl);
+                                            if (isPrivateNetworkHost(parsedUrl.hostname || '')) {
+                                                result = { error: 'Refusing to access private network baseUrl from non-loopback request' };
+                                                break;
+                                            }
+                                        } catch (_) {}
+                                    }
                                     const res = await fetchModelsFromBaseUrl(baseUrl, apiKey);
                                     if (res.error) {
                                         result = { error: res.error, models: [], source: 'remote' };
@@ -9039,7 +9282,14 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                 });
                 return;
             }
-
+            const allowLegacy = process.env.CODEXMATE_ALLOW_LEGACY_DOWNLOAD === '1';
+            const remoteAddr = req && req.socket ? req.socket.remoteAddress : '';
+            const isLoopback = !remoteAddr || remoteAddr === '127.0.0.1' || remoteAddr === '::1' || remoteAddr === '::ffff:127.0.0.1';
+            if (!allowLegacy || !isLoopback) {
+                res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+                res.end('Not Found');
+                return;
+            }
             const tempDir = os.tmpdir();
             const legacyFilePath = path.join(tempDir, decodedFileName);
             if (!isPathInside(legacyFilePath, tempDir)) {
@@ -9113,8 +9363,12 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
         }
         console.log('  退出: Ctrl+C\n');
         if (isAnyAddressHost(host)) {
-            console.warn('! 安全提示: 当前监听所有网卡（无鉴权）。');
-            console.warn('  建议仅在可信网络使用，或改用 --host 127.0.0.1。');
+            const tokenEnabled = typeof process.env.CODEXMATE_HTTP_TOKEN === 'string' && process.env.CODEXMATE_HTTP_TOKEN.trim().length > 0;
+            console.warn(`! 安全提示: 当前监听所有网卡（${tokenEnabled ? '已启用鉴权' : '无鉴权'}）。`);
+            if (!tokenEnabled) {
+                console.warn('  建议仅在可信网络使用，或改用 --host 127.0.0.1。');
+                console.warn('  如需远程访问，请设置 CODEXMATE_HTTP_TOKEN。');
+            }
         }
 
         if (willOpenBrowser) {
@@ -11473,14 +11727,21 @@ function normalizeTaskQueueItem(raw = {}) {
 
 function readTaskQueueState() {
     const parsed = readJsonObjectFromFile(TASK_QUEUE_FILE, {});
+    if (!parsed.ok && parsed.exists) {
+        return {
+            tasks: [],
+            error: parsed.error || 'failed to read task queue'
+        };
+    }
     if (!parsed.ok || !parsed.exists) {
         return {
-            tasks: []
+            tasks: [],
+            error: ''
         };
     }
     const source = parsed.data && typeof parsed.data === 'object' ? parsed.data : {};
     const tasks = Array.isArray(source.tasks) ? source.tasks.map((item) => normalizeTaskQueueItem(item)) : [];
-    return { tasks };
+    return { tasks, error: '' };
 }
 
 function writeTaskQueueState(state = {}) {
@@ -11490,17 +11751,58 @@ function writeTaskQueueState(state = {}) {
     });
 }
 
-function upsertTaskQueueItem(item) {
-    const state = readTaskQueueState();
-    const next = normalizeTaskQueueItem(item || {});
-    const index = state.tasks.findIndex((entry) => entry.taskId === next.taskId);
-    if (index >= 0) {
-        state.tasks[index] = next;
-    } else {
-        state.tasks.push(next);
+function withTaskQueueLock(fn) {
+    const lockPath = `${TASK_QUEUE_FILE}.lock`;
+    ensureDir(path.dirname(lockPath));
+    let lockFd = null;
+    try {
+        lockFd = fs.openSync(lockPath, 'wx', 0o600);
+    } catch (error) {
+        const code = error && error.code ? error.code : '';
+        if (code === 'EEXIST') {
+            try {
+                const stat = fs.statSync(lockPath);
+                const ageMs = Date.now() - stat.mtimeMs;
+                if (ageMs > 5000) {
+                    try {
+                        fs.unlinkSync(lockPath);
+                    } catch (_) {}
+                    lockFd = fs.openSync(lockPath, 'wx', 0o600);
+                }
+            } catch (_) {}
+        }
     }
-    writeTaskQueueState(state);
-    return next;
+    if (!lockFd) {
+        return { error: 'task queue is busy' };
+    }
+    try {
+        return fn();
+    } finally {
+        try {
+            fs.closeSync(lockFd);
+        } catch (_) {}
+        try {
+            fs.unlinkSync(lockPath);
+        } catch (_) {}
+    }
+}
+
+function upsertTaskQueueItem(item) {
+    return withTaskQueueLock(() => {
+        const state = readTaskQueueState();
+        if (state.error) {
+            return { error: state.error };
+        }
+        const next = normalizeTaskQueueItem(item || {});
+        const index = state.tasks.findIndex((entry) => entry.taskId === next.taskId);
+        if (index >= 0) {
+            state.tasks[index] = next;
+        } else {
+            state.tasks.push(next);
+        }
+        writeTaskQueueState(state);
+        return next;
+    });
 }
 
 function getTaskQueueItem(taskId) {
@@ -11535,15 +11837,19 @@ function appendTaskRunRecord(record) {
     fs.appendFileSync(TASK_RUNS_FILE, `${JSON.stringify(record)}\n`, { encoding: 'utf-8', mode: 0o600 });
 }
 
+let g_taskRunRecordsLastParseErrors = 0;
+
 function listTaskRunRecords(limit = 20) {
     const max = Number.isFinite(limit) ? Math.max(1, Math.floor(limit)) : 20;
     if (!fs.existsSync(TASK_RUNS_FILE)) {
+        g_taskRunRecordsLastParseErrors = 0;
         return [];
     }
     let content = '';
     try {
         content = fs.readFileSync(TASK_RUNS_FILE, 'utf-8');
     } catch (_) {
+        g_taskRunRecordsLastParseErrors = 0;
         return [];
     }
     const rows = content
@@ -11551,14 +11857,18 @@ function listTaskRunRecords(limit = 20) {
         .map((line) => line.trim())
         .filter(Boolean);
     const parsed = [];
+    let parseErrors = 0;
     for (let i = rows.length - 1; i >= 0; i -= 1) {
         try {
             parsed.push(JSON.parse(rows[i]));
             if (parsed.length >= max) {
                 break;
             }
-        } catch (_) {}
+        } catch (_) {
+            parseErrors += 1;
+        }
     }
+    g_taskRunRecordsLastParseErrors = parseErrors;
     return parsed;
 }
 
@@ -11660,7 +11970,13 @@ async function notifyAutomationOnTaskRun(detail = {}) {
 
 function startAutomationScheduler() {
     const lastTicks = new Map();
+    let tickInFlight = false;
     let timer = setInterval(async () => {
+        if (tickInFlight) {
+            return;
+        }
+        tickInFlight = true;
+        try {
         const cfg = readAutomationConfig(AUTOMATION_CONFIG_FILE, { env: process.env });
         if (!cfg.ok || !cfg.config) {
             return;
@@ -11681,11 +11997,16 @@ function startAutomationScheduler() {
             const actionType = typeof action.type === 'string' ? action.type.trim().toLowerCase() : '';
             if (actionType !== 'task.queue.add') continue;
             const taskPayload = action.task && typeof action.task === 'object' ? action.task : {};
-            const enqueue = addTaskToQueue(taskPayload);
-            if (enqueue && enqueue.error) continue;
-            if (action.startQueue === true) {
-                await startTaskQueueProcessing({ taskId: '', detach: true });
-            }
+            try {
+                const enqueue = addTaskToQueue(taskPayload);
+                if (enqueue && enqueue.error) continue;
+                if (action.startQueue === true) {
+                    await startTaskQueueProcessing({ taskId: '', detach: true });
+                }
+            } catch (_) {}
+        }
+        } finally {
+            tickInFlight = false;
         }
     }, 30000);
     if (timer && typeof timer.unref === 'function') {
@@ -11702,14 +12023,24 @@ function buildTaskOverviewPayload(options = {}) {
     const queueLimit = Number.isFinite(options.queueLimit) ? Math.max(1, Math.floor(options.queueLimit)) : 20;
     const runLimit = Number.isFinite(options.runLimit) ? Math.max(1, Math.floor(options.runLimit)) : 20;
     const workflowCatalog = buildTaskWorkflowCatalog();
-    const queue = listTaskQueueItems({ limit: queueLimit });
+    const queueState = readTaskQueueState();
+    const queue = queueState.error ? [] : listTaskQueueItems({ limit: queueLimit });
     const runs = listTaskRunRecords(runLimit);
+    const warnings = Array.isArray(workflowCatalog.warnings) ? [...workflowCatalog.warnings] : [];
+    if (queueState.error) {
+        warnings.push(`task queue read error: ${queueState.error}`);
+    }
+    if (g_taskRunRecordsLastParseErrors > 0) {
+        warnings.push(`task run history parse errors: ${g_taskRunRecordsLastParseErrors}`);
+    }
     return {
         workflows: workflowCatalog.workflows,
-        warnings: workflowCatalog.warnings,
+        warnings,
         queue,
         runs,
-        activeRunIds: Array.from(g_taskRunControllers.keys())
+        activeRunIds: Array.from(g_taskRunControllers.keys()),
+        queueError: queueState.error || '',
+        runParseErrors: g_taskRunRecordsLastParseErrors
     };
 }
 
@@ -12007,7 +12338,7 @@ async function runTaskPlanInternal(plan, options = {}) {
         }
     });
     if (options.queueItem) {
-        upsertTaskQueueItem({
+        const queued = upsertTaskQueueItem({
             ...options.queueItem,
             taskId,
             status: 'running',
@@ -12017,6 +12348,7 @@ async function runTaskPlanInternal(plan, options = {}) {
             updatedAt: toIsoTime(Date.now()),
             plan
         });
+        if (queued && queued.error) {}
     }
     try {
         const run = await executeTaskPlan(plan, {
@@ -12040,7 +12372,7 @@ async function runTaskPlanInternal(plan, options = {}) {
                 };
                 writeTaskRunDetail(nextDetail);
                 if (options.queueItem) {
-                    upsertTaskQueueItem({
+                    const queued = upsertTaskQueueItem({
                         ...options.queueItem,
                         taskId,
                         status: snapshot.status === 'success'
@@ -12052,6 +12384,7 @@ async function runTaskPlanInternal(plan, options = {}) {
                         updatedAt: toIsoTime(Date.now()),
                         plan
                     });
+                    if (queued && queued.error) {}
                 }
             }
         });
@@ -12068,7 +12401,7 @@ async function runTaskPlanInternal(plan, options = {}) {
             await notifyAutomationOnTaskRun(detail);
         } catch (_) {}
         if (options.queueItem) {
-            upsertTaskQueueItem({
+            const queued = upsertTaskQueueItem({
                 ...options.queueItem,
                 taskId,
                 status: run.status === 'success'
@@ -12080,6 +12413,7 @@ async function runTaskPlanInternal(plan, options = {}) {
                 updatedAt: toIsoTime(Date.now()),
                 plan
             });
+            if (queued && queued.error) {}
         }
         return detail;
     } finally {
@@ -12115,6 +12449,9 @@ function addTaskToQueue(params = {}) {
         runStatus: '',
         plan
     });
+    if (item && item.error) {
+        return { error: item.error };
+    }
     return {
         ok: true,
         task: item,
@@ -12285,6 +12622,9 @@ function cancelTaskRunOrQueue(params = {}) {
                 updatedAt: toIsoTime(Date.now()),
                 lastSummary: queueItem.lastSummary || '已取消'
             });
+            if (next && next.error) {
+                return { error: next.error };
+            }
             return {
                 ok: true,
                 cancelled: true,
@@ -12423,13 +12763,37 @@ function isLiveProcessId(value) {
     }
 }
 
+function isTaskWorkerProcessId(value) {
+    const pid = Number.isFinite(Number(value)) ? Math.floor(Number(value)) : 0;
+    if (!isLiveProcessId(pid)) return false;
+    if (process.platform === 'linux') {
+        try {
+            const raw = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf-8');
+            return raw.includes('__task-worker');
+        } catch (_) {
+            return true;
+        }
+    }
+    if (process.platform === 'darwin') {
+        try {
+            const probe = spawnSync('ps', ['-p', String(pid), '-o', 'command='], { encoding: 'utf-8', timeout: 1500 });
+            if (probe.error || probe.status !== 0) return true;
+            const cmd = String(probe.stdout || '');
+            return cmd.includes('__task-worker');
+        } catch (_) {
+            return true;
+        }
+    }
+    return true;
+}
+
 function readTaskQueueWorkerState() {
     const parsed = readJsonObjectFromFile(TASK_QUEUE_WORKER_FILE, {});
     if (!parsed.ok || !parsed.exists || !parsed.data || typeof parsed.data !== 'object') {
         return null;
     }
     const state = parsed.data;
-    if (!isLiveProcessId(state.pid)) {
+    if (!isTaskWorkerProcessId(state.pid)) {
         try {
             fs.unlinkSync(TASK_QUEUE_WORKER_FILE);
         } catch (_) {}

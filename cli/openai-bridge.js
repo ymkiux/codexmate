@@ -238,6 +238,10 @@ function normalizeResponsesInputToChatMessages(input) {
                 out.push({ type: 'text', text: block.text });
                 continue;
             }
+            if ((type === 'reasoning' || type === 'reasoning_text' || type === 'reasoning_content') && typeof block.text === 'string') {
+                out.push({ type: 'text', text: block.text });
+                continue;
+            }
             if (type === 'input_image') {
                 const raw = block.image_url != null ? block.image_url : block.imageUrl;
                 const url = typeof raw === 'string'
@@ -255,7 +259,21 @@ function normalizeResponsesInputToChatMessages(input) {
             }
             if (type === 'image_url' && block.image_url) {
                 out.push({ type: 'image_url', image_url: block.image_url });
+                continue;
             }
+            const text = typeof block.text === 'string'
+                ? block.text
+                : (typeof block.content === 'string' ? block.content : '');
+            if (text) {
+                out.push({ type: 'text', text });
+                continue;
+            }
+            try {
+                const raw = JSON.stringify(block);
+                if (raw) {
+                    out.push({ type: 'text', text: raw.slice(0, 4000) });
+                }
+            } catch (_) {}
         }
         if (out.length === 0) return '';
         return out;
@@ -635,6 +653,9 @@ async function proxyRequestJson(targetUrl, options = {}) {
     const parsed = new URL(targetUrl);
     const transport = parsed.protocol === 'https:' ? https : http;
     const bodyText = options.body ? JSON.stringify(options.body) : '';
+    const maxBytes = Number.isFinite(options.maxBytes) && options.maxBytes > 0
+        ? Math.floor(options.maxBytes)
+        : 0;
     const headers = {
         'Accept': 'application/json',
         ...(options.body ? { 'Content-Type': 'application/json' } : {}),
@@ -664,7 +685,21 @@ async function proxyRequestJson(targetUrl, options = {}) {
             agent: parsed.protocol === 'https:' ? options.httpsAgent : options.httpAgent
         }, (upstreamRes) => {
             const chunks = [];
-            upstreamRes.on('data', (chunk) => chunk && chunks.push(chunk));
+            let size = 0;
+            upstreamRes.on('data', (chunk) => {
+                if (!chunk) return;
+                if (maxBytes > 0) {
+                    size += chunk.length;
+                    if (size > maxBytes) {
+                        chunks.length = 0;
+                        try { upstreamRes.destroy(new Error('response too large')); } catch (_) {}
+                        try { req.destroy(new Error('response too large')); } catch (_) {}
+                        finish({ ok: false, error: 'response too large' });
+                        return;
+                    }
+                }
+                chunks.push(chunk);
+            });
             upstreamRes.on('end', () => {
                 const text = chunks.length ? Buffer.concat(chunks).toString('utf-8') : '';
                 finish({
@@ -689,12 +724,16 @@ async function proxyRequestJson(targetUrl, options = {}) {
 
 function createOpenaiBridgeHttpHandler(options = {}) {
     const settingsFile = options.settingsFile;
-    const expectedToken = typeof options.expectedToken === 'string' && options.expectedToken.trim()
-        ? options.expectedToken.trim()
-        : DEFAULT_BRIDGE_TOKEN;
+    const expectedTokenRaw = typeof options.expectedToken === 'string' ? options.expectedToken.trim() : '';
+    const expectedToken = Object.prototype.hasOwnProperty.call(options, 'expectedToken')
+        ? expectedTokenRaw
+        : (expectedTokenRaw || DEFAULT_BRIDGE_TOKEN);
     const maxBodySize = Number.isFinite(options.maxBodySize) ? options.maxBodySize : 0;
     const httpAgent = options.httpAgent;
     const httpsAgent = options.httpsAgent;
+    const maxUpstreamBytes = Number.isFinite(options.maxUpstreamBytes) && options.maxUpstreamBytes > 0
+        ? Math.floor(options.maxUpstreamBytes)
+        : Math.max(16 * 1024 * 1024, maxBodySize > 0 ? maxBodySize * 4 : 0);
 
     if (!settingsFile) {
         throw new Error('createOpenaiBridgeHttpHandler 缺少 settingsFile');
@@ -730,6 +769,11 @@ function createOpenaiBridgeHttpHandler(options = {}) {
             // 为避免在 LAN 暴露无鉴权的代理，这里仅允许 loopback 连接缺省 token。
             const remoteAddr = req && req.socket ? req.socket.remoteAddress : '';
             const isLoopback = isLoopbackAddress(remoteAddr);
+            if (!isLoopback && !expectedToken) {
+                res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ error: 'Remote access is disabled (set CODEXMATE_HTTP_TOKEN)' }));
+                return;
+            }
             if (!token && !isLoopback) {
                 res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
                 res.end(JSON.stringify({ error: 'Unauthorized' }));
@@ -774,6 +818,7 @@ function createOpenaiBridgeHttpHandler(options = {}) {
                         ...(authHeader ? { Authorization: authHeader } : {}),
                         ...upstreamHeaders
                     },
+                    maxBytes: maxUpstreamBytes,
                     httpAgent,
                     httpsAgent
                 });
@@ -827,6 +872,7 @@ function createOpenaiBridgeHttpHandler(options = {}) {
                     ...(authHeader ? { Authorization: authHeader } : {}),
                     ...upstreamHeaders
                 },
+                maxBytes: maxUpstreamBytes,
                 httpAgent,
                 httpsAgent
             });
@@ -887,6 +933,7 @@ function createOpenaiBridgeHttpHandler(options = {}) {
                     ...(authHeader ? { Authorization: authHeader } : {}),
                     ...upstreamHeaders
                 },
+                maxBytes: maxUpstreamBytes,
                 httpAgent,
                 httpsAgent
             });
