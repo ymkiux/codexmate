@@ -653,6 +653,9 @@ async function proxyRequestJson(targetUrl, options = {}) {
     const parsed = new URL(targetUrl);
     const transport = parsed.protocol === 'https:' ? https : http;
     const bodyText = options.body ? JSON.stringify(options.body) : '';
+    const maxBytes = Number.isFinite(options.maxBytes) && options.maxBytes > 0
+        ? Math.floor(options.maxBytes)
+        : 0;
     const headers = {
         'Accept': 'application/json',
         ...(options.body ? { 'Content-Type': 'application/json' } : {}),
@@ -682,7 +685,21 @@ async function proxyRequestJson(targetUrl, options = {}) {
             agent: parsed.protocol === 'https:' ? options.httpsAgent : options.httpAgent
         }, (upstreamRes) => {
             const chunks = [];
-            upstreamRes.on('data', (chunk) => chunk && chunks.push(chunk));
+            let size = 0;
+            upstreamRes.on('data', (chunk) => {
+                if (!chunk) return;
+                if (maxBytes > 0) {
+                    size += chunk.length;
+                    if (size > maxBytes) {
+                        chunks.length = 0;
+                        try { upstreamRes.destroy(new Error('response too large')); } catch (_) {}
+                        try { req.destroy(new Error('response too large')); } catch (_) {}
+                        finish({ ok: false, error: 'response too large' });
+                        return;
+                    }
+                }
+                chunks.push(chunk);
+            });
             upstreamRes.on('end', () => {
                 const text = chunks.length ? Buffer.concat(chunks).toString('utf-8') : '';
                 finish({
@@ -714,6 +731,9 @@ function createOpenaiBridgeHttpHandler(options = {}) {
     const maxBodySize = Number.isFinite(options.maxBodySize) ? options.maxBodySize : 0;
     const httpAgent = options.httpAgent;
     const httpsAgent = options.httpsAgent;
+    const maxUpstreamBytes = Number.isFinite(options.maxUpstreamBytes) && options.maxUpstreamBytes > 0
+        ? Math.floor(options.maxUpstreamBytes)
+        : Math.max(16 * 1024 * 1024, maxBodySize > 0 ? maxBodySize * 4 : 0);
 
     if (!settingsFile) {
         throw new Error('createOpenaiBridgeHttpHandler 缺少 settingsFile');
@@ -798,6 +818,7 @@ function createOpenaiBridgeHttpHandler(options = {}) {
                         ...(authHeader ? { Authorization: authHeader } : {}),
                         ...upstreamHeaders
                     },
+                    maxBytes: maxUpstreamBytes,
                     httpAgent,
                     httpsAgent
                 });
@@ -851,6 +872,7 @@ function createOpenaiBridgeHttpHandler(options = {}) {
                     ...(authHeader ? { Authorization: authHeader } : {}),
                     ...upstreamHeaders
                 },
+                maxBytes: maxUpstreamBytes,
                 httpAgent,
                 httpsAgent
             });
@@ -911,6 +933,7 @@ function createOpenaiBridgeHttpHandler(options = {}) {
                     ...(authHeader ? { Authorization: authHeader } : {}),
                     ...upstreamHeaders
                 },
+                maxBytes: maxUpstreamBytes,
                 httpAgent,
                 httpsAgent
             });
