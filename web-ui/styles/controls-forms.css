@@ -18,6 +18,8 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: nowrap;
+    gap: 10px;
     margin-bottom: 2px;
 }
 
@@ -81,6 +83,10 @@
     text-transform: none;
     letter-spacing: 0.03em;
     opacity: 0.85;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .selector-actions {
@@ -91,6 +97,12 @@
     align-items: center;
     justify-content: end;
     white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+.selector-actions > .btn-tool,
+.selector-actions > .btn-tool-compact {
+    flex: 0 0 auto;
 }
 
 .health-report {
