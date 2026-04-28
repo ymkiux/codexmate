@@ -1,6 +1,6 @@
 ﻿<div align="center">
 
-<img src="res/logo.png" alt="Codex Mate logo" width="180" />
+<img src="site/.vitepress/public/images/logo.png" alt="Codex Mate logo" width="180" />
 
 # Codex Mate
 
