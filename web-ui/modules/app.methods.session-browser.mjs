@@ -258,6 +258,9 @@ export function createSessionBrowserMethods(options = {}) {
             const urlState = readSessionsFilterUrlState();
             if (urlState) {
                 applySessionsFilterUrlState(this, urlState);
+                if (this.mainTab === 'sessions' && typeof this.loadSessions === 'function') {
+                    void this.loadSessions();
+                }
                 return;
             }
             const sourceCache = localStorage.getItem('codexmateSessionFilterSource');
@@ -272,6 +275,16 @@ export function createSessionBrowserMethods(options = {}) {
             this.sessionRoleFilter = normalizeSessionRoleFilter(roleCache);
             this.sessionTimePreset = normalizeSessionTimePreset(timeCache);
             this.refreshSessionPathOptions(this.sessionFilterSource);
+            if (this.mainTab === 'sessions' && typeof this.loadSessions === 'function') {
+                const shouldReload = cached.source !== 'all'
+                    || !!cached.pathFilter
+                    || !!(this.sessionQuery && isSessionQueryEnabled(cached.source))
+                    || (this.sessionRoleFilter && this.sessionRoleFilter !== 'all')
+                    || (this.sessionTimePreset && this.sessionTimePreset !== 'all');
+                if (shouldReload) {
+                    void this.loadSessions();
+                }
+            }
         },
 
         persistSessionFilterCache() {

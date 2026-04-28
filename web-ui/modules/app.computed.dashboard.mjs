@@ -77,6 +77,7 @@ export function createDashboardComputed() {
         inspectorSessionSourceLabel() {
             if (this.sessionFilterSource === 'codex') return this.t('dashboard.sessionSource.codex');
             if (this.sessionFilterSource === 'claude') return this.t('dashboard.sessionSource.claude');
+            if (this.sessionFilterSource === 'gemini') return this.t('dashboard.sessionSource.gemini');
             return this.t('dashboard.sessionSource.all');
         },
         inspectorSessionPathLabel() {
