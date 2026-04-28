@@ -97,6 +97,17 @@ function extractHttpStatusFromError(err) {
     return Number.isFinite(value) ? value : 0;
 }
 
+function isAllowedSkillsRedirectHost(originHost, nextHost) {
+    const origin = typeof originHost === 'string' ? originHost.trim().toLowerCase() : '';
+    const next = typeof nextHost === 'string' ? nextHost.trim().toLowerCase() : '';
+    if (!origin || !next) return false;
+    if (origin === next) return true;
+    if (process.env.CODEXMATE_ALLOW_SKILLS_REDIRECT === '1') return true;
+    if (origin === 'github.com' && next === 'codeload.github.com') return true;
+    if (origin === 'github.com' && next.endsWith('.githubusercontent.com')) return true;
+    return false;
+}
+
 function downloadUrlToFile(targetUrl, filePath, options = {}) {
     const maxBytes = Number.isFinite(options.maxBytes) && options.maxBytes > 0
         ? Math.floor(options.maxBytes)
@@ -141,8 +152,19 @@ function downloadUrlToFile(targetUrl, filePath, options = {}) {
                 const nextUrl = redirectLocation.startsWith('http')
                     ? redirectLocation
                     : `${parsed.origin}${redirectLocation}`;
+                let originHost = typeof options.originHost === 'string' && options.originHost.trim()
+                    ? options.originHost.trim()
+                    : parsed.host;
+                try {
+                    const nextParsed = new URL(nextUrl);
+                    if (!isAllowedSkillsRedirectHost(originHost, nextParsed.host)) {
+                        res.resume();
+                        reject(new Error('Cross-origin redirect is not allowed'));
+                        return;
+                    }
+                } catch (_) {}
                 res.resume();
-                downloadUrlToFile(nextUrl, filePath, { maxBytes, timeoutMs, maxRedirects: maxRedirects - 1 })
+                downloadUrlToFile(nextUrl, filePath, { maxBytes, timeoutMs, maxRedirects: maxRedirects - 1, originHost })
                     .then(resolve)
                     .catch(reject);
                 return;

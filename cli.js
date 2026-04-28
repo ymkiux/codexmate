@@ -10,6 +10,7 @@ const yauzl = require('yauzl');
 const { exec, execSync, spawn, spawnSync } = require('child_process');
 const http = require('http');
 const https = require('https');
+const net = require('net');
 const readline = require('readline');
 const {
     expandHomePath,
@@ -7315,18 +7316,55 @@ function cmdClaude(baseUrl, apiKey, model, silent = false) {
 function commandExists(command, args = '') {
     const cmd = typeof command === 'string' ? command.trim() : '';
     const argText = typeof args === 'string' ? args.trim() : '';
-    if (!cmd || !/^[A-Za-z0-9._-]+$/.test(cmd)) {
+    if (!cmd || cmd.includes('\0') || /[\r\n]/.test(cmd)) {
         return false;
     }
-    if (argText && /[\r\n;&|<>`$]/.test(argText)) {
-        return false;
+    const argv = argText ? argText.split(/\s+/g).filter(Boolean) : [];
+    const hasSeparators = cmd.includes('/') || cmd.includes('\\');
+    const useShell = process.platform === 'win32' && !hasSeparators;
+    if (useShell) {
+        if (!/^[A-Za-z0-9._-]+$/.test(cmd)) return false;
+        if (argText && /[\r\n;&|<>`$]/.test(argText)) return false;
     }
     try {
-        execSync(`${cmd}${argText ? ` ${argText}` : ''}`, { stdio: 'ignore', shell: process.platform === 'win32' });
-        return true;
-    } catch (e) {
+        const probe = spawnSync(cmd, argv, {
+            stdio: 'ignore',
+            windowsHide: true,
+            timeout: 5000,
+            shell: useShell
+        });
+        return probe.status === 0;
+    } catch (_) {
         return false;
     }
+}
+
+function isPrivateNetworkHost(hostname) {
+    const host = typeof hostname === 'string' ? hostname.trim().toLowerCase() : '';
+    if (!host) return true;
+    if (host === 'localhost') return true;
+    const ipVer = net.isIP(host);
+    if (!ipVer) {
+        return false;
+    }
+    if (ipVer === 4) {
+        const parts = host.split('.').map((x) => parseInt(x, 10));
+        if (parts.length !== 4 || parts.some((x) => !Number.isFinite(x))) return true;
+        const [a, b] = parts;
+        if (a === 10) return true;
+        if (a === 127) return true;
+        if (a === 169 && b === 254) return true;
+        if (a === 192 && b === 168) return true;
+        if (a === 172 && b >= 16 && b <= 31) return true;
+        return false;
+    }
+    if (ipVer === 6) {
+        if (host === '::1') return true;
+        if (host.startsWith('fe80:')) return true;
+        if (host.startsWith('fc') || host.startsWith('fd')) return true;
+        return false;
+    }
+    return false;
 }
 
 function detectPreferredPackageManager() {
@@ -8643,6 +8681,20 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                                 if (!baseUrl) {
                                     result = { error: 'Base URL is required' };
                                 } else {
+                                    const remoteAddr = req && req.socket ? req.socket.remoteAddress : '';
+                                    const requesterIsLoopback = !remoteAddr
+                                        || remoteAddr === '127.0.0.1'
+                                        || remoteAddr === '::1'
+                                        || remoteAddr === '::ffff:127.0.0.1';
+                                    if (!requesterIsLoopback) {
+                                        try {
+                                            const parsedUrl = new URL(baseUrl);
+                                            if (isPrivateNetworkHost(parsedUrl.hostname || '')) {
+                                                result = { error: 'Refusing to access private network baseUrl from non-loopback request' };
+                                                break;
+                                            }
+                                        } catch (_) {}
+                                    }
                                     const res = await fetchModelsFromBaseUrl(baseUrl, apiKey);
                                     if (res.error) {
                                         result = { error: res.error, models: [], source: 'remote' };
@@ -9230,7 +9282,14 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                 });
                 return;
             }
-
+            const allowLegacy = process.env.CODEXMATE_ALLOW_LEGACY_DOWNLOAD === '1';
+            const remoteAddr = req && req.socket ? req.socket.remoteAddress : '';
+            const isLoopback = !remoteAddr || remoteAddr === '127.0.0.1' || remoteAddr === '::1' || remoteAddr === '::ffff:127.0.0.1';
+            if (!allowLegacy || !isLoopback) {
+                res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+                res.end('Not Found');
+                return;
+            }
             const tempDir = os.tmpdir();
             const legacyFilePath = path.join(tempDir, decodedFileName);
             if (!isPathInside(legacyFilePath, tempDir)) {
@@ -9304,8 +9363,12 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
         }
         console.log('  退出: Ctrl+C\n');
         if (isAnyAddressHost(host)) {
-            console.warn('! 安全提示: 当前监听所有网卡（无鉴权）。');
-            console.warn('  建议仅在可信网络使用，或改用 --host 127.0.0.1。');
+            const tokenEnabled = typeof process.env.CODEXMATE_HTTP_TOKEN === 'string' && process.env.CODEXMATE_HTTP_TOKEN.trim().length > 0;
+            console.warn(`! 安全提示: 当前监听所有网卡（${tokenEnabled ? '已启用鉴权' : '无鉴权'}）。`);
+            if (!tokenEnabled) {
+                console.warn('  建议仅在可信网络使用，或改用 --host 127.0.0.1。');
+                console.warn('  如需远程访问，请设置 CODEXMATE_HTTP_TOKEN。');
+            }
         }
 
         if (willOpenBrowser) {
