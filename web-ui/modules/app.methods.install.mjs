@@ -104,6 +104,11 @@ export function createInstallMethods() {
                     update: '',
                     uninstall: ''
                 },
+                codebuddy: {
+                    install: '',
+                    update: '',
+                    uninstall: ''
+                },
                 gemini: {
                     install: '',
                     update: '',
@@ -119,6 +124,9 @@ export function createInstallMethods() {
                 matrix.claude.install = 'pnpm add -g @anthropic-ai/claude-code';
                 matrix.claude.update = 'pnpm up -g @anthropic-ai/claude-code';
                 matrix.claude.uninstall = 'pnpm remove -g @anthropic-ai/claude-code';
+                matrix.codebuddy.install = 'pnpm add -g @tencent-ai/codebuddy-code';
+                matrix.codebuddy.update = 'pnpm up -g @tencent-ai/codebuddy-code';
+                matrix.codebuddy.uninstall = 'pnpm remove -g @tencent-ai/codebuddy-code';
                 matrix.gemini.install = 'pnpm add -g @google/gemini-cli';
                 matrix.gemini.update = 'pnpm up -g @google/gemini-cli';
                 matrix.gemini.uninstall = 'pnpm remove -g @google/gemini-cli';
@@ -131,6 +139,9 @@ export function createInstallMethods() {
                 matrix.claude.install = 'bun add -g @anthropic-ai/claude-code';
                 matrix.claude.update = 'bun update -g @anthropic-ai/claude-code';
                 matrix.claude.uninstall = 'bun remove -g @anthropic-ai/claude-code';
+                matrix.codebuddy.install = 'bun add -g @tencent-ai/codebuddy-code';
+                matrix.codebuddy.update = 'bun update -g @tencent-ai/codebuddy-code';
+                matrix.codebuddy.uninstall = 'bun remove -g @tencent-ai/codebuddy-code';
                 matrix.gemini.install = 'bun add -g @google/gemini-cli';
                 matrix.gemini.update = 'bun update -g @google/gemini-cli';
                 matrix.gemini.uninstall = 'bun remove -g @google/gemini-cli';
@@ -142,6 +153,9 @@ export function createInstallMethods() {
             matrix.claude.install = 'npm install -g @anthropic-ai/claude-code';
             matrix.claude.update = 'npm update -g @anthropic-ai/claude-code';
             matrix.claude.uninstall = 'npm uninstall -g @anthropic-ai/claude-code';
+            matrix.codebuddy.install = 'npm install -g @tencent-ai/codebuddy-code';
+            matrix.codebuddy.update = 'npm update -g @tencent-ai/codebuddy-code';
+            matrix.codebuddy.uninstall = 'npm uninstall -g @tencent-ai/codebuddy-code';
             matrix.gemini.install = 'npm install -g @google/gemini-cli';
             matrix.gemini.update = 'npm update -g @google/gemini-cli';
             matrix.gemini.uninstall = 'npm uninstall -g @google/gemini-cli';

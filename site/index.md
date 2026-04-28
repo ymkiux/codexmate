@@ -34,7 +34,7 @@ Codex Mate 是一个本地优先的配置与会话管理工具，覆盖：
 - Codex provider/model 切换与配置写入
 - Claude Code 配置方案管理（写入 `~/.claude/settings.json`）
 - OpenClaw JSON5 配置与 Workspace `AGENTS.md`
-- Codex / Claude / Gemini CLI 本地会话浏览、导出、删除
+- Codex / Claude / Gemini CLI / CodeBuddy Code 本地会话浏览、导出、删除
 
 ## 快速开始
 
@@ -86,7 +86,7 @@ codexmate run --no-browser
 
 ### 会话
 
-- Codex + Claude + Gemini CLI 会话统一视图
+- Codex + Claude + Gemini CLI + CodeBuddy Code 会话统一视图
 - 搜索、筛选、导出、删除、批量清理
 
 ## 测试约定

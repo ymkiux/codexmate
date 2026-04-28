@@ -29,7 +29,7 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 - Claude Code `CLAUDE.md` 编辑（写入 `~/.claude/CLAUDE.md`）
 - OpenClaw JSON5 配置与 Workspace `AGENTS.md`
 - Codex / Claude Code Skills 市场（安装目标切换、本地 skills 管理、跨应用导入、ZIP 分发）
-- Codex / Claude / Gemini CLI 本地会话浏览、筛选、导出、删除与 Usage 统计概览
+- Codex / Claude / Gemini CLI / CodeBuddy Code 本地会话浏览、筛选、导出、删除与 Usage 统计概览
 - 插件（提示词模板）：模板复用、变量填写、一键复制
 - 任务编排：规划 / 排队 / 执行 / 回看
 
@@ -58,7 +58,7 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 - OpenClaw JSON5 配置方案管理
 
 **会话管理**
-- 同页查看 Codex、Claude 与 Gemini CLI 会话
+- 同页查看 Codex、Claude、Gemini CLI 与 CodeBuddy Code 会话
 - 支持本地会话置顶，置顶状态持久化保存并优先排序显示
 - 关键词搜索、来源筛选、cwd 路径筛选
 - 搜索体验优化：短周期结果缓存，避免输入时重复扫描
@@ -166,7 +166,7 @@ codexmate run
 
 > 安全提示：默认监听会在当前局域网暴露未鉴权的管理界面。若包含 API Key、provider 配置或 skills 管理，请仅在可信网络中使用；如需仅本机访问，可设置 `CODEXMATE_HOST=127.0.0.1` 或启动时传入 `--host 127.0.0.1`。
 
-### 安装 Codex CLI / Claude Code / Gemini CLI（可选）
+### 安装 Codex CLI / Claude Code / Gemini CLI / CodeBuddy Code（可选）
 
 Codex Mate 支持透传调用官方 CLI（例如 `codexmate codex ...`），建议先安装：
 
@@ -182,6 +182,9 @@ npm install -g @anthropic-ai/claude-code
 
 # Gemini CLI
 npm install -g @google/gemini-cli
+
+# CodeBuddy Code
+npm install -g @tencent-ai/codebuddy-code
 ```
 
 ### 从源码运行

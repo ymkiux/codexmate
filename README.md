@@ -29,7 +29,7 @@ Codex Mate is a local-first CLI + Web UI for unified management of:
 - Claude Code `CLAUDE.md` editing (writes to `~/.claude/CLAUDE.md`)
 - OpenClaw JSON5 profiles and workspace `AGENTS.md`
 - Local skills market for Codex / Claude Code (target switching, local skills management, cross-app import, ZIP distribution)
-- Local Codex/Claude/Gemini CLI sessions (list/filter/export/delete) with Usage analytics overview
+- Local Codex/Claude/Gemini CLI/CodeBuddy Code sessions (list/filter/export/delete) with Usage analytics overview
 - Plugins (Prompt templates): reusable templates with variables and one-click copy
 - Task orchestration: plan/queue/run/review local tasks
 
@@ -57,7 +57,7 @@ It works on local files directly and does not require cloud hosting. The skills 
 - OpenClaw JSON5 profile management
 
 **Session Management**
-- Unified Codex + Claude + Gemini CLI session list
+- Unified Codex + Claude + Gemini CLI + CodeBuddy Code session list
 - Local session pinning with persistent pinned state and pinned-first ordering
 - Keyword/source/cwd filters
 - Fast search UX: short-lived query result caching to avoid rescanning on each keystroke
@@ -179,6 +179,9 @@ npm install -g @anthropic-ai/claude-code
 
 # Gemini CLI
 npm install -g @google/gemini-cli
+
+# CodeBuddy Code
+npm install -g @tencent-ai/codebuddy-code
 ```
 
 ### Run from source

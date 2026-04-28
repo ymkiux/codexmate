@@ -26,6 +26,9 @@ npm install -g @anthropic-ai/claude-code
 
 # Gemini CLI
 npm install -g @google/gemini-cli
+
+# CodeBuddy Code
+npm install -g @tencent-ai/codebuddy-code
 ```
 
 ### 免安装试用
@@ -63,7 +66,7 @@ codexmate claude <BaseURL> <API_KEY> [model]
 codexmate auth <list|import|switch|delete|status>
 codexmate workflow <list|get|validate|run|runs>
 codexmate qwen [args...]
-codexmate export-session --source <codex|claude|gemini> --session-id <ID>
+codexmate export-session --source <codex|claude|gemini|codebuddy> --session-id <ID>
 ```
 
 ## 校验建议

@@ -7,12 +7,13 @@ async function listSessionUsageCore(params = {}, deps = {}) {
         listSessionBrowse,
         parseCodexSessionSummary,
         parseClaudeSessionSummary,
+        parseCodeBuddySessionSummary,
         parseGeminiSessionSummary,
         MAX_SESSION_USAGE_LIST_SIZE,
         SESSION_BROWSE_SUMMARY_READ_BYTES
     } = deps;
 
-    const source = params.source === 'codex' || params.source === 'claude' || params.source === 'gemini'
+    const source = params.source === 'codex' || params.source === 'claude' || params.source === 'gemini' || params.source === 'codebuddy'
         ? params.source
         : 'all';
     const rawLimit = Number(params.limit);
@@ -84,7 +85,9 @@ async function listSessionUsageCore(params = {}, deps = {}) {
                     ? parseClaudeSessionSummary(filePath, summaryOptions)
                     : (normalized.source === 'gemini'
                         ? parseGeminiSessionSummary(filePath, summaryOptions)
-                        : parseCodexSessionSummary(filePath, summaryOptions));
+                        : (normalized.source === 'codebuddy'
+                            ? parseCodeBuddySessionSummary(filePath, summaryOptions)
+                            : parseCodexSessionSummary(filePath, summaryOptions)));
             } catch (_) {
                 summary = null;
             }
