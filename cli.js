@@ -8945,8 +8945,8 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                 deleteAfterDownload: false
             });
         } else if (requestPath.startsWith('/res/')) {
-            const normalized = path.normalize(requestPath).replace(/^([\\.\\/])+/, '');
-            const filePath = path.join(__dirname, normalized);
+            const normalized = path.normalize(requestPath.slice('/res/'.length)).replace(/^([\\.\\/])+/, '');
+            const filePath = path.join(assetsDir, normalized);
             if (!isPathInside(filePath, assetsDir)) {
                 res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
                 res.end('Forbidden');
@@ -9108,7 +9108,7 @@ function cmdStart(options = {}) {
     const newHtmlPath = path.join(webDir, 'index.html');
     const legacyHtmlPath = path.join(__dirname, 'web-ui.html');
     const htmlPath = fs.existsSync(newHtmlPath) ? newHtmlPath : legacyHtmlPath;
-    const assetsDir = path.join(__dirname, 'res');
+    const assetsDir = path.join(webDir, 'res');
     if (!fs.existsSync(htmlPath)) {
         console.error('错误: Web UI 页面不存在（尝试路径: web-ui/index.html, web-ui.html）');
         process.exit(1);
