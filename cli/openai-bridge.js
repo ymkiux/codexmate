@@ -238,6 +238,10 @@ function normalizeResponsesInputToChatMessages(input) {
                 out.push({ type: 'text', text: block.text });
                 continue;
             }
+            if ((type === 'reasoning' || type === 'reasoning_text' || type === 'reasoning_content') && typeof block.text === 'string') {
+                out.push({ type: 'text', text: block.text });
+                continue;
+            }
             if (type === 'input_image') {
                 const raw = block.image_url != null ? block.image_url : block.imageUrl;
                 const url = typeof raw === 'string'
@@ -255,7 +259,21 @@ function normalizeResponsesInputToChatMessages(input) {
             }
             if (type === 'image_url' && block.image_url) {
                 out.push({ type: 'image_url', image_url: block.image_url });
+                continue;
             }
+            const text = typeof block.text === 'string'
+                ? block.text
+                : (typeof block.content === 'string' ? block.content : '');
+            if (text) {
+                out.push({ type: 'text', text });
+                continue;
+            }
+            try {
+                const raw = JSON.stringify(block);
+                if (raw) {
+                    out.push({ type: 'text', text: raw.slice(0, 4000) });
+                }
+            } catch (_) {}
         }
         if (out.length === 0) return '';
         return out;
