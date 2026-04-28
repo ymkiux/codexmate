@@ -116,6 +116,8 @@
 
 .sessions-header-actions > .btn-tool,
 .sessions-header-actions > .btn-tool-compact {
+    display: inline-flex !important;
+    width: auto !important;
     white-space: nowrap;
     flex: 0 0 auto;
 }

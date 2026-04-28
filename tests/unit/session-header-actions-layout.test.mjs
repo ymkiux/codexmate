@@ -28,6 +28,14 @@ test('sessions header actions keep buttons inline (contract)', () => {
         'controls-forms.css should force sessions-header-actions inline-flex nowrap'
     );
     assert(
+        /\.sessions-header-actions\s*>\s*\.btn-tool[\s\S]*?width:\s*auto\s*!important\s*;/m.test(css),
+        'controls-forms.css should force sessions-header-actions > .btn-tool width auto'
+    );
+    assert(
+        /\.sessions-header-actions\s*>\s*\.btn-tool-compact[\s\S]*?width:\s*auto\s*!important\s*;/m.test(css),
+        'controls-forms.css should force sessions-header-actions > .btn-tool-compact width auto'
+    );
+    assert(
         !/\.sessions-header-actions\s*\{[\s\S]*?flex-wrap:\s*wrap\b/m.test(css),
         'sessions-header-actions must not allow flex-wrap: wrap'
     );
@@ -49,4 +57,3 @@ test('sessions header actions keep buttons inline (contract)', () => {
         `sessions-header-actions should not be overridden in other stylesheets: ${unexpectedOverrides.join(', ')}`
     );
 });
-
