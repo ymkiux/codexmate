@@ -674,6 +674,41 @@ function createBuiltinProxyRuntimeController(deps = {}) {
                 return;
             }
 
+            const remoteAddr = req && req.socket ? req.socket.remoteAddress : '';
+            const isLoopback = !remoteAddr
+                || remoteAddr === '127.0.0.1'
+                || remoteAddr === '::1'
+                || remoteAddr === '::ffff:127.0.0.1';
+            if (!isLoopback) {
+                const expected = typeof process.env.CODEXMATE_HTTP_TOKEN === 'string'
+                    ? process.env.CODEXMATE_HTTP_TOKEN.trim()
+                    : '';
+                if (!expected) {
+                    const body = JSON.stringify({ error: 'Remote access is disabled (set CODEXMATE_HTTP_TOKEN)' });
+                    res.writeHead(403, {
+                        'Content-Type': 'application/json; charset=utf-8',
+                        'Content-Length': Buffer.byteLength(body, 'utf-8')
+                    });
+                    res.end(body, 'utf-8');
+                    return;
+                }
+                const headers = req && req.headers && typeof req.headers === 'object' ? req.headers : {};
+                const rawAuth = typeof headers.authorization === 'string' ? headers.authorization.trim() : '';
+                const match = rawAuth ? rawAuth.match(/^bearer\s+(.+)$/i) : null;
+                const actual = match && match[1]
+                    ? match[1].trim()
+                    : (rawAuth ? rawAuth : (typeof headers['x-codexmate-token'] === 'string' ? String(headers['x-codexmate-token']).trim() : ''));
+                if (!actual || actual !== expected) {
+                    const body = JSON.stringify({ error: 'Unauthorized' });
+                    res.writeHead(401, {
+                        'Content-Type': 'application/json; charset=utf-8',
+                        'Content-Length': Buffer.byteLength(body, 'utf-8')
+                    });
+                    res.end(body, 'utf-8');
+                    return;
+                }
+            }
+
             const incomingPath = parsedIncoming.pathname || '/';
             if (incomingPath === '/health' || incomingPath === '/status') {
                 const body = JSON.stringify({

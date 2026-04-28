@@ -285,7 +285,7 @@ const HTTPS_KEEP_ALIVE_AGENT = new https.Agent({ keepAlive: true });
 
 const openaiBridgeHandler = createOpenaiBridgeHttpHandler({
     settingsFile: OPENAI_BRIDGE_SETTINGS_FILE,
-    expectedToken: 'codexmate',
+    expectedToken: typeof process.env.CODEXMATE_HTTP_TOKEN === 'string' ? process.env.CODEXMATE_HTTP_TOKEN.trim() : '',
     maxBodySize: MAX_API_BODY_SIZE,
     httpAgent: HTTP_KEEP_ALIVE_AGENT,
     httpsAgent: HTTPS_KEEP_ALIVE_AGENT
@@ -7964,7 +7964,7 @@ function writeJsonResponse(res, statusCode, payload) {
 function readJsonRequestBody(req, res, options = {}) {
     const maxBytes = Number.isFinite(options.maxBytes) ? Math.max(1024, Math.floor(options.maxBytes)) : MAX_API_BODY_SIZE;
     return new Promise((resolve) => {
-        let body = '';
+        const chunks = [];
         let bodySize = 0;
         let bodyTooLarge = false;
         req.on('data', (chunk) => {
@@ -7979,12 +7979,14 @@ function readJsonRequestBody(req, res, options = {}) {
                 resolve({ ok: false, error: 'payload-too-large' });
                 return;
             }
-            body += chunk;
+            chunks.push(chunk);
         });
         req.on('end', () => {
             if (bodyTooLarge) return;
+            const rawBuffer = chunks.length ? Buffer.concat(chunks) : Buffer.alloc(0);
+            const rawText = rawBuffer.length ? rawBuffer.toString('utf-8') : '';
             try {
-                resolve({ ok: true, body: JSON.parse(body || '{}') });
+                resolve({ ok: true, body: JSON.parse(rawText || '{}'), rawText, rawBuffer });
             } catch (error) {
                 resolve({ ok: false, error: error && error.message ? error.message : 'invalid json' });
             }
@@ -8064,6 +8066,25 @@ function rememberWebhookDeliveryId(value, ttlMs = 10 * 60 * 1000) {
     return { ok: true, seen: false };
 }
 
+function safeTimingEqual(a, b) {
+    try {
+        const ba = Buffer.isBuffer(a) ? a : Buffer.from(String(a || ''), 'utf-8');
+        const bb = Buffer.isBuffer(b) ? b : Buffer.from(String(b || ''), 'utf-8');
+        if (ba.length !== bb.length) return false;
+        return crypto.timingSafeEqual(ba, bb);
+    } catch (_) {
+        return false;
+    }
+}
+
+function verifyGithubWebhookSignature(secret, signatureHeader, rawBuffer) {
+    const key = typeof secret === 'string' ? secret : '';
+    const signature = typeof signatureHeader === 'string' ? signatureHeader.trim() : '';
+    if (!key || !signature || !signature.startsWith('sha256=')) return false;
+    const expected = 'sha256=' + crypto.createHmac('sha256', key).update(rawBuffer || Buffer.alloc(0)).digest('hex');
+    return safeTimingEqual(signature, expected);
+}
+
 async function handleAutomationHook(req, res, source) {
     const method = (req.method || 'GET').toUpperCase();
     if (method !== 'POST') {
@@ -8084,6 +8105,42 @@ async function handleAutomationHook(req, res, source) {
             writeJsonResponse(res, 400, { error: parsedBody.error || 'invalid request body' });
         }
         return;
+    }
+    const remoteAddr = req && req.socket ? req.socket.remoteAddress : '';
+    const isLoopback = !remoteAddr || isLoopbackRemoteAddress(remoteAddr);
+    const normalizedSource = typeof source === 'string' ? source.trim().toLowerCase() : '';
+    if (normalizedSource === 'github') {
+        const secret = typeof process.env.CODEXMATE_GITHUB_WEBHOOK_SECRET === 'string'
+            ? process.env.CODEXMATE_GITHUB_WEBHOOK_SECRET
+            : '';
+        if (!secret && !isLoopback) {
+            writeJsonResponse(res, 403, { error: 'Remote GitHub webhook is disabled (set CODEXMATE_GITHUB_WEBHOOK_SECRET)' });
+            return;
+        }
+        if (secret) {
+            const signature = (req.headers || {})['x-hub-signature-256'];
+            if (!verifyGithubWebhookSignature(secret, signature, parsedBody.rawBuffer)) {
+                writeJsonResponse(res, 401, { error: 'Invalid webhook signature' });
+                return;
+            }
+        }
+    } else if (normalizedSource === 'gitlab') {
+        const secret = typeof process.env.CODEXMATE_GITLAB_WEBHOOK_SECRET === 'string'
+            ? process.env.CODEXMATE_GITLAB_WEBHOOK_SECRET.trim()
+            : '';
+        if (!secret && !isLoopback) {
+            writeJsonResponse(res, 403, { error: 'Remote GitLab webhook is disabled (set CODEXMATE_GITLAB_WEBHOOK_SECRET)' });
+            return;
+        }
+        if (secret) {
+            const tokenHeader = typeof (req.headers || {})['x-gitlab-token'] === 'string'
+                ? String(req.headers['x-gitlab-token']).trim()
+                : '';
+            if (!tokenHeader || tokenHeader !== secret) {
+                writeJsonResponse(res, 401, { error: 'Invalid webhook token' });
+                return;
+            }
+        }
     }
     const payload = parsedBody.body && typeof parsedBody.body === 'object' ? parsedBody.body : {};
     const eventKey = buildAutomationEventKey(source, req.headers || {}, payload);

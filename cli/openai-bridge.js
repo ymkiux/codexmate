@@ -707,9 +707,10 @@ async function proxyRequestJson(targetUrl, options = {}) {
 
 function createOpenaiBridgeHttpHandler(options = {}) {
     const settingsFile = options.settingsFile;
-    const expectedToken = typeof options.expectedToken === 'string' && options.expectedToken.trim()
-        ? options.expectedToken.trim()
-        : DEFAULT_BRIDGE_TOKEN;
+    const expectedTokenRaw = typeof options.expectedToken === 'string' ? options.expectedToken.trim() : '';
+    const expectedToken = Object.prototype.hasOwnProperty.call(options, 'expectedToken')
+        ? expectedTokenRaw
+        : (expectedTokenRaw || DEFAULT_BRIDGE_TOKEN);
     const maxBodySize = Number.isFinite(options.maxBodySize) ? options.maxBodySize : 0;
     const httpAgent = options.httpAgent;
     const httpsAgent = options.httpsAgent;
@@ -748,6 +749,11 @@ function createOpenaiBridgeHttpHandler(options = {}) {
             // 为避免在 LAN 暴露无鉴权的代理，这里仅允许 loopback 连接缺省 token。
             const remoteAddr = req && req.socket ? req.socket.remoteAddress : '';
             const isLoopback = isLoopbackAddress(remoteAddr);
+            if (!isLoopback && !expectedToken) {
+                res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ error: 'Remote access is disabled (set CODEXMATE_HTTP_TOKEN)' }));
+                return;
+            }
             if (!token && !isLoopback) {
                 res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
                 res.end(JSON.stringify({ error: 'Unauthorized' }));

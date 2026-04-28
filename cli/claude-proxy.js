@@ -864,6 +864,30 @@ function createBuiltinClaudeProxyRuntimeController(deps = {}) {
     function createBuiltinClaudeProxyServer(settings, upstream) {
         const connections = new Set();
         const server = http.createServer((req, res) => {
+            const remoteAddr = req && req.socket ? req.socket.remoteAddress : '';
+            const isLoopback = !remoteAddr
+                || remoteAddr === '127.0.0.1'
+                || remoteAddr === '::1'
+                || remoteAddr === '::ffff:127.0.0.1';
+            if (!isLoopback) {
+                const expected = typeof process.env.CODEXMATE_HTTP_TOKEN === 'string'
+                    ? process.env.CODEXMATE_HTTP_TOKEN.trim()
+                    : '';
+                if (!expected) {
+                    writeAnthropicProxyError(res, 403, 'Remote access is disabled (set CODEXMATE_HTTP_TOKEN)', 'authentication_error');
+                    return;
+                }
+                const headers = req && req.headers && typeof req.headers === 'object' ? req.headers : {};
+                const rawAuth = typeof headers.authorization === 'string' ? headers.authorization.trim() : '';
+                const match = rawAuth ? rawAuth.match(/^bearer\s+(.+)$/i) : null;
+                const actual = match && match[1]
+                    ? match[1].trim()
+                    : (rawAuth ? rawAuth : (typeof headers['x-codexmate-token'] === 'string' ? String(headers['x-codexmate-token']).trim() : ''));
+                if (!actual || actual !== expected) {
+                    writeAnthropicProxyError(res, 401, 'Unauthorized', 'authentication_error');
+                    return;
+                }
+            }
             handleBuiltinClaudeProxyRequest(req, res, settings, upstream).catch((err) => {
                 if (res.headersSent) {
                     try { res.destroy(err); } catch (_) {}
