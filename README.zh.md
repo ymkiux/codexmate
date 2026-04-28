@@ -1,6 +1,6 @@
 ﻿<div align="center">
 
-<img src="res/logo.png" alt="Codex Mate logo" width="180" />
+<img src="site/.vitepress/public/images/logo.png" alt="Codex Mate logo" width="180" />
 
 # Codex Mate
 
@@ -83,7 +83,17 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 
 **工程能力**
 - MCP stdio 能力（tools/resources/prompts）
+- 自动化钩子（`/hooks/*`）+ 外发 webhook 通知
 - Zip 压缩/解压（优先系统工具，失败回退 JS 库）
+
+## 自动化（信号 → 行动）
+
+运行 `codexmate run` 后，可接收外部 webhook 并转为任务队列：
+
+- 入口：`POST /hooks/<source>`（当前支持 `github`、`gitlab`）
+- 规则：`~/.codex/codexmate-automation.json`
+- 动作：`task.queue.add`（可选 `startQueue: true`）
+- 通知：`notifiers[]` 支持 `type: "webhook"`（适配 Slack/飞书等入站 webhook）
 
 ## 架构总览
 

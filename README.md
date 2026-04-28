@@ -1,6 +1,6 @@
 ﻿<div align="center">
 
-<img src="res/logo.png" alt="Codex Mate logo" width="180" />
+<img src="site/.vitepress/public/images/logo.png" alt="Codex Mate logo" width="180" />
 
 # Codex Mate
 
@@ -78,9 +78,19 @@ It works on local files directly and does not require cloud hosting. The skills 
 
 **Engineering Utilities**
 - MCP stdio domains (`tools`, `resources`, `prompts`)
+- Automation hooks (`/hooks/*`) + outbound webhook notifiers
 - Built-in proxy controls (`proxy`)
 - Auth profile management (`auth`)
 - Zip/unzip utilities
+
+## Automation (signal → action)
+
+When running `codexmate run`, you can accept external webhooks and convert them into queued tasks:
+
+- Webhook entry: `POST /hooks/<source>` (currently `github`, `gitlab`)
+- Rule config: `~/.codex/codexmate-automation.json`
+- Supported action: `task.queue.add` (optionally `startQueue: true`)
+- Notifications: `notifiers[]` supports `type: "webhook"` for Slack/Feishu-style incoming webhooks
 
 ## Architecture
 

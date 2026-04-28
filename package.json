@@ -13,9 +13,6 @@
     "web-ui.html",
     "lib/",
     "web-ui/",
-    "res/json5.min.js",
-    "res/vue.global.prod.js",
-    "res/logo-pack.webp",
     "doc/",
     "README.md",
     "README.zh.md",
@@ -25,7 +22,7 @@
     ".": "./cli.js",
     "./lib/*": "./lib/*.js",
     "./web-ui/*": "./web-ui/*",
-    "./res/*": "./res/*"
+    "./res/*": "./web-ui/res/*"
   },
   "scripts": {
     "dev": "node cli.js run",
