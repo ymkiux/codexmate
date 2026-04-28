@@ -105,6 +105,21 @@
     flex: 0 0 auto;
 }
 
+.sessions-header-actions {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center;
+    gap: var(--spacing-xs);
+    white-space: nowrap;
+}
+
+.sessions-header-actions > .btn-tool,
+.sessions-header-actions > .btn-tool-compact {
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
 .health-report {
     margin-top: 10px;
     padding: 10px 0 0;

@@ -24,7 +24,7 @@
                 <div class="selector-section">
                     <div class="selector-header">
                         <span class="selector-title">{{ t('sessions.sourceTitle') }}</span>
-                        <div class="selector-actions">
+                        <div class="selector-actions sessions-header-actions">
                             <button class="btn-tool btn-tool-compact" @click="loadSessions({ forceRefresh: true })" :disabled="sessionsLoading">
                                 {{ sessionsLoading ? t('sessions.refreshing') : t('sessions.refresh') }}
                             </button>
