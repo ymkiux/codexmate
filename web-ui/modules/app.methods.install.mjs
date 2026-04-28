@@ -104,6 +104,11 @@ export function createInstallMethods() {
                     update: '',
                     uninstall: ''
                 },
+                gemini: {
+                    install: '',
+                    update: '',
+                    uninstall: ''
+                },
                 codex: {
                     install: '',
                     update: '',
@@ -114,6 +119,9 @@ export function createInstallMethods() {
                 matrix.claude.install = 'pnpm add -g @anthropic-ai/claude-code';
                 matrix.claude.update = 'pnpm up -g @anthropic-ai/claude-code';
                 matrix.claude.uninstall = 'pnpm remove -g @anthropic-ai/claude-code';
+                matrix.gemini.install = 'pnpm add -g @google/gemini-cli';
+                matrix.gemini.update = 'pnpm up -g @google/gemini-cli';
+                matrix.gemini.uninstall = 'pnpm remove -g @google/gemini-cli';
                 matrix.codex.install = `pnpm add -g ${codexInstallPackage}`;
                 matrix.codex.update = `pnpm up -g ${codexPackage}`;
                 matrix.codex.uninstall = `pnpm remove -g ${codexPackage}`;
@@ -123,6 +131,9 @@ export function createInstallMethods() {
                 matrix.claude.install = 'bun add -g @anthropic-ai/claude-code';
                 matrix.claude.update = 'bun update -g @anthropic-ai/claude-code';
                 matrix.claude.uninstall = 'bun remove -g @anthropic-ai/claude-code';
+                matrix.gemini.install = 'bun add -g @google/gemini-cli';
+                matrix.gemini.update = 'bun update -g @google/gemini-cli';
+                matrix.gemini.uninstall = 'bun remove -g @google/gemini-cli';
                 matrix.codex.install = `bun add -g ${codexInstallPackage}`;
                 matrix.codex.update = `bun update -g ${codexPackage}`;
                 matrix.codex.uninstall = `bun remove -g ${codexPackage}`;
@@ -131,6 +142,9 @@ export function createInstallMethods() {
             matrix.claude.install = 'npm install -g @anthropic-ai/claude-code';
             matrix.claude.update = 'npm update -g @anthropic-ai/claude-code';
             matrix.claude.uninstall = 'npm uninstall -g @anthropic-ai/claude-code';
+            matrix.gemini.install = 'npm install -g @google/gemini-cli';
+            matrix.gemini.update = 'npm update -g @google/gemini-cli';
+            matrix.gemini.uninstall = 'npm uninstall -g @google/gemini-cli';
             matrix.codex.install = `npm install -g ${codexInstallPackage}`;
             matrix.codex.update = platform === 'termux'
                 ? `npm install -g ${codexInstallPackage}`

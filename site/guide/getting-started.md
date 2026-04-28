@@ -13,6 +13,21 @@
 npm install -g codexmate
 ```
 
+### 安装官方 CLI（可选）
+
+Codex Mate 支持透传调用官方 CLI（例如 `codexmate codex ...`），并可在 Web UI 中浏览本地会话。建议先安装：
+
+```bash
+# Codex CLI
+npm install -g @openai/codex
+
+# Claude Code
+npm install -g @anthropic-ai/claude-code
+
+# Gemini CLI
+npm install -g @google/gemini-cli
+```
+
 ### 免安装试用
 
 ```bash
@@ -48,7 +63,7 @@ codexmate claude <BaseURL> <API_KEY> [model]
 codexmate auth <list|import|switch|delete|status>
 codexmate workflow <list|get|validate|run|runs>
 codexmate qwen [args...]
-codexmate export-session --source <codex|claude> --session-id <ID>
+codexmate export-session --source <codex|claude|gemini> --session-id <ID>
 ```
 
 ## 校验建议

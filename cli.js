@@ -275,6 +275,12 @@ const CLI_INSTALL_TARGETS = Object.freeze([
         bins: ['claude']
     },
     {
+        id: 'gemini',
+        name: 'Gemini CLI',
+        packageName: '@google/gemini-cli',
+        bins: ['gemini']
+    },
+    {
         id: 'codex',
         name: 'Codex CLI',
         packageName: '@openai/codex',
