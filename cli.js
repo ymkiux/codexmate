@@ -193,6 +193,8 @@ const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 const CLAUDE_SETTINGS_FILE = path.join(CLAUDE_DIR, 'settings.json');
 const CLAUDE_MD_FILE_NAME = 'CLAUDE.md';
 const CLAUDE_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
+const GEMINI_DIR = path.join(os.homedir(), '.gemini');
+const GEMINI_TMP_DIR = path.join(GEMINI_DIR, 'tmp');
 const RECENT_CONFIGS_FILE = path.join(CONFIG_DIR, 'recent-configs.json');
 const WORKFLOW_DEFINITIONS_FILE = path.join(CONFIG_DIR, 'codexmate-workflows.json');
 const WORKFLOW_RUNS_FILE = path.join(CONFIG_DIR, 'codexmate-workflow-runs.jsonl');
@@ -569,7 +571,8 @@ let g_sessionListCache = new Map();
 let g_sessionInventoryCache = new Map();
 let g_sessionFileLookupCache = {
     codex: new Map(),
-    claude: new Map()
+    claude: new Map(),
+    gemini: new Map()
 };
 let g_exactMessageCountCache = new Map();
 let g_modelsCache = new Map();
@@ -1262,6 +1265,21 @@ function getClaudeProjectsDir() {
     candidates.push(path.join(os.homedir(), '.config', 'claude', 'projects'));
     candidates.push(CLAUDE_PROJECTS_DIR);
     return resolveExistingDir(candidates, CLAUDE_PROJECTS_DIR);
+}
+
+function getGeminiTmpDir() {
+    const candidates = [];
+    const envGeminiHome = process.env.GEMINI_HOME;
+    if (envGeminiHome) {
+        candidates.push(path.join(envGeminiHome, 'tmp'));
+    }
+    const xdgConfig = process.env.XDG_CONFIG_HOME;
+    if (xdgConfig) {
+        candidates.push(path.join(xdgConfig, 'gemini', 'tmp'));
+    }
+    candidates.push(path.join(os.homedir(), '.config', 'gemini', 'tmp'));
+    candidates.push(GEMINI_TMP_DIR);
+    return resolveExistingDir(candidates, GEMINI_TMP_DIR);
 }
 
 function readModelsCacheEntry(cacheKey) {
@@ -2532,6 +2550,28 @@ async function countConversationMessagesInFile(filePath, source) {
         return cached;
     }
 
+    if (source === 'gemini') {
+        let json;
+        try {
+            json = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        } catch (_) {
+            json = null;
+        }
+        const rawMessages = json && Array.isArray(json.messages) ? json.messages : [];
+        const messages = [];
+        for (const entry of rawMessages) {
+            if (!entry || typeof entry !== 'object') continue;
+            const role = normalizeGeminiMessageRole(entry.type);
+            if (!role) continue;
+            const text = extractMessageText(extractGeminiMessageText(entry.content ?? entry.message ?? entry.text));
+            if (!text && role !== 'system') continue;
+            messages.push({ role, text });
+        }
+        const safeCount = removeLeadingSystemMessage(messages).length;
+        writeExactMessageCountCache(filePath, source, safeCount, fileStat);
+        return safeCount;
+    }
+
     let stream;
     let rl;
     let messageCount = 0;
@@ -2744,7 +2784,11 @@ async function hydrateSessionItemsExactMessageCount(items) {
         if (item.__messageCountExact === true) {
             return item;
         }
-        const source = item.source === 'claude' ? 'claude' : (item.source === 'codex' ? 'codex' : '');
+        const source = item.source === 'claude'
+            ? 'claude'
+            : (item.source === 'codex'
+                ? 'codex'
+                : (item.source === 'gemini' ? 'gemini' : ''));
         const filePath = typeof item.filePath === 'string' ? item.filePath : '';
         if (!source || !filePath || !fs.existsSync(filePath)) {
             return item;
@@ -2971,6 +3015,54 @@ async function scanSessionContentForQuery(session, tokens, options = {}) {
         ? Math.max(1024, rawMaxBytes)
         : 0;
     const state = createSessionQueryScanState(tokens, options);
+    if (session.source === 'gemini') {
+        if (state.roleFilter !== 'all') {
+            let json;
+            try {
+                json = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+            } catch (_) {
+                json = null;
+            }
+            const rawMessages = json && Array.isArray(json.messages) ? json.messages : [];
+            for (const entry of rawMessages) {
+                if (!entry || typeof entry !== 'object') continue;
+                const role = normalizeGeminiMessageRole(entry.type);
+                if (!role) continue;
+                const text = extractMessageText(extractGeminiMessageText(entry.content ?? entry.message ?? entry.text));
+                if (!text) continue;
+                if (consumeSessionQueryMessage(state, { role, text })) {
+                    break;
+                }
+            }
+            return buildSessionQueryScanResult(state);
+        }
+
+        let text = '';
+        try {
+            const stat = fs.statSync(filePath);
+            const targetBytes = maxBytes > 0 ? Math.min(maxBytes, stat.size || 0) : Math.min(stat.size || 0, 512 * 1024);
+            const fd = fs.openSync(filePath, 'r');
+            const buf = Buffer.alloc(targetBytes);
+            const bytes = fs.readSync(fd, buf, 0, targetBytes, 0);
+            fs.closeSync(fd);
+            text = bytes > 0 ? buf.slice(0, bytes).toString('utf-8') : '';
+        } catch (_) {
+            try {
+                text = fs.readFileSync(filePath, 'utf-8');
+            } catch (_) {
+                text = '';
+            }
+        }
+
+        if (!matchTokensInText(text, state.tokens, state.mode)) {
+            return buildSessionQueryScanResult(state);
+        }
+        state.count = 1;
+        if (state.snippetLimit > 0) {
+            state.snippets.push(truncateText(text));
+        }
+        return buildSessionQueryScanResult(state);
+    }
     let stream;
     let rl;
     try {
@@ -3292,7 +3384,7 @@ function setSessionInventoryCache(cacheKey, source, value) {
 }
 
 function listSessionInventoryBySource(source, limit, scanOptions = {}, options = {}) {
-    const normalizedSource = source === 'claude' ? 'claude' : 'codex';
+    const normalizedSource = source === 'claude' || source === 'gemini' ? source : 'codex';
     const forceRefresh = !!options.forceRefresh;
     const cacheKey = buildSessionInventoryCacheKey(normalizedSource, limit, scanOptions);
     const cached = getSessionInventoryCache(cacheKey, forceRefresh);
@@ -3302,7 +3394,9 @@ function listSessionInventoryBySource(source, limit, scanOptions = {}, options =
 
     const sessions = normalizedSource === 'claude'
         ? listClaudeSessions(limit, scanOptions)
-        : listCodexSessions(limit, scanOptions);
+        : (normalizedSource === 'gemini'
+            ? listGeminiSessions(limit, scanOptions)
+            : listCodexSessions(limit, scanOptions));
     setSessionInventoryCache(cacheKey, normalizedSource, sessions);
     return sessions;
 }
@@ -3312,7 +3406,8 @@ function invalidateSessionListCache() {
     g_sessionInventoryCache.clear();
     g_sessionFileLookupCache = {
         codex: new Map(),
-        claude: new Map()
+        claude: new Map(),
+        gemini: new Map()
     };
 }
 
@@ -3904,6 +3999,160 @@ function parseClaudeSessionSummary(filePath, options = {}) {
     };
 }
 
+function extractGeminiMessageText(content) {
+    if (typeof content === 'string') {
+        return content;
+    }
+    if (Array.isArray(content)) {
+        const parts = [];
+        for (const item of content) {
+            if (!item) continue;
+            if (typeof item === 'string') {
+                parts.push(item);
+                continue;
+            }
+            if (typeof item.text === 'string' && item.text.trim()) {
+                parts.push(item.text);
+                continue;
+            }
+            if (typeof item.content === 'string' && item.content.trim()) {
+                parts.push(item.content);
+            }
+        }
+        return parts.filter(Boolean).join('\n');
+    }
+    if (content && typeof content === 'object') {
+        if (typeof content.text === 'string') {
+            return content.text;
+        }
+        if (typeof content.content === 'string') {
+            return content.content;
+        }
+        if (Array.isArray(content.parts)) {
+            return extractGeminiMessageText(content.parts);
+        }
+        if (Array.isArray(content.content)) {
+            return extractGeminiMessageText(content.content);
+        }
+    }
+    return '';
+}
+
+function normalizeGeminiMessageRole(type) {
+    const t = typeof type === 'string' ? type.trim().toLowerCase() : '';
+    if (t === 'user') return 'user';
+    if (t === 'gemini' || t === 'assistant' || t === 'model') return 'assistant';
+    if (t === 'system' || t === 'info' || t === 'warning' || t === 'error') return 'system';
+    return '';
+}
+
+function parseGeminiSessionSummary(filePath, options = {}) {
+    const summaryReadBytes = Number.isFinite(Number(options.summaryReadBytes))
+        ? Math.max(1024, Math.floor(Number(options.summaryReadBytes)))
+        : SESSION_SUMMARY_READ_BYTES;
+    const titleReadBytes = Number.isFinite(Number(options.titleReadBytes))
+        ? Math.max(1024, Math.floor(Number(options.titleReadBytes)))
+        : SESSION_TITLE_READ_BYTES;
+    let stat;
+    try {
+        stat = fs.statSync(filePath);
+    } catch (_) {
+        return null;
+    }
+
+    const fileName = path.basename(filePath);
+    const projectHash = path.basename(path.dirname(path.dirname(filePath)));
+    let sessionId = path.basename(filePath, '.json');
+    let createdAt = '';
+    let updatedAt = stat.mtime.toISOString();
+    let provider = 'gemini';
+    let model = '';
+    const models = [];
+    let firstPrompt = '';
+    let messageCount = 0;
+
+    let headText = '';
+    try {
+        const fd = fs.openSync(filePath, 'r');
+        const buf = Buffer.alloc(summaryReadBytes);
+        const bytes = fs.readSync(fd, buf, 0, summaryReadBytes, 0);
+        fs.closeSync(fd);
+        headText = bytes > 0 ? buf.slice(0, bytes).toString('utf-8') : '';
+    } catch (_) {
+        headText = '';
+    }
+
+    if (headText) {
+        const sessionIdMatch = headText.match(/"sessionId"\s*:\s*"([^"]+)"/);
+        if (sessionIdMatch) {
+            sessionId = sessionIdMatch[1] || sessionId;
+        }
+        const startMatch = headText.match(/"startTime"\s*:\s*"([^"]+)"/);
+        if (startMatch) {
+            createdAt = toIsoTime(startMatch[1], createdAt);
+        }
+        const updatedMatch = headText.match(/"lastUpdated"\s*:\s*"([^"]+)"/);
+        if (updatedMatch) {
+            updatedAt = toIsoTime(updatedMatch[1], updatedAt);
+        }
+        const modelMatch = headText.match(/"model"\s*:\s*"([^"]+)"/);
+        if (modelMatch && modelMatch[1]) {
+            model = modelMatch[1];
+            models.push(model);
+        }
+        const summaryMatch = headText.match(/"summary"\s*:\s*"([^"]+)"/);
+        if (summaryMatch && summaryMatch[1]) {
+            firstPrompt = truncateText(summaryMatch[1]);
+        }
+        if (!firstPrompt) {
+            const userIdx = headText.search(/"type"\s*:\s*"user"/);
+            if (userIdx >= 0) {
+                const slice = headText.slice(userIdx, Math.min(headText.length, userIdx + titleReadBytes));
+                const contentStringMatch = slice.match(/"content"\s*:\s*"((?:\\\\.|[^\"\\\\])*)"/);
+                const textMatch = slice.match(/"text"\s*:\s*"((?:\\\\.|[^\"\\\\])*)"/);
+                const raw = (contentStringMatch && contentStringMatch[1]) || (textMatch && textMatch[1]) || '';
+                if (raw) {
+                    try {
+                        firstPrompt = truncateText(JSON.parse(`"${raw}"`));
+                    } catch (_) {
+                        firstPrompt = truncateText(raw);
+                    }
+                }
+            }
+        }
+    }
+
+    if (!createdAt) {
+        createdAt = stat.mtime.toISOString();
+    }
+
+    const cwd = projectHash ? path.join(getGeminiTmpDir(), projectHash) : '';
+
+    return {
+        source: 'gemini',
+        sourceLabel: 'Gemini CLI',
+        provider,
+        model,
+        models,
+        sessionId,
+        title: firstPrompt || sessionId || fileName,
+        cwd,
+        createdAt,
+        updatedAt,
+        messageCount,
+        totalTokens: 0,
+        contextWindow: 0,
+        inputTokens: 0,
+        cachedInputTokens: 0,
+        outputTokens: 0,
+        reasoningOutputTokens: 0,
+        __messageCountExact: false,
+        filePath,
+        keywords: [],
+        capabilities: { code: true }
+    };
+}
+
 function listCodexSessions(limit, options = {}) {
     const codexSessionsDir = getCodexSessionsDir();
     const scanFactor = Number.isFinite(Number(options.scanFactor))
@@ -4154,8 +4403,92 @@ function listClaudeSessions(limit, options = {}) {
     return mergeAndLimitSessions(sessions, limit);
 }
 
+function listGeminiSessions(limit, options = {}) {
+    const geminiTmpDir = getGeminiTmpDir();
+    if (!fs.existsSync(geminiTmpDir)) {
+        return [];
+    }
+
+    const scanFactor = Number.isFinite(Number(options.scanFactor))
+        ? Math.max(1, Number(options.scanFactor))
+        : SESSION_SCAN_FACTOR;
+    const minFiles = Number.isFinite(Number(options.minFiles))
+        ? Math.max(1, Number(options.minFiles))
+        : Math.min(SESSION_SCAN_MIN_FILES, MAX_SESSION_LIST_SIZE * SESSION_SCAN_FACTOR);
+    const targetCount = Number.isFinite(Number(options.targetCount))
+        ? Math.max(1, Math.floor(Number(options.targetCount)))
+        : Math.max(1, Math.floor(limit * scanFactor));
+    const scanCount = Number.isFinite(Number(options.scanCount))
+        ? Math.max(targetCount, Math.floor(Number(options.scanCount)))
+        : Math.max(targetCount, minFiles);
+    const maxFilesScanned = Number.isFinite(Number(options.maxFilesScanned))
+        ? Math.max(scanCount, Math.floor(Number(options.maxFilesScanned)))
+        : Math.max(scanCount * 2, minFiles);
+    const summaryReadBytes = Number.isFinite(Number(options.summaryReadBytes))
+        ? Math.max(1024, Math.floor(Number(options.summaryReadBytes)))
+        : SESSION_SUMMARY_READ_BYTES;
+    const titleReadBytes = Number.isFinite(Number(options.titleReadBytes))
+        ? Math.max(1024, Math.floor(Number(options.titleReadBytes)))
+        : SESSION_TITLE_READ_BYTES;
+
+    const sessions = [];
+    const filesMeta = [];
+    let scanned = 0;
+    let projectDirs = [];
+    try {
+        projectDirs = fs.readdirSync(geminiTmpDir, { withFileTypes: true })
+            .filter(entry => entry.isDirectory())
+            .map(entry => path.join(geminiTmpDir, entry.name));
+    } catch (_) {
+        projectDirs = [];
+    }
+
+    for (const projectDir of projectDirs) {
+        const chatsDir = path.join(projectDir, 'chats');
+        if (!fs.existsSync(chatsDir)) {
+            continue;
+        }
+        let entries = [];
+        try {
+            entries = fs.readdirSync(chatsDir, { withFileTypes: true });
+        } catch (_) {
+            entries = [];
+        }
+        for (const entry of entries) {
+            if (!entry.isFile() || !entry.name.endsWith('.json')) {
+                continue;
+            }
+            const fullPath = path.join(chatsDir, entry.name);
+            try {
+                const stat = fs.statSync(fullPath);
+                filesMeta.push({ filePath: fullPath, mtimeMs: stat.mtimeMs || 0 });
+            } catch (_) {}
+            scanned += 1;
+            if (scanned >= maxFilesScanned) {
+                break;
+            }
+        }
+        if (scanned >= maxFilesScanned) {
+            break;
+        }
+    }
+
+    filesMeta.sort((a, b) => b.mtimeMs - a.mtimeMs);
+    for (const item of filesMeta.slice(0, scanCount)) {
+        const summary = parseGeminiSessionSummary(item.filePath, { summaryReadBytes, titleReadBytes });
+        if (summary) {
+            sessions.push(summary);
+        }
+        if (sessions.length >= targetCount) {
+            break;
+        }
+    }
+
+    return mergeAndLimitSessions(sessions, limit);
+}
+
 async function listAllSessions(params = {}) {
-    const source = params.source === 'codex' || params.source === 'claude'
+    const source = params.source === 'codex' || params.source === 'claude' || params.source === 'gemini'
         ? params.source
         : 'all';
     const rawLimit = Number(params.limit);
@@ -4198,6 +4531,9 @@ async function listAllSessions(params = {}) {
     }
     if (source === 'all' || source === 'claude') {
         sessions = sessions.concat(listSessionInventoryBySource('claude', limit, scanOptions, { forceRefresh }));
+    }
+    if (source === 'all' || source === 'gemini') {
+        sessions = sessions.concat(listSessionInventoryBySource('gemini', limit, scanOptions, { forceRefresh }));
     }
 
     if (hasPathFilter) {
@@ -4279,6 +4615,7 @@ async function listSessionUsage(params = {}) {
         listSessionBrowse,
         parseCodexSessionSummary,
         parseClaudeSessionSummary,
+        parseGeminiSessionSummary,
         MAX_SESSION_USAGE_LIST_SIZE,
         SESSION_BROWSE_SUMMARY_READ_BYTES
     });
@@ -4286,10 +4623,10 @@ async function listSessionUsage(params = {}) {
 
 function listSessionPaths(params = {}) {
     const source = typeof params.source === 'string' ? params.source.trim().toLowerCase() : '';
-    if (source && source !== 'codex' && source !== 'claude' && source !== 'all') {
+    if (source && source !== 'codex' && source !== 'claude' && source !== 'gemini' && source !== 'all') {
         return [];
     }
-    const validSource = source === 'codex' || source === 'claude' ? source : 'all';
+    const validSource = source === 'codex' || source === 'claude' || source === 'gemini' ? source : 'all';
     const rawLimit = Number(params.limit);
     const limit = Number.isFinite(rawLimit)
         ? Math.max(1, Math.min(rawLimit, MAX_SESSION_PATH_LIST_SIZE))
@@ -4317,6 +4654,9 @@ function listSessionPaths(params = {}) {
     if (validSource === 'all' || validSource === 'claude') {
         sessions = sessions.concat(listSessionInventoryBySource('claude', gatherLimit, scanOptions, { forceRefresh }));
     }
+    if (validSource === 'all' || validSource === 'gemini') {
+        sessions = sessions.concat(listSessionInventoryBySource('gemini', gatherLimit, scanOptions, { forceRefresh }));
+    }
 
     const dedupedPaths = [];
     const seen = new Set();
@@ -4342,7 +4682,10 @@ function listSessionPaths(params = {}) {
 }
 
 function resolveSessionFilePath(source, filePath, sessionId) {
-    const root = source === 'claude' ? getClaudeProjectsDir() : getCodexSessionsDir();
+    const normalizedSource = source === 'claude' || source === 'gemini' ? source : 'codex';
+    const root = normalizedSource === 'claude'
+        ? getClaudeProjectsDir()
+        : (normalizedSource === 'gemini' ? getGeminiTmpDir() : getCodexSessionsDir());
     if (!root || !fs.existsSync(root)) {
         return '';
     }
@@ -4357,7 +4700,7 @@ function resolveSessionFilePath(source, filePath, sessionId) {
 
     if (typeof sessionId === 'string' && sessionId.trim()) {
         const targetId = sessionId.trim().toLowerCase();
-        const lookupStore = g_sessionFileLookupCache[source === 'claude' ? 'claude' : 'codex'];
+        const lookupStore = g_sessionFileLookupCache[normalizedSource];
         if (lookupStore instanceof Map && lookupStore.has(targetId)) {
             const cachedPath = lookupStore.get(targetId);
             if (cachedPath && fs.existsSync(cachedPath) && isPathInside(cachedPath, root)) {
@@ -4365,8 +4708,39 @@ function resolveSessionFilePath(source, filePath, sessionId) {
             }
             lookupStore.delete(targetId);
         }
-        const files = collectJsonlFiles(root, 5000);
-        const matchedFile = files.find(item => path.basename(item, '.jsonl').toLowerCase() === targetId);
+        let matchedFile = '';
+        if (normalizedSource === 'gemini') {
+            const filesMeta = [];
+            let projectDirs = [];
+            try {
+                projectDirs = fs.readdirSync(root, { withFileTypes: true })
+                    .filter(entry => entry.isDirectory())
+                    .map(entry => path.join(root, entry.name));
+            } catch (_) {
+                projectDirs = [];
+            }
+            for (const projectDir of projectDirs) {
+                const chatsDir = path.join(projectDir, 'chats');
+                if (!fs.existsSync(chatsDir)) continue;
+                let entries = [];
+                try {
+                    entries = fs.readdirSync(chatsDir, { withFileTypes: true });
+                } catch (_) {
+                    entries = [];
+                }
+                for (const entry of entries) {
+                    if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
+                    const fullPath = path.join(chatsDir, entry.name);
+                    filesMeta.push(fullPath);
+                    if (filesMeta.length >= 5000) break;
+                }
+                if (filesMeta.length >= 5000) break;
+            }
+            matchedFile = filesMeta.find(item => path.basename(item, '.json').toLowerCase() === targetId) || '';
+        } else {
+            const files = collectJsonlFiles(root, 5000);
+            matchedFile = files.find(item => path.basename(item, '.jsonl').toLowerCase() === targetId) || '';
+        }
         if (matchedFile && fs.existsSync(matchedFile)) {
             return matchedFile;
         }
@@ -4558,7 +4932,7 @@ function buildSessionSummaryFallback(source, filePath, sessionId = '') {
         contextWindow: 0,
         filePath,
         keywords: [],
-        capabilities: source === 'claude' ? { code: true } : {}
+        capabilities: source === 'claude' || source === 'gemini' ? { code: true } : {}
     };
 }
 
@@ -4569,11 +4943,14 @@ function generateSessionTrashId() {
     return `trash-${Date.now().toString(36)}-${crypto.randomBytes(8).toString('hex')}`;
 }
 
-function allocateSessionTrashTarget() {
+function allocateSessionTrashTarget(extension = 'jsonl') {
     ensureDir(SESSION_TRASH_FILES_DIR);
+    const safeExt = typeof extension === 'string' && extension.trim()
+        ? extension.trim().replace(/^\./, '')
+        : 'jsonl';
     for (let attempt = 0; attempt < 6; attempt += 1) {
         const trashId = generateSessionTrashId();
-        const trashFileName = `${trashId}.jsonl`;
+        const trashFileName = `${trashId}.${safeExt}`;
         const trashFilePath = path.join(SESSION_TRASH_FILES_DIR, trashFileName);
         if (!fs.existsSync(trashFilePath)) {
             return { trashId, trashFileName, trashFilePath };
@@ -4582,8 +4959,8 @@ function allocateSessionTrashTarget() {
     const fallbackId = `trash-${Date.now().toString(36)}-${crypto.randomBytes(8).toString('hex')}`;
     return {
         trashId: fallbackId,
-        trashFileName: `${fallbackId}.jsonl`,
-        trashFilePath: path.join(SESSION_TRASH_FILES_DIR, `${fallbackId}.jsonl`)
+        trashFileName: `${fallbackId}.${safeExt}`,
+        trashFilePath: path.join(SESSION_TRASH_FILES_DIR, `${fallbackId}.${safeExt}`)
     };
 }
 
@@ -4591,7 +4968,11 @@ function normalizeSessionTrashEntry(entry) {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
         return null;
     }
-    const source = entry.source === 'claude' ? 'claude' : (entry.source === 'codex' ? 'codex' : '');
+    const source = entry.source === 'claude'
+        ? 'claude'
+        : (entry.source === 'codex'
+            ? 'codex'
+            : (entry.source === 'gemini' ? 'gemini' : ''));
     const trashId = typeof entry.trashId === 'string' ? entry.trashId.trim() : '';
     if (!source || !trashId || trashId.includes('/') || trashId.includes('\\') || trashId.includes('\0')) {
         return null;
@@ -4606,7 +4987,7 @@ function normalizeSessionTrashEntry(entry) {
         trashId,
         trashFileName,
         source,
-        sourceLabel: source === 'claude' ? 'Claude Code' : 'Codex',
+        sourceLabel: source === 'claude' ? 'Claude Code' : (source === 'gemini' ? 'Gemini CLI' : 'Codex'),
         sessionId: sessionId || trashId,
         title: typeof entry.title === 'string' && entry.title.trim() ? entry.title.trim() : (sessionId || trashId),
         cwd: typeof entry.cwd === 'string' ? entry.cwd : '',
@@ -5061,7 +5442,11 @@ async function purgeSessionTrashItems(params = {}) {
 }
 
 async function trashSessionData(params = {}) {
-    const source = params.source === 'claude' ? 'claude' : (params.source === 'codex' ? 'codex' : '');
+    const source = params.source === 'claude'
+        ? 'claude'
+        : (params.source === 'codex'
+            ? 'codex'
+            : (params.source === 'gemini' ? 'gemini' : ''));
     if (!source) {
         return { error: 'Invalid source' };
     }
@@ -5071,14 +5456,16 @@ async function trashSessionData(params = {}) {
         return { error: 'Session file not found' };
     }
 
-    const summary = (source === 'claude' ? parseClaudeSessionSummary(filePath) : parseCodexSessionSummary(filePath))
+    const summary = (source === 'claude'
+        ? parseClaudeSessionSummary(filePath)
+        : (source === 'gemini' ? parseGeminiSessionSummary(filePath) : parseCodexSessionSummary(filePath)))
         || buildSessionSummaryFallback(source, filePath, params.sessionId);
     const exactMessageCount = await countConversationMessagesInFile(filePath, source);
     if (Number.isFinite(Number(exactMessageCount))) {
         summary.messageCount = Math.max(0, Math.floor(Number(exactMessageCount)));
     }
-    const sessionId = summary.sessionId || params.sessionId || path.basename(filePath, '.jsonl');
-    const { trashId, trashFileName, trashFilePath } = allocateSessionTrashTarget();
+    const sessionId = summary.sessionId || params.sessionId || path.basename(filePath, source === 'gemini' ? '.json' : '.jsonl');
+    const { trashId, trashFileName, trashFilePath } = allocateSessionTrashTarget(source === 'gemini' ? 'json' : 'jsonl');
     const deletedAt = new Date().toISOString();
     const claudeIndexPath = source === 'claude' ? findClaudeSessionIndexPath(filePath) : '';
     let removedClaudeIndexEntry = null;
@@ -5162,7 +5549,11 @@ async function trashSessionData(params = {}) {
 }
 
 async function deleteSessionData(params = {}) {
-    const source = params.source === 'claude' ? 'claude' : (params.source === 'codex' ? 'codex' : '');
+    const source = params.source === 'claude'
+        ? 'claude'
+        : (params.source === 'codex'
+            ? 'codex'
+            : (params.source === 'gemini' ? 'gemini' : ''));
     if (!source) {
         return { error: 'Invalid source' };
     }
@@ -5172,7 +5563,7 @@ async function deleteSessionData(params = {}) {
         return { error: 'Session file not found' };
     }
 
-    const sessionId = params.sessionId || path.basename(filePath, '.jsonl');
+    const sessionId = params.sessionId || path.basename(filePath, source === 'gemini' ? '.json' : '.jsonl');
     let fileDeleted = false;
     try {
         fs.unlinkSync(filePath);
@@ -5631,7 +6022,11 @@ async function extractMessagesFromFile(filePath, source, options = {}) {
 }
 
 async function readSessionDetail(params = {}) {
-    const source = params.source === 'claude' ? 'claude' : (params.source === 'codex' ? 'codex' : '');
+    const source = params.source === 'claude'
+        ? 'claude'
+        : (params.source === 'codex'
+            ? 'codex'
+            : (params.source === 'gemini' ? 'gemini' : ''));
     if (!source) {
         return { error: 'Invalid source' };
     }
@@ -5648,9 +6043,48 @@ async function readSessionDetail(params = {}) {
         : DEFAULT_SESSION_DETAIL_MESSAGES;
     const preview = params.preview === true || params.preview === 'true';
 
-    const extracted = await extractSessionDetailPreviewFromFile(filePath, source, messageLimit, { preview });
-    const sessionId = extracted.sessionId || params.sessionId || path.basename(filePath, '.jsonl');
-    const sourceLabel = source === 'codex' ? 'Codex' : 'Claude Code';
+    let extracted;
+    if (source === 'gemini') {
+        let json;
+        try {
+            json = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        } catch (_) {
+            json = null;
+        }
+        if (!json || typeof json !== 'object') {
+            return { error: 'Failed to parse session file' };
+        }
+        const rawMessages = Array.isArray(json.messages) ? json.messages : [];
+        const messages = [];
+        for (const entry of rawMessages) {
+            if (!entry || typeof entry !== 'object') continue;
+            const role = normalizeGeminiMessageRole(entry.type);
+            if (!role) continue;
+            const text = extractMessageText(extractGeminiMessageText(entry.content ?? entry.message ?? entry.text));
+            if (!text && role !== 'system') continue;
+            messages.push({
+                role,
+                text,
+                timestamp: toIsoTime(entry.timestamp ?? entry.time ?? entry.at, '')
+            });
+        }
+        const filtered = removeLeadingSystemMessage(messages);
+        const totalMessages = filtered.length;
+        const clipped = totalMessages > messageLimit;
+        const sliced = clipped ? filtered.slice(Math.max(0, totalMessages - messageLimit)) : filtered;
+        extracted = {
+            sessionId: typeof json.sessionId === 'string' && json.sessionId.trim() ? json.sessionId.trim() : path.basename(filePath, '.json'),
+            cwd: typeof json.projectRoot === 'string' ? json.projectRoot : (typeof json.cwd === 'string' ? json.cwd : ''),
+            updatedAt: toIsoTime(json.lastUpdated ?? json.updatedAt, ''),
+            totalMessages,
+            clipped,
+            messages: sliced
+        };
+    } else {
+        extracted = await extractSessionDetailPreviewFromFile(filePath, source, messageLimit, { preview });
+    }
+    const sessionId = extracted.sessionId || params.sessionId || path.basename(filePath, source === 'gemini' ? '.json' : '.jsonl');
+    const sourceLabel = source === 'codex' ? 'Codex' : (source === 'claude' ? 'Claude Code' : 'Gemini CLI');
     const clippedMessages = Array.isArray(extracted.messages) ? extracted.messages : [];
     const hasExactTotalMessages = Number.isFinite(extracted.totalMessages);
     const startIndex = hasExactTotalMessages
@@ -5684,7 +6118,11 @@ async function readSessionDetail(params = {}) {
 }
 
 async function readSessionPlain(params = {}) {
-    const source = params.source === 'claude' ? 'claude' : (params.source === 'codex' ? 'codex' : '');
+    const source = params.source === 'claude'
+        ? 'claude'
+        : (params.source === 'codex'
+            ? 'codex'
+            : (params.source === 'gemini' ? 'gemini' : ''));
     if (!source) {
         return { error: 'Invalid source' };
     }
@@ -5695,26 +6133,53 @@ async function readSessionPlain(params = {}) {
     }
 
     let extracted;
-    try {
-        extracted = await extractMessagesFromFile(filePath, source, { maxMessages: Infinity });
-    } catch (e) {
-        extracted = null;
-    }
-
-    if (!extracted) {
-        return { error: 'Failed to parse session file' };
-    }
-
-    if ((!extracted.messages || extracted.messages.length === 0) && !extracted.sessionId && !extracted.cwd) {
-        const fallbackRecords = readJsonlRecords(filePath);
-        if (fallbackRecords.length === 0) {
-            return { error: 'Session file is empty' };
+    if (source === 'gemini') {
+        let json;
+        try {
+            json = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        } catch (_) {
+            json = null;
         }
-        extracted = extractMessagesFromRecords(fallbackRecords, source, { maxMessages: Infinity });
+        if (!json || typeof json !== 'object') {
+            return { error: 'Failed to parse session file' };
+        }
+        const rawMessages = Array.isArray(json.messages) ? json.messages : [];
+        const messages = [];
+        for (const entry of rawMessages) {
+            if (!entry || typeof entry !== 'object') continue;
+            const role = normalizeGeminiMessageRole(entry.type);
+            if (!role) continue;
+            const text = extractMessageText(extractGeminiMessageText(entry.content ?? entry.message ?? entry.text));
+            if (!text && role !== 'system') continue;
+            messages.push({ role, text });
+        }
+        extracted = {
+            sessionId: typeof json.sessionId === 'string' && json.sessionId.trim() ? json.sessionId.trim() : path.basename(filePath, '.json'),
+            cwd: typeof json.projectRoot === 'string' ? json.projectRoot : '',
+            messages
+        };
+    } else {
+        try {
+            extracted = await extractMessagesFromFile(filePath, source, { maxMessages: Infinity });
+        } catch (e) {
+            extracted = null;
+        }
+
+        if (!extracted) {
+            return { error: 'Failed to parse session file' };
+        }
+
+        if ((!extracted.messages || extracted.messages.length === 0) && !extracted.sessionId && !extracted.cwd) {
+            const fallbackRecords = readJsonlRecords(filePath);
+            if (fallbackRecords.length === 0) {
+                return { error: 'Session file is empty' };
+            }
+            extracted = extractMessagesFromRecords(fallbackRecords, source, { maxMessages: Infinity });
+        }
     }
 
-    const sessionId = extracted.sessionId || params.sessionId || path.basename(filePath, '.jsonl');
-    const sourceLabel = source === 'codex' ? 'Codex' : 'Claude Code';
+    const sessionId = extracted.sessionId || params.sessionId || path.basename(filePath, source === 'gemini' ? '.json' : '.jsonl');
+    const sourceLabel = source === 'codex' ? 'Codex' : (source === 'claude' ? 'Claude Code' : 'Gemini CLI');
     const messages = removeLeadingSystemMessage(Array.isArray(extracted.messages) ? extracted.messages : []);
     const text = buildSessionPlainText(messages);
 
@@ -5729,7 +6194,11 @@ async function readSessionPlain(params = {}) {
 }
 
 async function exportSessionData(params = {}) {
-    const source = params.source === 'claude' ? 'claude' : (params.source === 'codex' ? 'codex' : '');
+    const source = params.source === 'claude'
+        ? 'claude'
+        : (params.source === 'codex'
+            ? 'codex'
+            : (params.source === 'gemini' ? 'gemini' : ''));
     if (!source) {
         return { error: 'Invalid source' };
     }
@@ -5741,22 +6210,51 @@ async function exportSessionData(params = {}) {
     }
 
     let extracted;
-    try {
-        extracted = await extractMessagesFromFile(filePath, source, { maxMessages });
-    } catch (e) {
-        extracted = null;
-    }
-
-    if (!extracted) {
-        return { error: 'Failed to parse session file' };
-    }
-
-    if ((!extracted.messages || extracted.messages.length === 0) && !extracted.sessionId && !extracted.cwd) {
-        const fallbackRecords = readJsonlRecords(filePath);
-        if (fallbackRecords.length === 0) {
-            return { error: 'Session file is empty' };
+    if (source === 'gemini') {
+        let json;
+        try {
+            json = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        } catch (_) {
+            json = null;
         }
-        extracted = extractMessagesFromRecords(fallbackRecords, source, { maxMessages });
+        if (!json || typeof json !== 'object') {
+            return { error: 'Failed to parse session file' };
+        }
+        const rawMessages = Array.isArray(json.messages) ? json.messages : [];
+        const messages = [];
+        for (const entry of rawMessages) {
+            if (!entry || typeof entry !== 'object') continue;
+            const role = normalizeGeminiMessageRole(entry.type);
+            if (!role) continue;
+            const text = extractMessageText(extractGeminiMessageText(entry.content ?? entry.message ?? entry.text));
+            if (!text && role !== 'system') continue;
+            messages.push({ role, text, timestamp: toIsoTime(entry.timestamp ?? entry.time ?? entry.at, '') });
+        }
+        extracted = {
+            sessionId: typeof json.sessionId === 'string' && json.sessionId.trim() ? json.sessionId.trim() : path.basename(filePath, '.json'),
+            cwd: typeof json.projectRoot === 'string' ? json.projectRoot : '',
+            updatedAt: toIsoTime(json.lastUpdated ?? json.updatedAt, ''),
+            messages: maxMessages === Infinity ? messages : messages.slice(-maxMessages),
+            truncated: maxMessages !== Infinity && messages.length > maxMessages
+        };
+    } else {
+        try {
+            extracted = await extractMessagesFromFile(filePath, source, { maxMessages });
+        } catch (e) {
+            extracted = null;
+        }
+
+        if (!extracted) {
+            return { error: 'Failed to parse session file' };
+        }
+
+        if ((!extracted.messages || extracted.messages.length === 0) && !extracted.sessionId && !extracted.cwd) {
+            const fallbackRecords = readJsonlRecords(filePath);
+            if (fallbackRecords.length === 0) {
+                return { error: 'Session file is empty' };
+            }
+            extracted = extractMessagesFromRecords(fallbackRecords, source, { maxMessages });
+        }
     }
 
     extracted.messages = removeLeadingSystemMessage(Array.isArray(extracted.messages) ? extracted.messages : []);
@@ -5768,9 +6266,9 @@ async function exportSessionData(params = {}) {
         }
     }
 
-    const sessionId = extracted.sessionId || params.sessionId || path.basename(filePath, '.jsonl');
+    const sessionId = extracted.sessionId || params.sessionId || path.basename(filePath, source === 'gemini' ? '.json' : '.jsonl');
     const safeSessionId = String(sessionId).replace(/[^a-zA-Z0-9_-]/g, '_');
-    const sourceLabel = source === 'codex' ? 'Codex' : 'Claude Code';
+    const sourceLabel = source === 'codex' ? 'Codex' : (source === 'claude' ? 'Claude Code' : 'Gemini CLI');
     const truncated = !!extracted.truncated;
     const maxMessagesLabel = maxMessages === Infinity ? 'all' : maxMessages;
     const markdown = buildSessionMarkdown({
@@ -8664,8 +9162,8 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                         case 'list-sessions':
                             {
                                 const source = typeof params.source === 'string' ? params.source.trim().toLowerCase() : '';
-                                if (source && source !== 'codex' && source !== 'claude' && source !== 'all') {
-                                    result = { error: 'Invalid source. Must be codex, claude, or all' };
+                                if (source && source !== 'codex' && source !== 'claude' && source !== 'gemini' && source !== 'all') {
+                                    result = { error: 'Invalid source. Must be codex, claude, gemini, or all' };
                                 } else {
                                     result = {
                                         sessions: await listSessionBrowse(params),
@@ -8678,8 +9176,8 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             {
                                 const usageParams = isPlainObject(params) ? params : {};
                                 const source = typeof usageParams.source === 'string' ? usageParams.source.trim().toLowerCase() : '';
-                                if (source && source !== 'codex' && source !== 'claude' && source !== 'all') {
-                                    result = { error: 'Invalid source. Must be codex, claude, or all' };
+                                if (source && source !== 'codex' && source !== 'claude' && source !== 'gemini' && source !== 'all') {
+                                    result = { error: 'Invalid source. Must be codex, claude, gemini, or all' };
                                 } else {
                                     result = {
                                         sessions: await listSessionUsage({
@@ -8694,8 +9192,8 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                         case 'list-session-paths':
                             {
                                 const source = typeof params.source === 'string' ? params.source.trim().toLowerCase() : '';
-                                if (source && source !== 'codex' && source !== 'claude' && source !== 'all') {
-                                    result = { error: 'Invalid source. Must be codex, claude, or all' };
+                                if (source && source !== 'codex' && source !== 'claude' && source !== 'gemini' && source !== 'all') {
+                                    result = { error: 'Invalid source. Must be codex, claude, gemini, or all' };
                                 } else {
                                     result = {
                                         paths: listSessionPaths(params)

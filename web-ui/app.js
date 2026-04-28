@@ -178,17 +178,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 sessionPathOptionsMap: {
                     all: [],
                     codex: [],
-                    claude: []
+                    claude: [],
+                    gemini: []
                 },
                 sessionPathOptionsLoadedMap: {
                     all: false,
                     codex: false,
-                    claude: false
+                    claude: false,
+                    gemini: false
                 },
                 sessionPathRequestSeqMap: {
                     all: 0,
                     codex: 0,
-                    claude: 0
+                    claude: 0,
+                    gemini: 0
                 },
                 sessionExporting: {},
                 sessionCloning: {},

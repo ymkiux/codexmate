@@ -127,7 +127,9 @@ export function createSessionBrowserMethods(options = {}) {
         },
 
         syncSessionPathOptionsForSource(source, nextOptions, mergeWithExisting = false) {
-            const targetSource = source === 'claude' ? 'claude' : (source === 'all' ? 'all' : 'codex');
+            const targetSource = source === 'claude'
+                ? 'claude'
+                : (source === 'gemini' ? 'gemini' : (source === 'all' ? 'all' : 'codex'));
             const current = Array.isArray(this.sessionPathOptionsMap[targetSource])
                 ? this.sessionPathOptionsMap[targetSource]
                 : [];
@@ -142,7 +144,9 @@ export function createSessionBrowserMethods(options = {}) {
         },
 
         refreshSessionPathOptions(source) {
-            const targetSource = source === 'claude' ? 'claude' : (source === 'all' ? 'all' : 'codex');
+            const targetSource = source === 'claude'
+                ? 'claude'
+                : (source === 'gemini' ? 'gemini' : (source === 'all' ? 'all' : 'codex'));
             const base = Array.isArray(this.sessionPathOptionsMap[targetSource])
                 ? [...this.sessionPathOptionsMap[targetSource]]
                 : [];
@@ -164,7 +168,9 @@ export function createSessionBrowserMethods(options = {}) {
         },
 
         async loadSessionPathOptions(options = {}) {
-            const source = options.source === 'claude' ? 'claude' : (options.source === 'all' ? 'all' : 'codex');
+            const source = options.source === 'claude'
+                ? 'claude'
+                : (options.source === 'gemini' ? 'gemini' : (options.source === 'all' ? 'all' : 'codex'));
             const forceRefresh = !!options.forceRefresh;
             const loaded = !!this.sessionPathOptionsLoadedMap[source];
             if (!forceRefresh && loaded) {
