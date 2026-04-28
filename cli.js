@@ -74,6 +74,14 @@ const {
     validateTaskPlan,
     executeTaskPlan
 } = require('./lib/task-orchestrator');
+const {
+    readAutomationConfig,
+    matchAutomationRule,
+    buildAutomationEventKey,
+    isCronMatch,
+    dispatchAutomationNotifiers,
+    formatTaskRunNotificationPayload
+} = require('./lib/automation');
 const { buildConfigHealthReport: buildConfigHealthReportCore } = require('./cli/config-health');
 const { buildDoctorReport, buildDoctorLegacyPayload, renderDoctorMarkdown } = require('./cli/doctor-core');
 const {
@@ -192,6 +200,8 @@ const TASK_QUEUE_FILE = path.join(CONFIG_DIR, 'codexmate-task-queue.json');
 const TASK_RUNS_FILE = path.join(CONFIG_DIR, 'codexmate-task-runs.jsonl');
 const TASK_RUN_DETAILS_DIR = path.join(CONFIG_DIR, 'codexmate-task-runs');
 const TASK_QUEUE_WORKER_FILE = path.join(CONFIG_DIR, 'codexmate-task-queue-worker.json');
+const TASK_ARTIFACTS_DIR = path.join(CONFIG_DIR, 'codexmate-task-artifacts');
+const AUTOMATION_CONFIG_FILE = path.join(CONFIG_DIR, 'codexmate-automation.json');
 const DEFAULT_CLAUDE_MODEL = 'glm-4.7';
 const DEFAULT_MODEL_CONTEXT_WINDOW = 190000;
 const DEFAULT_MODEL_AUTO_COMPACT_TOKEN_LIMIT = 185000;
@@ -7943,6 +7953,97 @@ function writeJsonResponse(res, statusCode, payload) {
     res.end(body, 'utf-8');
 }
 
+function readJsonRequestBody(req, res, options = {}) {
+    const maxBytes = Number.isFinite(options.maxBytes) ? Math.max(1024, Math.floor(options.maxBytes)) : MAX_API_BODY_SIZE;
+    return new Promise((resolve) => {
+        let body = '';
+        let bodySize = 0;
+        let bodyTooLarge = false;
+        req.on('data', (chunk) => {
+            if (bodyTooLarge) return;
+            bodySize += chunk.length;
+            if (bodySize > maxBytes) {
+                bodyTooLarge = true;
+                writeJsonResponse(res, 413, {
+                    error: `请求体过大（>${Math.floor(maxBytes / 1024 / 1024)}MB）`
+                });
+                req.destroy();
+                resolve({ ok: false, error: 'payload-too-large' });
+                return;
+            }
+            body += chunk;
+        });
+        req.on('end', () => {
+            if (bodyTooLarge) return;
+            try {
+                resolve({ ok: true, body: JSON.parse(body || '{}') });
+            } catch (error) {
+                resolve({ ok: false, error: error && error.message ? error.message : 'invalid json' });
+            }
+        });
+    });
+}
+
+async function handleAutomationHook(req, res, source) {
+    const method = (req.method || 'GET').toUpperCase();
+    if (method !== 'POST') {
+        writeJsonResponse(res, 405, { error: 'Method Not Allowed' });
+        return;
+    }
+    const parsedBody = await readJsonRequestBody(req, res);
+    if (!parsedBody.ok) {
+        if (parsedBody.error !== 'payload-too-large') {
+            writeJsonResponse(res, 400, { error: parsedBody.error || 'invalid request body' });
+        }
+        return;
+    }
+    const payload = parsedBody.body && typeof parsedBody.body === 'object' ? parsedBody.body : {};
+    const eventKey = buildAutomationEventKey(source, req.headers || {}, payload);
+    if (!eventKey) {
+        writeJsonResponse(res, 400, { error: 'unknown event' });
+        return;
+    }
+    const cfg = readAutomationConfig(AUTOMATION_CONFIG_FILE, { env: process.env });
+    if (!cfg.ok) {
+        writeJsonResponse(res, 500, { error: cfg.error || 'failed to load automation config' });
+        return;
+    }
+    const rule = matchAutomationRule(cfg.config, { source, event: eventKey });
+    if (!rule) {
+        writeJsonResponse(res, 404, { error: 'no matching rule', source, event: eventKey });
+        return;
+    }
+    const action = rule.action && typeof rule.action === 'object' ? rule.action : {};
+    const actionType = typeof action.type === 'string' ? action.type.trim().toLowerCase() : '';
+    if (actionType !== 'task.queue.add') {
+        writeJsonResponse(res, 400, { error: 'unsupported rule action', action: actionType || '' });
+        return;
+    }
+    const taskPayload = action.task && typeof action.task === 'object' ? action.task : {};
+    const enqueue = addTaskToQueue(taskPayload);
+    if (enqueue.error) {
+        writeJsonResponse(res, 400, { error: enqueue.error, issues: enqueue.issues || [], warnings: enqueue.warnings || [] });
+        return;
+    }
+    const taskId = enqueue.task && enqueue.task.taskId ? enqueue.task.taskId : '';
+    const shouldStart = action.startQueue === true;
+    const queueResult = shouldStart
+        ? await startTaskQueueProcessing({ taskId: '', detach: true })
+        : { ok: true, started: false };
+    writeJsonResponse(res, 200, {
+        ok: true,
+        ruleId: rule.id,
+        source,
+        event: eventKey,
+        taskId,
+        queue: {
+            started: !!queueResult.started,
+            alreadyRunning: !!queueResult.alreadyRunning,
+            detached: !!queueResult.detached
+        }
+    });
+}
+
 function streamZipDownloadResponse(res, filePath, options = {}) {
     if (!filePath || !fs.existsSync(filePath)) {
         res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -8254,6 +8355,12 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
         }
         if (requestPath === '/api/import-codex-skills-zip') {
             void handleImportSkillsZipUpload(req, res, { targetApp: 'codex' });
+            return;
+        }
+        if (requestPath.startsWith('/hooks/')) {
+            const segments = requestPath.split('/').filter(Boolean);
+            const source = segments[1] ? String(segments[1]) : '';
+            void handleAutomationHook(req, res, source);
             return;
         }
         if (requestPath === '/api') {
@@ -9133,12 +9240,15 @@ function cmdStart(options = {}) {
         openBrowser: shouldOpenBrowser
     });
 
+    const stopAutomationScheduler = startAutomationScheduler();
+
     // 禁止前端变更侦测与自动重启：避免终端输出噪音与访问时短暂 Connection Refused。
     // 如需热重启，请由开发者自行使用外部 watcher / nodemon 等工具。
     const stopWatch = () => {};
 
     const handleExit = () => {
         stopWatch();
+        stopAutomationScheduler();
         Promise.allSettled([
             serverHandle.stop(),
             stopBuiltinProxyRuntime(),
@@ -11510,6 +11620,84 @@ function collectTaskRunSummary(detail = {}) {
     };
 }
 
+function writeTaskRunArtifacts(detail = {}) {
+    const validation = validateTaskRunId(detail && typeof detail.runId === 'string' ? detail.runId : '');
+    if (!validation.ok) {
+        return;
+    }
+    const run = detail.run && typeof detail.run === 'object' ? detail.run : {};
+    const nodes = Array.isArray(run.nodes) ? run.nodes : [];
+    const dir = path.join(TASK_ARTIFACTS_DIR, validation.runId);
+    ensureDir(dir);
+    writeJsonAtomic(path.join(dir, 'summary.json'), collectTaskRunSummary(detail));
+    const runLogText = summarizeTaskLogs(run.logs || [], 200);
+    const nodeLogText = nodes
+        .map((node) => {
+            const header = node && node.id ? `\n# ${node.id}\n` : '\n# node\n';
+            const text = summarizeTaskLogs(node && node.logs ? node.logs : [], 200);
+            return `${header}${text}`.trimEnd();
+        })
+        .filter(Boolean)
+        .join('\n');
+    const combined = `${runLogText}${nodeLogText ? `\n\n${nodeLogText}` : ''}`.trim();
+    try {
+        fs.writeFileSync(path.join(dir, 'logs.txt'), combined, { encoding: 'utf-8', mode: 0o600 });
+    } catch (_) {}
+}
+
+async function notifyAutomationOnTaskRun(detail = {}) {
+    const cfg = readAutomationConfig(AUTOMATION_CONFIG_FILE, { env: process.env });
+    if (!cfg.ok || !cfg.config) {
+        return [];
+    }
+    const payload = formatTaskRunNotificationPayload(detail);
+    const status = String(payload.status || '').toLowerCase();
+    const eventType = status === 'success'
+        ? 'task.completed'
+        : (status === 'failed' ? 'task.failed' : 'task.finished');
+    return await dispatchAutomationNotifiers(cfg.config, eventType, payload);
+}
+
+function startAutomationScheduler() {
+    const lastTicks = new Map();
+    let timer = setInterval(async () => {
+        const cfg = readAutomationConfig(AUTOMATION_CONFIG_FILE, { env: process.env });
+        if (!cfg.ok || !cfg.config) {
+            return;
+        }
+        const schedules = Array.isArray(cfg.config.schedules) ? cfg.config.schedules : [];
+        if (schedules.length === 0) {
+            return;
+        }
+        const now = new Date();
+        const tickKey = now.toISOString().slice(0, 16);
+        for (const schedule of schedules) {
+            if (!schedule || schedule.enabled === false) continue;
+            if (!schedule.id || !schedule.cron) continue;
+            if (!isCronMatch(schedule.cron, now)) continue;
+            if (lastTicks.get(schedule.id) === tickKey) continue;
+            lastTicks.set(schedule.id, tickKey);
+            const action = schedule.action && typeof schedule.action === 'object' ? schedule.action : {};
+            const actionType = typeof action.type === 'string' ? action.type.trim().toLowerCase() : '';
+            if (actionType !== 'task.queue.add') continue;
+            const taskPayload = action.task && typeof action.task === 'object' ? action.task : {};
+            const enqueue = addTaskToQueue(taskPayload);
+            if (enqueue && enqueue.error) continue;
+            if (action.startQueue === true) {
+                await startTaskQueueProcessing({ taskId: '', detach: true });
+            }
+        }
+    }, 30000);
+    if (timer && typeof timer.unref === 'function') {
+        timer.unref();
+    }
+    return () => {
+        if (!timer) return;
+        clearInterval(timer);
+        timer = null;
+    };
+}
+
 function buildTaskOverviewPayload(options = {}) {
     const queueLimit = Number.isFinite(options.queueLimit) ? Math.max(1, Math.floor(options.queueLimit)) : 20;
     const runLimit = Number.isFinite(options.runLimit) ? Math.max(1, Math.floor(options.runLimit)) : 20;
@@ -11875,6 +12063,10 @@ async function runTaskPlanInternal(plan, options = {}) {
         };
         writeTaskRunDetail(detail);
         appendTaskRunRecord(collectTaskRunSummary(detail));
+        writeTaskRunArtifacts(detail);
+        try {
+            await notifyAutomationOnTaskRun(detail);
+        } catch (_) {}
         if (options.queueItem) {
             upsertTaskQueueItem({
                 ...options.queueItem,
