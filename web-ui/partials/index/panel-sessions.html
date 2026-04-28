@@ -35,7 +35,7 @@
                     </div>
                     <div class="session-toolbar">
                         <div class="session-toolbar-group session-toolbar-primary">
-                            <select class="session-source-select" v-model="sessionFilterSource" @change="onSessionSourceChange" :disabled="sessionsLoading">
+                            <select class="session-source-select" v-model="sessionFilterSource" @change="onSessionSourceChange($event)" :disabled="sessionsLoading">
                                 <option value="all">{{ t('common.all') }}</option>
                                 <option value="codex">{{ t('sessions.source.codex') }}</option>
                                 <option value="claude">{{ t('sessions.source.claudeCode') }}</option>

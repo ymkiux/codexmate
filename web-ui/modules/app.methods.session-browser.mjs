@@ -418,7 +418,12 @@ export function createSessionBrowserMethods(options = {}) {
             this.persistSessionPinnedMap();
         },
 
-        async onSessionSourceChange() {
+        async onSessionSourceChange(event) {
+            const rawValue = event && event.target && typeof event.target.value === 'string'
+                ? event.target.value
+                : this.sessionFilterSource;
+            const cached = buildSessionFilterCacheState(rawValue, this.sessionPathFilter);
+            this.sessionFilterSource = cached.source;
             this.refreshSessionPathOptions(this.sessionFilterSource);
             this.persistSessionFilterCache();
             syncSessionsFilterUrl(this);

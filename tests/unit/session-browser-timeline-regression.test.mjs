@@ -29,6 +29,27 @@ test('loadSessionPathOptions clears visible loading state when reusing cached so
     assert.strictEqual(context.sessionPathOptionsLoading, false);
 });
 
+test('onSessionSourceChange prefers event target value over stale state', async () => {
+    const methods = createSessionBrowserMethods({
+        api: async () => ({ sessions: [] })
+    });
+    let loadCalls = 0;
+    const context = {
+        sessionFilterSource: 'codex',
+        sessionPathFilter: '',
+        refreshSessionPathOptions() {},
+        persistSessionFilterCache() {},
+        loadSessions: async () => {
+            loadCalls += 1;
+        }
+    };
+
+    await methods.onSessionSourceChange.call(context, { target: { value: 'gemini' } });
+
+    assert.strictEqual(context.sessionFilterSource, 'gemini');
+    assert.strictEqual(loadCalls, 1);
+});
+
 test('selectSession defers detail loading until the next frame when a scheduler is available', async () => {
     const methods = createSessionBrowserMethods({
         api: async () => ({})
