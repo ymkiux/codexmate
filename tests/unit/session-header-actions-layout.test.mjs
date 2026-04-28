@@ -24,8 +24,16 @@ test('sessions header actions keep buttons inline (contract)', () => {
         'controls-forms.css should force selector-header to nowrap'
     );
     assert(
-        /\.sessions-header-actions\s*\{[\s\S]*?display:\s*inline-flex\s*!important\s*;[\s\S]*?flex-wrap:\s*nowrap\s*!important\s*;[\s\S]*?\}/m.test(css),
-        'controls-forms.css should force sessions-header-actions inline-flex nowrap'
+        /\.sessions-header-actions\s*\{[\s\S]*?display:\s*flex\s*!important\s*;/m.test(css),
+        'controls-forms.css should force sessions-header-actions display:flex'
+    );
+    assert(
+        /\.sessions-header-actions\s*\{[\s\S]*?flex-wrap:\s*nowrap\s*!important\s*;/m.test(css),
+        'controls-forms.css should force sessions-header-actions nowrap'
+    );
+    assert(
+        /\.sessions-header-actions\s*\{[\s\S]*?align-items:\s*center\s*!important\s*;/m.test(css),
+        'controls-forms.css should center sessions-header-actions items'
     );
     assert(
         /\.sessions-header-actions\s*>\s*\.btn-tool[\s\S]*?width:\s*auto\s*!important\s*;/m.test(css),
@@ -34,6 +42,14 @@ test('sessions header actions keep buttons inline (contract)', () => {
     assert(
         /\.sessions-header-actions\s*>\s*\.btn-tool-compact[\s\S]*?width:\s*auto\s*!important\s*;/m.test(css),
         'controls-forms.css should force sessions-header-actions > .btn-tool-compact width auto'
+    );
+    assert(
+        /\.sessions-header-actions\s*>\s*\.btn-tool[\s\S]*?height:\s*28px\s*!important\s*;[\s\S]*?padding:\s*0\s+10px\s*!important\s*;[\s\S]*?font-size:\s*12px\s*!important\s*;/m.test(css),
+        'controls-forms.css should normalize sessions header button metrics'
+    );
+    assert(
+        /\.sessions-header-actions\s*>\s*\.btn-tool[\s\S]*?margin:\s*0\s*!important\s*;/m.test(css),
+        'controls-forms.css should reset sessions header button margins'
     );
     assert(
         !/\.sessions-header-actions\s*\{[\s\S]*?flex-wrap:\s*wrap\b/m.test(css),

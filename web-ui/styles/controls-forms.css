@@ -106,11 +106,11 @@
 }
 
 .sessions-header-actions {
-    display: inline-flex !important;
+    display: flex !important;
     flex-direction: row !important;
     flex-wrap: nowrap !important;
-    align-items: center;
-    gap: var(--spacing-xs);
+    align-items: center !important;
+    gap: 8px !important;
     white-space: nowrap;
 }
 
@@ -118,8 +118,22 @@
 .sessions-header-actions > .btn-tool-compact {
     display: inline-flex !important;
     width: auto !important;
+    margin: 0 !important;
     white-space: nowrap;
     flex: 0 0 auto;
+    height: 28px !important;
+    min-height: 28px !important;
+    padding: 0 10px !important;
+    line-height: 1 !important;
+    border-radius: 8px !important;
+    border: 1px solid var(--color-border-soft) !important;
+    background: rgba(255, 255, 255, 0.72) !important;
+    font-size: 12px !important;
+    font-weight: var(--font-weight-secondary) !important;
+    color: var(--color-text-secondary) !important;
+    box-shadow: none !important;
+    letter-spacing: -0.01em !important;
+    justify-content: center !important;
 }
 
 .health-report {
