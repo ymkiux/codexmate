@@ -69,8 +69,8 @@ test('styles keep desktop layout wide and session history readable on large scre
 
     const titleBlock = styles.match(/\.session-item-title\s*\{[^}]*\}/);
     assert.ok(titleBlock, 'missing session item title style block');
-    assert.match(titleBlock[0], /display:\s*-webkit-box;/);
-    assert.match(titleBlock[0], /-webkit-line-clamp:\s*2;/);
-    assert.match(titleBlock[0], /white-space:\s*normal;/);
+    assert.match(titleBlock[0], /white-space:\s*nowrap;/);
+    assert.match(titleBlock[0], /text-overflow:\s*ellipsis;/);
+    assert.match(titleBlock[0], /overflow:\s*hidden;/);
     assert.match(titleBlock[0], /max-width:\s*none;/);
 });
