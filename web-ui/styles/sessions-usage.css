@@ -44,6 +44,30 @@
     margin-bottom: 16px;
 }
 
+.usage-current-session-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    margin: 0 0 14px;
+    border-radius: 12px;
+    border: 1px solid var(--color-border-soft);
+    background: var(--color-surface-alt);
+    font-size: 12px;
+    color: var(--color-text-secondary);
+}
+
+.usage-current-session-label {
+    font-weight: 700;
+    color: var(--color-text-primary);
+}
+
+.usage-current-session-item strong {
+    font-weight: 700;
+    color: var(--color-text-primary);
+}
+
 .usage-range-group {
     display: flex;
     gap: 8px;

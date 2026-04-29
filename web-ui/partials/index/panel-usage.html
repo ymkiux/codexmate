@@ -42,6 +42,13 @@
                                 {{ t('usage.refreshOverlay') }}
                             </div>
 
+                            <div v-if="usageCurrentSessionStats" class="usage-current-session-bar">
+                                <span class="usage-current-session-label">{{ usageCurrentSessionStats.label }}</span>
+                                <span class="usage-current-session-item">{{ usageCurrentSessionStats.apiDurationText }} <strong>{{ usageCurrentSessionStats.apiDurationLabel }}</strong></span>
+                                <span class="usage-current-session-item">{{ usageCurrentSessionStats.totalDurationText }} <strong>{{ usageCurrentSessionStats.totalDurationLabel }}</strong></span>
+                                <span class="usage-current-session-item">{{ usageCurrentSessionStats.tokenText }} <strong>{{ usageCurrentSessionStats.tokenLabel }}</strong></span>
+                            </div>
+
                             <div class="usage-summary-grid">
                                 <div
                                     v-for="card in sessionUsageSummaryCards"
