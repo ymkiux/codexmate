@@ -504,7 +504,7 @@ const DICT = Object.freeze({
 
         // Docs panel
         'docs.title': 'CLI 安装文档',
-        'docs.subtitle': '查看 Claude Code / Codex CLI 命令。',
+        'docs.subtitle': '查看 Claude Code / Gemini CLI / CodeBuddy Code / Codex CLI 命令。',
         'docs.section.commands': '安装命令',
         'docs.section.commandsNote': '命令可直接复制。',
         'docs.section.faq': '常见问题',
@@ -520,10 +520,10 @@ const DICT = Object.freeze({
         'docs.rule.2': '自定义镜像仅用于安装与升级。'
         ,
         'docs.tip.win.1': 'PowerShell 报权限不足（EACCES/EPERM）时，请以管理员身份执行安装命令。',
-        'docs.tip.win.2': '安装后若仍提示找不到命令，重开终端并执行：where codex / where claude。',
+        'docs.tip.win.2': '安装后若仍提示找不到命令，重开终端并执行：where codex / where claude / where gemini / where codebuddy。',
         'docs.tip.win.3': '公司网络受限时，可先切换镜像源快捷项（npmmirror / 腾讯云 / 自定义）。',
         'docs.tip.unix.1': '出现 EACCES 权限错误时，优先修复 Node 全局目录权限，不建议直接 sudo npm。',
-        'docs.tip.unix.2': '安装后若命令未生效，重开终端并执行：which codex / which claude。',
+        'docs.tip.unix.2': '安装后若命令未生效，重开终端并执行：which codex / which claude / which gemini / which codebuddy。',
         'docs.tip.unix.3': '公司网络受限时，可先切换镜像源快捷项（npmmirror / 腾讯云 / 自定义）。'
         ,
 
@@ -1525,7 +1525,7 @@ const DICT = Object.freeze({
 
         // Docs panel
         'docs.title': 'CLI Install',
-        'docs.subtitle': 'Install commands for Claude Code / Codex CLI.',
+        'docs.subtitle': 'Install commands for Claude Code / Gemini CLI / CodeBuddy Code / Codex CLI.',
         'docs.section.commands': 'Commands',
         'docs.section.commandsNote': 'Copy and run directly.',
         'docs.section.faq': 'FAQ',
@@ -1541,10 +1541,10 @@ const DICT = Object.freeze({
         'docs.rule.2': 'Custom registry is used for install/update only.'
         ,
         'docs.tip.win.1': 'If PowerShell reports permission errors (EACCES/EPERM), run the install command as Administrator.',
-        'docs.tip.win.2': 'If the command is still not found after install, reopen the terminal and run: where codex / where claude.',
+        'docs.tip.win.2': 'If the command is still not found after install, reopen the terminal and run: where codex / where claude / where gemini / where codebuddy.',
         'docs.tip.win.3': 'If your network blocks npm, try switching registry presets (npmmirror / Tencent / Custom).',
         'docs.tip.unix.1': 'If you hit EACCES, fix your global Node directory permissions instead of using sudo npm.',
-        'docs.tip.unix.2': 'If the command is not available after install, reopen the terminal and run: which codex / which claude.',
+        'docs.tip.unix.2': 'If the command is not available after install, reopen the terminal and run: which codex / which claude / which gemini / which codebuddy.',
         'docs.tip.unix.3': 'If your network blocks npm, try switching registry presets (npmmirror / Tencent / Custom).'
         ,
 
@@ -1561,7 +1561,7 @@ const DICT = Object.freeze({
         'sessions.loadingList': 'Loading sessions...',
         'sessions.empty': 'No sessions found',
         'sessions.unknownTime': 'unknown time',
-        'sessions.query.placeholder.enabled': 'Search keywords (Codex/Claude, e.g. claude code)',
+        'sessions.query.placeholder.enabled': 'Search keywords (Codex/Claude/Gemini/CodeBuddy, e.g. claude code)',
         'sessions.query.placeholder.disabled': 'Keyword search is not available for this source',
         'sessions.pin': 'Pin',
         'sessions.unpin': 'Unpin',
