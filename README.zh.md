@@ -4,7 +4,7 @@
 
 # Codex Mate
 
-**Codex / Claude Code / OpenClaw 的本地控制台：配置、会话、Skills 与 Usage 统计一体化管理。**
+**本地优先的 CLI + Web UI：直接写入你的本地配置与会话文件，内置 Usage 统计，并提供可审计、可回滚的变更保护。**
 
 [![Build](https://img.shields.io/github/actions/workflow/status/SakuraByteCore/codexmate/release.yml?label=build&style=flat)](https://github.com/SakuraByteCore/codexmate/actions/workflows/release.yml)
 [![Version](https://img.shields.io/npm/v/codexmate?label=version&style=flat)](https://www.npmjs.com/package/codexmate)
