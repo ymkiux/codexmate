@@ -586,7 +586,8 @@ let g_sessionInventoryCache = new Map();
 let g_sessionFileLookupCache = {
     codex: new Map(),
     claude: new Map(),
-    gemini: new Map()
+    gemini: new Map(),
+    codebuddy: new Map()
 };
 let g_exactMessageCountCache = new Map();
 let g_modelsCache = new Map();
