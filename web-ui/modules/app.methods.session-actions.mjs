@@ -117,7 +117,7 @@ export function createSessionActionMethods(options = {}) {
             if (!session) return false;
             const source = String(session.source || '').trim().toLowerCase();
             const sessionId = typeof session.sessionId === 'string' ? session.sessionId.trim() : '';
-            return source === 'codex' && !!sessionId;
+            return (source === 'codex' || source === 'codebuddy') && !!sessionId;
         },
 
         isCloneAvailable(session) {
@@ -138,8 +138,12 @@ export function createSessionActionMethods(options = {}) {
         },
 
         buildResumeCommand(session) {
+            const source = session && session.source ? String(session.source).trim().toLowerCase() : '';
             const sessionId = session && session.sessionId ? String(session.sessionId).trim() : '';
             const arg = this.quoteResumeArg(sessionId);
+            if (source === 'codebuddy') {
+                return `codebuddy -r ${arg}`;
+            }
             if (this.sessionResumeWithYolo) {
                 return `codex --yolo resume ${arg}`;
             }
