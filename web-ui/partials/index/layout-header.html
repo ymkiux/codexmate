@@ -369,7 +369,17 @@
                         <div class="status-chip">
                             <span class="label">{{ t('status.currentSource') }}</span>
                             <span class="value">
-                                {{ sessionFilterSource === 'all' ? t('sessions.source.all') : (sessionFilterSource === 'claude' ? 'Claude Code' : (sessionFilterSource === 'gemini' ? 'Gemini CLI' : 'Codex')) }}
+                                {{ sessionFilterSource === 'all'
+                                    ? t('sessions.source.all')
+                                    : (sessionFilterSource === 'codex'
+                                        ? t('sessions.source.codex')
+                                        : (sessionFilterSource === 'claude'
+                                            ? t('sessions.source.claudeCode')
+                                            : (sessionFilterSource === 'gemini'
+                                                ? t('sessions.source.gemini')
+                                                : (sessionFilterSource === 'codebuddy'
+                                                    ? t('sessions.source.codebuddy')
+                                                    : t('sessions.source.codex'))))) }}
                             </span>
                         </div>
                         <div class="status-chip">
