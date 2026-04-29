@@ -16,6 +16,9 @@
 
 [Docs](https://sakurabytecore.github.io/codexmate/) · [Quick Start](#quick-start) · [Commands](#command-reference) · [Web UI](#web-ui) · [MCP](#mcp) · [中文](README.zh.md)
 
+<br />
+<a href="https://ibb.co/G4rRhTc4"><img src="https://i.ibb.co/Kp8W1wFp/Screen-Shot-2026-04-29-162110-679.png" alt="Codex Mate screenshot" width="960" /></a>
+
 </div>
 
 ---
