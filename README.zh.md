@@ -59,12 +59,17 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 
 **会话管理**
 - 同页查看 Codex、Claude、Gemini CLI 与 CodeBuddy Code 会话
+- 会话来源与默认路径（本地优先，可通过环境变量覆盖）：
+  - Codex：`~/.codex/sessions/*.jsonl`（或 `$CODEX_HOME/sessions`、`$XDG_CONFIG_HOME/codex/sessions`）
+  - Claude：`~/.claude/projects/**/**/*.jsonl`（或 `$CLAUDE_HOME/projects`、`$XDG_CONFIG_HOME/claude/projects`）
+  - Gemini：`~/.gemini/tmp/*/chats/*.json`（或 `$GEMINI_HOME/tmp`、`$XDG_CONFIG_HOME/gemini/tmp`）
+  - CodeBuddy：`~/.codebuddy/projects/**/**/*.jsonl`（或 `$CODEBUDDY_CODE_HOME_DIR/projects`）
 - 支持本地会话置顶，置顶状态持久化保存并优先排序显示
-- 关键词搜索、来源筛选、cwd 路径筛选
+- 关键词搜索、来源筛选、cwd/角色/时间筛选，并支持复制筛选链接
 - 复制恢复命令（Codex/Gemini/CodeBuddy）：`codex resume <sessionId>` / `gemini -r <sessionId>` / `codebuddy -r <sessionId>`
 - 搜索体验优化：短周期结果缓存，避免输入时重复扫描
 - Usage 子页：近 7 天 / 近 30 天会话趋势、消息趋势、来源占比、高频路径
-- 会话导出 Markdown
+- 会话导出 Markdown（Web UI + `codexmate export-session`，支持 `--session-id` 或 `--file`）
 - 会话与消息级删除（支持批量），并提供本地回收站用于恢复/彻底删除
 - 大会话预览优化（快速 tail 预览路径）
 

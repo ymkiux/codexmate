@@ -58,12 +58,17 @@ It works on local files directly and does not require cloud hosting. The skills 
 
 **Session Management**
 - Unified Codex + Claude + Gemini CLI + CodeBuddy Code session list
+- Session locations (local-first, configurable):
+  - Codex: `~/.codex/sessions/*.jsonl` (or `$CODEX_HOME/sessions`, `$XDG_CONFIG_HOME/codex/sessions`)
+  - Claude: `~/.claude/projects/**/**/*.jsonl` (or `$CLAUDE_HOME/projects`, `$XDG_CONFIG_HOME/claude/projects`)
+  - Gemini: `~/.gemini/tmp/*/chats/*.json` (or `$GEMINI_HOME/tmp`, `$XDG_CONFIG_HOME/gemini/tmp`)
+  - CodeBuddy: `~/.codebuddy/projects/**/**/*.jsonl` (or `$CODEBUDDY_CODE_HOME_DIR/projects`)
 - Local session pinning with persistent pinned state and pinned-first ordering
-- Keyword/source/cwd filters
+- Keyword/source/cwd/role/time filters, plus shareable filter links
 - Copy resume command (Codex/Gemini/CodeBuddy): `codex resume <sessionId>` / `gemini -r <sessionId>` / `codebuddy -r <sessionId>`
 - Fast search UX: short-lived query result caching to avoid rescanning on each keystroke
 - Usage subview with 7d / 30d session trends, message trends, source share, and top paths
-- Markdown export
+- Markdown export (Web UI + `codexmate export-session`, supports `--session-id` or `--file`)
 - Session-level and message-level delete (supports batch), with a local recycle bin for restore/purge
 - Large-session preview optimization (fast tail preview path)
 
