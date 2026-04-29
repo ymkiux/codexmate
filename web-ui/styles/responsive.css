@@ -268,8 +268,6 @@ textarea:focus-visible {
     }
 
     .session-item-title {
-        -webkit-line-clamp: 1;
-        max-height: none;
         white-space: nowrap;
         text-overflow: ellipsis;
         overflow: hidden;

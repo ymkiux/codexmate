@@ -127,7 +127,9 @@ export function createSessionBrowserMethods(options = {}) {
         },
 
         syncSessionPathOptionsForSource(source, nextOptions, mergeWithExisting = false) {
-            const targetSource = source === 'claude' ? 'claude' : (source === 'all' ? 'all' : 'codex');
+            const targetSource = source === 'claude'
+                ? 'claude'
+                : (source === 'gemini' ? 'gemini' : (source === 'all' ? 'all' : 'codex'));
             const current = Array.isArray(this.sessionPathOptionsMap[targetSource])
                 ? this.sessionPathOptionsMap[targetSource]
                 : [];
@@ -142,7 +144,9 @@ export function createSessionBrowserMethods(options = {}) {
         },
 
         refreshSessionPathOptions(source) {
-            const targetSource = source === 'claude' ? 'claude' : (source === 'all' ? 'all' : 'codex');
+            const targetSource = source === 'claude'
+                ? 'claude'
+                : (source === 'gemini' ? 'gemini' : (source === 'all' ? 'all' : 'codex'));
             const base = Array.isArray(this.sessionPathOptionsMap[targetSource])
                 ? [...this.sessionPathOptionsMap[targetSource]]
                 : [];
@@ -164,7 +168,9 @@ export function createSessionBrowserMethods(options = {}) {
         },
 
         async loadSessionPathOptions(options = {}) {
-            const source = options.source === 'claude' ? 'claude' : (options.source === 'all' ? 'all' : 'codex');
+            const source = options.source === 'claude'
+                ? 'claude'
+                : (options.source === 'gemini' ? 'gemini' : (options.source === 'all' ? 'all' : 'codex'));
             const forceRefresh = !!options.forceRefresh;
             const loaded = !!this.sessionPathOptionsLoadedMap[source];
             if (!forceRefresh && loaded) {
@@ -252,6 +258,9 @@ export function createSessionBrowserMethods(options = {}) {
             const urlState = readSessionsFilterUrlState();
             if (urlState) {
                 applySessionsFilterUrlState(this, urlState);
+                if (this.mainTab === 'sessions' && typeof this.loadSessions === 'function') {
+                    void this.loadSessions();
+                }
                 return;
             }
             const sourceCache = localStorage.getItem('codexmateSessionFilterSource');
@@ -266,6 +275,16 @@ export function createSessionBrowserMethods(options = {}) {
             this.sessionRoleFilter = normalizeSessionRoleFilter(roleCache);
             this.sessionTimePreset = normalizeSessionTimePreset(timeCache);
             this.refreshSessionPathOptions(this.sessionFilterSource);
+            if (this.mainTab === 'sessions' && typeof this.loadSessions === 'function') {
+                const shouldReload = cached.source !== 'all'
+                    || !!cached.pathFilter
+                    || !!(this.sessionQuery && isSessionQueryEnabled(cached.source))
+                    || (this.sessionRoleFilter && this.sessionRoleFilter !== 'all')
+                    || (this.sessionTimePreset && this.sessionTimePreset !== 'all');
+                if (shouldReload) {
+                    void this.loadSessions();
+                }
+            }
         },
 
         persistSessionFilterCache() {
@@ -412,7 +431,12 @@ export function createSessionBrowserMethods(options = {}) {
             this.persistSessionPinnedMap();
         },
 
-        async onSessionSourceChange() {
+        async onSessionSourceChange(event) {
+            const rawValue = event && event.target && typeof event.target.value === 'string'
+                ? event.target.value
+                : this.sessionFilterSource;
+            const cached = buildSessionFilterCacheState(rawValue, this.sessionPathFilter);
+            this.sessionFilterSource = cached.source;
             this.refreshSessionPathOptions(this.sessionFilterSource);
             this.persistSessionFilterCache();
             syncSessionsFilterUrl(this);

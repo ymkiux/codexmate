@@ -18,6 +18,8 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: nowrap;
+    gap: 10px;
     margin-bottom: 2px;
 }
 
@@ -81,12 +83,57 @@
     text-transform: none;
     letter-spacing: 0.03em;
     opacity: 0.85;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .selector-actions {
-    display: flex;
-    gap: var(--spacing-xs);
+    display: inline-grid;
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    column-gap: var(--spacing-xs);
     align-items: center;
+    justify-content: end;
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+.selector-actions > .btn-tool,
+.selector-actions > .btn-tool-compact {
+    flex: 0 0 auto;
+}
+
+.sessions-header-actions {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 8px !important;
+    white-space: nowrap;
+}
+
+.sessions-header-actions > .btn-tool,
+.sessions-header-actions > .btn-tool-compact {
+    display: inline-flex !important;
+    width: auto !important;
+    margin: 0 !important;
+    white-space: nowrap;
+    flex: 0 0 auto;
+    height: 28px !important;
+    min-height: 28px !important;
+    padding: 0 10px !important;
+    line-height: 1 !important;
+    border-radius: 8px !important;
+    border: 1px solid var(--color-border-soft) !important;
+    background: rgba(255, 255, 255, 0.72) !important;
+    font-size: 12px !important;
+    font-weight: var(--font-weight-secondary) !important;
+    color: var(--color-text-secondary) !important;
+    box-shadow: none !important;
+    letter-spacing: -0.01em !important;
+    justify-content: center !important;
 }
 
 .health-report {

@@ -29,14 +29,14 @@ function shouldUseFastSessionBrowseLimit(options = {}) {
 
 export function isSessionQueryEnabled(source) {
     const normalized = normalizeSessionSource(source, '');
-    return normalized === 'codex' || normalized === 'claude' || normalized === 'all';
+    return normalized === 'codex' || normalized === 'claude' || normalized === 'gemini' || normalized === 'codebuddy' || normalized === 'all';
 }
 
 export function normalizeSessionSource(source, fallback = 'all') {
     const normalized = typeof source === 'string'
         ? source.trim().toLowerCase()
         : '';
-    if (normalized === 'codex' || normalized === 'claude' || normalized === 'all') {
+    if (normalized === 'codex' || normalized === 'claude' || normalized === 'gemini' || normalized === 'codebuddy' || normalized === 'all') {
         return normalized;
     }
     return fallback;

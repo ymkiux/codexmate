@@ -24,7 +24,7 @@
                 <div class="selector-section">
                     <div class="selector-header">
                         <span class="selector-title">{{ t('sessions.sourceTitle') }}</span>
-                        <div class="selector-actions">
+                        <div class="selector-actions sessions-header-actions">
                             <button class="btn-tool btn-tool-compact" @click="loadSessions({ forceRefresh: true })" :disabled="sessionsLoading">
                                 {{ sessionsLoading ? t('sessions.refreshing') : t('sessions.refresh') }}
                             </button>
@@ -35,10 +35,12 @@
                     </div>
                     <div class="session-toolbar">
                         <div class="session-toolbar-group session-toolbar-primary">
-                            <select class="session-source-select" v-model="sessionFilterSource" @change="onSessionSourceChange" :disabled="sessionsLoading">
+                            <select class="session-source-select" v-model="sessionFilterSource" @change="onSessionSourceChange($event)" :disabled="sessionsLoading">
                                 <option value="all">{{ t('common.all') }}</option>
                                 <option value="codex">{{ t('sessions.source.codex') }}</option>
                                 <option value="claude">{{ t('sessions.source.claudeCode') }}</option>
+                                <option value="gemini">{{ t('sessions.source.gemini') }}</option>
+                                <option value="codebuddy">{{ t('sessions.source.codebuddy') }}</option>
                             </select>
                             <select
                                 class="session-path-select"

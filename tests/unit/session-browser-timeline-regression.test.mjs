@@ -5,6 +5,10 @@ import { fileURLToPath, pathToFileURL } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const { withGlobalOverrides } = await import(
+    pathToFileURL(path.join(__dirname, 'helpers', 'web-ui-app-options.mjs'))
+);
+
 const { createSessionBrowserMethods } = await import(
     pathToFileURL(path.join(__dirname, '..', '..', 'web-ui', 'modules', 'app.methods.session-browser.mjs'))
 );
@@ -27,6 +31,112 @@ test('loadSessionPathOptions clears visible loading state when reusing cached so
     await methods.loadSessionPathOptions.call(context, { source: 'claude' });
 
     assert.strictEqual(context.sessionPathOptionsLoading, false);
+});
+
+test('onSessionSourceChange prefers event target value over stale state', async () => {
+    const methods = createSessionBrowserMethods({
+        api: async () => ({ sessions: [] })
+    });
+    let loadCalls = 0;
+    const context = {
+        sessionFilterSource: 'codex',
+        sessionPathFilter: '',
+        refreshSessionPathOptions() {},
+        persistSessionFilterCache() {},
+        loadSessions: async () => {
+            loadCalls += 1;
+        }
+    };
+
+    await methods.onSessionSourceChange.call(context, { target: { value: 'gemini' } });
+
+    assert.strictEqual(context.sessionFilterSource, 'gemini');
+    assert.strictEqual(loadCalls, 1);
+});
+
+test('restoreSessionFilterCache triggers reload when url state sets source', async () => {
+    const methods = createSessionBrowserMethods({
+        api: async () => ({ sessions: [] })
+    });
+    let loadCalls = 0;
+    const context = {
+        mainTab: 'sessions',
+        sessionFilterSource: 'codex',
+        sessionPathFilter: '',
+        sessionQuery: '',
+        sessionRoleFilter: 'all',
+        sessionTimePreset: 'all',
+        refreshSessionPathOptions() {},
+        loadSessions: async () => {
+            loadCalls += 1;
+        }
+    };
+    const localStorage = {
+        getItem() { return null; },
+        setItem() {},
+        removeItem() {}
+    };
+    const window = {
+        location: {
+            href: 'http://localhost/?tab=sessions&s_source=gemini',
+            pathname: '/',
+            search: '?tab=sessions&s_source=gemini'
+        },
+        history: {
+            replaceState() {}
+        }
+    };
+
+    await withGlobalOverrides({ window, localStorage }, async () => {
+        await methods.restoreSessionFilterCache.call(context);
+    });
+
+    assert.strictEqual(context.sessionFilterSource, 'gemini');
+    assert.strictEqual(loadCalls, 1);
+});
+
+test('restoreSessionFilterCache triggers reload when stored source is not default', async () => {
+    const methods = createSessionBrowserMethods({
+        api: async () => ({ sessions: [] })
+    });
+    let loadCalls = 0;
+    const context = {
+        mainTab: 'sessions',
+        sessionFilterSource: 'all',
+        sessionPathFilter: '',
+        sessionQuery: '',
+        sessionRoleFilter: 'all',
+        sessionTimePreset: 'all',
+        refreshSessionPathOptions() {},
+        loadSessions: async () => {
+            loadCalls += 1;
+        }
+    };
+    const localStorage = {
+        getItem(key) {
+            if (key === 'codexmateSessionFilterSource') return 'gemini';
+            return null;
+        },
+        setItem() {},
+        removeItem() {}
+    };
+    const window = {
+        location: {
+            href: 'http://localhost/?tab=sessions',
+            pathname: '/',
+            search: '?tab=sessions'
+        },
+        history: {
+            replaceState() {}
+        }
+    };
+
+    await withGlobalOverrides({ window, localStorage }, async () => {
+        await methods.restoreSessionFilterCache.call(context);
+    });
+
+    assert.strictEqual(context.sessionFilterSource, 'gemini');
+    assert.strictEqual(loadCalls, 1);
 });
 
 test('selectSession defers detail loading until the next frame when a scheduler is available', async () => {

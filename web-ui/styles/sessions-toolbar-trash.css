@@ -2,7 +2,7 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: var(--spacing-xs);
-    margin-bottom: var(--spacing-sm);
+    margin-bottom: var(--spacing-xs);
     align-items: end;
 }
 
@@ -31,9 +31,9 @@
     align-items: center;
     justify-content: flex-end;
     gap: var(--spacing-xs);
-    margin-top: -2px;
-    padding-top: 6px;
-    margin-bottom: 12px;
+    margin-top: -1px;
+    padding-top: 4px;
+    margin-bottom: var(--spacing-xs);
     border-top: 1px dashed var(--color-border-soft);
 }
 

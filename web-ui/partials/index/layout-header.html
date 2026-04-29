@@ -214,7 +214,7 @@
                         <div class="side-item-title">{{ t('side.sessions.browser') }}</div>
                         <div class="side-item-meta">
                             <span>{{ t('side.sessions.browser.meta') }}</span>
-                            <span>{{ t('sessions.sourceLabel', { value: (sessionFilterSource === 'all' ? t('sessions.source.all') : (sessionFilterSource === 'codex' ? 'Codex' : 'Claude')) }) }}</span>
+                            <span>{{ t('sessions.sourceLabel', { value: (sessionFilterSource === 'all' ? t('sessions.source.all') : (sessionFilterSource === 'claude' ? 'Claude Code' : (sessionFilterSource === 'gemini' ? 'Gemini CLI' : (sessionFilterSource === 'codebuddy' ? 'CodeBuddy Code' : 'Codex')))) }) }}</span>
                         </div>
                     </button>
                     <button
@@ -369,7 +369,17 @@
                         <div class="status-chip">
                             <span class="label">{{ t('status.currentSource') }}</span>
                             <span class="value">
-                                {{ sessionFilterSource === 'all' ? t('sessions.source.all') : (sessionFilterSource === 'claude' ? 'Claude Code' : 'Codex') }}
+                                {{ sessionFilterSource === 'all'
+                                    ? t('sessions.source.all')
+                                    : (sessionFilterSource === 'codex'
+                                        ? t('sessions.source.codex')
+                                        : (sessionFilterSource === 'claude'
+                                            ? t('sessions.source.claudeCode')
+                                            : (sessionFilterSource === 'gemini'
+                                                ? t('sessions.source.gemini')
+                                                : (sessionFilterSource === 'codebuddy'
+                                                    ? t('sessions.source.codebuddy')
+                                                    : t('sessions.source.codex'))))) }}
                             </span>
                         </div>
                         <div class="status-chip">

@@ -194,6 +194,10 @@ const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 const CLAUDE_SETTINGS_FILE = path.join(CLAUDE_DIR, 'settings.json');
 const CLAUDE_MD_FILE_NAME = 'CLAUDE.md';
 const CLAUDE_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
+const CODEBUDDY_DIR = path.join(os.homedir(), '.codebuddy');
+const CODEBUDDY_PROJECTS_DIR = path.join(CODEBUDDY_DIR, 'projects');
+const GEMINI_DIR = path.join(os.homedir(), '.gemini');
+const GEMINI_TMP_DIR = path.join(GEMINI_DIR, 'tmp');
 const RECENT_CONFIGS_FILE = path.join(CONFIG_DIR, 'recent-configs.json');
 const WORKFLOW_DEFINITIONS_FILE = path.join(CONFIG_DIR, 'codexmate-workflows.json');
 const WORKFLOW_RUNS_FILE = path.join(CONFIG_DIR, 'codexmate-workflow-runs.jsonl');
@@ -272,6 +276,18 @@ const CLI_INSTALL_TARGETS = Object.freeze([
         name: 'Claude Code CLI',
         packageName: '@anthropic-ai/claude-code',
         bins: ['claude']
+    },
+    {
+        id: 'codebuddy',
+        name: 'CodeBuddy Code',
+        packageName: '@tencent-ai/codebuddy-code',
+        bins: ['codebuddy']
+    },
+    {
+        id: 'gemini',
+        name: 'Gemini CLI',
+        packageName: '@google/gemini-cli',
+        bins: ['gemini']
     },
     {
         id: 'codex',
@@ -570,7 +586,9 @@ let g_sessionListCache = new Map();
 let g_sessionInventoryCache = new Map();
 let g_sessionFileLookupCache = {
     codex: new Map(),
-    claude: new Map()
+    claude: new Map(),
+    gemini: new Map(),
+    codebuddy: new Map()
 };
 let g_exactMessageCountCache = new Map();
 let g_modelsCache = new Map();
@@ -1263,6 +1281,31 @@ function getClaudeProjectsDir() {
     candidates.push(path.join(os.homedir(), '.config', 'claude', 'projects'));
     candidates.push(CLAUDE_PROJECTS_DIR);
     return resolveExistingDir(candidates, CLAUDE_PROJECTS_DIR);
+}
+
+function getGeminiTmpDir() {
+    const candidates = [];
+    const envGeminiHome = process.env.GEMINI_HOME;
+    if (envGeminiHome) {
+        candidates.push(path.join(envGeminiHome, 'tmp'));
+    }
+    const xdgConfig = process.env.XDG_CONFIG_HOME;
+    if (xdgConfig) {
+        candidates.push(path.join(xdgConfig, 'gemini', 'tmp'));
+    }
+    candidates.push(path.join(os.homedir(), '.config', 'gemini', 'tmp'));
+    candidates.push(GEMINI_TMP_DIR);
+    return resolveExistingDir(candidates, GEMINI_TMP_DIR);
+}
+
+function getCodeBuddyProjectsDir() {
+    const candidates = [];
+    const envHome = process.env.CODEBUDDY_CODE_HOME_DIR || process.env.CODEBUDDY_HOME;
+    if (envHome) {
+        candidates.push(path.join(envHome, 'projects'));
+    }
+    candidates.push(CODEBUDDY_PROJECTS_DIR);
+    return resolveExistingDir(candidates, CODEBUDDY_PROJECTS_DIR);
 }
 
 function readModelsCacheEntry(cacheKey) {
@@ -2512,6 +2555,19 @@ function countConversationMessagesInRecords(records, source) {
             }
             continue;
         }
+        if (source === 'codebuddy') {
+            if (record && record.type === 'message') {
+                const role = normalizeRole(record.role);
+                if (role === 'assistant' || role === 'user' || role === 'system') {
+                    const content = record.message?.content ?? record.content ?? '';
+                    messages.push({
+                        role,
+                        text: extractMessageText(content)
+                    });
+                }
+            }
+            continue;
+        }
 
         const role = normalizeRole(record.type);
         if (role === 'assistant' || role === 'user' || role === 'system') {
@@ -2531,6 +2587,28 @@ async function countConversationMessagesInFile(filePath, source) {
     const cached = readExactMessageCountCache(filePath, source, fileStat);
     if (cached !== null) {
         return cached;
+    }
+
+    if (source === 'gemini') {
+        let json;
+        try {
+            json = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        } catch (_) {
+            json = null;
+        }
+        const rawMessages = json && Array.isArray(json.messages) ? json.messages : [];
+        const messages = [];
+        for (const entry of rawMessages) {
+            if (!entry || typeof entry !== 'object') continue;
+            const role = normalizeGeminiMessageRole(entry.type);
+            if (!role) continue;
+            const text = extractMessageText(extractGeminiMessageText(entry.content ?? entry.message ?? entry.text));
+            if (!text && role !== 'system') continue;
+            messages.push({ role, text });
+        }
+        const safeCount = removeLeadingSystemMessage(messages).length;
+        writeExactMessageCountCache(filePath, source, safeCount, fileStat);
+        return safeCount;
     }
 
     let stream;
@@ -2559,6 +2637,15 @@ async function countConversationMessagesInFile(filePath, source) {
                 if (record.type === 'response_item' && record.payload && record.payload.type === 'message') {
                     role = normalizeRole(record.payload.role);
                     text = extractMessageText(record.payload.content);
+                }
+            } else if (source === 'codebuddy') {
+                if (record && record.type === 'message') {
+                    role = normalizeRole(record.role);
+                    if (role === 'assistant' || role === 'user' || role === 'system') {
+                        text = extractMessageText(record.message?.content ?? record.content ?? '');
+                    } else {
+                        role = '';
+                    }
                 }
             } else {
                 role = normalizeRole(record.type);
@@ -2722,7 +2809,13 @@ async function resolveSessionTrashEntryExactMessageCount(entry) {
 }
 
 async function hydrateSessionTrashEntries(entries, options = {}) {
-    const source = options.source === 'claude' ? 'claude' : (options.source === 'codex' ? 'codex' : 'all');
+    const source = options.source === 'claude'
+        ? 'claude'
+        : (options.source === 'codex'
+            ? 'codex'
+            : (options.source === 'gemini'
+                ? 'gemini'
+                : (options.source === 'codebuddy' ? 'codebuddy' : 'all')));
     const hydratedEntries = await mapWithConcurrency(Array.isArray(entries) ? entries : [], 8, async (entry) => {
         const normalizedEntry = normalizeSessionTrashEntry(entry);
         if (!normalizedEntry) {
@@ -2731,7 +2824,7 @@ async function hydrateSessionTrashEntries(entries, options = {}) {
         return await resolveSessionTrashEntryExactMessageCount(normalizedEntry);
     });
 
-    if (source === 'codex' || source === 'claude') {
+    if (source === 'codex' || source === 'claude' || source === 'gemini' || source === 'codebuddy') {
         return hydratedEntries.filter((entry) => entry.source === source);
     }
     return hydratedEntries;
@@ -2745,7 +2838,11 @@ async function hydrateSessionItemsExactMessageCount(items) {
         if (item.__messageCountExact === true) {
             return item;
         }
-        const source = item.source === 'claude' ? 'claude' : (item.source === 'codex' ? 'codex' : '');
+        const source = item.source === 'claude'
+            ? 'claude'
+            : (item.source === 'codex'
+                ? 'codex'
+                : (item.source === 'gemini' ? 'gemini' : (item.source === 'codebuddy' ? 'codebuddy' : '')));
         const filePath = typeof item.filePath === 'string' ? item.filePath : '';
         if (!source || !filePath || !fs.existsSync(filePath)) {
             return item;
@@ -2972,6 +3069,54 @@ async function scanSessionContentForQuery(session, tokens, options = {}) {
         ? Math.max(1024, rawMaxBytes)
         : 0;
     const state = createSessionQueryScanState(tokens, options);
+    if (session.source === 'gemini') {
+        if (state.roleFilter !== 'all') {
+            let json;
+            try {
+                json = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+            } catch (_) {
+                json = null;
+            }
+            const rawMessages = json && Array.isArray(json.messages) ? json.messages : [];
+            for (const entry of rawMessages) {
+                if (!entry || typeof entry !== 'object') continue;
+                const role = normalizeGeminiMessageRole(entry.type);
+                if (!role) continue;
+                const text = extractMessageText(extractGeminiMessageText(entry.content ?? entry.message ?? entry.text));
+                if (!text) continue;
+                if (consumeSessionQueryMessage(state, { role, text })) {
+                    break;
+                }
+            }
+            return buildSessionQueryScanResult(state);
+        }
+
+        let text = '';
+        try {
+            const stat = fs.statSync(filePath);
+            const targetBytes = maxBytes > 0 ? Math.min(maxBytes, stat.size || 0) : Math.min(stat.size || 0, 512 * 1024);
+            const fd = fs.openSync(filePath, 'r');
+            const buf = Buffer.alloc(targetBytes);
+            const bytes = fs.readSync(fd, buf, 0, targetBytes, 0);
+            fs.closeSync(fd);
+            text = bytes > 0 ? buf.slice(0, bytes).toString('utf-8') : '';
+        } catch (_) {
+            try {
+                text = fs.readFileSync(filePath, 'utf-8');
+            } catch (_) {
+                text = '';
+            }
+        }
+
+        if (!matchTokensInText(text, state.tokens, state.mode)) {
+            return buildSessionQueryScanResult(state);
+        }
+        state.count = 1;
+        if (state.snippetLimit > 0) {
+            state.snippets.push(truncateText(text));
+        }
+        return buildSessionQueryScanResult(state);
+    }
     let stream;
     let rl;
     try {
@@ -3254,7 +3399,9 @@ function getSessionInventoryCache(cacheKey, forceRefresh = false) {
 }
 
 function registerSessionFileLookupEntries(source, sessions = []) {
-    const normalizedSource = source === 'claude' ? 'claude' : 'codex';
+    const normalizedSource = source === 'claude' || source === 'gemini' || source === 'codebuddy'
+        ? source
+        : 'codex';
     const store = g_sessionFileLookupCache[normalizedSource];
     if (!(store instanceof Map) || !Array.isArray(sessions)) {
         return;
@@ -3293,7 +3440,9 @@ function setSessionInventoryCache(cacheKey, source, value) {
 }
 
 function listSessionInventoryBySource(source, limit, scanOptions = {}, options = {}) {
-    const normalizedSource = source === 'claude' ? 'claude' : 'codex';
+    const normalizedSource = source === 'claude' || source === 'gemini' || source === 'codebuddy'
+        ? source
+        : 'codex';
     const forceRefresh = !!options.forceRefresh;
     const cacheKey = buildSessionInventoryCacheKey(normalizedSource, limit, scanOptions);
     const cached = getSessionInventoryCache(cacheKey, forceRefresh);
@@ -3303,7 +3452,11 @@ function listSessionInventoryBySource(source, limit, scanOptions = {}, options =
 
     const sessions = normalizedSource === 'claude'
         ? listClaudeSessions(limit, scanOptions)
-        : listCodexSessions(limit, scanOptions);
+        : (normalizedSource === 'gemini'
+            ? listGeminiSessions(limit, scanOptions)
+            : (normalizedSource === 'codebuddy'
+                ? listCodeBuddySessions(limit, scanOptions)
+                : listCodexSessions(limit, scanOptions)));
     setSessionInventoryCache(cacheKey, normalizedSource, sessions);
     return sessions;
 }
@@ -3313,7 +3466,9 @@ function invalidateSessionListCache() {
     g_sessionInventoryCache.clear();
     g_sessionFileLookupCache = {
         codex: new Map(),
-        claude: new Map()
+        claude: new Map(),
+        gemini: new Map(),
+        codebuddy: new Map()
     };
 }
 
@@ -3905,6 +4060,317 @@ function parseClaudeSessionSummary(filePath, options = {}) {
     };
 }
 
+function parseCodeBuddySessionSummary(filePath, options = {}) {
+    const summaryReadBytes = Number.isFinite(Number(options.summaryReadBytes))
+        ? Math.max(1024, Math.floor(Number(options.summaryReadBytes)))
+        : SESSION_SUMMARY_READ_BYTES;
+    const titleReadBytes = Number.isFinite(Number(options.titleReadBytes))
+        ? Math.max(1024, Math.floor(Number(options.titleReadBytes)))
+        : SESSION_TITLE_READ_BYTES;
+    const records = parseJsonlHeadRecords(filePath, summaryReadBytes);
+    if (records.length === 0) {
+        return null;
+    }
+
+    let stat;
+    try {
+        stat = fs.statSync(filePath);
+    } catch (_) {
+        return null;
+    }
+
+    let sessionId = path.basename(filePath, '.jsonl');
+    let cwd = '';
+    let firstPrompt = '';
+    let messageCount = 0;
+    let totalTokens = 0;
+    let contextWindow = 0;
+    let inputTokens = 0;
+    let cachedInputTokens = 0;
+    let outputTokens = 0;
+    let reasoningOutputTokens = 0;
+    let provider = 'codebuddy';
+    let model = '';
+    const models = [];
+    const usageState = { totalTokens, contextWindow, inputTokens, cachedInputTokens, outputTokens, reasoningOutputTokens };
+    const previewMessages = [];
+    let createdAt = '';
+    let updatedAt = stat.mtime.toISOString();
+
+    for (const record of records) {
+        if (!createdAt && record && record.timestamp) {
+            createdAt = toIsoTime(record.timestamp, createdAt);
+        }
+        if (record && record.timestamp) {
+            updatedAt = updateLatestIso(updatedAt, record.timestamp);
+        }
+
+        applySessionUsageSummaryFromRecord(usageState, record, 'codebuddy');
+        totalTokens = usageState.totalTokens || 0;
+        contextWindow = usageState.contextWindow || 0;
+        inputTokens = usageState.inputTokens || 0;
+        cachedInputTokens = usageState.cachedInputTokens || 0;
+        outputTokens = usageState.outputTokens || 0;
+        reasoningOutputTokens = usageState.reasoningOutputTokens || 0;
+
+        if (record && typeof record.sessionId === 'string' && record.sessionId.trim()) {
+            sessionId = record.sessionId.trim();
+        }
+        if (!cwd && record && typeof record.cwd === 'string' && record.cwd.trim()) {
+            cwd = record.cwd.trim();
+        }
+
+        provider = readExplicitSessionProviderFromRecord(record) || provider;
+        const recordModels = readSessionModelsFromRecord(record);
+        for (const recordModel of recordModels) {
+            if (!models.includes(recordModel)) {
+                models.push(recordModel);
+            }
+        }
+        model = recordModels[0] || model;
+
+        if (record && record.type === 'message') {
+            const role = normalizeRole(record.role);
+            if (role === 'assistant' || role === 'user' || role === 'system') {
+                const content = record.message?.content ?? record.content ?? '';
+                previewMessages.push({
+                    role,
+                    text: extractMessageText(content)
+                });
+            }
+        }
+    }
+
+    const tailRecords = parseJsonlTailRecords(filePath, summaryReadBytes);
+    for (const record of tailRecords) {
+        applySessionUsageSummaryFromRecord(usageState, record, 'codebuddy');
+        totalTokens = usageState.totalTokens || 0;
+        contextWindow = usageState.contextWindow || 0;
+        inputTokens = usageState.inputTokens || 0;
+        cachedInputTokens = usageState.cachedInputTokens || 0;
+        outputTokens = usageState.outputTokens || 0;
+        reasoningOutputTokens = usageState.reasoningOutputTokens || 0;
+        provider = readExplicitSessionProviderFromRecord(record) || provider;
+        const recordModels = readSessionModelsFromRecord(record);
+        for (const recordModel of recordModels) {
+            if (!models.includes(recordModel)) {
+                models.push(recordModel);
+            }
+        }
+        model = recordModels[0] || model;
+    }
+
+    const filteredPreviewMessages = removeLeadingSystemMessage(previewMessages);
+    messageCount = filteredPreviewMessages.length;
+    const firstUser = filteredPreviewMessages.find(item => item.role === 'user' && item.text);
+    if (firstUser) {
+        firstPrompt = truncateText(firstUser.text);
+    }
+
+    if (!firstPrompt) {
+        const titleRecords = parseJsonlHeadRecords(filePath, titleReadBytes);
+        const titleMessages = [];
+        for (const record of titleRecords) {
+            if (record && record.type === 'message') {
+                const role = normalizeRole(record.role);
+                if (role === 'assistant' || role === 'user' || role === 'system') {
+                    const content = record.message?.content ?? record.content ?? '';
+                    titleMessages.push({
+                        role,
+                        text: extractMessageText(content)
+                    });
+                }
+            }
+        }
+
+        const filteredTitleMessages = removeLeadingSystemMessage(titleMessages);
+        const titleUser = filteredTitleMessages.find(item => item.role === 'user' && item.text);
+        if (titleUser) {
+            firstPrompt = truncateText(titleUser.text);
+        }
+    }
+
+    messageCount = Math.max(0, messageCount);
+
+    return {
+        source: 'codebuddy',
+        sourceLabel: 'CodeBuddy Code',
+        provider,
+        model,
+        models,
+        sessionId,
+        title: firstPrompt || sessionId,
+        cwd,
+        createdAt,
+        updatedAt,
+        messageCount,
+        totalTokens,
+        contextWindow,
+        inputTokens,
+        cachedInputTokens,
+        outputTokens,
+        reasoningOutputTokens,
+        __messageCountExact: isSessionSummaryMessageCountExact(stat, summaryReadBytes),
+        filePath,
+        keywords: [],
+        capabilities: { code: true }
+    };
+}
+
+function extractGeminiMessageText(content) {
+    if (typeof content === 'string') {
+        return content;
+    }
+    if (Array.isArray(content)) {
+        const parts = [];
+        for (const item of content) {
+            if (!item) continue;
+            if (typeof item === 'string') {
+                parts.push(item);
+                continue;
+            }
+            if (typeof item.text === 'string' && item.text.trim()) {
+                parts.push(item.text);
+                continue;
+            }
+            if (typeof item.content === 'string' && item.content.trim()) {
+                parts.push(item.content);
+            }
+        }
+        return parts.filter(Boolean).join('\n');
+    }
+    if (content && typeof content === 'object') {
+        if (typeof content.text === 'string') {
+            return content.text;
+        }
+        if (typeof content.content === 'string') {
+            return content.content;
+        }
+        if (Array.isArray(content.parts)) {
+            return extractGeminiMessageText(content.parts);
+        }
+        if (Array.isArray(content.content)) {
+            return extractGeminiMessageText(content.content);
+        }
+    }
+    return '';
+}
+
+function normalizeGeminiMessageRole(type) {
+    const t = typeof type === 'string' ? type.trim().toLowerCase() : '';
+    if (t === 'user') return 'user';
+    if (t === 'gemini' || t === 'assistant' || t === 'model') return 'assistant';
+    if (t === 'system' || t === 'info' || t === 'warning' || t === 'error') return 'system';
+    return '';
+}
+
+function parseGeminiSessionSummary(filePath, options = {}) {
+    const summaryReadBytes = Number.isFinite(Number(options.summaryReadBytes))
+        ? Math.max(1024, Math.floor(Number(options.summaryReadBytes)))
+        : SESSION_SUMMARY_READ_BYTES;
+    const titleReadBytes = Number.isFinite(Number(options.titleReadBytes))
+        ? Math.max(1024, Math.floor(Number(options.titleReadBytes)))
+        : SESSION_TITLE_READ_BYTES;
+    let stat;
+    try {
+        stat = fs.statSync(filePath);
+    } catch (_) {
+        return null;
+    }
+
+    const fileName = path.basename(filePath);
+    const projectHash = path.basename(path.dirname(path.dirname(filePath)));
+    let sessionId = path.basename(filePath, '.json');
+    let createdAt = '';
+    let updatedAt = stat.mtime.toISOString();
+    let provider = 'gemini';
+    let model = '';
+    const models = [];
+    let firstPrompt = '';
+    let messageCount = 0;
+
+    let headText = '';
+    try {
+        const fd = fs.openSync(filePath, 'r');
+        const buf = Buffer.alloc(summaryReadBytes);
+        const bytes = fs.readSync(fd, buf, 0, summaryReadBytes, 0);
+        fs.closeSync(fd);
+        headText = bytes > 0 ? buf.slice(0, bytes).toString('utf-8') : '';
+    } catch (_) {
+        headText = '';
+    }
+
+    if (headText) {
+        const sessionIdMatch = headText.match(/"sessionId"\s*:\s*"([^"]+)"/);
+        if (sessionIdMatch) {
+            sessionId = sessionIdMatch[1] || sessionId;
+        }
+        const startMatch = headText.match(/"startTime"\s*:\s*"([^"]+)"/);
+        if (startMatch) {
+            createdAt = toIsoTime(startMatch[1], createdAt);
+        }
+        const updatedMatch = headText.match(/"lastUpdated"\s*:\s*"([^"]+)"/);
+        if (updatedMatch) {
+            updatedAt = toIsoTime(updatedMatch[1], updatedAt);
+        }
+        const modelMatch = headText.match(/"model"\s*:\s*"([^"]+)"/);
+        if (modelMatch && modelMatch[1]) {
+            model = modelMatch[1];
+            models.push(model);
+        }
+        const summaryMatch = headText.match(/"summary"\s*:\s*"([^"]+)"/);
+        if (summaryMatch && summaryMatch[1]) {
+            firstPrompt = truncateText(summaryMatch[1]);
+        }
+        if (!firstPrompt) {
+            const userIdx = headText.search(/"type"\s*:\s*"user"/);
+            if (userIdx >= 0) {
+                const slice = headText.slice(userIdx, Math.min(headText.length, userIdx + titleReadBytes));
+                const contentStringMatch = slice.match(/"content"\s*:\s*"((?:\\\\.|[^\"\\\\])*)"/);
+                const textMatch = slice.match(/"text"\s*:\s*"((?:\\\\.|[^\"\\\\])*)"/);
+                const raw = (contentStringMatch && contentStringMatch[1]) || (textMatch && textMatch[1]) || '';
+                if (raw) {
+                    try {
+                        firstPrompt = truncateText(JSON.parse(`"${raw}"`));
+                    } catch (_) {
+                        firstPrompt = truncateText(raw);
+                    }
+                }
+            }
+        }
+    }
+
+    if (!createdAt) {
+        createdAt = stat.mtime.toISOString();
+    }
+
+    const cwd = projectHash ? path.join(getGeminiTmpDir(), projectHash) : '';
+
+    return {
+        source: 'gemini',
+        sourceLabel: 'Gemini CLI',
+        provider,
+        model,
+        models,
+        sessionId,
+        title: firstPrompt || sessionId || fileName,
+        cwd,
+        createdAt,
+        updatedAt,
+        messageCount,
+        totalTokens: 0,
+        contextWindow: 0,
+        inputTokens: 0,
+        cachedInputTokens: 0,
+        outputTokens: 0,
+        reasoningOutputTokens: 0,
+        __messageCountExact: false,
+        filePath,
+        keywords: [],
+        capabilities: { code: true }
+    };
+}
+
 function listCodexSessions(limit, options = {}) {
     const codexSessionsDir = getCodexSessionsDir();
     const scanFactor = Number.isFinite(Number(options.scanFactor))
@@ -4155,8 +4621,144 @@ function listClaudeSessions(limit, options = {}) {
     return mergeAndLimitSessions(sessions, limit);
 }
 
+function listGeminiSessions(limit, options = {}) {
+    const geminiTmpDir = getGeminiTmpDir();
+    if (!fs.existsSync(geminiTmpDir)) {
+        return [];
+    }
+
+    const scanFactor = Number.isFinite(Number(options.scanFactor))
+        ? Math.max(1, Number(options.scanFactor))
+        : SESSION_SCAN_FACTOR;
+    const minFiles = Number.isFinite(Number(options.minFiles))
+        ? Math.max(1, Number(options.minFiles))
+        : Math.min(SESSION_SCAN_MIN_FILES, MAX_SESSION_LIST_SIZE * SESSION_SCAN_FACTOR);
+    const targetCount = Number.isFinite(Number(options.targetCount))
+        ? Math.max(1, Math.floor(Number(options.targetCount)))
+        : Math.max(1, Math.floor(limit * scanFactor));
+    const scanCount = Number.isFinite(Number(options.scanCount))
+        ? Math.max(targetCount, Math.floor(Number(options.scanCount)))
+        : Math.max(targetCount, minFiles);
+    const maxFilesScanned = Number.isFinite(Number(options.maxFilesScanned))
+        ? Math.max(scanCount, Math.floor(Number(options.maxFilesScanned)))
+        : Math.max(scanCount * 2, minFiles);
+    const summaryReadBytes = Number.isFinite(Number(options.summaryReadBytes))
+        ? Math.max(1024, Math.floor(Number(options.summaryReadBytes)))
+        : SESSION_SUMMARY_READ_BYTES;
+    const titleReadBytes = Number.isFinite(Number(options.titleReadBytes))
+        ? Math.max(1024, Math.floor(Number(options.titleReadBytes)))
+        : SESSION_TITLE_READ_BYTES;
+
+    const sessions = [];
+    const filesMeta = [];
+    let scanned = 0;
+    let projectDirs = [];
+    try {
+        projectDirs = fs.readdirSync(geminiTmpDir, { withFileTypes: true })
+            .filter(entry => entry.isDirectory())
+            .map(entry => path.join(geminiTmpDir, entry.name));
+    } catch (_) {
+        projectDirs = [];
+    }
+
+    for (const projectDir of projectDirs) {
+        const chatsDir = path.join(projectDir, 'chats');
+        if (!fs.existsSync(chatsDir)) {
+            continue;
+        }
+        let entries = [];
+        try {
+            entries = fs.readdirSync(chatsDir, { withFileTypes: true });
+        } catch (_) {
+            entries = [];
+        }
+        for (const entry of entries) {
+            if (!entry.isFile() || !entry.name.endsWith('.json')) {
+                continue;
+            }
+            const fullPath = path.join(chatsDir, entry.name);
+            try {
+                const stat = fs.statSync(fullPath);
+                filesMeta.push({ filePath: fullPath, mtimeMs: stat.mtimeMs || 0 });
+            } catch (_) {}
+            scanned += 1;
+            if (scanned >= maxFilesScanned) {
+                break;
+            }
+        }
+        if (scanned >= maxFilesScanned) {
+            break;
+        }
+    }
+
+    filesMeta.sort((a, b) => b.mtimeMs - a.mtimeMs);
+    for (const item of filesMeta.slice(0, scanCount)) {
+        const summary = parseGeminiSessionSummary(item.filePath, { summaryReadBytes, titleReadBytes });
+        if (summary) {
+            sessions.push(summary);
+        }
+        if (sessions.length >= targetCount) {
+            break;
+        }
+    }
+
+    return mergeAndLimitSessions(sessions, limit);
+}
+
+function listCodeBuddySessions(limit, options = {}) {
+    const projectsDir = getCodeBuddyProjectsDir();
+    if (!fs.existsSync(projectsDir)) {
+        return [];
+    }
+
+    const scanFactor = Number.isFinite(Number(options.scanFactor))
+        ? Math.max(1, Number(options.scanFactor))
+        : SESSION_SCAN_FACTOR;
+    const minFiles = Number.isFinite(Number(options.minFiles))
+        ? Math.max(1, Number(options.minFiles))
+        : Math.min(SESSION_SCAN_MIN_FILES, MAX_SESSION_LIST_SIZE * SESSION_SCAN_FACTOR);
+    const targetCount = Number.isFinite(Number(options.targetCount))
+        ? Math.max(1, Math.floor(Number(options.targetCount)))
+        : Math.max(1, Math.floor(limit * scanFactor));
+    const scanCount = Number.isFinite(Number(options.scanCount))
+        ? Math.max(targetCount, Math.floor(Number(options.scanCount)))
+        : Math.max(targetCount, minFiles);
+    const maxFilesScanned = Number.isFinite(Number(options.maxFilesScanned))
+        ? Math.max(scanCount, Math.floor(Number(options.maxFilesScanned)))
+        : Math.max(scanCount * 2, minFiles);
+    const summaryReadBytes = Number.isFinite(Number(options.summaryReadBytes))
+        ? Math.max(1024, Math.floor(Number(options.summaryReadBytes)))
+        : SESSION_SUMMARY_READ_BYTES;
+    const titleReadBytes = Number.isFinite(Number(options.titleReadBytes))
+        ? Math.max(1024, Math.floor(Number(options.titleReadBytes)))
+        : SESSION_TITLE_READ_BYTES;
+
+    const files = collectRecentJsonlFiles(projectsDir, {
+        returnCount: scanCount,
+        maxFilesScanned,
+        ignoreSubPath: `${path.sep}subagents${path.sep}`
+    });
+    const sessions = [];
+    for (const filePath of files) {
+        if (path.basename(filePath) === 'history.jsonl') {
+            continue;
+        }
+        const summary = parseCodeBuddySessionSummary(filePath, {
+            summaryReadBytes,
+            titleReadBytes
+        });
+        if (summary) {
+            sessions.push(summary);
+        }
+        if (sessions.length >= targetCount) {
+            break;
+        }
+    }
+    return mergeAndLimitSessions(sessions, limit);
+}
+
 async function listAllSessions(params = {}) {
-    const source = params.source === 'codex' || params.source === 'claude'
+    const source = params.source === 'codex' || params.source === 'claude' || params.source === 'gemini' || params.source === 'codebuddy'
         ? params.source
         : 'all';
     const rawLimit = Number(params.limit);
@@ -4199,6 +4801,12 @@ async function listAllSessions(params = {}) {
     }
     if (source === 'all' || source === 'claude') {
         sessions = sessions.concat(listSessionInventoryBySource('claude', limit, scanOptions, { forceRefresh }));
+    }
+    if (source === 'all' || source === 'gemini') {
+        sessions = sessions.concat(listSessionInventoryBySource('gemini', limit, scanOptions, { forceRefresh }));
+    }
+    if (source === 'all' || source === 'codebuddy') {
+        sessions = sessions.concat(listSessionInventoryBySource('codebuddy', limit, scanOptions, { forceRefresh }));
     }
 
     if (hasPathFilter) {
@@ -4280,6 +4888,8 @@ async function listSessionUsage(params = {}) {
         listSessionBrowse,
         parseCodexSessionSummary,
         parseClaudeSessionSummary,
+        parseCodeBuddySessionSummary,
+        parseGeminiSessionSummary,
         MAX_SESSION_USAGE_LIST_SIZE,
         SESSION_BROWSE_SUMMARY_READ_BYTES
     });
@@ -4287,10 +4897,10 @@ async function listSessionUsage(params = {}) {
 
 function listSessionPaths(params = {}) {
     const source = typeof params.source === 'string' ? params.source.trim().toLowerCase() : '';
-    if (source && source !== 'codex' && source !== 'claude' && source !== 'all') {
+    if (source && source !== 'codex' && source !== 'claude' && source !== 'gemini' && source !== 'codebuddy' && source !== 'all') {
         return [];
     }
-    const validSource = source === 'codex' || source === 'claude' ? source : 'all';
+    const validSource = source === 'codex' || source === 'claude' || source === 'gemini' || source === 'codebuddy' ? source : 'all';
     const rawLimit = Number(params.limit);
     const limit = Number.isFinite(rawLimit)
         ? Math.max(1, Math.min(rawLimit, MAX_SESSION_PATH_LIST_SIZE))
@@ -4318,6 +4928,12 @@ function listSessionPaths(params = {}) {
     if (validSource === 'all' || validSource === 'claude') {
         sessions = sessions.concat(listSessionInventoryBySource('claude', gatherLimit, scanOptions, { forceRefresh }));
     }
+    if (validSource === 'all' || validSource === 'gemini') {
+        sessions = sessions.concat(listSessionInventoryBySource('gemini', gatherLimit, scanOptions, { forceRefresh }));
+    }
+    if (validSource === 'all' || validSource === 'codebuddy') {
+        sessions = sessions.concat(listSessionInventoryBySource('codebuddy', gatherLimit, scanOptions, { forceRefresh }));
+    }
 
     const dedupedPaths = [];
     const seen = new Set();
@@ -4343,7 +4959,14 @@ function listSessionPaths(params = {}) {
 }
 
 function resolveSessionFilePath(source, filePath, sessionId) {
-    const root = source === 'claude' ? getClaudeProjectsDir() : getCodexSessionsDir();
+    const normalizedSource = source === 'claude' || source === 'gemini' || source === 'codebuddy'
+        ? source
+        : 'codex';
+    const root = normalizedSource === 'claude'
+        ? getClaudeProjectsDir()
+        : (normalizedSource === 'gemini'
+            ? getGeminiTmpDir()
+            : (normalizedSource === 'codebuddy' ? getCodeBuddyProjectsDir() : getCodexSessionsDir()));
     if (!root || !fs.existsSync(root)) {
         return '';
     }
@@ -4358,7 +4981,7 @@ function resolveSessionFilePath(source, filePath, sessionId) {
 
     if (typeof sessionId === 'string' && sessionId.trim()) {
         const targetId = sessionId.trim().toLowerCase();
-        const lookupStore = g_sessionFileLookupCache[source === 'claude' ? 'claude' : 'codex'];
+        const lookupStore = g_sessionFileLookupCache[normalizedSource];
         if (lookupStore instanceof Map && lookupStore.has(targetId)) {
             const cachedPath = lookupStore.get(targetId);
             if (cachedPath && fs.existsSync(cachedPath) && isPathInside(cachedPath, root)) {
@@ -4366,8 +4989,39 @@ function resolveSessionFilePath(source, filePath, sessionId) {
             }
             lookupStore.delete(targetId);
         }
-        const files = collectJsonlFiles(root, 5000);
-        const matchedFile = files.find(item => path.basename(item, '.jsonl').toLowerCase() === targetId);
+        let matchedFile = '';
+        if (normalizedSource === 'gemini') {
+            const filesMeta = [];
+            let projectDirs = [];
+            try {
+                projectDirs = fs.readdirSync(root, { withFileTypes: true })
+                    .filter(entry => entry.isDirectory())
+                    .map(entry => path.join(root, entry.name));
+            } catch (_) {
+                projectDirs = [];
+            }
+            for (const projectDir of projectDirs) {
+                const chatsDir = path.join(projectDir, 'chats');
+                if (!fs.existsSync(chatsDir)) continue;
+                let entries = [];
+                try {
+                    entries = fs.readdirSync(chatsDir, { withFileTypes: true });
+                } catch (_) {
+                    entries = [];
+                }
+                for (const entry of entries) {
+                    if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
+                    const fullPath = path.join(chatsDir, entry.name);
+                    filesMeta.push(fullPath);
+                    if (filesMeta.length >= 5000) break;
+                }
+                if (filesMeta.length >= 5000) break;
+            }
+            matchedFile = filesMeta.find(item => path.basename(item, '.json').toLowerCase() === targetId) || '';
+        } else {
+            const files = collectJsonlFiles(root, 5000);
+            matchedFile = files.find(item => path.basename(item, '.jsonl').toLowerCase() === targetId) || '';
+        }
         if (matchedFile && fs.existsSync(matchedFile)) {
             return matchedFile;
         }
@@ -4544,11 +5198,15 @@ function moveFileSync(sourcePath, targetPath) {
 
 function buildSessionSummaryFallback(source, filePath, sessionId = '') {
     const resolvedSessionId = sessionId || path.basename(filePath, '.jsonl');
-    const sourceLabel = source === 'claude' ? 'Claude Code' : 'Codex';
+    const sourceLabel = source === 'claude'
+        ? 'Claude Code'
+        : (source === 'gemini' ? 'Gemini CLI' : (source === 'codebuddy' ? 'CodeBuddy Code' : 'Codex'));
     return {
         source,
         sourceLabel,
-        provider: source === 'claude' ? 'claude' : 'codex',
+        provider: source === 'claude'
+            ? 'claude'
+            : (source === 'gemini' ? 'gemini' : (source === 'codebuddy' ? 'codebuddy' : 'codex')),
         sessionId: resolvedSessionId,
         title: resolvedSessionId,
         cwd: '',
@@ -4559,7 +5217,7 @@ function buildSessionSummaryFallback(source, filePath, sessionId = '') {
         contextWindow: 0,
         filePath,
         keywords: [],
-        capabilities: source === 'claude' ? { code: true } : {}
+        capabilities: source === 'claude' || source === 'gemini' || source === 'codebuddy' ? { code: true } : {}
     };
 }
 
@@ -4570,11 +5228,14 @@ function generateSessionTrashId() {
     return `trash-${Date.now().toString(36)}-${crypto.randomBytes(8).toString('hex')}`;
 }
 
-function allocateSessionTrashTarget() {
+function allocateSessionTrashTarget(extension = 'jsonl') {
     ensureDir(SESSION_TRASH_FILES_DIR);
+    const safeExt = typeof extension === 'string' && extension.trim()
+        ? extension.trim().replace(/^\./, '')
+        : 'jsonl';
     for (let attempt = 0; attempt < 6; attempt += 1) {
         const trashId = generateSessionTrashId();
-        const trashFileName = `${trashId}.jsonl`;
+        const trashFileName = `${trashId}.${safeExt}`;
         const trashFilePath = path.join(SESSION_TRASH_FILES_DIR, trashFileName);
         if (!fs.existsSync(trashFilePath)) {
             return { trashId, trashFileName, trashFilePath };
@@ -4583,8 +5244,8 @@ function allocateSessionTrashTarget() {
     const fallbackId = `trash-${Date.now().toString(36)}-${crypto.randomBytes(8).toString('hex')}`;
     return {
         trashId: fallbackId,
-        trashFileName: `${fallbackId}.jsonl`,
-        trashFilePath: path.join(SESSION_TRASH_FILES_DIR, `${fallbackId}.jsonl`)
+        trashFileName: `${fallbackId}.${safeExt}`,
+        trashFilePath: path.join(SESSION_TRASH_FILES_DIR, `${fallbackId}.${safeExt}`)
     };
 }
 
@@ -4592,7 +5253,13 @@ function normalizeSessionTrashEntry(entry) {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
         return null;
     }
-    const source = entry.source === 'claude' ? 'claude' : (entry.source === 'codex' ? 'codex' : '');
+    const source = entry.source === 'claude'
+        ? 'claude'
+        : (entry.source === 'codex'
+            ? 'codex'
+            : (entry.source === 'gemini'
+                ? 'gemini'
+                : (entry.source === 'codebuddy' ? 'codebuddy' : '')));
     const trashId = typeof entry.trashId === 'string' ? entry.trashId.trim() : '';
     if (!source || !trashId || trashId.includes('/') || trashId.includes('\\') || trashId.includes('\0')) {
         return null;
@@ -4607,7 +5274,9 @@ function normalizeSessionTrashEntry(entry) {
         trashId,
         trashFileName,
         source,
-        sourceLabel: source === 'claude' ? 'Claude Code' : 'Codex',
+        sourceLabel: source === 'claude'
+            ? 'Claude Code'
+            : (source === 'gemini' ? 'Gemini CLI' : (source === 'codebuddy' ? 'CodeBuddy Code' : 'Codex')),
         sessionId: sessionId || trashId,
         title: typeof entry.title === 'string' && entry.title.trim() ? entry.title.trim() : (sessionId || trashId),
         cwd: typeof entry.cwd === 'string' ? entry.cwd : '',
@@ -4623,7 +5292,7 @@ function normalizeSessionTrashEntry(entry) {
         originalFilePath: typeof entry.originalFilePath === 'string' ? entry.originalFilePath : '',
         provider: typeof entry.provider === 'string' && entry.provider.trim()
             ? entry.provider.trim()
-            : (source === 'claude' ? 'claude' : 'codex'),
+            : (source === 'claude' ? 'claude' : (source === 'gemini' ? 'gemini' : (source === 'codebuddy' ? 'codebuddy' : 'codex'))),
         keywords: normalizeKeywords(entry.keywords),
         capabilities: normalizeCapabilities(entry.capabilities),
         claudeIndexPath: typeof entry.claudeIndexPath === 'string' ? entry.claudeIndexPath : '',
@@ -4741,7 +5410,11 @@ function resolveSessionRestoreTarget(entry) {
     if (!normalized) {
         return '';
     }
-    const root = normalized.source === 'claude' ? getClaudeProjectsDir() : getCodexSessionsDir();
+    const root = normalized.source === 'claude'
+        ? getClaudeProjectsDir()
+        : (normalized.source === 'gemini'
+            ? getGeminiTmpDir()
+            : (normalized.source === 'codebuddy' ? getCodeBuddyProjectsDir() : getCodexSessionsDir()));
     const originalFilePath = typeof normalized.originalFilePath === 'string' ? normalized.originalFilePath.trim() : '';
     if (!root || !originalFilePath) {
         return '';
@@ -4875,14 +5548,20 @@ function upsertClaudeSessionIndexEntry(indexPath, sessionFilePath, entry) {
 }
 
 async function listSessionTrashItems(params = {}) {
-    const source = params.source === 'claude' ? 'claude' : (params.source === 'codex' ? 'codex' : 'all');
+    const source = params.source === 'claude'
+        ? 'claude'
+        : (params.source === 'codex'
+            ? 'codex'
+            : (params.source === 'gemini'
+                ? 'gemini'
+                : (params.source === 'codebuddy' ? 'codebuddy' : 'all')));
     const countOnly = params.countOnly === true;
     const rawLimit = Number(params.limit);
     const limit = Number.isFinite(rawLimit)
         ? Math.max(1, Math.min(rawLimit, MAX_SESSION_TRASH_LIST_SIZE))
         : 200;
     const allEntries = readSessionTrashEntries();
-    let items = source === 'codex' || source === 'claude'
+    let items = source === 'codex' || source === 'claude' || source === 'gemini' || source === 'codebuddy'
         ? allEntries.filter((entry) => entry.source === source)
         : allEntries.slice();
     items.sort((a, b) => {
@@ -5062,7 +5741,13 @@ async function purgeSessionTrashItems(params = {}) {
 }
 
 async function trashSessionData(params = {}) {
-    const source = params.source === 'claude' ? 'claude' : (params.source === 'codex' ? 'codex' : '');
+    const source = params.source === 'claude'
+        ? 'claude'
+        : (params.source === 'codex'
+            ? 'codex'
+            : (params.source === 'gemini'
+                ? 'gemini'
+                : (params.source === 'codebuddy' ? 'codebuddy' : '')));
     if (!source) {
         return { error: 'Invalid source' };
     }
@@ -5072,14 +5757,18 @@ async function trashSessionData(params = {}) {
         return { error: 'Session file not found' };
     }
 
-    const summary = (source === 'claude' ? parseClaudeSessionSummary(filePath) : parseCodexSessionSummary(filePath))
+    const summary = (source === 'claude'
+        ? parseClaudeSessionSummary(filePath)
+        : (source === 'gemini'
+            ? parseGeminiSessionSummary(filePath)
+            : (source === 'codebuddy' ? parseCodeBuddySessionSummary(filePath) : parseCodexSessionSummary(filePath))))
         || buildSessionSummaryFallback(source, filePath, params.sessionId);
     const exactMessageCount = await countConversationMessagesInFile(filePath, source);
     if (Number.isFinite(Number(exactMessageCount))) {
         summary.messageCount = Math.max(0, Math.floor(Number(exactMessageCount)));
     }
-    const sessionId = summary.sessionId || params.sessionId || path.basename(filePath, '.jsonl');
-    const { trashId, trashFileName, trashFilePath } = allocateSessionTrashTarget();
+    const sessionId = summary.sessionId || params.sessionId || path.basename(filePath, source === 'gemini' ? '.json' : '.jsonl');
+    const { trashId, trashFileName, trashFilePath } = allocateSessionTrashTarget(source === 'gemini' ? 'json' : 'jsonl');
     const deletedAt = new Date().toISOString();
     const claudeIndexPath = source === 'claude' ? findClaudeSessionIndexPath(filePath) : '';
     let removedClaudeIndexEntry = null;
@@ -5163,7 +5852,13 @@ async function trashSessionData(params = {}) {
 }
 
 async function deleteSessionData(params = {}) {
-    const source = params.source === 'claude' ? 'claude' : (params.source === 'codex' ? 'codex' : '');
+    const source = params.source === 'claude'
+        ? 'claude'
+        : (params.source === 'codex'
+            ? 'codex'
+            : (params.source === 'gemini'
+                ? 'gemini'
+                : (params.source === 'codebuddy' ? 'codebuddy' : '')));
     if (!source) {
         return { error: 'Invalid source' };
     }
@@ -5173,7 +5868,7 @@ async function deleteSessionData(params = {}) {
         return { error: 'Session file not found' };
     }
 
-    const sessionId = params.sessionId || path.basename(filePath, '.jsonl');
+    const sessionId = params.sessionId || path.basename(filePath, source === 'gemini' ? '.json' : '.jsonl');
     let fileDeleted = false;
     try {
         fs.unlinkSync(filePath);
@@ -5498,6 +6193,38 @@ function extractClaudeMessageFromRecord(record, state, lineIndex = -1) {
     }
 }
 
+function extractCodeBuddyMessageFromRecord(record, state, lineIndex = -1) {
+    if (record && record.timestamp) {
+        state.updatedAt = toIsoTime(record.timestamp, state.updatedAt);
+    }
+
+    if (record && typeof record.sessionId === 'string' && record.sessionId.trim()) {
+        state.sessionId = record.sessionId.trim();
+    }
+
+    if (!state.cwd && record && typeof record.cwd === 'string' && record.cwd.trim()) {
+        state.cwd = record.cwd.trim();
+    }
+
+    if (!record || record.type !== 'message') {
+        return;
+    }
+
+    const role = normalizeRole(record.role);
+    if (role === 'user' || role === 'assistant' || role === 'system') {
+        const content = record.message?.content ?? record.content ?? '';
+        const text = extractMessageText(content);
+        if (text && canAppendMessage(state)) {
+            state.messages.push({
+                role,
+                text,
+                timestamp: toIsoTime(record.timestamp, ''),
+                recordLineIndex: Number.isInteger(lineIndex) ? lineIndex : -1
+            });
+        }
+    }
+}
+
 function recordHasCodexMessage(record) {
     if (!record || record.type !== 'response_item' || !record.payload) {
         return false;
@@ -5526,10 +6253,23 @@ function recordHasClaudeMessage(record) {
     return !!text;
 }
 
+function recordHasCodeBuddyMessage(record) {
+    if (!record || record.type !== 'message') {
+        return false;
+    }
+    const role = normalizeRole(record.role);
+    if (role !== 'user' && role !== 'assistant' && role !== 'system') {
+        return false;
+    }
+    const content = record.message?.content ?? record.content ?? '';
+    const text = extractMessageText(content);
+    return !!text;
+}
+
 function recordHasMessage(record, source) {
-    return source === 'codex'
-        ? recordHasCodexMessage(record)
-        : recordHasClaudeMessage(record);
+    if (source === 'codex') return recordHasCodexMessage(record);
+    if (source === 'codebuddy') return recordHasCodeBuddyMessage(record);
+    return recordHasClaudeMessage(record);
 }
 
 function extractMessagesFromRecords(records, source, options = {}) {
@@ -5547,6 +6287,8 @@ function extractMessagesFromRecords(records, source, options = {}) {
         const record = records[lineIndex];
         if (source === 'codex') {
             extractCodexMessageFromRecord(record, state, lineIndex);
+        } else if (source === 'codebuddy') {
+            extractCodeBuddyMessageFromRecord(record, state, lineIndex);
         } else {
             extractClaudeMessageFromRecord(record, state, lineIndex);
         }
@@ -5608,6 +6350,8 @@ async function extractMessagesFromFile(filePath, source, options = {}) {
 
             if (source === 'codex') {
                 extractCodexMessageFromRecord(record, state, currentLineIndex);
+            } else if (source === 'codebuddy') {
+                extractCodeBuddyMessageFromRecord(record, state, currentLineIndex);
             } else {
                 extractClaudeMessageFromRecord(record, state, currentLineIndex);
             }
@@ -5632,7 +6376,13 @@ async function extractMessagesFromFile(filePath, source, options = {}) {
 }
 
 async function readSessionDetail(params = {}) {
-    const source = params.source === 'claude' ? 'claude' : (params.source === 'codex' ? 'codex' : '');
+    const source = params.source === 'claude'
+        ? 'claude'
+        : (params.source === 'codex'
+            ? 'codex'
+            : (params.source === 'gemini'
+                ? 'gemini'
+                : (params.source === 'codebuddy' ? 'codebuddy' : '')));
     if (!source) {
         return { error: 'Invalid source' };
     }
@@ -5649,9 +6399,52 @@ async function readSessionDetail(params = {}) {
         : DEFAULT_SESSION_DETAIL_MESSAGES;
     const preview = params.preview === true || params.preview === 'true';
 
-    const extracted = await extractSessionDetailPreviewFromFile(filePath, source, messageLimit, { preview });
-    const sessionId = extracted.sessionId || params.sessionId || path.basename(filePath, '.jsonl');
-    const sourceLabel = source === 'codex' ? 'Codex' : 'Claude Code';
+    let extracted;
+    if (source === 'gemini') {
+        let json;
+        try {
+            json = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        } catch (_) {
+            json = null;
+        }
+        if (!json || typeof json !== 'object') {
+            return { error: 'Failed to parse session file' };
+        }
+        const rawMessages = Array.isArray(json.messages) ? json.messages : [];
+        const messages = [];
+        for (const entry of rawMessages) {
+            if (!entry || typeof entry !== 'object') continue;
+            const role = normalizeGeminiMessageRole(entry.type);
+            if (!role) continue;
+            const text = extractMessageText(extractGeminiMessageText(entry.content ?? entry.message ?? entry.text));
+            if (!text && role !== 'system') continue;
+            messages.push({
+                role,
+                text,
+                timestamp: toIsoTime(entry.timestamp ?? entry.time ?? entry.at, '')
+            });
+        }
+        const filtered = removeLeadingSystemMessage(messages);
+        const totalMessages = filtered.length;
+        const clipped = totalMessages > messageLimit;
+        const sliced = clipped ? filtered.slice(Math.max(0, totalMessages - messageLimit)) : filtered;
+        extracted = {
+            sessionId: typeof json.sessionId === 'string' && json.sessionId.trim() ? json.sessionId.trim() : path.basename(filePath, '.json'),
+            cwd: typeof json.projectRoot === 'string' ? json.projectRoot : (typeof json.cwd === 'string' ? json.cwd : ''),
+            updatedAt: toIsoTime(json.lastUpdated ?? json.updatedAt, ''),
+            totalMessages,
+            clipped,
+            messages: sliced
+        };
+    } else {
+        extracted = await extractSessionDetailPreviewFromFile(filePath, source, messageLimit, { preview });
+    }
+    const sessionId = extracted.sessionId || params.sessionId || path.basename(filePath, source === 'gemini' ? '.json' : '.jsonl');
+    const sourceLabel = source === 'codex'
+        ? 'Codex'
+        : (source === 'claude'
+            ? 'Claude Code'
+            : (source === 'gemini' ? 'Gemini CLI' : 'CodeBuddy Code'));
     const clippedMessages = Array.isArray(extracted.messages) ? extracted.messages : [];
     const hasExactTotalMessages = Number.isFinite(extracted.totalMessages);
     const startIndex = hasExactTotalMessages
@@ -5685,7 +6478,13 @@ async function readSessionDetail(params = {}) {
 }
 
 async function readSessionPlain(params = {}) {
-    const source = params.source === 'claude' ? 'claude' : (params.source === 'codex' ? 'codex' : '');
+    const source = params.source === 'claude'
+        ? 'claude'
+        : (params.source === 'codex'
+            ? 'codex'
+            : (params.source === 'gemini'
+                ? 'gemini'
+                : (params.source === 'codebuddy' ? 'codebuddy' : '')));
     if (!source) {
         return { error: 'Invalid source' };
     }
@@ -5696,26 +6495,57 @@ async function readSessionPlain(params = {}) {
     }
 
     let extracted;
-    try {
-        extracted = await extractMessagesFromFile(filePath, source, { maxMessages: Infinity });
-    } catch (e) {
-        extracted = null;
-    }
-
-    if (!extracted) {
-        return { error: 'Failed to parse session file' };
-    }
-
-    if ((!extracted.messages || extracted.messages.length === 0) && !extracted.sessionId && !extracted.cwd) {
-        const fallbackRecords = readJsonlRecords(filePath);
-        if (fallbackRecords.length === 0) {
-            return { error: 'Session file is empty' };
+    if (source === 'gemini') {
+        let json;
+        try {
+            json = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        } catch (_) {
+            json = null;
         }
-        extracted = extractMessagesFromRecords(fallbackRecords, source, { maxMessages: Infinity });
+        if (!json || typeof json !== 'object') {
+            return { error: 'Failed to parse session file' };
+        }
+        const rawMessages = Array.isArray(json.messages) ? json.messages : [];
+        const messages = [];
+        for (const entry of rawMessages) {
+            if (!entry || typeof entry !== 'object') continue;
+            const role = normalizeGeminiMessageRole(entry.type);
+            if (!role) continue;
+            const text = extractMessageText(extractGeminiMessageText(entry.content ?? entry.message ?? entry.text));
+            if (!text && role !== 'system') continue;
+            messages.push({ role, text });
+        }
+        extracted = {
+            sessionId: typeof json.sessionId === 'string' && json.sessionId.trim() ? json.sessionId.trim() : path.basename(filePath, '.json'),
+            cwd: typeof json.projectRoot === 'string' ? json.projectRoot : '',
+            messages
+        };
+    } else {
+        try {
+            extracted = await extractMessagesFromFile(filePath, source, { maxMessages: Infinity });
+        } catch (e) {
+            extracted = null;
+        }
+
+        if (!extracted) {
+            return { error: 'Failed to parse session file' };
+        }
+
+        if ((!extracted.messages || extracted.messages.length === 0) && !extracted.sessionId && !extracted.cwd) {
+            const fallbackRecords = readJsonlRecords(filePath);
+            if (fallbackRecords.length === 0) {
+                return { error: 'Session file is empty' };
+            }
+            extracted = extractMessagesFromRecords(fallbackRecords, source, { maxMessages: Infinity });
+        }
     }
 
-    const sessionId = extracted.sessionId || params.sessionId || path.basename(filePath, '.jsonl');
-    const sourceLabel = source === 'codex' ? 'Codex' : 'Claude Code';
+    const sessionId = extracted.sessionId || params.sessionId || path.basename(filePath, source === 'gemini' ? '.json' : '.jsonl');
+    const sourceLabel = source === 'codex'
+        ? 'Codex'
+        : (source === 'claude'
+            ? 'Claude Code'
+            : (source === 'gemini' ? 'Gemini CLI' : 'CodeBuddy Code'));
     const messages = removeLeadingSystemMessage(Array.isArray(extracted.messages) ? extracted.messages : []);
     const text = buildSessionPlainText(messages);
 
@@ -5730,7 +6560,13 @@ async function readSessionPlain(params = {}) {
 }
 
 async function exportSessionData(params = {}) {
-    const source = params.source === 'claude' ? 'claude' : (params.source === 'codex' ? 'codex' : '');
+    const source = params.source === 'claude'
+        ? 'claude'
+        : (params.source === 'codex'
+            ? 'codex'
+            : (params.source === 'gemini'
+                ? 'gemini'
+                : (params.source === 'codebuddy' ? 'codebuddy' : '')));
     if (!source) {
         return { error: 'Invalid source' };
     }
@@ -5742,22 +6578,51 @@ async function exportSessionData(params = {}) {
     }
 
     let extracted;
-    try {
-        extracted = await extractMessagesFromFile(filePath, source, { maxMessages });
-    } catch (e) {
-        extracted = null;
-    }
-
-    if (!extracted) {
-        return { error: 'Failed to parse session file' };
-    }
-
-    if ((!extracted.messages || extracted.messages.length === 0) && !extracted.sessionId && !extracted.cwd) {
-        const fallbackRecords = readJsonlRecords(filePath);
-        if (fallbackRecords.length === 0) {
-            return { error: 'Session file is empty' };
+    if (source === 'gemini') {
+        let json;
+        try {
+            json = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        } catch (_) {
+            json = null;
         }
-        extracted = extractMessagesFromRecords(fallbackRecords, source, { maxMessages });
+        if (!json || typeof json !== 'object') {
+            return { error: 'Failed to parse session file' };
+        }
+        const rawMessages = Array.isArray(json.messages) ? json.messages : [];
+        const messages = [];
+        for (const entry of rawMessages) {
+            if (!entry || typeof entry !== 'object') continue;
+            const role = normalizeGeminiMessageRole(entry.type);
+            if (!role) continue;
+            const text = extractMessageText(extractGeminiMessageText(entry.content ?? entry.message ?? entry.text));
+            if (!text && role !== 'system') continue;
+            messages.push({ role, text, timestamp: toIsoTime(entry.timestamp ?? entry.time ?? entry.at, '') });
+        }
+        extracted = {
+            sessionId: typeof json.sessionId === 'string' && json.sessionId.trim() ? json.sessionId.trim() : path.basename(filePath, '.json'),
+            cwd: typeof json.projectRoot === 'string' ? json.projectRoot : '',
+            updatedAt: toIsoTime(json.lastUpdated ?? json.updatedAt, ''),
+            messages: maxMessages === Infinity ? messages : messages.slice(-maxMessages),
+            truncated: maxMessages !== Infinity && messages.length > maxMessages
+        };
+    } else {
+        try {
+            extracted = await extractMessagesFromFile(filePath, source, { maxMessages });
+        } catch (e) {
+            extracted = null;
+        }
+
+        if (!extracted) {
+            return { error: 'Failed to parse session file' };
+        }
+
+        if ((!extracted.messages || extracted.messages.length === 0) && !extracted.sessionId && !extracted.cwd) {
+            const fallbackRecords = readJsonlRecords(filePath);
+            if (fallbackRecords.length === 0) {
+                return { error: 'Session file is empty' };
+            }
+            extracted = extractMessagesFromRecords(fallbackRecords, source, { maxMessages });
+        }
     }
 
     extracted.messages = removeLeadingSystemMessage(Array.isArray(extracted.messages) ? extracted.messages : []);
@@ -5769,9 +6634,13 @@ async function exportSessionData(params = {}) {
         }
     }
 
-    const sessionId = extracted.sessionId || params.sessionId || path.basename(filePath, '.jsonl');
+    const sessionId = extracted.sessionId || params.sessionId || path.basename(filePath, source === 'gemini' ? '.json' : '.jsonl');
     const safeSessionId = String(sessionId).replace(/[^a-zA-Z0-9_-]/g, '_');
-    const sourceLabel = source === 'codex' ? 'Codex' : 'Claude Code';
+    const sourceLabel = source === 'codex'
+        ? 'Codex'
+        : (source === 'claude'
+            ? 'Claude Code'
+            : (source === 'gemini' ? 'Gemini CLI' : 'CodeBuddy Code'));
     const truncated = !!extracted.truncated;
     const maxMessagesLabel = maxMessages === Infinity ? 'all' : maxMessages;
     const markdown = buildSessionMarkdown({
@@ -7583,10 +8452,11 @@ function resolveExportOutputPath(outputPath, defaultFileName) {
 }
 
 function printExportSessionUsage() {
-    console.log('\n用法: codexmate export-session --source <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]');
+    console.log('\n用法: codexmate export-session --source <codex|claude|gemini|codebuddy> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]');
     console.log('\n示例:');
     console.log('  codexmate export-session --source codex --session-id 123456');
     console.log('  codexmate export-session --source claude --file "~/.claude/projects/demo/session.jsonl"');
+    console.log('  codexmate export-session --source codebuddy --file "~/.codebuddy/projects/demo/session.jsonl"');
     console.log('  codexmate export-session --source codex --session-id 123456 --max-messages=all');
 }
 
@@ -8907,8 +9777,8 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                         case 'list-sessions':
                             {
                                 const source = typeof params.source === 'string' ? params.source.trim().toLowerCase() : '';
-                                if (source && source !== 'codex' && source !== 'claude' && source !== 'all') {
-                                    result = { error: 'Invalid source. Must be codex, claude, or all' };
+                                if (source && source !== 'codex' && source !== 'claude' && source !== 'gemini' && source !== 'codebuddy' && source !== 'all') {
+                                    result = { error: 'Invalid source. Must be codex, claude, gemini, codebuddy, or all' };
                                 } else {
                                     result = {
                                         sessions: await listSessionBrowse(params),
@@ -8921,8 +9791,8 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             {
                                 const usageParams = isPlainObject(params) ? params : {};
                                 const source = typeof usageParams.source === 'string' ? usageParams.source.trim().toLowerCase() : '';
-                                if (source && source !== 'codex' && source !== 'claude' && source !== 'all') {
-                                    result = { error: 'Invalid source. Must be codex, claude, or all' };
+                                if (source && source !== 'codex' && source !== 'claude' && source !== 'gemini' && source !== 'codebuddy' && source !== 'all') {
+                                    result = { error: 'Invalid source. Must be codex, claude, gemini, codebuddy, or all' };
                                 } else {
                                     result = {
                                         sessions: await listSessionUsage({
@@ -8937,8 +9807,8 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                         case 'list-session-paths':
                             {
                                 const source = typeof params.source === 'string' ? params.source.trim().toLowerCase() : '';
-                                if (source && source !== 'codex' && source !== 'claude' && source !== 'all') {
-                                    result = { error: 'Invalid source. Must be codex, claude, or all' };
+                                if (source && source !== 'codex' && source !== 'claude' && source !== 'gemini' && source !== 'codebuddy' && source !== 'all') {
+                                    result = { error: 'Invalid source. Must be codex, claude, gemini, codebuddy, or all' };
                                 } else {
                                     result = {
                                         paths: listSessionPaths(params)
@@ -11042,7 +11912,7 @@ function buildMcpClaudeSettingsPayload() {
 function normalizeMcpSource(value) {
     const source = typeof value === 'string' ? value.trim().toLowerCase() : '';
     if (!source) return '';
-    if (source === 'codex' || source === 'claude' || source === 'all') {
+    if (source === 'codex' || source === 'claude' || source === 'gemini' || source === 'codebuddy' || source === 'all') {
         return source;
     }
     return null;
@@ -11355,7 +12225,7 @@ function createWorkflowToolCatalog() {
             handler: async (args = {}) => {
                 const source = normalizeMcpSource(args.source);
                 if (source === null) {
-                    return { error: 'Invalid source. Must be codex, claude, or all' };
+                    return { error: 'Invalid source. Must be codex, claude, gemini, codebuddy, or all' };
                 }
                 return {
                     source: source || 'all',
@@ -13048,7 +13918,7 @@ function createMcpTools(options = {}) {
             const input = args && typeof args === 'object' ? args : {};
             const source = normalizeMcpSource(input.source);
             if (source === null) {
-                return { error: 'Invalid source. Must be codex, claude, or all' };
+                return { error: 'Invalid source. Must be codex, claude, gemini, codebuddy, or all' };
             }
             const normalizedInput = {
                 ...input,
@@ -13497,7 +14367,7 @@ function createMcpResources() {
                         contents: [{
                             uri,
                             mimeType: 'application/json',
-                            text: JSON.stringify({ error: 'Invalid source. Must be codex, claude, or all' }, null, 2)
+                            text: JSON.stringify({ error: 'Invalid source. Must be codex, claude, gemini, codebuddy, or all' }, null, 2)
                         }]
                     };
                 }
@@ -13743,7 +14613,7 @@ function printMainHelp() {
     console.log('    注: follow-up 自动排队仅支持 linux/android/netbsd/openbsd/darwin/freebsd 且 stdin 必须是 TTY，其他平台会报错');
     console.log('  codexmate qwen [参数...]   等同于 qwen --yolo');
     console.log('  codexmate mcp [serve] [--transport stdio] [--allow-write|--read-only]');
-    console.log('  codexmate export-session --source <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]');
+    console.log('  codexmate export-session --source <codex|claude|gemini|codebuddy> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]');
     console.log('  codexmate zip <路径> [--max:级别]  压缩（系统 zip 优先，其次 zip-lib）');
     console.log('  codexmate unzip <zip文件> [输出目录]  解压（zip-lib）');
     console.log('  codexmate unzip-ext <zip目录> [输出目录] [--ext:后缀[,后缀...]] [--no-recursive]  批量提取 ZIP 指定后缀文件（默认递归）');

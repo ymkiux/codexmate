@@ -205,6 +205,22 @@ module.exports = async function testSetup(ctx) {
     };
     fs.writeFileSync(claudeIndexPath, JSON.stringify(claudeIndex, null, 2), 'utf-8');
 
+    const geminiProjectHash = 'e2e-gemini-project';
+    const geminiChatsDir = path.join(tmpHome, '.gemini', 'tmp', geminiProjectHash, 'chats');
+    fs.mkdirSync(geminiChatsDir, { recursive: true });
+    const geminiSessionId = 'gemini-e2e-session';
+    const geminiSessionPath = path.join(geminiChatsDir, `${geminiSessionId}.json`);
+    const geminiSession = {
+        sessionId: geminiSessionId,
+        startTime: '2025-02-15T00:00:00.000Z',
+        lastUpdated: '2025-02-15T00:00:02.000Z',
+        messages: [
+            { type: 'user', content: 'hello from gemini cli session', timestamp: '2025-02-15T00:00:01.000Z' },
+            { type: 'gemini', content: 'hello from codexmate', timestamp: '2025-02-15T00:00:02.000Z' }
+        ]
+    };
+    fs.writeFileSync(geminiSessionPath, JSON.stringify(geminiSession, null, 2), 'utf-8');
+
     Object.assign(ctx, {
         claudeModel,
         sessionId,
@@ -216,6 +232,8 @@ module.exports = async function testSetup(ctx) {
         lateKeywordMessage,
         claudeSessionId,
         claudeSessionPath,
+        geminiSessionId,
+        geminiSessionPath,
         noModelsUrl,
         htmlModelsUrl,
         authFailUrl

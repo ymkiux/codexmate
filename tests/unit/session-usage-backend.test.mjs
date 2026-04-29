@@ -56,6 +56,12 @@ const parseClaudeSessionSummarySrc = extractFunction(cliContent, 'parseClaudeSes
 function instantiateListSessionUsage(bindings = {}) {
     const effectiveBindings = {
         listSessionUsageCore: usageCore.listSessionUsageCore,
+        parseCodeBuddySessionSummary() {
+            throw new Error('should not parse codebuddy summary in this test');
+        },
+        parseGeminiSessionSummary() {
+            throw new Error('should not parse gemini summary in this test');
+        },
         ...(bindings || {})
     };
     const bindingNames = Object.keys(effectiveBindings);

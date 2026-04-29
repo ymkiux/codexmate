@@ -549,6 +549,23 @@ export function createSessionComputed() {
             ];
         },
 
+        usageCurrentSessionStats() {
+            const summary = this.sessionUsageCharts && this.sessionUsageCharts.summary
+                ? this.sessionUsageCharts.summary
+                : null;
+            if (!summary) return null;
+            const t = typeof this.t === 'function' ? this.t : null;
+            return {
+                apiDurationLabel: formatUsageDuration(summary.activeDurationMs || 0, { compact: true, lang: this.lang }),
+                totalDurationLabel: formatUsageDuration(summary.totalDurationMs || 0, { compact: true, lang: this.lang }),
+                tokenLabel: formatCompactUsageSummaryNumber(summary.totalTokens || 0),
+                label: t ? t('usage.currentSession.title') : '当前会话',
+                apiDurationText: t ? t('usage.currentSession.apiDuration') : 'API时长',
+                totalDurationText: t ? t('usage.currentSession.totalDuration') : '总时长',
+                tokenText: t ? t('usage.currentSession.tokens') : 'Token'
+            };
+        },
+
         sessionUsageDaily() {
             const baseBuckets = this.sessionUsageCharts && Array.isArray(this.sessionUsageCharts.buckets)
                 ? this.sessionUsageCharts.buckets

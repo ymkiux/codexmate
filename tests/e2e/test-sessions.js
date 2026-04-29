@@ -3,7 +3,7 @@ const fs = require('fs');
 const { assert } = require('./helpers');
 
 module.exports = async function testSessions(ctx) {
-    const { api, sessionId, tmpHome, claudeSessionId, sessionPath, claudeSessionPath } = ctx;
+    const { api, sessionId, tmpHome, claudeSessionId, sessionPath, claudeSessionPath, geminiSessionId, geminiSessionPath } = ctx;
     const buildTimestamp = (baseIso, offsetSeconds) => new Date(Date.parse(baseIso) + (offsetSeconds * 1000)).toISOString();
     const bestEffortApi = async (action, params) => {
         try {
@@ -24,11 +24,17 @@ module.exports = async function testSessions(ctx) {
     assert(Array.isArray(apiSessionsClaude.sessions), 'api sessions(claude) missing');
     assert(apiSessionsClaude.sessions.some(item => item.sessionId === claudeSessionId), 'api sessions(claude) missing claude entry');
 
+    // ========== List Sessions Tests - Gemini ==========
+    const apiSessionsGemini = await api('list-sessions', { source: 'gemini', limit: 50, forceRefresh: true });
+    assert(Array.isArray(apiSessionsGemini.sessions), 'api sessions(gemini) missing');
+    assert(apiSessionsGemini.sessions.some(item => item.sessionId === geminiSessionId), 'api sessions(gemini) missing gemini entry');
+
     // ========== List Sessions Tests - All Sources ==========
     const apiSessionsAll = await api('list-sessions', { source: 'all', limit: 50, forceRefresh: true });
     assert(Array.isArray(apiSessionsAll.sessions), 'api sessions(all) missing');
     assert(apiSessionsAll.sessions.some(item => item.sessionId === sessionId), 'api sessions(all) missing codex entry');
     assert(apiSessionsAll.sessions.some(item => item.sessionId === claudeSessionId), 'api sessions(all) missing claude entry');
+    assert(apiSessionsAll.sessions.some(item => item.sessionId === geminiSessionId), 'api sessions(all) missing gemini entry');
 
     // ========== List Sessions Tests - Invalid Source ==========
     const apiSessionsInvalid = await api('list-sessions', { source: 'invalid', limit: 50 });
@@ -75,6 +81,10 @@ module.exports = async function testSessions(ctx) {
     const sessionDetailClaude = await api('session-detail', { source: 'claude', sessionId: claudeSessionId });
     assert(Array.isArray(sessionDetailClaude.messages), 'session-detail(claude) missing messages');
 
+    const sessionDetailGemini = await api('session-detail', { source: 'gemini', sessionId: geminiSessionId });
+    assert(Array.isArray(sessionDetailGemini.messages), 'session-detail(gemini) missing messages');
+    assert(sessionDetailGemini.messages.some((m) => String(m.text || '').includes('hello from codexmate')), 'session-detail(gemini) content mismatch');
+
     const sessionDetailMissing = await api('session-detail', { source: 'codex', sessionId: 'missing-session' });
     assert(sessionDetailMissing.error, 'session-detail should fail for missing session');
 
@@ -85,6 +95,9 @@ module.exports = async function testSessions(ctx) {
     const sessionPlain = await api('session-plain', { source: 'codex', sessionId });
     assert(sessionPlain.text && sessionPlain.text.includes('world'), 'session-plain missing content');
     assert(typeof sessionPlain.text === 'string', 'session-plain text missing');
+
+    const sessionPlainGemini = await api('session-plain', { source: 'gemini', sessionId: geminiSessionId });
+    assert(sessionPlainGemini.text && sessionPlainGemini.text.includes('hello from codexmate'), 'session-plain(gemini) missing content');
 
     const sessionPlainMissing = await api('session-plain', { source: 'codex', sessionId: 'missing-session' });
     assert(sessionPlainMissing.error, 'session-plain should fail for missing session');
@@ -101,6 +114,9 @@ module.exports = async function testSessions(ctx) {
     const exportSessionFull = await api('export-session', { source: 'codex', sessionId, maxMessages: 100 });
     assert(exportSessionFull.content, 'export-session(full) missing content');
     assert(exportSessionFull.truncated === false, 'export-session(full) should not be truncated');
+
+    const exportSessionGemini = await api('export-session', { source: 'gemini', sessionId: geminiSessionId, maxMessages: 100 });
+    assert(exportSessionGemini.content, 'export-session(gemini) missing content');
 
     const exportSessionMissing = await api('export-session', { source: 'codex', sessionId: 'missing', maxMessages: 10 });
     assert(exportSessionMissing.error, 'export-session should fail for missing session');
