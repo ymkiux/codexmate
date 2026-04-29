@@ -60,6 +60,7 @@ It works on local files directly and does not require cloud hosting. The skills 
 - Unified Codex + Claude + Gemini CLI + CodeBuddy Code session list
 - Local session pinning with persistent pinned state and pinned-first ordering
 - Keyword/source/cwd filters
+- Copy resume command (Codex/Gemini/CodeBuddy): `codex resume <sessionId>` / `gemini -r <sessionId>` / `codebuddy -r <sessionId>`
 - Fast search UX: short-lived query result caching to avoid rescanning on each keystroke
 - Usage subview with 7d / 30d session trends, message trends, source share, and top paths
 - Markdown export
@@ -229,7 +230,7 @@ npm run reset 79
 | `codexmate qwen [args...]` | Qwen CLI passthrough entrypoint |
 | `codexmate run [--host <HOST>] [--no-browser]` | Start Web UI |
 | `codexmate mcp serve [--read-only\|--allow-write]` | Start MCP stdio server |
-| `codexmate export-session --source <codex\|claude> ...` | Export session to Markdown |
+| `codexmate export-session --source <codex\|claude\|gemini\|codebuddy> ...` | Export session to Markdown |
 | `codexmate zip <path> [--max:0-9]` / `codexmate unzip <zip> [out]` | Zip / unzip |
 | `codexmate unzip-ext <zip-dir> [out] [--ext:suffix[,suffix...]] [--no-recursive]` | Extract files with target suffixes from ZIP files in a directory (default `.json`, recursive by default) |
 

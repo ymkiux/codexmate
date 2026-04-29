@@ -61,6 +61,7 @@ Codex Mate 提供一套本地优先的 CLI + Web UI，用于统一管理：
 - 同页查看 Codex、Claude、Gemini CLI 与 CodeBuddy Code 会话
 - 支持本地会话置顶，置顶状态持久化保存并优先排序显示
 - 关键词搜索、来源筛选、cwd 路径筛选
+- 复制恢复命令（Codex/Gemini/CodeBuddy）：`codex resume <sessionId>` / `gemini -r <sessionId>` / `codebuddy -r <sessionId>`
 - 搜索体验优化：短周期结果缓存，避免输入时重复扫描
 - Usage 子页：近 7 天 / 近 30 天会话趋势、消息趋势、来源占比、高频路径
 - 会话导出 Markdown
@@ -231,7 +232,7 @@ npm run reset 79
 | `codexmate qwen [args...]` | Qwen CLI 透传入口 |
 | `codexmate run [--host <HOST>] [--no-browser]` | 启动 Web UI |
 | `codexmate mcp serve [--read-only\|--allow-write]` | 启动 MCP stdio 服务 |
-| `codexmate export-session --source <codex\|claude> ...` | 导出会话为 Markdown |
+| `codexmate export-session --source <codex\|claude\|gemini\|codebuddy> ...` | 导出会话为 Markdown |
 | `codexmate zip <path> [--max:0-9]` / `codexmate unzip <zip> [out]` | 压缩 / 解压 |
 | `codexmate unzip-ext <zip-dir> [out] [--ext:suffix[,suffix...]] [--no-recursive]` | 批量提取目录下 ZIP 内指定后缀文件（默认 `.json`，默认递归） |
 
