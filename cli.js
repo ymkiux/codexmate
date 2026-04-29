@@ -115,6 +115,7 @@ const {
 const {
     createZipCommandController
 } = require('./cli/zip-commands');
+const { cmdConvertSession } = require('./cli/session-convert');
 const {
     getCodexSkillsDir,
     getClaudeSkillsDir,
@@ -14614,6 +14615,7 @@ function printMainHelp() {
     console.log('  codexmate qwen [参数...]   等同于 qwen --yolo');
     console.log('  codexmate mcp [serve] [--transport stdio] [--allow-write|--read-only]');
     console.log('  codexmate export-session --source <codex|claude|gemini|codebuddy> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]');
+    console.log('  codexmate convert-session --from <codex|claude> --to <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]');
     console.log('  codexmate zip <路径> [--max:级别]  压缩（系统 zip 优先，其次 zip-lib）');
     console.log('  codexmate unzip <zip文件> [输出目录]  解压（zip-lib）');
     console.log('  codexmate unzip-ext <zip目录> [输出目录] [--ext:后缀[,后缀...]] [--no-recursive]  批量提取 ZIP 指定后缀文件（默认递归）');
@@ -14712,6 +14714,7 @@ async function main() {
         }
         case 'mcp': await cmdMcp(args.slice(1)); break;
         case 'export-session': await cmdExportSession(args.slice(1)); break;
+        case 'convert-session': await cmdConvertSession(args.slice(1), { resolveSessionFilePath }); break;
         case 'zip': {
             const { targetPath, options } = parseZipCommandArgs(args.slice(1));
             await cmdZip(targetPath, options);
