@@ -16,6 +16,9 @@
 
 [文档](https://sakurabytecore.github.io/codexmate/) · [快速开始](#快速开始) · [命令速查](#命令速查) · [Web 界面](#web-界面) · [MCP](#mcp) · [English](README.md)
 
+<br />
+<img src="site/.vitepress/public/images/readme-hero.png" alt="Codex Mate 界面预览" width="960" />
+
 </div>
 
 ---
