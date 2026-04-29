@@ -117,7 +117,7 @@ export function createSessionActionMethods(options = {}) {
             if (!session) return false;
             const source = String(session.source || '').trim().toLowerCase();
             const sessionId = typeof session.sessionId === 'string' ? session.sessionId.trim() : '';
-            return (source === 'codex' || source === 'codebuddy') && !!sessionId;
+            return (source === 'codex' || source === 'codebuddy' || source === 'gemini') && !!sessionId;
         },
 
         isCloneAvailable(session) {
@@ -143,6 +143,9 @@ export function createSessionActionMethods(options = {}) {
             const arg = this.quoteResumeArg(sessionId);
             if (source === 'codebuddy') {
                 return `codebuddy -r ${arg}`;
+            }
+            if (source === 'gemini') {
+                return `gemini -r ${arg}`;
             }
             if (this.sessionResumeWithYolo) {
                 return `codex --yolo resume ${arg}`;

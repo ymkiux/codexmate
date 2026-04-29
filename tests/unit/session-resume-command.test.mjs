@@ -13,11 +13,12 @@ test('isResumeCommandAvailable supports codex and codebuddy with sessionId', () 
     const methods = createSessionActionMethods();
     assert.strictEqual(methods.isResumeCommandAvailable({ source: 'codex', sessionId: 'sess-1' }), true);
     assert.strictEqual(methods.isResumeCommandAvailable({ source: 'codebuddy', sessionId: 'abc123' }), true);
+    assert.strictEqual(methods.isResumeCommandAvailable({ source: 'gemini', sessionId: 'gm-123' }), true);
     assert.strictEqual(methods.isResumeCommandAvailable({ source: 'codebuddy', sessionId: '' }), false);
     assert.strictEqual(methods.isResumeCommandAvailable({ source: 'claude', sessionId: 'sess-2' }), false);
 });
 
-test('buildResumeCommand generates codex resume with optional --yolo and codebuddy -r', () => {
+test('buildResumeCommand generates codex resume with optional --yolo, codebuddy -r, and gemini -r', () => {
     const methods = createSessionActionMethods();
     const contextBase = {
         ...methods,
@@ -38,5 +39,9 @@ test('buildResumeCommand generates codex resume with optional --yolo and codebud
         methods.buildResumeCommand.call({ ...contextBase, sessionResumeWithYolo: true }, { source: 'codebuddy', sessionId: 'abc123' }),
         'codebuddy -r abc123'
     );
-});
 
+    assert.strictEqual(
+        methods.buildResumeCommand.call({ ...contextBase, sessionResumeWithYolo: true }, { source: 'gemini', sessionId: 'gm-123' }),
+        'gemini -r gm-123'
+    );
+});
