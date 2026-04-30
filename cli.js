@@ -6837,7 +6837,9 @@ async function convertSessionToDerived(params = {}) {
     const sourceKey = buildSessionDerivedSourceKey(source, baseSessionId, filePath);
     const outputDir = target === 'codex'
         ? getCodexSessionsDir()
-        : buildDerivedSessionOutputDir(target, source, sourceKey);
+        : (target === 'claude'
+            ? path.join(getClaudeProjectsDir(), 'codexmate-derived')
+            : buildDerivedSessionOutputDir(target, source, sourceKey));
     ensureDir(outputDir);
     const outputPath = path.join(outputDir, `${derivedSessionId}.jsonl`);
     const metaPath = path.join(outputDir, `${derivedSessionId}.meta.json`);
@@ -6905,6 +6907,23 @@ async function convertSessionToDerived(params = {}) {
     const summary = target === 'codex'
         ? parseCodexSessionSummary(outputPath, { summaryReadBytes: SESSION_BROWSE_SUMMARY_READ_BYTES, titleReadBytes: SESSION_BROWSE_SUMMARY_READ_BYTES })
         : parseClaudeSessionSummary(outputPath, { summaryReadBytes: SESSION_BROWSE_SUMMARY_READ_BYTES, titleReadBytes: SESSION_BROWSE_SUMMARY_READ_BYTES });
+    if (target === 'claude' && summary) {
+        const indexPath = path.join(outputDir, 'sessions-index.json');
+        upsertClaudeSessionIndexEntry(indexPath, outputPath, {
+            source: 'claude',
+            trashId: summary.sessionId,
+            trashFileName: `${summary.sessionId}.jsonl`,
+            sessionId: summary.sessionId,
+            title: summary.title,
+            cwd: summary.cwd,
+            createdAt: summary.createdAt,
+            updatedAt: summary.updatedAt,
+            messageCount: summary.messageCount,
+            provider: summary.provider,
+            keywords: summary.keywords,
+            capabilities: summary.capabilities
+        });
+    }
     const maxMessagesLabel = maxMessages === Infinity ? 'all' : maxMessages;
 
     return {

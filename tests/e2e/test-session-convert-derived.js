@@ -18,6 +18,12 @@ function isCodexSessionPath(tmpHome, filePath) {
         || normalized.startsWith(path.join(tmpHome, '.config', 'codex', 'sessions') + path.sep);
 }
 
+function isClaudeProjectPath(tmpHome, filePath) {
+    const normalized = String(filePath || '');
+    return normalized.startsWith(path.join(tmpHome, '.claude', 'projects') + path.sep)
+        || normalized.startsWith(path.join(tmpHome, '.config', 'claude', 'projects') + path.sep);
+}
+
 function buildIso(baseIso, offsetSeconds) {
     return new Date(Date.parse(baseIso) + (offsetSeconds * 1000)).toISOString();
 }
@@ -56,6 +62,8 @@ async function convertAndAssertListed(api, tmpHome, source, target, params = {},
     assert(fs.existsSync(derivedMetaPath(outPath)), `derived ${target} meta missing`);
     if (target === 'codex') {
         assert(isCodexSessionPath(tmpHome, outPath), 'derived codex session path should stay inside ~/.codex or ~/.config/codex');
+    } else if (target === 'claude') {
+        assert(isClaudeProjectPath(tmpHome, outPath), 'derived claude session path should stay inside ~/.claude/projects or ~/.config/claude/projects');
     } else {
         assert(
             outPath.startsWith(path.join(tmpHome, '.codexmate', 'sessions', 'derived', target) + path.sep),
