@@ -12,30 +12,63 @@ function derivedMetaPath(filePath) {
     return filePath.endsWith('.jsonl') ? filePath.replace(/\.jsonl$/, '.meta.json') : `${filePath}.meta.json`;
 }
 
+function buildIso(baseIso, offsetSeconds) {
+    return new Date(Date.parse(baseIso) + (offsetSeconds * 1000)).toISOString();
+}
+
+function writeCodexSession(filePath, sessionId, messages, options = {}) {
+    const baseIso = options.baseIso || '2025-06-01T00:00:00.000Z';
+    const cwd = options.cwd || `/tmp/${sessionId}`;
+    const records = [];
+    records.push({
+        type: 'session_meta',
+        payload: { id: sessionId, cwd },
+        timestamp: baseIso
+    });
+    let offset = 1;
+    for (const message of messages) {
+        records.push({
+            type: 'response_item',
+            payload: {
+                type: 'message',
+                role: message.role,
+                content: message.content
+            },
+            timestamp: buildIso(baseIso, offset)
+        });
+        offset += 1;
+    }
+    fs.writeFileSync(filePath, records.map((r) => JSON.stringify(r)).join('\n') + '\n', 'utf-8');
+}
+
+async function convertAndAssertListed(api, tmpHome, source, target, params = {}, options = {}) {
+    const res = await api('convert-session', { source, target, ...params });
+    assert(!res.error, `convert-session ${source}->${target} failed: ${res.error || ''}`);
+    assert(res.session && res.session.filePath, `convert-session ${source}->${target} missing session.filePath`);
+    const outPath = res.session.filePath;
+    assert(fs.existsSync(outPath), `derived ${target} session file missing`);
+    assert(fs.existsSync(derivedMetaPath(outPath)), `derived ${target} meta missing`);
+    assert(
+        outPath.startsWith(path.join(tmpHome, '.codexmate', 'sessions', 'derived', target) + path.sep),
+        `derived ${target} session path should stay inside ~/.codexmate`
+    );
+    if (options.assertListed !== false) {
+        const list = await api('list-sessions', { source: target, limit: 300, forceRefresh: true });
+        assert(Array.isArray(list.sessions), `list-sessions(${target}) missing sessions`);
+        assert(list.sessions.some((item) => item && item.filePath === outPath), `derived ${target} session not listed`);
+    }
+    return { res, outPath };
+}
+
 module.exports = async function testSessionConvertDerived(ctx) {
     const { api, tmpHome, sessionId, sessionPath } = ctx;
 
     const beforeHash = sha256File(sessionPath);
 
-    const resCodexToClaude = await api('convert-session', {
-        source: 'codex',
-        target: 'claude',
+    const { outPath: derivedClaudePath } = await convertAndAssertListed(api, tmpHome, 'codex', 'claude', {
         sessionId,
         maxMessages: 'all'
     });
-    assert(!resCodexToClaude.error, `convert-session codex->claude failed: ${resCodexToClaude.error || ''}`);
-    assert(resCodexToClaude.session && resCodexToClaude.session.filePath, 'convert-session codex->claude missing session.filePath');
-    const derivedClaudePath = resCodexToClaude.session.filePath;
-    assert(fs.existsSync(derivedClaudePath), 'derived claude session file missing');
-    assert(fs.existsSync(derivedMetaPath(derivedClaudePath)), 'derived claude meta missing');
-    assert(
-        derivedClaudePath.startsWith(path.join(tmpHome, '.codexmate', 'sessions', 'derived', 'claude') + path.sep),
-        'derived claude session path should stay inside ~/.codexmate'
-    );
-
-    const listClaude = await api('list-sessions', { source: 'claude', limit: 200, forceRefresh: true });
-    assert(Array.isArray(listClaude.sessions), 'list-sessions(claude) missing sessions');
-    assert(listClaude.sessions.some((item) => item && item.filePath === derivedClaudePath), 'derived claude session not listed');
 
     const detailClaude = await api('session-detail', { source: 'claude', filePath: derivedClaudePath, maxMessages: 50 });
     assert(Array.isArray(detailClaude.messages), 'session-detail(derived claude) missing messages');
@@ -43,25 +76,10 @@ module.exports = async function testSessionConvertDerived(ctx) {
     assert(detailClaude.messages[0].text === 'hello', 'session-detail(derived claude) user text mismatch');
     assert(detailClaude.messages[1].text === 'world', 'session-detail(derived claude) assistant text mismatch');
 
-    const resClaudeToCodex = await api('convert-session', {
-        source: 'claude',
-        target: 'codex',
+    const { outPath: derivedCodexPath } = await convertAndAssertListed(api, tmpHome, 'claude', 'codex', {
         filePath: derivedClaudePath,
         maxMessages: 'all'
     });
-    assert(!resClaudeToCodex.error, `convert-session claude->codex failed: ${resClaudeToCodex.error || ''}`);
-    assert(resClaudeToCodex.session && resClaudeToCodex.session.filePath, 'convert-session claude->codex missing session.filePath');
-    const derivedCodexPath = resClaudeToCodex.session.filePath;
-    assert(fs.existsSync(derivedCodexPath), 'derived codex session file missing');
-    assert(fs.existsSync(derivedMetaPath(derivedCodexPath)), 'derived codex meta missing');
-    assert(
-        derivedCodexPath.startsWith(path.join(tmpHome, '.codexmate', 'sessions', 'derived', 'codex') + path.sep),
-        'derived codex session path should stay inside ~/.codexmate'
-    );
-
-    const listCodex = await api('list-sessions', { source: 'codex', limit: 200, forceRefresh: true });
-    assert(Array.isArray(listCodex.sessions), 'list-sessions(codex) missing sessions');
-    assert(listCodex.sessions.some((item) => item && item.filePath === derivedCodexPath), 'derived codex session not listed');
 
     const detailCodex = await api('session-detail', { source: 'codex', filePath: derivedCodexPath, maxMessages: 50 });
     assert(Array.isArray(detailCodex.messages), 'session-detail(derived codex) missing messages');
@@ -69,17 +87,97 @@ module.exports = async function testSessionConvertDerived(ctx) {
     assert(detailCodex.messages[0].text === 'hello', 'session-detail(derived codex) user text mismatch');
     assert(detailCodex.messages[1].text === 'world', 'session-detail(derived codex) assistant text mismatch');
 
-    const resCodexToClaude2 = await api('convert-session', {
-        source: 'codex',
-        target: 'claude',
+    const { outPath: derivedClaudePath2 } = await convertAndAssertListed(api, tmpHome, 'codex', 'claude', {
         sessionId,
         maxMessages: 'all'
     });
-    assert(!resCodexToClaude2.error, `convert-session codex->claude #2 failed: ${resCodexToClaude2.error || ''}`);
-    const derivedClaudePath2 = resCodexToClaude2.session && resCodexToClaude2.session.filePath ? resCodexToClaude2.session.filePath : '';
     assert(derivedClaudePath2 && derivedClaudePath2 !== derivedClaudePath, 'second derived session should create a distinct file');
     assert(fs.existsSync(derivedClaudePath2), 'second derived claude session file missing');
 
     const afterHash = sha256File(sessionPath);
     assert(afterHash === beforeHash, 'source codex session should remain unchanged after conversions');
+
+    const invalidSame = await api('convert-session', { source: 'codex', target: 'codex', sessionId, maxMessages: 'all' });
+    assert(invalidSame.error, 'convert-session should reject same source/target');
+    const invalidTarget = await api('convert-session', { source: 'codex', target: 'gemini', sessionId, maxMessages: 'all' });
+    assert(invalidTarget.error, 'convert-session should reject invalid target');
+
+    const sessionsDir = path.join(tmpHome, '.codex', 'sessions');
+    fs.mkdirSync(sessionsDir, { recursive: true });
+
+    {
+        const systemLeadingId = 'e2e-convert-system-leading';
+        const systemLeadingPath = path.join(sessionsDir, `${systemLeadingId}.jsonl`);
+        writeCodexSession(systemLeadingPath, systemLeadingId, [
+            { role: 'system', content: 'SYS-LEADING' },
+            { role: 'user', content: 'hello' },
+            { role: 'assistant', content: 'world' }
+        ]);
+        const before = sha256File(systemLeadingPath);
+        const { outPath } = await convertAndAssertListed(api, tmpHome, 'codex', 'claude', { filePath: systemLeadingPath, maxMessages: 'all' }, { assertListed: false });
+        const detail = await api('session-detail', { source: 'claude', filePath: outPath, maxMessages: 10 });
+        const texts = (detail.messages || []).map((m) => m.text);
+        assert(texts.length === 2, 'leading system message should be dropped during conversion');
+        assert(texts[0] === 'hello' && texts[1] === 'world', 'leading system drop should preserve conversation ordering');
+        assert(sha256File(systemLeadingPath) === before, 'system-leading source should remain unchanged');
+    }
+
+    {
+        const systemMiddleId = 'e2e-convert-system-middle';
+        const systemMiddlePath = path.join(sessionsDir, `${systemMiddleId}.jsonl`);
+        writeCodexSession(systemMiddlePath, systemMiddleId, [
+            { role: 'user', content: 'u' },
+            { role: 'system', content: 'SYS-MIDDLE' },
+            { role: 'assistant', content: 'a' }
+        ]);
+        const { outPath } = await convertAndAssertListed(api, tmpHome, 'codex', 'claude', { filePath: systemMiddlePath, maxMessages: 'all' }, { assertListed: false });
+        const detail = await api('session-detail', { source: 'claude', filePath: outPath, maxMessages: 10 });
+        const texts = (detail.messages || []).map((m) => m.text);
+        assert(texts.join('|') === 'u|SYS-MIDDLE|a', 'middle system message should be preserved during conversion');
+    }
+
+    {
+        const unicodeId = 'e2e-convert-unicode';
+        const unicodePath = path.join(sessionsDir, `${unicodeId}.jsonl`);
+        writeCodexSession(unicodePath, unicodeId, [
+            { role: 'user', content: '中文🚀\r\nline2' },
+            { role: 'assistant', content: 'ok' }
+        ]);
+        const { outPath } = await convertAndAssertListed(api, tmpHome, 'codex', 'claude', { filePath: unicodePath, maxMessages: 'all' }, { assertListed: false });
+        const detail = await api('session-detail', { source: 'claude', filePath: outPath, maxMessages: 10 });
+        assert((detail.messages || [])[0] && String(detail.messages[0].text || '').includes('中文'), 'unicode text should survive conversion');
+        assert(String(detail.messages[0].text || '').includes('line2'), 'CRLF payload should survive conversion');
+    }
+
+    {
+        const truncId = 'e2e-convert-truncate';
+        const truncPath = path.join(sessionsDir, `${truncId}.jsonl`);
+        writeCodexSession(truncPath, truncId, [
+            { role: 'user', content: 'm1' },
+            { role: 'assistant', content: 'm2' },
+            { role: 'user', content: 'm3' },
+            { role: 'assistant', content: 'm4' },
+            { role: 'user', content: 'm5' }
+        ]);
+        const { res, outPath } = await convertAndAssertListed(api, tmpHome, 'codex', 'claude', { filePath: truncPath, maxMessages: 2 }, { assertListed: false });
+        assert(res.truncated === true, 'convert-session should expose truncated flag when maxMessages is smaller than message count');
+        const detail = await api('session-detail', { source: 'claude', filePath: outPath, maxMessages: 10 });
+        const texts = (detail.messages || []).map((m) => m.text);
+        assert(texts.join('|') === 'm1|m2', 'conversion should keep first N messages when truncated');
+    }
+
+    {
+        const hugeId = 'e2e-convert-huge-line';
+        const hugePath = path.join(sessionsDir, `${hugeId}.jsonl`);
+        writeCodexSession(hugePath, hugeId, [
+            { role: 'user', content: 'x'.repeat(20000) },
+            { role: 'assistant', content: 'done' }
+        ]);
+        const { outPath } = await convertAndAssertListed(api, tmpHome, 'codex', 'claude', { filePath: hugePath, maxMessages: 'all' }, { assertListed: false });
+        const detail = await api('session-detail', { source: 'claude', filePath: outPath, maxMessages: 10 });
+        assert((detail.messages || []).length === 2, 'huge message conversion should keep message count');
+        const firstText = String(detail.messages[0] && detail.messages[0].text ? detail.messages[0].text : '');
+        assert(firstText.startsWith('x'), 'huge message should keep prefix');
+        assert(firstText.length <= 20000, 'huge message text should not exceed the original payload');
+    }
 };
