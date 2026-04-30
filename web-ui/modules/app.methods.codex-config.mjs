@@ -4,6 +4,7 @@ import {
     getConvertTargetSource,
     normalizeSessionConvertSource
 } from '../logic.session-convert.mjs';
+import { syncSessionsFilterUrl } from './sessions-filters-url.mjs';
 
 function hasResponseError(response) {
     if (!response || typeof response !== 'object') {
@@ -111,6 +112,17 @@ export function createCodexConfigMethods(options = {}) {
                     this.showMessage(`已生成派生会话（已截断：最多 ${maxLabel} 条消息）`, 'info');
                 } else {
                     this.showMessage('已生成派生会话', 'success');
+                }
+
+                if (converted && converted.source && typeof this.sessionFilterSource === 'string' && this.sessionFilterSource !== converted.source) {
+                    this.sessionFilterSource = converted.source;
+                    if (typeof this.refreshSessionPathOptions === 'function') {
+                        this.refreshSessionPathOptions(this.sessionFilterSource);
+                    }
+                    if (typeof this.persistSessionFilterCache === 'function') {
+                        this.persistSessionFilterCache();
+                    }
+                    syncSessionsFilterUrl(this);
                 }
                 if (typeof this.loadSessions === 'function') {
                     await this.loadSessions({ forceRefresh: true });
