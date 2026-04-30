@@ -4515,7 +4515,10 @@ function listCodexSessions(limit, options = {}) {
             titleReadBytes
         });
         if (summary) {
-            sessions.push(summary);
+            sessions.push({
+                ...summary,
+                derived: isDerivedSessionFile(filePath)
+            });
         }
 
         if (sessions.length >= targetCount) {
@@ -4697,6 +4700,7 @@ function listClaudeSessions(limit, options = {}) {
                 models,
                 __messageCountExact: quickRecords.length > 0 && isSessionSummaryMessageCountExact(fileStat, summaryReadBytes),
                 filePath,
+                derived: isDerivedSessionFile(filePath),
                 keywords,
                 capabilities
             });
@@ -4723,7 +4727,10 @@ function listClaudeSessions(limit, options = {}) {
                 titleReadBytes
             });
             if (summary) {
-                sessions.push(summary);
+                sessions.push({
+                    ...summary,
+                    derived: isDerivedSessionFile(filePath)
+                });
             }
 
             if (sessions.length >= targetCount) {
@@ -4745,7 +4752,10 @@ function listClaudeSessions(limit, options = {}) {
                 titleReadBytes
             });
             if (summary) {
-                sessions.push(summary);
+                sessions.push({
+                    ...summary,
+                    derived: isDerivedSessionFile(filePath)
+                });
             }
             seen.add(filePath);
         }
@@ -6324,6 +6334,28 @@ function buildSessionPlainText(messages) {
     return lines.join('\n');
 }
 
+function getDerivedSessionMetaPath(filePath) {
+    if (!filePath) return '';
+    const base = filePath.toLowerCase().endsWith('.jsonl')
+        ? filePath.slice(0, -5)
+        : filePath;
+    return `${base}.meta.json`;
+}
+
+function isDerivedSessionFile(filePath) {
+    const metaPath = getDerivedSessionMetaPath(filePath);
+    if (!metaPath) return false;
+    try {
+        if (fs.existsSync(metaPath)) {
+            return true;
+        }
+    } catch (_) {
+        return false;
+    }
+    const base = path.basename(filePath || '', path.extname(filePath || ''));
+    return /-\d{8}-\d{6}-[0-9a-f]{6}$/i.test(base);
+}
+
 function resolveStateMaxMessages(state) {
     if (!state || typeof state !== 'object') {
         return MAX_EXPORT_MESSAGES;
@@ -6669,6 +6701,20 @@ async function readSessionDetail(params = {}) {
         sessionId,
         cwd: extracted.cwd || '',
         updatedAt: extracted.updatedAt || '',
+        derived: (() => {
+            try {
+                const metaPath = filePath.toLowerCase().endsWith('.jsonl')
+                    ? `${filePath.slice(0, -5)}.meta.json`
+                    : `${filePath}.meta.json`;
+                if (fs.existsSync(metaPath)) {
+                    return true;
+                }
+            } catch (_) {
+                return false;
+            }
+            const base = path.basename(filePath || '', path.extname(filePath || ''));
+            return /-\d{8}-\d{6}-[0-9a-f]{6}$/i.test(base);
+        })(),
         totalMessages: hasExactTotalMessages ? extracted.totalMessages : null,
         clipped: typeof extracted.clipped === 'boolean'
             ? extracted.clipped
@@ -6696,6 +6742,15 @@ async function readSessionPlain(params = {}) {
         return { error: 'Session file not found' };
     }
 
+    const rawMaxMessages = params.maxMessages;
+    const maxMessages = rawMaxMessages === Infinity || rawMaxMessages === 'all'
+        ? Infinity
+        : (
+            Number.isFinite(Number(rawMaxMessages))
+                ? Math.max(1, Math.floor(Number(rawMaxMessages)))
+                : 50
+        );
+
     let extracted;
     if (source === 'gemini') {
         let json;
@@ -6716,15 +6771,19 @@ async function readSessionPlain(params = {}) {
             const text = extractMessageText(extractGeminiMessageText(entry.content ?? entry.message ?? entry.text));
             if (!text && role !== 'system') continue;
             messages.push({ role, text });
+            if (maxMessages !== Infinity && messages.length >= maxMessages) {
+                break;
+            }
         }
         extracted = {
             sessionId: typeof json.sessionId === 'string' && json.sessionId.trim() ? json.sessionId.trim() : path.basename(filePath, '.json'),
             cwd: typeof json.projectRoot === 'string' ? json.projectRoot : '',
-            messages
+            messages,
+            truncated: maxMessages !== Infinity && rawMessages.length > messages.length
         };
     } else {
         try {
-            extracted = await extractMessagesFromFile(filePath, source, { maxMessages: Infinity });
+            extracted = await extractMessagesFromFile(filePath, source, { maxMessages });
         } catch (e) {
             extracted = null;
         }
@@ -6738,7 +6797,7 @@ async function readSessionPlain(params = {}) {
             if (fallbackRecords.length === 0) {
                 return { error: 'Session file is empty' };
             }
-            extracted = extractMessagesFromRecords(fallbackRecords, source, { maxMessages: Infinity });
+            extracted = extractMessagesFromRecords(fallbackRecords, source, { maxMessages });
         }
     }
 
@@ -6757,7 +6816,8 @@ async function readSessionPlain(params = {}) {
         sessionId,
         title: sessionId,
         filePath,
-        text
+        text,
+        clipped: maxMessages !== Infinity && !!(extracted && extracted.truncated)
     };
 }
 
@@ -6998,7 +7058,7 @@ async function convertSessionToDerived(params = {}) {
         target,
         truncated: !!extracted.truncated,
         maxMessages: maxMessagesLabel,
-        session: summary || {
+        session: summary ? { ...summary, derived: true } : {
             source: target,
             sourceLabel: target === 'codex' ? 'Codex' : 'Claude Code',
             sessionId: derivedSessionId,
@@ -7015,6 +7075,7 @@ async function convertSessionToDerived(params = {}) {
             reasoningOutputTokens: 0,
             __messageCountExact: true,
             filePath: outputPath,
+            derived: true,
             keywords: [],
             capabilities: {}
         }

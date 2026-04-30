@@ -686,7 +686,8 @@ export function createSessionBrowserMethods(options = {}) {
                 const res = await api('session-plain', {
                     source: sessionSnapshot.source,
                     sessionId: sessionSnapshot.sessionId,
-                    filePath: sessionSnapshot.filePath
+                    filePath: sessionSnapshot.filePath,
+                    maxMessages: sessionSnapshot.maxMessages || 50
                 });
 
                 if (requestSeq !== this.sessionStandaloneRequestSeq) {

@@ -487,6 +487,8 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'openClaudeMdEditor'
     ];
     allowedExtraCurrentMethodKeys.push(
+        'isDerivedSession',
+        'isDerivedSessionId',
         'resetConfigTemplateDiffState',
         'onConfigTemplateContentInput',
         'buildConfigTemplateDiffFingerprint',
