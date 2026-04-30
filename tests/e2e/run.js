@@ -18,6 +18,7 @@ const testClaude = require('./test-claude');
 const testClaudeProxy = require('./test-claude-proxy');
 const testSessionSearch = require('./test-session-search');
 const testSessions = require('./test-sessions');
+const testSessionConvertDerived = require('./test-session-convert-derived');
 const testOpenclaw = require('./test-openclaw');
 const testHealthSpeed = require('./test-health-speed');
 const testMessages = require('./test-messages');
@@ -130,6 +131,7 @@ async function main() {
         await testClaudeProxy(ctx);
         await testSessionSearch(ctx);
         await testSessions(ctx);
+        await testSessionConvertDerived(ctx);
         await testOpenclaw(ctx);
         await testHealthSpeed(ctx);
         await testMessages(ctx);
