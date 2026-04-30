@@ -4,7 +4,6 @@ import {
     getConvertTargetSource,
     normalizeSessionConvertSource
 } from '../logic.session-convert.mjs';
-import { syncSessionsFilterUrl } from './sessions-filters-url.mjs';
 
 function hasResponseError(response) {
     if (!response || typeof response !== 'object') {
@@ -109,29 +108,28 @@ export function createCodexConfigMethods(options = {}) {
                 }
                 if (res && res.truncated) {
                     const maxLabel = res.maxMessages === 'all' ? 'all' : res.maxMessages;
-                    this.showMessage(`已生成派生会话（已截断：最多 ${maxLabel} 条消息）`, 'info');
+                    const targetLabel = converted && converted.sourceLabel ? String(converted.sourceLabel).trim() : '';
+                    if (targetLabel && typeof this.sessionFilterSource === 'string' && this.sessionFilterSource !== converted.source) {
+                        this.showMessage(`已生成派生会话（来源：${targetLabel}，已截断：最多 ${maxLabel} 条消息）`, 'info');
+                    } else {
+                        this.showMessage(`已生成派生会话（已截断：最多 ${maxLabel} 条消息）`, 'info');
+                    }
                 } else {
-                    this.showMessage('已生成派生会话', 'success');
+                    const targetLabel = converted && converted.sourceLabel ? String(converted.sourceLabel).trim() : '';
+                    if (targetLabel && typeof this.sessionFilterSource === 'string' && this.sessionFilterSource !== converted.source) {
+                        this.showMessage(`已生成派生会话（来源：${targetLabel}）`, 'success');
+                    } else {
+                        this.showMessage('已生成派生会话', 'success');
+                    }
                 }
 
-                if (converted && converted.source && typeof this.sessionFilterSource === 'string' && this.sessionFilterSource !== converted.source) {
-                    this.sessionFilterSource = converted.source;
-                    if (typeof this.refreshSessionPathOptions === 'function') {
-                        this.refreshSessionPathOptions(this.sessionFilterSource);
-                    }
-                    if (typeof this.persistSessionFilterCache === 'function') {
-                        this.persistSessionFilterCache();
-                    }
-                    syncSessionsFilterUrl(this);
+                if (converted && converted.source && typeof this.sessionFilterSource === 'string' && this.sessionFilterSource === converted.source) {
+                    const list = Array.isArray(this.sessionsList) ? this.sessionsList : [];
+                    const next = [converted, ...list.filter(item => !(item && item.filePath === converted.filePath && item.source === converted.source))];
+                    this.sessionsList = next;
                 }
-                if (typeof this.loadSessions === 'function') {
-                    await this.loadSessions({ forceRefresh: true });
-                }
-                if (typeof this.selectSession === 'function' && Array.isArray(this.sessionsList)) {
-                    const matched = this.sessionsList.find(item => item && item.filePath === converted.filePath && item.source === converted.source);
-                    if (matched) {
-                        await this.selectSession(matched);
-                    }
+                if (typeof this.selectSession === 'function') {
+                    await this.selectSession(converted);
                 }
             } catch (e) {
                 this.showMessage('转换失败', 'error');
