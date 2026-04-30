@@ -194,6 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     gemini: 0
                 },
                 sessionExporting: {},
+                sessionConverting: {},
                 sessionCloning: {},
                 sessionDeleting: {},
                 activeSession: null,

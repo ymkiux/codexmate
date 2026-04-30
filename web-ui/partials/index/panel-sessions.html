@@ -206,6 +206,12 @@
                                             {{ (activeSession && sessionExporting[getSessionExportKey(activeSession)]) ? t('sessions.preview.exporting') : t('sessions.preview.export') }}
                                         </button>
                                         <button
+                                            class="btn-session-export"
+                                            @click="convertSession(activeSession)"
+                                            :disabled="!activeSession || sessionConverting[getSessionExportKey(activeSession)] || (activeSession.source !== 'codex' && activeSession.source !== 'claude')">
+                                            {{ (activeSession && sessionConverting[getSessionExportKey(activeSession)]) ? t('sessions.preview.converting') : t('sessions.preview.convert') }}
+                                        </button>
+                                        <button
                                             class="btn-session-open"
                                             @click="openSessionStandalone(activeSession)"
                                             :disabled="!activeSession">

@@ -1,5 +1,10 @@
 import { runLatestOnlyQueue } from '../logic.mjs';
 import { normalizeConfigTemplateDiffConfirmEnabled } from './config-template-confirm-pref.mjs';
+import {
+    buildConvertedSessionJsonl,
+    getConvertTargetSource,
+    normalizeSessionConvertSource
+} from '../logic.session-convert.mjs';
 
 function hasResponseError(response) {
     if (!response || typeof response !== 'object') {
@@ -72,6 +77,53 @@ export function createCodexConfigMethods(options = {}) {
                 this.showMessage('导出失败', 'error');
             } finally {
                 this.sessionExporting[key] = false;
+            }
+        },
+
+        async convertSession(session) {
+            const source = normalizeSessionConvertSource(session && session.source ? session.source : '');
+            const target = getConvertTargetSource(source);
+            if (!source || !target) {
+                this.showMessage('不支持此操作', 'error');
+                return;
+            }
+            const key = this.getSessionExportKey(session);
+            if (this.sessionConverting[key]) return;
+            this.sessionConverting[key] = true;
+            try {
+                const messages = Array.isArray(this.activeSessionMessages) ? this.activeSessionMessages : [];
+                if (!messages.length) {
+                    this.showMessage('暂无可转换内容', 'info');
+                    return;
+                }
+                const sessionId = typeof session.sessionId === 'string' && session.sessionId.trim()
+                    ? session.sessionId.trim()
+                    : (typeof session.filePath === 'string' && session.filePath.trim()
+                        ? session.filePath.trim().split(/[\\/]/).pop()
+                        : String(Date.now()));
+                const safeSessionId = String(sessionId).replace(/[^a-zA-Z0-9_-]/g, '_');
+                const content = buildConvertedSessionJsonl(target, {
+                    sessionId,
+                    cwd: session.cwd || '',
+                    messages
+                });
+                const blob = new Blob([content], { type: 'application/x-ndjson;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${target}-session-${safeSessionId}.jsonl`;
+                link.click();
+                URL.revokeObjectURL(url);
+
+                if (this.activeSessionDetailClipped || this.canLoadMoreSessionMessages) {
+                    this.showMessage(typeof this.t === 'function' ? this.t('sessions.preview.convert.loadedOnly') : 'Converted loaded messages only', 'info');
+                } else {
+                    this.showMessage('操作成功', 'success');
+                }
+            } catch (_) {
+                this.showMessage('转换失败', 'error');
+            } finally {
+                this.sessionConverting[key] = false;
             }
         },
 

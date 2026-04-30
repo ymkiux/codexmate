@@ -402,7 +402,8 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'promptComposerVarValuesRaw',
         'showPromptTemplateVarModal',
         'promptTemplateVarDraftName',
-        'promptTemplateVarDraftError'
+        'promptTemplateVarDraftError',
+        'sessionConverting'
     );
     if (parityAgainstHead) {
         const allowedExtraKeySet = new Set(allowedExtraCurrentKeys);
@@ -438,6 +439,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'findProviderByName',
         'getProviderValidation',
         'getShareCommandPrefixInvocation',
+        'convertSession',
         'invalidateSessionsUsageData',
         'isReservedProviderCreationName',
         'isSessionLoadNativeDialogEnabled',
