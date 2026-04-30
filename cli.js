@@ -115,6 +115,7 @@ const {
 const {
     createZipCommandController
 } = require('./cli/zip-commands');
+const { cmdConvertSession } = require('./cli/session-convert');
 const {
     getCodexSkillsDir,
     getClaudeSkillsDir,
@@ -196,6 +197,11 @@ const CLAUDE_MD_FILE_NAME = 'CLAUDE.md';
 const CLAUDE_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
 const CODEBUDDY_DIR = path.join(os.homedir(), '.codebuddy');
 const CODEBUDDY_PROJECTS_DIR = path.join(CODEBUDDY_DIR, 'projects');
+const CODEXMATE_DIR = path.join(os.homedir(), '.codexmate');
+const CODEXMATE_SESSIONS_DIR = path.join(CODEXMATE_DIR, 'sessions');
+const CODEXMATE_DERIVED_SESSIONS_DIR = path.join(CODEXMATE_SESSIONS_DIR, 'derived');
+const CODEXMATE_DERIVED_CODEX_DIR = path.join(CODEXMATE_DERIVED_SESSIONS_DIR, 'codex');
+const CODEXMATE_DERIVED_CLAUDE_DIR = path.join(CODEXMATE_DERIVED_SESSIONS_DIR, 'claude');
 const GEMINI_DIR = path.join(os.homedir(), '.gemini');
 const GEMINI_TMP_DIR = path.join(GEMINI_DIR, 'tmp');
 const RECENT_CONFIGS_FILE = path.join(CONFIG_DIR, 'recent-configs.json');
@@ -1306,6 +1312,58 @@ function getCodeBuddyProjectsDir() {
     }
     candidates.push(CODEBUDDY_PROJECTS_DIR);
     return resolveExistingDir(candidates, CODEBUDDY_PROJECTS_DIR);
+}
+
+function getCodexmateDerivedSessionsRoot(target) {
+    if (target === 'claude') {
+        return CODEXMATE_DERIVED_CLAUDE_DIR;
+    }
+    return CODEXMATE_DERIVED_CODEX_DIR;
+}
+
+function normalizeSessionDerivedTarget(value) {
+    const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (normalized === 'codex' || normalized === 'claude') {
+        return normalized;
+    }
+    return '';
+}
+
+function normalizeSessionDerivedSource(value) {
+    return normalizeSessionDerivedTarget(value);
+}
+
+function buildSessionDerivedSourceKey(source, sessionId, filePath) {
+    const baseSource = normalizeSessionDerivedSource(source);
+    const id = typeof sessionId === 'string' ? sessionId.trim() : '';
+    const pathValue = typeof filePath === 'string' ? filePath.trim() : '';
+    const seed = `${baseSource}|${id}|${pathValue}`;
+    return crypto.createHash('sha1').update(seed).digest('hex').slice(0, 16);
+}
+
+function formatCompactTimestamp(value = Date.now()) {
+    const stamp = new Date(value);
+    const year = String(stamp.getFullYear());
+    const month = String(stamp.getMonth() + 1).padStart(2, '0');
+    const day = String(stamp.getDate()).padStart(2, '0');
+    const hour = String(stamp.getHours()).padStart(2, '0');
+    const minute = String(stamp.getMinutes()).padStart(2, '0');
+    const second = String(stamp.getSeconds()).padStart(2, '0');
+    return `${year}${month}${day}-${hour}${minute}${second}`;
+}
+
+function buildDerivedSessionId(baseId) {
+    const safeBase = typeof baseId === 'string' && baseId.trim() ? baseId.trim() : 'session';
+    const normalized = safeBase.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64) || 'session';
+    const suffix = crypto.randomBytes(3).toString('hex');
+    return `${normalized}-${formatCompactTimestamp()}-${suffix}`;
+}
+
+function buildDerivedSessionOutputDir(target, source, sourceKey) {
+    const targetRoot = getCodexmateDerivedSessionsRoot(target);
+    const safeSource = normalizeSessionDerivedSource(source) || 'codex';
+    const safeKey = typeof sourceKey === 'string' && sourceKey.trim() ? sourceKey.trim() : 'unknown';
+    return path.join(targetRoot, safeSource, safeKey);
 }
 
 function readModelsCacheEntry(cacheKey) {
@@ -3279,6 +3337,57 @@ function collectRecentJsonlFiles(rootDir, options = {}) {
     return filesMeta.slice(0, returnCount).map(item => item.filePath);
 }
 
+function collectRecentJsonlFilesFromRoots(rootDirs, options = {}) {
+    const roots = Array.isArray(rootDirs)
+        ? rootDirs.filter((dirPath) => typeof dirPath === 'string' && dirPath.trim() && fs.existsSync(dirPath.trim()))
+        : [];
+    if (roots.length === 0) {
+        return [];
+    }
+
+    const returnCount = Math.max(1, Number(options.returnCount) || 1);
+    const maxFilesScanned = Math.max(returnCount, Number(options.maxFilesScanned) || 2000);
+    const ignoreSubPath = typeof options.ignoreSubPath === 'string' ? options.ignoreSubPath : '';
+    const stack = roots.map((dirPath) => dirPath.trim());
+    const filesMeta = [];
+    let scanned = 0;
+
+    while (stack.length > 0 && scanned < maxFilesScanned) {
+        const dir = stack.pop();
+        let entries = [];
+        try {
+            entries = fs.readdirSync(dir, { withFileTypes: true });
+        } catch (_) {
+            continue;
+        }
+
+        for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+                stack.push(fullPath);
+                continue;
+            }
+            if (!entry.isFile() || !entry.name.endsWith('.jsonl')) {
+                continue;
+            }
+            if (ignoreSubPath && fullPath.includes(ignoreSubPath)) {
+                continue;
+            }
+            scanned += 1;
+            try {
+                const stat = fs.statSync(fullPath);
+                filesMeta.push({ filePath: fullPath, mtimeMs: stat.mtimeMs || 0 });
+            } catch (_) {}
+            if (scanned >= maxFilesScanned) {
+                break;
+            }
+        }
+    }
+
+    filesMeta.sort((a, b) => b.mtimeMs - a.mtimeMs);
+    return filesMeta.slice(0, returnCount).map(item => item.filePath);
+}
+
 function getSessionListCache(cacheKey, forceRefresh = false) {
     if (forceRefresh) {
         g_sessionListCache.delete(cacheKey);
@@ -4394,7 +4503,7 @@ function listCodexSessions(limit, options = {}) {
     const titleReadBytes = Number.isFinite(Number(options.titleReadBytes))
         ? Math.max(1024, Math.floor(Number(options.titleReadBytes)))
         : SESSION_TITLE_READ_BYTES;
-    const files = collectRecentJsonlFiles(codexSessionsDir, {
+    const files = collectRecentJsonlFilesFromRoots([codexSessionsDir, getCodexmateDerivedSessionsRoot('codex')], {
         returnCount: scanCount,
         maxFilesScanned
     });
@@ -4419,7 +4528,10 @@ function listCodexSessions(limit, options = {}) {
 
 function listClaudeSessions(limit, options = {}) {
     const claudeProjectsDir = getClaudeProjectsDir();
-    if (!fs.existsSync(claudeProjectsDir)) {
+    const derivedClaudeRoot = getCodexmateDerivedSessionsRoot('claude');
+    const hasProjectsDir = fs.existsSync(claudeProjectsDir);
+    const hasDerivedDir = fs.existsSync(derivedClaudeRoot);
+    if (!hasProjectsDir && !hasDerivedDir) {
         return [];
     }
 
@@ -4447,12 +4559,14 @@ function listClaudeSessions(limit, options = {}) {
 
     const sessions = [];
     let projectDirs = [];
-    try {
-        projectDirs = fs.readdirSync(claudeProjectsDir, { withFileTypes: true })
-            .filter(entry => entry.isDirectory())
-            .map(entry => path.join(claudeProjectsDir, entry.name));
-    } catch (e) {
-        projectDirs = [];
+    if (hasProjectsDir) {
+        try {
+            projectDirs = fs.readdirSync(claudeProjectsDir, { withFileTypes: true })
+                .filter(entry => entry.isDirectory())
+                .map(entry => path.join(claudeProjectsDir, entry.name));
+        } catch (e) {
+            projectDirs = [];
+        }
     }
 
     for (const projectDir of projectDirs) {
@@ -4615,6 +4729,25 @@ function listClaudeSessions(limit, options = {}) {
             if (sessions.length >= targetCount) {
                 break;
             }
+        }
+    }
+
+    if (fs.existsSync(derivedClaudeRoot)) {
+        const seen = new Set(sessions.map((item) => (item && item.filePath ? item.filePath : '')).filter(Boolean));
+        const derivedFiles = collectRecentJsonlFiles(derivedClaudeRoot, {
+            returnCount: scanCount,
+            maxFilesScanned
+        });
+        for (const filePath of derivedFiles) {
+            if (seen.has(filePath)) continue;
+            const summary = parseClaudeSessionSummary(filePath, {
+                summaryReadBytes,
+                titleReadBytes
+            });
+            if (summary) {
+                sessions.push(summary);
+            }
+            seen.add(filePath);
         }
     }
 
@@ -4962,19 +5095,25 @@ function resolveSessionFilePath(source, filePath, sessionId) {
     const normalizedSource = source === 'claude' || source === 'gemini' || source === 'codebuddy'
         ? source
         : 'codex';
-    const root = normalizedSource === 'claude'
-        ? getClaudeProjectsDir()
+    const homeDir = process && process.env && process.env.HOME ? process.env.HOME : '';
+    const derivedCodexDir = homeDir ? `${homeDir}/.codexmate/sessions/derived/codex` : '';
+    const derivedClaudeDir = homeDir ? `${homeDir}/.codexmate/sessions/derived/claude` : '';
+    const roots = normalizedSource === 'claude'
+        ? [getClaudeProjectsDir(), derivedClaudeDir]
         : (normalizedSource === 'gemini'
-            ? getGeminiTmpDir()
-            : (normalizedSource === 'codebuddy' ? getCodeBuddyProjectsDir() : getCodexSessionsDir()));
-    if (!root || !fs.existsSync(root)) {
+            ? [getGeminiTmpDir()]
+            : (normalizedSource === 'codebuddy'
+                ? [getCodeBuddyProjectsDir()]
+                : [getCodexSessionsDir(), derivedCodexDir]));
+    const availableRoots = roots.filter((dirPath) => dirPath && fs.existsSync(dirPath));
+    if (availableRoots.length === 0) {
         return '';
     }
 
     if (typeof filePath === 'string' && filePath.trim()) {
         const expandedPath = expandHomePath(filePath.trim());
         const targetPath = expandedPath ? path.resolve(expandedPath) : '';
-        if (targetPath && fs.existsSync(targetPath) && isPathInside(targetPath, root)) {
+        if (targetPath && fs.existsSync(targetPath) && availableRoots.some((rootPath) => isPathInside(targetPath, rootPath))) {
             return targetPath;
         }
     }
@@ -4984,7 +5123,7 @@ function resolveSessionFilePath(source, filePath, sessionId) {
         const lookupStore = g_sessionFileLookupCache[normalizedSource];
         if (lookupStore instanceof Map && lookupStore.has(targetId)) {
             const cachedPath = lookupStore.get(targetId);
-            if (cachedPath && fs.existsSync(cachedPath) && isPathInside(cachedPath, root)) {
+            if (cachedPath && fs.existsSync(cachedPath) && availableRoots.some((rootPath) => isPathInside(cachedPath, rootPath))) {
                 return cachedPath;
             }
             lookupStore.delete(targetId);
@@ -5019,7 +5158,11 @@ function resolveSessionFilePath(source, filePath, sessionId) {
             }
             matchedFile = filesMeta.find(item => path.basename(item, '.json').toLowerCase() === targetId) || '';
         } else {
-            const files = collectJsonlFiles(root, 5000);
+            const files = [];
+            for (const rootPath of availableRoots) {
+                files.push(...collectJsonlFiles(rootPath, 5000));
+                if (files.length >= 5000) break;
+            }
             matchedFile = files.find(item => path.basename(item, '.jsonl').toLowerCase() === targetId) || '';
         }
         if (matchedFile && fs.existsSync(matchedFile)) {
@@ -6660,6 +6803,136 @@ async function exportSessionData(params = {}) {
         content: markdown,
         truncated,
         maxMessages: maxMessagesLabel
+    };
+}
+
+async function convertSessionToDerived(params = {}) {
+    const source = normalizeSessionDerivedSource(params.source);
+    const target = normalizeSessionDerivedTarget(params.target || params.to);
+    if (!source || !target) {
+        return { error: 'Invalid source/target' };
+    }
+    if (source === target) {
+        return { error: 'source and target must be different' };
+    }
+
+    const maxMessages = resolveMaxMessagesValue(params.maxMessages, MAX_EXPORT_MESSAGES);
+    const filePath = resolveSessionFilePath(source, getSessionFileArg(params), params.sessionId);
+    if (!filePath) {
+        return { error: 'Session file not found' };
+    }
+
+    let extracted;
+    try {
+        extracted = await extractMessagesFromFile(filePath, source, { maxMessages });
+    } catch (_) {
+        extracted = null;
+    }
+    if (!extracted) {
+        return { error: 'Failed to parse session file' };
+    }
+
+    const baseSessionId = extracted.sessionId || params.sessionId || path.basename(filePath, '.jsonl');
+    const derivedSessionId = buildDerivedSessionId(baseSessionId);
+    const sourceKey = buildSessionDerivedSourceKey(source, baseSessionId, filePath);
+    const outputDir = target === 'codex'
+        ? getCodexSessionsDir()
+        : buildDerivedSessionOutputDir(target, source, sourceKey);
+    ensureDir(outputDir);
+    const outputPath = path.join(outputDir, `${derivedSessionId}.jsonl`);
+    const metaPath = path.join(outputDir, `${derivedSessionId}.meta.json`);
+
+    const cwd = typeof extracted.cwd === 'string' ? extracted.cwd : '';
+    const messages = removeLeadingSystemMessage(Array.isArray(extracted.messages) ? extracted.messages : []);
+    const now = Date.now();
+    const baseTime = new Date(now).toISOString();
+    const lines = [];
+
+    if (target === 'codex') {
+        lines.push(JSON.stringify({ type: 'session_meta', timestamp: baseTime, payload: { id: derivedSessionId, cwd } }));
+        for (let i = 0; i < messages.length; i += 1) {
+            const message = messages[i];
+            if (!message) continue;
+            const role = normalizeRole(message.role);
+            if (role !== 'user' && role !== 'assistant' && role !== 'system') continue;
+            const text = typeof message.text === 'string' ? message.text : '';
+            if (!text) continue;
+            lines.push(JSON.stringify({
+                type: 'response_item',
+                timestamp: toIsoTime(message.timestamp, '') || new Date(now + i).toISOString(),
+                payload: { type: 'message', role, content: text }
+            }));
+        }
+    } else {
+        for (let i = 0; i < messages.length; i += 1) {
+            const message = messages[i];
+            if (!message) continue;
+            const role = normalizeRole(message.role);
+            if (role !== 'user' && role !== 'assistant' && role !== 'system') continue;
+            const text = typeof message.text === 'string' ? message.text : '';
+            if (!text) continue;
+            lines.push(JSON.stringify({
+                type: role,
+                timestamp: toIsoTime(message.timestamp, '') || new Date(now + i).toISOString(),
+                sessionId: derivedSessionId,
+                cwd,
+                message: { content: text }
+            }));
+        }
+    }
+
+    fs.writeFileSync(outputPath, `${lines.join('\n')}\n`, 'utf-8');
+    writeJsonAtomic(metaPath, {
+        version: 1,
+        createdAt: baseTime,
+        source: {
+            type: source,
+            sessionId: baseSessionId,
+            filePath
+        },
+        target: {
+            type: target,
+            sessionId: derivedSessionId,
+            filePath: outputPath
+        },
+        options: {
+            maxMessages: maxMessages === Infinity ? 'all' : maxMessages
+        }
+    });
+
+    invalidateSessionListCache();
+
+    const summary = target === 'codex'
+        ? parseCodexSessionSummary(outputPath, { summaryReadBytes: SESSION_BROWSE_SUMMARY_READ_BYTES, titleReadBytes: SESSION_BROWSE_SUMMARY_READ_BYTES })
+        : parseClaudeSessionSummary(outputPath, { summaryReadBytes: SESSION_BROWSE_SUMMARY_READ_BYTES, titleReadBytes: SESSION_BROWSE_SUMMARY_READ_BYTES });
+    const maxMessagesLabel = maxMessages === Infinity ? 'all' : maxMessages;
+
+    return {
+        derived: true,
+        source,
+        target,
+        truncated: !!extracted.truncated,
+        maxMessages: maxMessagesLabel,
+        session: summary || {
+            source: target,
+            sourceLabel: target === 'codex' ? 'Codex' : 'Claude Code',
+            sessionId: derivedSessionId,
+            title: derivedSessionId,
+            cwd,
+            createdAt: baseTime,
+            updatedAt: baseTime,
+            messageCount: messages.length,
+            totalTokens: 0,
+            contextWindow: 0,
+            inputTokens: 0,
+            cachedInputTokens: 0,
+            outputTokens: 0,
+            reasoningOutputTokens: 0,
+            __messageCountExact: true,
+            filePath: outputPath,
+            keywords: [],
+            capabilities: {}
+        }
     };
 }
 
@@ -9830,6 +10103,9 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                             break;
                         case 'export-session':
                             result = await exportSessionData(params);
+                            break;
+                        case 'convert-session':
+                            result = await convertSessionToDerived(params || {});
                             break;
                         case 'delete-session':
                             result = await deleteSessionData(params || {});
@@ -14614,6 +14890,7 @@ function printMainHelp() {
     console.log('  codexmate qwen [参数...]   等同于 qwen --yolo');
     console.log('  codexmate mcp [serve] [--transport stdio] [--allow-write|--read-only]');
     console.log('  codexmate export-session --source <codex|claude|gemini|codebuddy> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]');
+    console.log('  codexmate convert-session --from <codex|claude> --to <codex|claude> (--session-id <ID>|--file <PATH>) [--output <PATH>] [--max-messages <N|all|Infinity>]');
     console.log('  codexmate zip <路径> [--max:级别]  压缩（系统 zip 优先，其次 zip-lib）');
     console.log('  codexmate unzip <zip文件> [输出目录]  解压（zip-lib）');
     console.log('  codexmate unzip-ext <zip目录> [输出目录] [--ext:后缀[,后缀...]] [--no-recursive]  批量提取 ZIP 指定后缀文件（默认递归）');
@@ -14712,6 +14989,7 @@ async function main() {
         }
         case 'mcp': await cmdMcp(args.slice(1)); break;
         case 'export-session': await cmdExportSession(args.slice(1)); break;
+        case 'convert-session': await cmdConvertSession(args.slice(1), { resolveSessionFilePath }); break;
         case 'zip': {
             const { targetPath, options } = parseZipCommandArgs(args.slice(1));
             await cmdZip(targetPath, options);

@@ -1,5 +1,9 @@
 import { runLatestOnlyQueue } from '../logic.mjs';
 import { normalizeConfigTemplateDiffConfirmEnabled } from './config-template-confirm-pref.mjs';
+import {
+    getConvertTargetSource,
+    normalizeSessionConvertSource
+} from '../logic.session-convert.mjs';
 
 function hasResponseError(response) {
     if (!response || typeof response !== 'object') {
@@ -72,6 +76,55 @@ export function createCodexConfigMethods(options = {}) {
                 this.showMessage('导出失败', 'error');
             } finally {
                 this.sessionExporting[key] = false;
+            }
+        },
+
+        async convertSession(session) {
+            const source = normalizeSessionConvertSource(session && session.source ? session.source : '');
+            const target = getConvertTargetSource(source);
+            if (!source || !target) {
+                this.showMessage('不支持此操作', 'error');
+                return;
+            }
+            const key = this.getSessionExportKey(session);
+            if (this.sessionConverting[key]) return;
+            this.sessionConverting[key] = true;
+            try {
+                const res = await api('convert-session', {
+                    source,
+                    target,
+                    sessionId: session.sessionId,
+                    filePath: session.filePath,
+                    maxMessages: 'all'
+                });
+                if (res && res.error) {
+                    this.showMessage(res.error, 'error');
+                    return;
+                }
+                const converted = res && res.session ? res.session : null;
+                if (!converted) {
+                    this.showMessage('转换失败', 'error');
+                    return;
+                }
+                if (res && res.truncated) {
+                    const maxLabel = res.maxMessages === 'all' ? 'all' : res.maxMessages;
+                    this.showMessage(`已生成派生会话（已截断：最多 ${maxLabel} 条消息）`, 'info');
+                } else {
+                    this.showMessage('已生成派生会话', 'success');
+                }
+                if (typeof this.loadSessions === 'function') {
+                    await this.loadSessions({ forceRefresh: true });
+                }
+                if (typeof this.selectSession === 'function' && Array.isArray(this.sessionsList)) {
+                    const matched = this.sessionsList.find(item => item && item.filePath === converted.filePath && item.source === converted.source);
+                    if (matched) {
+                        await this.selectSession(matched);
+                    }
+                }
+            } catch (e) {
+                this.showMessage('转换失败', 'error');
+            } finally {
+                this.sessionConverting[key] = false;
             }
         },
 

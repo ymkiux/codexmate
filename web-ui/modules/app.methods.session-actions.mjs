@@ -117,6 +117,13 @@ export function createSessionActionMethods(options = {}) {
             if (!session) return false;
             const source = String(session.source || '').trim().toLowerCase();
             const sessionId = typeof session.sessionId === 'string' ? session.sessionId.trim() : '';
+            const filePath = typeof session.filePath === 'string' ? session.filePath.trim() : '';
+            if (source === 'claude') {
+                return !!sessionId || !!this.extractClaudeResumeKeyFromFilePath(filePath);
+            }
+            if (source === 'gemini') {
+                return !!sessionId || !!this.extractClaudeResumeKeyFromFilePath(filePath);
+            }
             return (source === 'codex' || source === 'codebuddy' || source === 'gemini') && !!sessionId;
         },
 
@@ -140,17 +147,40 @@ export function createSessionActionMethods(options = {}) {
         buildResumeCommand(session) {
             const source = session && session.source ? String(session.source).trim().toLowerCase() : '';
             const sessionId = session && session.sessionId ? String(session.sessionId).trim() : '';
-            const arg = this.quoteResumeArg(sessionId);
+            const filePath = session && session.filePath ? String(session.filePath).trim() : '';
+            const resumeKey = (source === 'claude' || source === 'gemini')
+                ? (sessionId || this.extractClaudeResumeKeyFromFilePath(filePath))
+                : sessionId;
+            const arg = this.quoteResumeArg(resumeKey);
             if (source === 'codebuddy') {
                 return `codebuddy -r ${arg}`;
             }
             if (source === 'gemini') {
                 return `gemini -r ${arg}`;
             }
+            if (source === 'claude') {
+                return `claude -r ${arg}`;
+            }
             if (this.sessionResumeWithYolo) {
                 return `codex --yolo resume ${arg}`;
             }
             return `codex resume ${arg}`;
+        },
+
+        extractClaudeResumeKeyFromFilePath(filePath) {
+            const value = typeof filePath === 'string' ? filePath.trim() : '';
+            if (!value) return '';
+            const normalized = value.replace(/\\/g, '/');
+            const base = normalized.split('/').pop() || '';
+            if (!base) return '';
+            const lower = base.toLowerCase();
+            if (lower.endsWith('.jsonl')) {
+                return base.slice(0, -6);
+            }
+            if (lower.endsWith('.json')) {
+                return base.slice(0, -5);
+            }
+            return base;
         },
 
         quoteShellArg(value) {

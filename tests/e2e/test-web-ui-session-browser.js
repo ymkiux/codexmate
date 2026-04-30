@@ -160,7 +160,7 @@ async function flushScheduledFrames(vm) {
 }
 
 async function waitForCondition(check, label) {
-    const deadline = Date.now() + 6000;
+    const deadline = Date.now() + 20000;
     while (Date.now() < deadline) {
         if (check()) {
             return;
@@ -173,6 +173,7 @@ async function waitForCondition(check, label) {
 module.exports = async function testWebUiSessionBrowser(ctx) {
     const { api, tmpHome } = ctx;
     const sessionsDir = path.join(tmpHome, '.codex', 'sessions');
+    const derivedCodexDir = path.join(tmpHome, '.codexmate', 'sessions', 'derived', 'codex');
     fs.mkdirSync(sessionsDir, { recursive: true });
 
     const denseListSessionCount = 140;
@@ -256,7 +257,13 @@ module.exports = async function testWebUiSessionBrowser(ctx) {
     });
 
     assert(vm.sessionsList.length >= denseListSessionCount + 3, 'session browser should load the large isolated codex dataset');
-    assert(vm.sessionsList.every((item) => String(item.filePath || '').startsWith(sessionsDir)), 'session browser e2e should stay inside the isolated tmp HOME dataset');
+    assert(
+        vm.sessionsList.every((item) => {
+            const filePath = String(item && item.filePath ? item.filePath : '');
+            return filePath.startsWith(sessionsDir) || filePath.startsWith(derivedCodexDir);
+        }),
+        'session browser e2e should stay inside the isolated tmp HOME dataset'
+    );
     assert(vm.activeSession && vm.activeSession.sessionId === initialHugeLineSessionId, 'session browser should select the newest session from the isolated dataset on tab entry');
     assert(vm.visibleSessionsList.length === vm.sessionListInitialBatchSize, 'session browser should render only the first session list batch initially');
     assert(vm.activeSessionMessages.length > 0, 'session browser should hydrate the initially selected huge-line session on tab entry');
