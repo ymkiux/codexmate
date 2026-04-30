@@ -61,7 +61,15 @@ async function convertAndAssertListed(api, tmpHome, source, target, params = {},
 }
 
 module.exports = async function testSessionConvertDerived(ctx) {
-    const { api, tmpHome, sessionId, sessionPath } = ctx;
+    const {
+        api,
+        tmpHome,
+        sessionId,
+        sessionPath,
+        daudeSessionPath,
+        claudeSessionId,
+        claudeSessionPath
+    } = ctx;
 
     const beforeHash = sha256File(sessionPath);
 
@@ -96,6 +104,34 @@ module.exports = async function testSessionConvertDerived(ctx) {
 
     const afterHash = sha256File(sessionPath);
     assert(afterHash === beforeHash, 'source codex session should remain unchanged after conversions');
+
+    if (daudeSessionPath) {
+        const beforeDaudeHash = sha256File(daudeSessionPath);
+        const { outPath: daudeDerivedClaudePath } = await convertAndAssertListed(api, tmpHome, 'codex', 'claude', {
+            filePath: daudeSessionPath,
+            maxMessages: 'all'
+        });
+        const daudeDetail = await api('session-detail', { source: 'claude', filePath: daudeDerivedClaudePath, maxMessages: 20 });
+        const daudeTexts = (daudeDetail.messages || []).map((m) => m.text);
+        assert(daudeTexts.length === 2, 'daude derived claude session should keep message count');
+        assert(daudeTexts[0] === 'daude code quick start 222', 'daude derived claude user text mismatch');
+        assert(daudeTexts[1] === 'sharing daude-code bootstrap', 'daude derived claude assistant text mismatch');
+        assert(sha256File(daudeSessionPath) === beforeDaudeHash, 'daude source session should remain unchanged after conversion');
+    }
+
+    if (claudeSessionId && claudeSessionPath) {
+        const beforeClaudeHash = sha256File(claudeSessionPath);
+        const { outPath: claudeDerivedCodexPath } = await convertAndAssertListed(api, tmpHome, 'claude', 'codex', {
+            sessionId: claudeSessionId,
+            maxMessages: 'all'
+        });
+        const detail = await api('session-detail', { source: 'codex', filePath: claudeDerivedCodexPath, maxMessages: 50 });
+        const texts = (detail.messages || []).map((m) => m.text);
+        assert(texts.length === 2, 'claude derived codex session should keep message count');
+        assert(texts[0] === 'hello from claude code session', 'claude derived codex user text mismatch');
+        assert(texts[1] === 'initialized project', 'claude derived codex assistant text mismatch');
+        assert(sha256File(claudeSessionPath) === beforeClaudeHash, 'claude source session should remain unchanged after conversion');
+    }
 
     const invalidSame = await api('convert-session', { source: 'codex', target: 'codex', sessionId, maxMessages: 'all' });
     assert(invalidSame.error, 'convert-session should reject same source/target');
