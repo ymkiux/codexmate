@@ -5210,6 +5210,65 @@ function findClaudeSessionIndexPath(sessionFilePath) {
     return '';
 }
 
+function resolveClaudeProjectDirForCwd(cwd) {
+    const projectsDir = getClaudeProjectsDir();
+    const raw = typeof cwd === 'string' ? cwd.trim() : '';
+    if (!projectsDir || !raw) {
+        return '';
+    }
+    const ignoreCase = process.platform === 'win32';
+    const resolvedCwd = path.resolve(expandHomePath(raw));
+    let entries = [];
+    try {
+        entries = fs.readdirSync(projectsDir, { withFileTypes: true });
+    } catch (_) {
+        entries = [];
+    }
+    for (const entry of entries) {
+        if (!entry || !entry.isDirectory()) continue;
+        const projectDir = path.join(projectsDir, entry.name);
+        const indexPath = path.join(projectDir, 'sessions-index.json');
+        if (!fs.existsSync(indexPath)) continue;
+        const index = readJsonFile(indexPath, null);
+        const originalPathRaw = index && typeof index.originalPath === 'string' ? index.originalPath.trim() : '';
+        if (!originalPathRaw) continue;
+        const resolvedOriginal = path.resolve(expandHomePath(originalPathRaw));
+        if (normalizePathForCompare(resolvedOriginal, { ignoreCase }) === normalizePathForCompare(resolvedCwd, { ignoreCase })) {
+            return projectDir;
+        }
+    }
+    const hash = crypto.createHash('sha1').update(resolvedCwd).digest('hex').slice(0, 12);
+    return path.join(projectsDir, `codexmate-${hash}`);
+}
+
+function ensureClaudeSessionsIndex(indexPath, originalPath) {
+    if (!indexPath) return;
+    const resolvedOriginal = typeof originalPath === 'string' && originalPath.trim()
+        ? path.resolve(expandHomePath(originalPath.trim()))
+        : '';
+    const existing = readJsonFile(indexPath, null);
+    const index = existing && typeof existing === 'object' && !Array.isArray(existing)
+        ? { ...existing }
+        : { entries: [] };
+    if (!Array.isArray(index.entries)) {
+        index.entries = [];
+    }
+    if (!index.originalPath && resolvedOriginal) {
+        index.originalPath = resolvedOriginal;
+    }
+    if (!fs.existsSync(indexPath)) {
+        if (!index.originalPath) {
+            index.originalPath = resolvedOriginal || path.dirname(indexPath);
+        }
+        writeJsonAtomic(indexPath, index);
+        return;
+    }
+    if (existing && typeof existing === 'object' && !Array.isArray(existing) && existing.originalPath === index.originalPath) {
+        return;
+    }
+    writeJsonAtomic(indexPath, index);
+}
+
 const {
     findAvailablePort,
     saveBuiltinProxySettings,
@@ -6838,13 +6897,14 @@ async function convertSessionToDerived(params = {}) {
     const outputDir = target === 'codex'
         ? getCodexSessionsDir()
         : (target === 'claude'
-            ? path.join(getClaudeProjectsDir(), 'codexmate-derived')
+            ? (resolveClaudeProjectDirForCwd(extracted.cwd || '') || path.join(getClaudeProjectsDir(), 'codexmate-derived'))
             : buildDerivedSessionOutputDir(target, source, sourceKey));
     ensureDir(outputDir);
     const outputPath = path.join(outputDir, `${derivedSessionId}.jsonl`);
     const metaPath = path.join(outputDir, `${derivedSessionId}.meta.json`);
 
     const cwd = typeof extracted.cwd === 'string' ? extracted.cwd : '';
+    const resolvedCwd = cwd ? path.resolve(expandHomePath(cwd)) : '';
     const messages = removeLeadingSystemMessage(Array.isArray(extracted.messages) ? extracted.messages : []);
     const now = Date.now();
     const baseTime = new Date(now).toISOString();
@@ -6866,6 +6926,7 @@ async function convertSessionToDerived(params = {}) {
             }));
         }
     } else {
+        const claudeIndexPath = target === 'claude' ? path.join(outputDir, 'sessions-index.json') : '';
         for (let i = 0; i < messages.length; i += 1) {
             const message = messages[i];
             if (!message) continue;
@@ -6880,6 +6941,9 @@ async function convertSessionToDerived(params = {}) {
                 cwd,
                 message: { content: text }
             }));
+        }
+        if (claudeIndexPath) {
+            ensureClaudeSessionsIndex(claudeIndexPath, resolvedCwd);
         }
     }
 
@@ -6909,6 +6973,7 @@ async function convertSessionToDerived(params = {}) {
         : parseClaudeSessionSummary(outputPath, { summaryReadBytes: SESSION_BROWSE_SUMMARY_READ_BYTES, titleReadBytes: SESSION_BROWSE_SUMMARY_READ_BYTES });
     if (target === 'claude' && summary) {
         const indexPath = path.join(outputDir, 'sessions-index.json');
+        ensureClaudeSessionsIndex(indexPath, resolvedCwd);
         upsertClaudeSessionIndexEntry(indexPath, outputPath, {
             source: 'claude',
             trashId: summary.sessionId,
@@ -6921,7 +6986,8 @@ async function convertSessionToDerived(params = {}) {
             messageCount: summary.messageCount,
             provider: summary.provider,
             keywords: summary.keywords,
-            capabilities: summary.capabilities
+            capabilities: summary.capabilities,
+            claudeIndexEntry: resolvedCwd ? { projectPath: resolvedCwd } : null
         });
     }
     const maxMessagesLabel = maxMessages === Infinity ? 'all' : maxMessages;

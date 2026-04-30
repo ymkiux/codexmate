@@ -4,6 +4,7 @@ import {
     getConvertTargetSource,
     normalizeSessionConvertSource
 } from '../logic.session-convert.mjs';
+import { syncSessionsFilterUrl } from './sessions-filters-url.mjs';
 
 function hasResponseError(response) {
     if (!response || typeof response !== 'object') {
@@ -123,10 +124,22 @@ export function createCodexConfigMethods(options = {}) {
                     }
                 }
 
-                if (converted && converted.source && typeof this.sessionFilterSource === 'string' && this.sessionFilterSource === converted.source) {
-                    const list = Array.isArray(this.sessionsList) ? this.sessionsList : [];
-                    const next = [converted, ...list.filter(item => !(item && item.filePath === converted.filePath && item.source === converted.source))];
-                    this.sessionsList = next;
+                if (converted && converted.source && typeof this.sessionFilterSource === 'string') {
+                    if (this.sessionFilterSource !== converted.source) {
+                        this.sessionFilterSource = converted.source;
+                        if (typeof this.refreshSessionPathOptions === 'function') {
+                            this.refreshSessionPathOptions(this.sessionFilterSource);
+                        }
+                        if (typeof this.persistSessionFilterCache === 'function') {
+                            this.persistSessionFilterCache();
+                        }
+                        syncSessionsFilterUrl(this);
+                        this.sessionsList = [converted];
+                    } else {
+                        const list = Array.isArray(this.sessionsList) ? this.sessionsList : [];
+                        const next = [converted, ...list.filter(item => !(item && item.filePath === converted.filePath && item.source === converted.source))];
+                        this.sessionsList = next;
+                    }
                 }
                 if (typeof this.selectSession === 'function') {
                     await this.selectSession(converted);
