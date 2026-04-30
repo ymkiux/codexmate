@@ -6835,7 +6835,9 @@ async function convertSessionToDerived(params = {}) {
     const baseSessionId = extracted.sessionId || params.sessionId || path.basename(filePath, '.jsonl');
     const derivedSessionId = buildDerivedSessionId(baseSessionId);
     const sourceKey = buildSessionDerivedSourceKey(source, baseSessionId, filePath);
-    const outputDir = buildDerivedSessionOutputDir(target, source, sourceKey);
+    const outputDir = target === 'codex'
+        ? getCodexSessionsDir()
+        : buildDerivedSessionOutputDir(target, source, sourceKey);
     ensureDir(outputDir);
     const outputPath = path.join(outputDir, `${derivedSessionId}.jsonl`);
     const metaPath = path.join(outputDir, `${derivedSessionId}.meta.json`);

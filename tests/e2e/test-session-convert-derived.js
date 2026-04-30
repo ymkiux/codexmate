@@ -12,6 +12,12 @@ function derivedMetaPath(filePath) {
     return filePath.endsWith('.jsonl') ? filePath.replace(/\.jsonl$/, '.meta.json') : `${filePath}.meta.json`;
 }
 
+function isCodexSessionPath(tmpHome, filePath) {
+    const normalized = String(filePath || '');
+    return normalized.startsWith(path.join(tmpHome, '.codex', 'sessions') + path.sep)
+        || normalized.startsWith(path.join(tmpHome, '.config', 'codex', 'sessions') + path.sep);
+}
+
 function buildIso(baseIso, offsetSeconds) {
     return new Date(Date.parse(baseIso) + (offsetSeconds * 1000)).toISOString();
 }
@@ -48,10 +54,14 @@ async function convertAndAssertListed(api, tmpHome, source, target, params = {},
     const outPath = res.session.filePath;
     assert(fs.existsSync(outPath), `derived ${target} session file missing`);
     assert(fs.existsSync(derivedMetaPath(outPath)), `derived ${target} meta missing`);
-    assert(
-        outPath.startsWith(path.join(tmpHome, '.codexmate', 'sessions', 'derived', target) + path.sep),
-        `derived ${target} session path should stay inside ~/.codexmate`
-    );
+    if (target === 'codex') {
+        assert(isCodexSessionPath(tmpHome, outPath), 'derived codex session path should stay inside ~/.codex or ~/.config/codex');
+    } else {
+        assert(
+            outPath.startsWith(path.join(tmpHome, '.codexmate', 'sessions', 'derived', target) + path.sep),
+            `derived ${target} session path should stay inside ~/.codexmate`
+        );
+    }
     if (options.assertListed !== false) {
         const list = await api('list-sessions', { source: target, limit: 300, forceRefresh: true });
         assert(Array.isArray(list.sessions), `list-sessions(${target}) missing sessions`);
