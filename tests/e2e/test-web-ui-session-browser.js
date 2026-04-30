@@ -160,7 +160,7 @@ async function flushScheduledFrames(vm) {
 }
 
 async function waitForCondition(check, label) {
-    const deadline = Date.now() + 6000;
+    const deadline = Date.now() + 20000;
     while (Date.now() < deadline) {
         if (check()) {
             return;

@@ -117,6 +117,10 @@ export function createSessionActionMethods(options = {}) {
             if (!session) return false;
             const source = String(session.source || '').trim().toLowerCase();
             const sessionId = typeof session.sessionId === 'string' ? session.sessionId.trim() : '';
+            if (source === 'claude') {
+                const filePath = typeof session.filePath === 'string' ? session.filePath.trim() : '';
+                return !!sessionId || !!this.extractClaudeResumeKeyFromFilePath(filePath);
+            }
             return (source === 'codex' || source === 'codebuddy' || source === 'gemini') && !!sessionId;
         },
 
@@ -140,17 +144,36 @@ export function createSessionActionMethods(options = {}) {
         buildResumeCommand(session) {
             const source = session && session.source ? String(session.source).trim().toLowerCase() : '';
             const sessionId = session && session.sessionId ? String(session.sessionId).trim() : '';
-            const arg = this.quoteResumeArg(sessionId);
+            const filePath = session && session.filePath ? String(session.filePath).trim() : '';
+            const resumeKey = source === 'claude'
+                ? (sessionId || this.extractClaudeResumeKeyFromFilePath(filePath))
+                : sessionId;
+            const arg = this.quoteResumeArg(resumeKey);
             if (source === 'codebuddy') {
                 return `codebuddy -r ${arg}`;
             }
             if (source === 'gemini') {
                 return `gemini -r ${arg}`;
             }
+            if (source === 'claude') {
+                return `claude -r ${arg}`;
+            }
             if (this.sessionResumeWithYolo) {
                 return `codex --yolo resume ${arg}`;
             }
             return `codex resume ${arg}`;
+        },
+
+        extractClaudeResumeKeyFromFilePath(filePath) {
+            const value = typeof filePath === 'string' ? filePath.trim() : '';
+            if (!value) return '';
+            const normalized = value.replace(/\\/g, '/');
+            const base = normalized.split('/').pop() || '';
+            if (!base) return '';
+            if (base.toLowerCase().endsWith('.jsonl')) {
+                return base.slice(0, -5);
+            }
+            return base;
         },
 
         quoteShellArg(value) {
