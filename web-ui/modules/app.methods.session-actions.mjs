@@ -117,8 +117,11 @@ export function createSessionActionMethods(options = {}) {
             if (!session) return false;
             const source = String(session.source || '').trim().toLowerCase();
             const sessionId = typeof session.sessionId === 'string' ? session.sessionId.trim() : '';
+            const filePath = typeof session.filePath === 'string' ? session.filePath.trim() : '';
             if (source === 'claude') {
-                const filePath = typeof session.filePath === 'string' ? session.filePath.trim() : '';
+                return !!sessionId || !!this.extractClaudeResumeKeyFromFilePath(filePath);
+            }
+            if (source === 'gemini') {
                 return !!sessionId || !!this.extractClaudeResumeKeyFromFilePath(filePath);
             }
             return (source === 'codex' || source === 'codebuddy' || source === 'gemini') && !!sessionId;
@@ -170,7 +173,11 @@ export function createSessionActionMethods(options = {}) {
             const normalized = value.replace(/\\/g, '/');
             const base = normalized.split('/').pop() || '';
             if (!base) return '';
-            if (base.toLowerCase().endsWith('.jsonl')) {
+            const lower = base.toLowerCase();
+            if (lower.endsWith('.jsonl')) {
+                return base.slice(0, -5);
+            }
+            if (lower.endsWith('.json')) {
                 return base.slice(0, -5);
             }
             return base;
