@@ -33,6 +33,7 @@ await import(pathToFileURL(path.join(__dirname, 'openclaw-editing.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'openclaw-persist-regression.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'agents-modal-guards.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'session-actions-standalone.test.mjs')));
+await import(pathToFileURL(path.join(__dirname, 'session-resume-command.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'session-header-actions-layout.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'session-browser-timeline-regression.test.mjs')));
 await import(pathToFileURL(path.join(__dirname, 'session-detail-preview-fast.test.mjs')));

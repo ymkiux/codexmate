@@ -148,7 +148,7 @@ export function createSessionActionMethods(options = {}) {
             const source = session && session.source ? String(session.source).trim().toLowerCase() : '';
             const sessionId = session && session.sessionId ? String(session.sessionId).trim() : '';
             const filePath = session && session.filePath ? String(session.filePath).trim() : '';
-            const resumeKey = source === 'claude'
+            const resumeKey = (source === 'claude' || source === 'gemini')
                 ? (sessionId || this.extractClaudeResumeKeyFromFilePath(filePath))
                 : sessionId;
             const arg = this.quoteResumeArg(resumeKey);
@@ -175,7 +175,7 @@ export function createSessionActionMethods(options = {}) {
             if (!base) return '';
             const lower = base.toLowerCase();
             if (lower.endsWith('.jsonl')) {
-                return base.slice(0, -5);
+                return base.slice(0, -6);
             }
             if (lower.endsWith('.json')) {
                 return base.slice(0, -5);
