@@ -263,6 +263,7 @@ export function buildUsageHeatmap(sessions = [], options = {}) {
 
     const weeks = Array.from({ length: weekCount }, (_, idx) => ({
         key: `w-${idx}`,
+        weekIndex: idx,
         days: Array.from({ length: 7 }, () => null)
     }));
 

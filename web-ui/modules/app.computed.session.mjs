@@ -464,13 +464,42 @@ export function createSessionComputed() {
             const heatmap = buildUsageHeatmap(sessions, { range: this.sessionsUsageTimeRange });
             const t = typeof this.t === 'function' ? this.t : null;
             const lang = typeof this.lang === 'string' ? this.lang.trim().toLowerCase() : '';
-            const weekday = lang === 'en'
-                ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-                : ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-            const max = Math.max(1, heatmap.maxSessionCount || 0);
-            const weeks = (Array.isArray(heatmap.weeks) ? heatmap.weeks : []).map((week) => ({
-                ...week,
-                days: (Array.isArray(week.days) ? week.days : []).map((cell) => {
+            const weekdayAxis = lang === 'en'
+                ? ['Mon', '', 'Wed', '', 'Fri', '', '']
+                : ['周一', '', '周三', '', '周五', '', ''];
+            const months = lang === 'en'
+                ? ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+                : ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+            const windowWeeks = this.sessionsUsageTimeRange === 'all'
+                ? 52
+                : (this.sessionsUsageTimeRange === '30d' ? 6 : 2);
+            const allWeeks = Array.isArray(heatmap.weeks) ? heatmap.weeks : [];
+            const startIndex = Math.max(0, allWeeks.length - windowWeeks);
+            const displayWeeksRaw = allWeeks.slice(startIndex);
+            let max = 0;
+            for (const week of displayWeeksRaw) {
+                const days = Array.isArray(week.days) ? week.days : [];
+                for (const cell of days) {
+                    if (cell && cell.isInRange) {
+                        max = Math.max(max, cell.sessionCount || 0);
+                    }
+                }
+            }
+            max = Math.max(1, max);
+            const dayMs = 24 * 60 * 60 * 1000;
+            let lastMonth = -1;
+            const weeks = displayWeeksRaw.map((week) => {
+                const idx = Number.isFinite(Number(week.weekIndex)) ? Number(week.weekIndex) : 0;
+                const weekStartMs = (Number.isFinite(Number(heatmap.alignedStart)) ? Number(heatmap.alignedStart) : 0) + (idx * 7 * dayMs);
+                const month = Number.isFinite(weekStartMs) ? new Date(weekStartMs).getUTCMonth() : -1;
+                const monthLabel = (month >= 0 && month <= 11 && month !== lastMonth) ? months[month] : '';
+                if (month >= 0 && month <= 11) {
+                    lastMonth = month;
+                }
+                return {
+                    ...week,
+                    monthLabel,
+                    days: (Array.isArray(week.days) ? week.days : []).map((cell) => {
                     if (!cell) return null;
                     if (!cell.isInRange) {
                         return {
@@ -506,11 +535,12 @@ export function createSessionComputed() {
                         ariaLabel
                     };
                 })
-            }));
+                };
+            });
             return {
                 ...heatmap,
                 weeks,
-                weekday
+                weekdayAxis
             };
         },
         sessionUsageSummaryCards() {

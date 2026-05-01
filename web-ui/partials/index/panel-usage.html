@@ -182,24 +182,29 @@
                                     <div class="usage-card-kicker">{{ sessionsUsageTimeRange === 'all' ? t('usage.range.kicker.all') : (sessionsUsageTimeRange === '30d' ? t('usage.range.kicker.30d') : t('usage.range.kicker.7d')) }}</div>
                                 </div>
 
-                                <div class="usage-heatmap-wrap">
-                                    <div class="usage-heatmap-axis">
-                                        <div v-for="(label, idx) in sessionUsageHeatmap.weekday" :key="'heatmap-wd-' + idx" class="usage-heatmap-axis-label">
-                                            {{ label }}
+                                <div class="usage-gh-heatmap">
+                                    <div class="usage-gh-heatmap-months">
+                                        <div class="usage-gh-heatmap-months-spacer"></div>
+                                        <div class="usage-gh-heatmap-months-row" aria-hidden="true">
+                                            <div v-for="week in (sessionUsageHeatmap.weeks || [])" :key="week.key + '-m'" class="usage-gh-heatmap-month">{{ week.monthLabel }}</div>
                                         </div>
                                     </div>
-                                    <div class="usage-heatmap-scroll">
-                                        <div class="usage-heatmap-weeks">
-                                            <div v-for="week in (sessionUsageHeatmap.weeks || [])" :key="week.key" class="usage-heatmap-week">
+
+                                    <div class="usage-gh-heatmap-body">
+                                        <div class="usage-gh-heatmap-weekdays" aria-hidden="true">
+                                            <div v-for="(label, idx) in sessionUsageHeatmap.weekdayAxis" :key="'gh-wd-' + idx" class="usage-gh-heatmap-weekday">{{ label }}</div>
+                                        </div>
+                                        <div class="usage-gh-heatmap-grid">
+                                            <div v-for="week in (sessionUsageHeatmap.weeks || [])" :key="week.key" class="usage-gh-heatmap-week">
                                                 <button
                                                     v-for="(cell, idx) in (week.days || [])"
                                                     :key="week.key + '-d-' + idx"
                                                     type="button"
-                                                    class="usage-heat-cell"
+                                                    class="usage-gh-heatmap-day"
                                                     :class="cell && cell.isInRange ? ('level-' + cell.level) : 'out'"
                                                     :disabled="!(cell && cell.isInRange)"
-                                                    :title="cell ? cell.title : ''"
-                                                    :aria-label="cell ? cell.ariaLabel : ''">
+                                                    :aria-label="cell ? cell.ariaLabel : ''"
+                                                    :data-tooltip="cell ? cell.title : ''">
                                                 </button>
                                             </div>
                                         </div>
