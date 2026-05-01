@@ -173,6 +173,52 @@
                                 </div>
                             </section>
 
+                            <section class="usage-card usage-card-wide usage-card-heatmap">
+                                <div class="usage-card-head">
+                                    <div>
+                                        <div class="usage-card-title">{{ t('usage.heatmap.title') }}</div>
+                                        <div class="usage-card-subtitle">{{ t('usage.heatmap.subtitle') }}</div>
+                                    </div>
+                                    <div class="usage-card-kicker">{{ sessionsUsageTimeRange === 'all' ? t('usage.range.kicker.all') : (sessionsUsageTimeRange === '30d' ? t('usage.range.kicker.30d') : t('usage.range.kicker.7d')) }}</div>
+                                </div>
+
+                                <div class="usage-heatmap-wrap">
+                                    <div class="usage-heatmap-axis">
+                                        <div v-for="(label, idx) in sessionUsageHeatmap.weekday" :key="'heatmap-wd-' + idx" class="usage-heatmap-axis-label">
+                                            {{ label }}
+                                        </div>
+                                    </div>
+                                    <div class="usage-heatmap-scroll">
+                                        <div class="usage-heatmap-weeks">
+                                            <div v-for="week in (sessionUsageHeatmap.weeks || [])" :key="week.key" class="usage-heatmap-week">
+                                                <button
+                                                    v-for="(cell, idx) in (week.days || [])"
+                                                    :key="week.key + '-d-' + idx"
+                                                    type="button"
+                                                    class="usage-heat-cell"
+                                                    :class="cell && cell.isInRange ? ('level-' + cell.level) : 'out'"
+                                                    :disabled="!(cell && cell.isInRange)"
+                                                    :title="cell ? cell.title : ''"
+                                                    :aria-label="cell ? cell.ariaLabel : ''">
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="usage-heatmap-legend" aria-hidden="true">
+                                    <span class="usage-heatmap-legend-label">{{ t('usage.heatmap.legend.less') }}</span>
+                                    <span class="usage-heatmap-legend-dots">
+                                        <span class="usage-heat-dot out"></span>
+                                        <span class="usage-heat-dot level-1"></span>
+                                        <span class="usage-heat-dot level-2"></span>
+                                        <span class="usage-heat-dot level-3"></span>
+                                        <span class="usage-heat-dot level-4"></span>
+                                    </span>
+                                    <span class="usage-heatmap-legend-label">{{ t('usage.heatmap.legend.more') }}</span>
+                                </div>
+                            </section>
+
                             <section class="usage-card">
                                 <div class="usage-card-title">{{ t('usage.trend.sessions') }}</div>
                                 <div class="usage-legend">

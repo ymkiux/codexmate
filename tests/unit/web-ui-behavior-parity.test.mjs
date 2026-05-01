@@ -600,6 +600,7 @@ test('captured bundled app skeleton only exposes expected data key drift versus 
         'promptComposerPickerList',
         'promptComposerMissingVars',
         'sessionUsageDaily',
+        'sessionUsageHeatmap',
         'sessionUsageDailyTableRows',
         'usageCurrentSessionStats',
         'taskOrchestrationSelectedRun',
