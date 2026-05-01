@@ -99,6 +99,19 @@
                             {{ t('sessions.resumeYolo') }}
                         </label>
                     </div>
+                    <div v-if="hasActiveSessionFilters()" class="session-filter-chips" :aria-label="t('sessions.filters.copyLink')">
+                        <button
+                            v-for="chip in getSessionFilterChips()"
+                            :key="'chip-' + chip.key"
+                            type="button"
+                            class="session-filter-chip"
+                            @click="clearSessionFilterChip(chip.key)"
+                            :title="`${chip.title}: ${chip.value}`">
+                            <span class="session-filter-chip-title">{{ chip.title }}</span>
+                            <span class="session-filter-chip-value">{{ chip.value }}</span>
+                            <span class="session-filter-chip-close">×</span>
+                        </button>
+                    </div>
                 </div>
 
                 <div v-if="sessionsLoading" class="state-message">
@@ -118,7 +131,7 @@
                         <div
                             v-for="session in visibleSessionsList"
                             :key="session.source + '-' + session.sessionId + '-' + session.filePath"
-                            v-memo="[activeSessionExportKey === getSessionExportKey(session), session.messageCount, session.updatedAt, session.title, session.sourceLabel, isSessionPinned(session), sessionsLoading]"
+                            v-memo="[activeSessionExportKey === getSessionExportKey(session), session.messageCount, session.updatedAt, session.title, session.sourceLabel, session.cwd, isSessionPinned(session), sessionsLoading]"
                             :class="[
                                 'session-item',
                                 {
@@ -169,6 +182,7 @@
                             <div class="session-item-meta">
                                 <span class="session-source">{{ session.sourceLabel }}</span>
                                 <span class="session-item-time">{{ session.updatedAt || t('sessions.unknownTime') }}</span>
+                                <span v-if="session.cwd" class="session-item-cwd session-item-sub">{{ session.cwd }}</span>
                             </div>
                         </div>
                     </div>

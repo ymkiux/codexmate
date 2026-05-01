@@ -581,6 +581,11 @@ const DICT = Object.freeze({
         ,
         'sessions.filters.copyLink': '复制筛选链接',
         'sessions.filters.urlBuildFail': '无法生成链接',
+        'sessions.filters.source': '来源',
+        'sessions.filters.path': '路径',
+        'sessions.filters.keyword': '关键词',
+        'sessions.filters.role': '角色',
+        'sessions.filters.time': '时间',
         'sessions.roleLabel.user': 'User',
         'sessions.roleLabel.system': 'System',
         'sessions.roleLabel.assistant': 'Assistant'
@@ -1609,6 +1614,11 @@ const DICT = Object.freeze({
         ,
         'sessions.filters.copyLink': 'Copy filter link',
         'sessions.filters.urlBuildFail': 'Failed to build link',
+        'sessions.filters.source': 'Source',
+        'sessions.filters.path': 'Path',
+        'sessions.filters.keyword': 'Keyword',
+        'sessions.filters.role': 'Role',
+        'sessions.filters.time': 'Time',
         'sessions.roleLabel.user': 'User',
         'sessions.roleLabel.system': 'System',
         'sessions.roleLabel.assistant': 'Assistant'
