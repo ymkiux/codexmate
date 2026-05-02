@@ -503,7 +503,7 @@ export function createSessionActionMethods(options = {}) {
                     return;
                 }
 
-                this.showMessage('操作成功', 'success');
+                this.showMessage('已生成派生会话', 'success');
                 if (typeof this.invalidateSessionsUsageData === 'function') {
                     this.invalidateSessionsUsageData({ preserveList: true });
                 }

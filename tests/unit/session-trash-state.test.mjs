@@ -1926,7 +1926,7 @@ test('cloneSession keeps success message when refresh fails after clone succeeds
     });
 
     assert.strictEqual(context.sessionCloning['codex:session-1:/tmp/session-1.jsonl'], false);
-    assert.deepStrictEqual(messages, [{ message: '操作成功', tone: 'success' }]);
+    assert.deepStrictEqual(messages, [{ message: '已生成派生会话', tone: 'success' }]);
 });
 
 test('cloneSession keeps success message when selecting the cloned session fails', async () => {
@@ -1967,7 +1967,7 @@ test('cloneSession keeps success message when selecting the cloned session fails
     });
 
     assert.strictEqual(context.sessionCloning['codex:session-1:/tmp/session-1.jsonl'], false);
-    assert.deepStrictEqual(messages, [{ message: '操作成功', tone: 'success' }]);
+    assert.deepStrictEqual(messages, [{ message: '已生成派生会话', tone: 'success' }]);
 });
 
 test('prependSessionTrashItem prefers authoritative trash totalCount when provided', () => {
