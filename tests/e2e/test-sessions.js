@@ -1,5 +1,6 @@
-﻿const path = require('path');
+const path = require('path');
 const fs = require('fs');
+const { pathToFileURL } = require('url');
 const { assert } = require('./helpers');
 
 module.exports = async function testSessions(ctx) {
@@ -149,9 +150,15 @@ module.exports = async function testSessions(ctx) {
         cloneResult = await api('clone-session', { source: 'codex', sessionId });
         assert(cloneResult.success === true, 'clone-session failed');
         assert(cloneResult.sessionId && cloneResult.sessionId !== sessionId, 'clone-session id invalid');
+        assert(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(cloneResult.sessionId), 'clone-session id should be codex-resumable uuid');
         assert(cloneResult.filePath && cloneResult.filePath.endsWith('.jsonl'), 'clone-session file path invalid');
+        const cloneFileBase = path.basename(cloneResult.filePath);
+        assert(new RegExp(`^rollout-\\d{4}-\\d{2}-\\d{2}T\\d{2}-\\d{2}-\\d{2}-${cloneResult.sessionId}\\.jsonl$`, 'i').test(cloneFileBase), 'clone-session file should use codex rollout filename');
+        assert(path.relative(path.join(tmpHome, '.codex', 'sessions'), cloneResult.filePath).split(path.sep).length === 4, 'clone-session file should live under codex date directory');
         assert(cloneResult.filePath && require('fs').existsSync(cloneResult.filePath), 'clone-session file missing');
         cloneSessionId = cloneResult.sessionId;
+        ctx.cloneSessionId = cloneResult.sessionId;
+        ctx.cloneSessionPath = cloneResult.filePath;
 
         const cloneInvalid = await api('clone-session', { source: 'claude', sessionId });
         assert(cloneInvalid.error, 'clone-session should reject non-codex source');
@@ -166,6 +173,18 @@ module.exports = async function testSessions(ctx) {
             && apiSessionsAfterClone.sessions[0].sessionId === cloneSessionId,
             'clone session not latest'
         );
+        const helperPath = path.resolve(__dirname, '..', 'unit', 'helpers', 'web-ui-app-options.mjs');
+        const { captureCurrentBundledAppOptions } = await import(pathToFileURL(helperPath).href);
+        const appOptions = await captureCurrentBundledAppOptions();
+        const vm = {
+            ...(typeof appOptions.data === 'function' ? appOptions.data() : {}),
+            $refs: {}
+        };
+        for (const [name, fn] of Object.entries(appOptions.methods || {})) {
+            vm[name] = fn;
+        }
+        assert(vm.isResumeCommandAvailable(apiSessionsAfterClone.sessions[0]) === true, 'cloned codex session should allow resume command');
+        assert(vm.buildResumeCommand.call({ ...vm, sessionResumeWithYolo: false }, apiSessionsAfterClone.sessions[0]) === `codex resume ${cloneSessionId}`, 'cloned codex resume command mismatch');
 
         const hardDeleteSessionId = 'codex-hard-delete-e2e';
         const hardDeleteSessionPath = path.join(tmpHome, '.codex', 'sessions', `${hardDeleteSessionId}.jsonl`);
