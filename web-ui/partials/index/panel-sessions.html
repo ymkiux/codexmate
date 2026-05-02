@@ -211,8 +211,8 @@
                                             class="btn-session-clone"
                                             @click="cloneSession(activeSession)"
                                             :disabled="!activeSession || sessionsLoading || sessionCloning[getSessionExportKey(activeSession)]"
-                                            title="复制当前 Codex 会话并生成新的派生会话">
-                                            {{ (activeSession && sessionCloning[getSessionExportKey(activeSession)]) ? '生成中...' : '生成派生会话' }}
+                                            :title="t('sessions.preview.cloneTitle')">
+                                            {{ (activeSession && sessionCloning[getSessionExportKey(activeSession)]) ? t('sessions.preview.cloning') : t('sessions.preview.clone') }}
                                         </button>
                                         <button
                                             v-if="isDeleteAvailable(activeSession)"

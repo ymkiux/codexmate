@@ -292,7 +292,7 @@ test('config template keeps expected config tabs in top and side navigation', ()
     assert.match(html, /class="session-item-copy session-item-pin"/);
     assert.match(
         sessionsPanel,
-        /<button[\s\S]*?v-if="isCloneAvailable\(activeSession\)"[\s\S]*?class="btn-session-clone"[\s\S]*?@click="cloneSession\(activeSession\)"[\s\S]*?:disabled="!activeSession \|\| sessionsLoading \|\| sessionCloning\[getSessionExportKey\(activeSession\)\]"[\s\S]*?生成派生会话[\s\S]*?<\/button>/
+        /<button[\s\S]*?v-if="isCloneAvailable\(activeSession\)"[\s\S]*?class="btn-session-clone"[\s\S]*?@click="cloneSession\(activeSession\)"[\s\S]*?:disabled="!activeSession \|\| sessionsLoading \|\| sessionCloning\[getSessionExportKey\(activeSession\)\]"[\s\S]*?t\('sessions\.preview\.clone'\)[\s\S]*?<\/button>/
     );
     assert.doesNotMatch(sessionsPanel, /sessionsViewMode/);
     assert.doesNotMatch(sessionsPanel, /sessionUsageSummaryCards/);
