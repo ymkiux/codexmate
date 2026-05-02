@@ -5,7 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const logic = await import(pathToFileURL(path.join(__dirname, '..', '..', 'web-ui', 'logic.mjs')));
-const { buildUsageChartGroups } = logic;
+const { buildUsageChartGroups, buildUsageHeatmap } = logic;
 
 test('buildUsageChartGroups aggregates codex and claude sessions into day buckets', () => {
     const now = Date.UTC(2026, 3, 6, 12, 0, 0);
@@ -90,4 +90,20 @@ test('buildUsageChartGroups supports all range and keeps every valid session in 
     assert.strictEqual(result.filteredSessions.length, 2);
     assert.strictEqual(result.buckets[0].key, '2026-03-01');
     assert.strictEqual(result.buckets[result.buckets.length - 1].key, '2026-04-06');
+});
+
+test('buildUsageHeatmap aligns to monday and aggregates sessions per day', () => {
+    const now = Date.UTC(2026, 3, 6, 12, 0, 0);
+    const result = buildUsageHeatmap([
+        { source: 'codex', updatedAt: '2026-04-06T08:00:00.000Z', messageCount: 5, totalTokens: 120 },
+        { source: 'claude', updatedAt: '2026-04-06T09:00:00.000Z', messageCount: 7, totalTokens: 230 },
+        { source: 'codex', updatedAt: '2026-04-05T09:00:00.000Z', messageCount: 3, totalTokens: 90 }
+    ], { range: '7d', now });
+
+    assert.strictEqual(result.range, '7d');
+    assert.ok(Array.isArray(result.weeks));
+    assert.ok(result.weeks.length >= 1);
+    assert.ok(result.maxSessionCount >= 2);
+    const hasDay = result.weeks.some((week) => Array.isArray(week.days) && week.days.some((cell) => cell && cell.dateKey === '2026-04-06' && cell.sessionCount === 2));
+    assert.ok(hasDay);
 });

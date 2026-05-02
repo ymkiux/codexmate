@@ -1,6 +1,7 @@
 import {
     buildSessionTimelineNodes,
     buildUsageChartGroups,
+    buildUsageHeatmap,
     isSessionQueryEnabled
 } from '../logic.mjs';
 import { SESSION_TRASH_PAGE_SIZE } from './app.constants.mjs';
@@ -455,6 +456,92 @@ export function createSessionComputed() {
             return buildUsageChartGroups(this.sessionsUsageList, {
                 range: this.sessionsUsageTimeRange
             });
+        },
+        sessionUsageHeatmap() {
+            const sessions = this.sessionUsageCharts && Array.isArray(this.sessionUsageCharts.filteredSessions)
+                ? this.sessionUsageCharts.filteredSessions
+                : this.sessionsUsageList;
+            const heatmap = buildUsageHeatmap(sessions, { range: this.sessionsUsageTimeRange });
+            const t = typeof this.t === 'function' ? this.t : null;
+            const lang = typeof this.lang === 'string' ? this.lang.trim().toLowerCase() : '';
+            const weekdayAxis = lang === 'en'
+                ? ['Mon', '', 'Wed', '', 'Fri', '', '']
+                : ['周一', '', '周三', '', '周五', '', ''];
+            const months = lang === 'en'
+                ? ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+                : ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+            const windowWeeks = this.sessionsUsageTimeRange === 'all'
+                ? 52
+                : (this.sessionsUsageTimeRange === '30d' ? 6 : 2);
+            const allWeeks = Array.isArray(heatmap.weeks) ? heatmap.weeks : [];
+            const startIndex = Math.max(0, allWeeks.length - windowWeeks);
+            const displayWeeksRaw = allWeeks.slice(startIndex);
+            let max = 0;
+            for (const week of displayWeeksRaw) {
+                const days = Array.isArray(week.days) ? week.days : [];
+                for (const cell of days) {
+                    if (cell && cell.isInRange) {
+                        max = Math.max(max, cell.sessionCount || 0);
+                    }
+                }
+            }
+            max = Math.max(1, max);
+            const dayMs = 24 * 60 * 60 * 1000;
+            let lastMonth = -1;
+            const weeks = displayWeeksRaw.map((week) => {
+                const idx = Number.isFinite(Number(week.weekIndex)) ? Number(week.weekIndex) : 0;
+                const weekStartMs = (Number.isFinite(Number(heatmap.alignedStart)) ? Number(heatmap.alignedStart) : 0) + (idx * 7 * dayMs);
+                const month = Number.isFinite(weekStartMs) ? new Date(weekStartMs).getUTCMonth() : -1;
+                const monthLabel = (month >= 0 && month <= 11 && month !== lastMonth) ? months[month] : '';
+                if (month >= 0 && month <= 11) {
+                    lastMonth = month;
+                }
+                return {
+                    ...week,
+                    monthLabel,
+                    days: (Array.isArray(week.days) ? week.days : []).map((cell) => {
+                    if (!cell) return null;
+                    if (!cell.isInRange) {
+                        return {
+                            ...cell,
+                            level: -1,
+                            title: '',
+                            ariaLabel: ''
+                        };
+                    }
+                    const ratio = cell.sessionCount > 0 ? (cell.sessionCount / max) : 0;
+                    const level = cell.sessionCount <= 0
+                        ? 0
+                        : (ratio <= 0.25 ? 1 : (ratio <= 0.5 ? 2 : (ratio <= 0.75 ? 3 : 4)));
+                    const tokensTitle = formatUsageSummaryNumber(cell.tokenTotal || 0);
+                    const title = t
+                        ? t('usage.heatmap.tooltip', {
+                            date: cell.dateKey,
+                            sessions: cell.sessionCount,
+                            messages: cell.messageCount,
+                            tokens: tokensTitle
+                        })
+                        : `${cell.dateKey} · sessions ${cell.sessionCount} · messages ${cell.messageCount} · tokens ${tokensTitle}`;
+                    const ariaLabel = t
+                        ? t('usage.heatmap.aria', {
+                            date: cell.dateKey,
+                            sessions: cell.sessionCount
+                        })
+                        : `${cell.dateKey} sessions ${cell.sessionCount}`;
+                    return {
+                        ...cell,
+                        level,
+                        title,
+                        ariaLabel
+                    };
+                })
+                };
+            });
+            return {
+                ...heatmap,
+                weeks,
+                weekdayAxis
+            };
         },
         sessionUsageSummaryCards() {
             const summary = this.sessionUsageCharts && this.sessionUsageCharts.summary

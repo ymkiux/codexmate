@@ -206,6 +206,101 @@ function formatUtcDayKey(value) {
     return `${stamp.getUTCFullYear()}-${String(stamp.getUTCMonth() + 1).padStart(2, '0')}-${String(stamp.getUTCDate()).padStart(2, '0')}`;
 }
 
+export function buildUsageHeatmap(sessions = [], options = {}) {
+    const list = Array.isArray(sessions) ? sessions : [];
+    const normalized = [];
+    for (const session of list) {
+        if (!session || typeof session !== 'object') continue;
+        const source = normalizeSessionSource(session.source, '');
+        if (source !== 'codex' && source !== 'claude') continue;
+        const updatedAtMs = Date.parse(session.updatedAt || '');
+        if (!Number.isFinite(updatedAtMs)) continue;
+        normalized.push({
+            updatedAtMs,
+            messageCount: Number.isFinite(Number(session.messageCount))
+                ? Math.max(0, Math.floor(Number(session.messageCount)))
+                : 0,
+            tokenTotal: readSessionTotalTokens(session)
+        });
+    }
+
+    const range = normalizeUsageRange(options.range);
+    const now = Number.isFinite(Number(options.now)) ? Number(options.now) : Date.now();
+    const dayMs = 24 * 60 * 60 * 1000;
+    const todayStart = toUtcDayStartMs(now);
+    let startDay = todayStart;
+    let endDay = todayStart;
+    if (range === 'all') {
+        const dayStarts = normalized.map((item) => toUtcDayStartMs(item.updatedAtMs)).filter((value) => Number.isFinite(value));
+        if (dayStarts.length) {
+            startDay = Math.min(...dayStarts);
+            endDay = Math.max(...dayStarts);
+        }
+    } else {
+        const rangeDays = range === '30d' ? 30 : 7;
+        endDay = todayStart;
+        startDay = todayStart - ((rangeDays - 1) * dayMs);
+    }
+
+    const startDow = new Date(startDay).getUTCDay();
+    const startShift = (startDow + 6) % 7;
+    const alignedStart = startDay - (startShift * dayMs);
+    const endDow = new Date(endDay).getUTCDay();
+    const endShift = (6 - ((endDow + 6) % 7));
+    const alignedEnd = endDay + (endShift * dayMs);
+    const totalDays = Math.floor((alignedEnd - alignedStart) / dayMs) + 1;
+    const weekCount = Math.max(1, Math.ceil(totalDays / 7));
+
+    const byDay = new Map();
+    for (const item of normalized) {
+        const dayKey = formatUtcDayKey(item.updatedAtMs);
+        const existing = byDay.get(dayKey) || { sessionCount: 0, messageCount: 0, tokenTotal: 0 };
+        existing.sessionCount += 1;
+        existing.messageCount += item.messageCount;
+        existing.tokenTotal += item.tokenTotal;
+        byDay.set(dayKey, existing);
+    }
+
+    const weeks = Array.from({ length: weekCount }, (_, idx) => ({
+        key: `w-${idx}`,
+        weekIndex: idx,
+        days: Array.from({ length: 7 }, () => null)
+    }));
+
+    let maxSessionCount = 0;
+    for (let dayIndex = 0; dayIndex < totalDays; dayIndex += 1) {
+        const dateMs = alignedStart + (dayIndex * dayMs);
+        const dateKey = formatUtcDayKey(dateMs);
+        const isInRange = dateMs >= startDay && dateMs <= endDay;
+        const weekIndex = Math.floor(dayIndex / 7);
+        const dow = new Date(dateMs).getUTCDay();
+        const rowIndex = (dow + 6) % 7;
+        const totals = isInRange ? (byDay.get(dateKey) || { sessionCount: 0, messageCount: 0, tokenTotal: 0 }) : null;
+        const sessionCount = totals ? totals.sessionCount : 0;
+        if (isInRange) {
+            maxSessionCount = Math.max(maxSessionCount, sessionCount);
+        }
+        weeks[weekIndex].days[rowIndex] = {
+            dateKey,
+            dateMs,
+            isInRange,
+            sessionCount,
+            messageCount: totals ? totals.messageCount : 0,
+            tokenTotal: totals ? totals.tokenTotal : 0
+        };
+    }
+
+    return {
+        range,
+        startDay,
+        endDay,
+        alignedStart,
+        alignedEnd,
+        maxSessionCount,
+        weeks
+    };
+}
+
 function buildUsageBuckets(normalizedSessions, options = {}) {
     const range = normalizeUsageRange(options.range);
     const now = Number.isFinite(Number(options.now)) ? Number(options.now) : Date.now();

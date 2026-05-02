@@ -422,6 +422,9 @@ export async function loadActiveSessionDetail(api, options = {}) {
         if (res.sourceLabel) {
             this.activeSession.sourceLabel = res.sourceLabel;
         }
+        if (typeof res.derived === 'boolean') {
+            this.activeSession.derived = res.derived;
+        }
         if (res.sessionId) {
             this.activeSession.sessionId = res.sessionId;
             if (!this.activeSession.title) {

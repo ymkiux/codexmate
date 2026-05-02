@@ -381,6 +381,12 @@
     white-space: nowrap;
 }
 
+.session-item-cwd {
+    flex: 1 1 160px;
+    min-width: 160px;
+    color: var(--color-text-muted);
+}
+
 .session-preview {
     border: 1px solid var(--color-border-soft);
     border-radius: var(--radius-xl);

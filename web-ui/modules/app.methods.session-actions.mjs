@@ -10,6 +10,24 @@ export function createSessionActionMethods(options = {}) {
     } = options;
 
     return {
+        isDerivedSessionId(value) {
+            const sessionId = typeof value === 'string' ? value.trim() : String(value || '');
+            if (!sessionId) return false;
+            return /-\d{8}-\d{6}-[0-9a-f]{6}$/i.test(sessionId);
+        },
+
+        isDerivedSession(session) {
+            if (!session || typeof session !== 'object') return false;
+            if (session.derived === true) return true;
+            if (this.isDerivedSessionId(session.sessionId)) return true;
+            const rawFilePath = typeof session.filePath === 'string' ? session.filePath.trim() : '';
+            if (!rawFilePath) return false;
+            const normalized = rawFilePath.replace(/\\/g, '/');
+            if (normalized.includes('/.codexmate/sessions/derived/')) return true;
+            if (normalized.includes('/codexmate-derived/')) return true;
+            return false;
+        },
+
         getSessionStandaloneContext() {
             try {
                 const url = new URL(window.location.href);
@@ -20,6 +38,8 @@ export function createSessionActionMethods(options = {}) {
                 const source = (url.searchParams.get('source') || '').trim().toLowerCase();
                 const sessionId = (url.searchParams.get('sessionId') || url.searchParams.get('id') || '').trim();
                 const filePath = (url.searchParams.get('filePath') || url.searchParams.get('path') || '').trim();
+                const maxMessagesRaw = (url.searchParams.get('maxMessages') || '').trim();
+                const maxMessages = Number(maxMessagesRaw);
                 let error = '';
                 if (!source) {
                     error = '缺少 source 参数';
@@ -39,7 +59,8 @@ export function createSessionActionMethods(options = {}) {
                     params: {
                         source,
                         sessionId,
-                        filePath
+                        filePath,
+                        maxMessages: Number.isFinite(maxMessages) && maxMessages > 0 ? Math.floor(maxMessages) : 0
                     },
                     error: ''
                 };
@@ -67,7 +88,8 @@ export function createSessionActionMethods(options = {}) {
                 sourceLabel,
                 sessionId: context.params.sessionId,
                 filePath: context.params.filePath,
-                title: context.params.sessionId || context.params.filePath || '会话'
+                title: context.params.sessionId || context.params.filePath || '会话',
+                maxMessages: context.params.maxMessages || 50
             };
             this.activeSessionMessages = [];
             this.activeSessionDetailError = '';

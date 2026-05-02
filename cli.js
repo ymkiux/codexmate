@@ -4515,7 +4515,10 @@ function listCodexSessions(limit, options = {}) {
             titleReadBytes
         });
         if (summary) {
-            sessions.push(summary);
+            sessions.push({
+                ...summary,
+                derived: isDerivedSessionFile(filePath)
+            });
         }
 
         if (sessions.length >= targetCount) {
@@ -4697,6 +4700,7 @@ function listClaudeSessions(limit, options = {}) {
                 models,
                 __messageCountExact: quickRecords.length > 0 && isSessionSummaryMessageCountExact(fileStat, summaryReadBytes),
                 filePath,
+                derived: isDerivedSessionFile(filePath),
                 keywords,
                 capabilities
             });
@@ -4723,7 +4727,10 @@ function listClaudeSessions(limit, options = {}) {
                 titleReadBytes
             });
             if (summary) {
-                sessions.push(summary);
+                sessions.push({
+                    ...summary,
+                    derived: isDerivedSessionFile(filePath)
+                });
             }
 
             if (sessions.length >= targetCount) {
@@ -4745,7 +4752,10 @@ function listClaudeSessions(limit, options = {}) {
                 titleReadBytes
             });
             if (summary) {
-                sessions.push(summary);
+                sessions.push({
+                    ...summary,
+                    derived: isDerivedSessionFile(filePath)
+                });
             }
             seen.add(filePath);
         }
@@ -5208,6 +5218,65 @@ function findClaudeSessionIndexPath(sessionFilePath) {
         current = parent;
     }
     return '';
+}
+
+function resolveClaudeProjectDirForCwd(cwd) {
+    const projectsDir = getClaudeProjectsDir();
+    const raw = typeof cwd === 'string' ? cwd.trim() : '';
+    if (!projectsDir || !raw) {
+        return '';
+    }
+    const ignoreCase = process.platform === 'win32';
+    const resolvedCwd = path.resolve(expandHomePath(raw));
+    let entries = [];
+    try {
+        entries = fs.readdirSync(projectsDir, { withFileTypes: true });
+    } catch (_) {
+        entries = [];
+    }
+    for (const entry of entries) {
+        if (!entry || !entry.isDirectory()) continue;
+        const projectDir = path.join(projectsDir, entry.name);
+        const indexPath = path.join(projectDir, 'sessions-index.json');
+        if (!fs.existsSync(indexPath)) continue;
+        const index = readJsonFile(indexPath, null);
+        const originalPathRaw = index && typeof index.originalPath === 'string' ? index.originalPath.trim() : '';
+        if (!originalPathRaw) continue;
+        const resolvedOriginal = path.resolve(expandHomePath(originalPathRaw));
+        if (normalizePathForCompare(resolvedOriginal, { ignoreCase }) === normalizePathForCompare(resolvedCwd, { ignoreCase })) {
+            return projectDir;
+        }
+    }
+    const hash = crypto.createHash('sha1').update(resolvedCwd).digest('hex').slice(0, 12);
+    return path.join(projectsDir, `codexmate-${hash}`);
+}
+
+function ensureClaudeSessionsIndex(indexPath, originalPath) {
+    if (!indexPath) return;
+    const resolvedOriginal = typeof originalPath === 'string' && originalPath.trim()
+        ? path.resolve(expandHomePath(originalPath.trim()))
+        : '';
+    const existing = readJsonFile(indexPath, null);
+    const index = existing && typeof existing === 'object' && !Array.isArray(existing)
+        ? { ...existing }
+        : { entries: [] };
+    if (!Array.isArray(index.entries)) {
+        index.entries = [];
+    }
+    if (!index.originalPath && resolvedOriginal) {
+        index.originalPath = resolvedOriginal;
+    }
+    if (!fs.existsSync(indexPath)) {
+        if (!index.originalPath) {
+            index.originalPath = resolvedOriginal || path.dirname(indexPath);
+        }
+        writeJsonAtomic(indexPath, index);
+        return;
+    }
+    if (existing && typeof existing === 'object' && !Array.isArray(existing) && existing.originalPath === index.originalPath) {
+        return;
+    }
+    writeJsonAtomic(indexPath, index);
 }
 
 const {
@@ -6265,6 +6334,28 @@ function buildSessionPlainText(messages) {
     return lines.join('\n');
 }
 
+function getDerivedSessionMetaPath(filePath) {
+    if (!filePath) return '';
+    const base = filePath.toLowerCase().endsWith('.jsonl')
+        ? filePath.slice(0, -5)
+        : filePath;
+    return `${base}.meta.json`;
+}
+
+function isDerivedSessionFile(filePath) {
+    const metaPath = getDerivedSessionMetaPath(filePath);
+    if (!metaPath) return false;
+    try {
+        if (fs.existsSync(metaPath)) {
+            return true;
+        }
+    } catch (_) {
+        return false;
+    }
+    const base = path.basename(filePath || '', path.extname(filePath || ''));
+    return /-\d{8}-\d{6}-[0-9a-f]{6}$/i.test(base);
+}
+
 function resolveStateMaxMessages(state) {
     if (!state || typeof state !== 'object') {
         return MAX_EXPORT_MESSAGES;
@@ -6610,6 +6701,20 @@ async function readSessionDetail(params = {}) {
         sessionId,
         cwd: extracted.cwd || '',
         updatedAt: extracted.updatedAt || '',
+        derived: (() => {
+            try {
+                const metaPath = filePath.toLowerCase().endsWith('.jsonl')
+                    ? `${filePath.slice(0, -5)}.meta.json`
+                    : `${filePath}.meta.json`;
+                if (fs.existsSync(metaPath)) {
+                    return true;
+                }
+            } catch (_) {
+                return false;
+            }
+            const base = path.basename(filePath || '', path.extname(filePath || ''));
+            return /-\d{8}-\d{6}-[0-9a-f]{6}$/i.test(base);
+        })(),
         totalMessages: hasExactTotalMessages ? extracted.totalMessages : null,
         clipped: typeof extracted.clipped === 'boolean'
             ? extracted.clipped
@@ -6637,6 +6742,15 @@ async function readSessionPlain(params = {}) {
         return { error: 'Session file not found' };
     }
 
+    const rawMaxMessages = params.maxMessages;
+    const maxMessages = rawMaxMessages === Infinity || rawMaxMessages === 'all'
+        ? Infinity
+        : (
+            Number.isFinite(Number(rawMaxMessages))
+                ? Math.max(1, Math.floor(Number(rawMaxMessages)))
+                : 50
+        );
+
     let extracted;
     if (source === 'gemini') {
         let json;
@@ -6657,15 +6771,19 @@ async function readSessionPlain(params = {}) {
             const text = extractMessageText(extractGeminiMessageText(entry.content ?? entry.message ?? entry.text));
             if (!text && role !== 'system') continue;
             messages.push({ role, text });
+            if (maxMessages !== Infinity && messages.length >= maxMessages) {
+                break;
+            }
         }
         extracted = {
             sessionId: typeof json.sessionId === 'string' && json.sessionId.trim() ? json.sessionId.trim() : path.basename(filePath, '.json'),
             cwd: typeof json.projectRoot === 'string' ? json.projectRoot : '',
-            messages
+            messages,
+            truncated: maxMessages !== Infinity && rawMessages.length > messages.length
         };
     } else {
         try {
-            extracted = await extractMessagesFromFile(filePath, source, { maxMessages: Infinity });
+            extracted = await extractMessagesFromFile(filePath, source, { maxMessages });
         } catch (e) {
             extracted = null;
         }
@@ -6679,7 +6797,7 @@ async function readSessionPlain(params = {}) {
             if (fallbackRecords.length === 0) {
                 return { error: 'Session file is empty' };
             }
-            extracted = extractMessagesFromRecords(fallbackRecords, source, { maxMessages: Infinity });
+            extracted = extractMessagesFromRecords(fallbackRecords, source, { maxMessages });
         }
     }
 
@@ -6698,7 +6816,8 @@ async function readSessionPlain(params = {}) {
         sessionId,
         title: sessionId,
         filePath,
-        text
+        text,
+        clipped: maxMessages !== Infinity && !!(extracted && extracted.truncated)
     };
 }
 
@@ -6838,13 +6957,14 @@ async function convertSessionToDerived(params = {}) {
     const outputDir = target === 'codex'
         ? getCodexSessionsDir()
         : (target === 'claude'
-            ? path.join(getClaudeProjectsDir(), 'codexmate-derived')
+            ? (resolveClaudeProjectDirForCwd(extracted.cwd || '') || path.join(getClaudeProjectsDir(), 'codexmate-derived'))
             : buildDerivedSessionOutputDir(target, source, sourceKey));
     ensureDir(outputDir);
     const outputPath = path.join(outputDir, `${derivedSessionId}.jsonl`);
     const metaPath = path.join(outputDir, `${derivedSessionId}.meta.json`);
 
     const cwd = typeof extracted.cwd === 'string' ? extracted.cwd : '';
+    const resolvedCwd = cwd ? path.resolve(expandHomePath(cwd)) : '';
     const messages = removeLeadingSystemMessage(Array.isArray(extracted.messages) ? extracted.messages : []);
     const now = Date.now();
     const baseTime = new Date(now).toISOString();
@@ -6866,6 +6986,7 @@ async function convertSessionToDerived(params = {}) {
             }));
         }
     } else {
+        const claudeIndexPath = target === 'claude' ? path.join(outputDir, 'sessions-index.json') : '';
         for (let i = 0; i < messages.length; i += 1) {
             const message = messages[i];
             if (!message) continue;
@@ -6880,6 +7001,9 @@ async function convertSessionToDerived(params = {}) {
                 cwd,
                 message: { content: text }
             }));
+        }
+        if (claudeIndexPath) {
+            ensureClaudeSessionsIndex(claudeIndexPath, resolvedCwd);
         }
     }
 
@@ -6909,6 +7033,7 @@ async function convertSessionToDerived(params = {}) {
         : parseClaudeSessionSummary(outputPath, { summaryReadBytes: SESSION_BROWSE_SUMMARY_READ_BYTES, titleReadBytes: SESSION_BROWSE_SUMMARY_READ_BYTES });
     if (target === 'claude' && summary) {
         const indexPath = path.join(outputDir, 'sessions-index.json');
+        ensureClaudeSessionsIndex(indexPath, resolvedCwd);
         upsertClaudeSessionIndexEntry(indexPath, outputPath, {
             source: 'claude',
             trashId: summary.sessionId,
@@ -6921,7 +7046,8 @@ async function convertSessionToDerived(params = {}) {
             messageCount: summary.messageCount,
             provider: summary.provider,
             keywords: summary.keywords,
-            capabilities: summary.capabilities
+            capabilities: summary.capabilities,
+            claudeIndexEntry: resolvedCwd ? { projectPath: resolvedCwd } : null
         });
     }
     const maxMessagesLabel = maxMessages === Infinity ? 'all' : maxMessages;
@@ -6932,7 +7058,7 @@ async function convertSessionToDerived(params = {}) {
         target,
         truncated: !!extracted.truncated,
         maxMessages: maxMessagesLabel,
-        session: summary || {
+        session: summary ? { ...summary, derived: true } : {
             source: target,
             sourceLabel: target === 'codex' ? 'Codex' : 'Claude Code',
             sessionId: derivedSessionId,
@@ -6949,6 +7075,7 @@ async function convertSessionToDerived(params = {}) {
             reasoningOutputTokens: 0,
             __messageCountExact: true,
             filePath: outputPath,
+            derived: true,
             keywords: [],
             capabilities: {}
         }

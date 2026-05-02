@@ -173,6 +173,57 @@
                                 </div>
                             </section>
 
+                            <section class="usage-card usage-card-wide usage-card-heatmap">
+                                <div class="usage-card-head">
+                                    <div>
+                                        <div class="usage-card-title">{{ t('usage.heatmap.title') }}</div>
+                                        <div class="usage-card-subtitle">{{ t('usage.heatmap.subtitle') }}</div>
+                                    </div>
+                                    <div class="usage-card-kicker">{{ sessionsUsageTimeRange === 'all' ? t('usage.range.kicker.all') : (sessionsUsageTimeRange === '30d' ? t('usage.range.kicker.30d') : t('usage.range.kicker.7d')) }}</div>
+                                </div>
+
+                                <div class="usage-gh-heatmap">
+                                    <div class="usage-gh-heatmap-months">
+                                        <div class="usage-gh-heatmap-months-spacer"></div>
+                                        <div class="usage-gh-heatmap-months-row" aria-hidden="true">
+                                            <div v-for="week in (sessionUsageHeatmap.weeks || [])" :key="week.key + '-m'" class="usage-gh-heatmap-month">{{ week.monthLabel }}</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="usage-gh-heatmap-body">
+                                        <div class="usage-gh-heatmap-weekdays" aria-hidden="true">
+                                            <div v-for="(label, idx) in sessionUsageHeatmap.weekdayAxis" :key="'gh-wd-' + idx" class="usage-gh-heatmap-weekday">{{ label }}</div>
+                                        </div>
+                                        <div class="usage-gh-heatmap-grid">
+                                            <div v-for="week in (sessionUsageHeatmap.weeks || [])" :key="week.key" class="usage-gh-heatmap-week">
+                                                <button
+                                                    v-for="(cell, idx) in (week.days || [])"
+                                                    :key="week.key + '-d-' + idx"
+                                                    type="button"
+                                                    class="usage-gh-heatmap-day"
+                                                    :class="cell && cell.isInRange ? ('level-' + cell.level) : 'out'"
+                                                    :disabled="!(cell && cell.isInRange)"
+                                                    :aria-label="cell ? cell.ariaLabel : ''"
+                                                    :data-tooltip="cell ? cell.title : ''">
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="usage-heatmap-legend" aria-hidden="true">
+                                    <span class="usage-heatmap-legend-label">{{ t('usage.heatmap.legend.less') }}</span>
+                                    <span class="usage-heatmap-legend-dots">
+                                        <span class="usage-heat-dot out"></span>
+                                        <span class="usage-heat-dot level-1"></span>
+                                        <span class="usage-heat-dot level-2"></span>
+                                        <span class="usage-heat-dot level-3"></span>
+                                        <span class="usage-heat-dot level-4"></span>
+                                    </span>
+                                    <span class="usage-heatmap-legend-label">{{ t('usage.heatmap.legend.more') }}</span>
+                                </div>
+                            </section>
+
                             <section class="usage-card">
                                 <div class="usage-card-title">{{ t('usage.trend.sessions') }}</div>
                                 <div class="usage-legend">

@@ -16,101 +16,137 @@ export function createStartupClaudeMethods(options = {}) {
 
     return {
         async loadAll(options = {}) {
-            const preserveLoading = !!options.preserveLoading;
-            let startupOk = false;
-            if (!preserveLoading) {
-                this.loading = true;
+            if (this._loadAllPromise) {
+                this._loadAllPendingOptions = options;
+                return this._loadAllPromise;
             }
-            this.initError = '';
-            try {
-                const statusRes = await api('status');
-                if (statusRes && statusRes.error) {
-                    this.initError = statusRes.error;
-                } else {
-                    const listRes = await api('list');
+            const preserveLoading = !!options.preserveLoading;
+            const run = async () => {
+                const configLoadTimeoutMs = 6000;
+                const withTimeout = async (promise, ms) => {
+                    const timeoutMs = Number.isFinite(Number(ms)) ? Math.max(0, Number(ms)) : 0;
+                    if (!timeoutMs) {
+                        return promise;
+                    }
+                    let timer = null;
+                    try {
+                        return await Promise.race([
+                            promise,
+                            new Promise((_, reject) => {
+                                timer = setTimeout(() => reject(new Error('timeout')), timeoutMs);
+                            })
+                        ]);
+                    } finally {
+                        if (timer) {
+                            clearTimeout(timer);
+                        }
+                    }
+                };
+                if (!preserveLoading) {
+                    this.loading = true;
+                }
+                this.initError = '';
+                const startedAt = Date.now();
+                const timeLeftMs = () => configLoadTimeoutMs - (Date.now() - startedAt);
+                try {
+                    const statusRes = await withTimeout(api('status'), timeLeftMs());
+                    if (statusRes && statusRes.error) {
+                        this.initError = statusRes.error;
+                        return false;
+                    }
+                    const listRes = await withTimeout(api('list'), timeLeftMs());
                     if (listRes && listRes.error) {
                         this.initError = listRes.error;
-                    } else {
-                        startupOk = true;
-                        this.currentProvider = statusRes.provider;
-                        this.currentModel = statusRes.model;
-                        try {
-                            const installRes = await api('install-status');
-                            if (installRes && !installRes.error) {
-                                const targets = Array.isArray(installRes.targets) ? installRes.targets : null;
-                                if (targets) {
-                                    this.installStatusTargets = targets;
-                                }
-                                if (typeof installRes.packageManager === 'string' && typeof this.normalizeInstallPackageManager === 'function') {
-                                    this.installPackageManager = this.normalizeInstallPackageManager(installRes.packageManager);
-                                }
+                        return false;
+                    }
+                    this.currentProvider = statusRes.provider;
+                    this.currentModel = statusRes.model;
+                    try {
+                        const installRes = await withTimeout(api('install-status'), Math.max(0, Math.min(1200, timeLeftMs())));
+                        if (installRes && !installRes.error) {
+                            const targets = Array.isArray(installRes.targets) ? installRes.targets : null;
+                            if (targets) {
+                                this.installStatusTargets = targets;
                             }
-                        } catch (_) {}
-                        {
-                            const tier = typeof statusRes.serviceTier === 'string'
-                                ? statusRes.serviceTier.trim().toLowerCase()
-                                : '';
-                            this.serviceTier = tier === 'fast' ? 'fast' : (tier ? 'standard' : 'fast');
-                        }
-                        {
-                            const effort = typeof statusRes.modelReasoningEffort === 'string'
-                                ? statusRes.modelReasoningEffort.trim().toLowerCase()
-                                : '';
-                            const allowedReasoningEfforts = new Set(['low', 'medium', 'high', 'xhigh']);
-                            this.modelReasoningEffort = allowedReasoningEfforts.has(effort) ? effort : 'medium';
-                        }
-                        {
-                            const contextWindow = this.normalizePositiveIntegerInput(
-                                statusRes.modelContextWindow,
-                                'model_context_window',
-                                defaultModelContextWindow
-                            );
-                            if (this.editingCodexBudgetField !== 'modelContextWindowInput') {
-                                this.modelContextWindowInput = contextWindow.ok && contextWindow.text
-                                    ? contextWindow.text
-                                    : String(defaultModelContextWindow);
+                            if (typeof installRes.packageManager === 'string' && typeof this.normalizeInstallPackageManager === 'function') {
+                                this.installPackageManager = this.normalizeInstallPackageManager(installRes.packageManager);
                             }
                         }
-                        {
-                            const autoCompactTokenLimit = this.normalizePositiveIntegerInput(
-                                statusRes.modelAutoCompactTokenLimit,
-                                'model_auto_compact_token_limit',
-                                defaultModelAutoCompactTokenLimit
-                            );
-                            if (this.editingCodexBudgetField !== 'modelAutoCompactTokenLimitInput') {
-                                this.modelAutoCompactTokenLimitInput = autoCompactTokenLimit.ok && autoCompactTokenLimit.text
-                                    ? autoCompactTokenLimit.text
-                                    : String(defaultModelAutoCompactTokenLimit);
-                            }
+                    } catch (_) {}
+                    {
+                        const tier = typeof statusRes.serviceTier === 'string'
+                            ? statusRes.serviceTier.trim().toLowerCase()
+                            : '';
+                        this.serviceTier = tier === 'fast' ? 'fast' : (tier ? 'standard' : 'fast');
+                    }
+                    {
+                        const effort = typeof statusRes.modelReasoningEffort === 'string'
+                            ? statusRes.modelReasoningEffort.trim().toLowerCase()
+                            : '';
+                        const allowedReasoningEfforts = new Set(['low', 'medium', 'high', 'xhigh']);
+                        this.modelReasoningEffort = allowedReasoningEfforts.has(effort) ? effort : 'medium';
+                    }
+                    {
+                        const contextWindow = this.normalizePositiveIntegerInput(
+                            statusRes.modelContextWindow,
+                            'model_context_window',
+                            defaultModelContextWindow
+                        );
+                        if (this.editingCodexBudgetField !== 'modelContextWindowInput') {
+                            this.modelContextWindowInput = contextWindow.ok && contextWindow.text
+                                ? contextWindow.text
+                                : String(defaultModelContextWindow);
                         }
-                        this.providersList = listRes.providers;
-                        if (statusRes.configReady === false) {
-                            this.showMessage('配置已加载', 'info');
+                    }
+                    {
+                        const autoCompactTokenLimit = this.normalizePositiveIntegerInput(
+                            statusRes.modelAutoCompactTokenLimit,
+                            'model_auto_compact_token_limit',
+                            defaultModelAutoCompactTokenLimit
+                        );
+                        if (this.editingCodexBudgetField !== 'modelAutoCompactTokenLimitInput') {
+                            this.modelAutoCompactTokenLimitInput = autoCompactTokenLimit.ok && autoCompactTokenLimit.text
+                                ? autoCompactTokenLimit.text
+                                : String(defaultModelAutoCompactTokenLimit);
                         }
-                        if (statusRes.initNotice) {
-                            this.showMessage('配置就绪', 'info');
-                        }
-                        this.maybeShowStarPrompt();
+                    }
+                    this.providersList = listRes.providers;
+                    if (statusRes.configReady === false) {
+                        this.showMessage('配置已加载', 'info');
+                    }
+                    if (statusRes.initNotice) {
+                        this.showMessage('配置就绪', 'info');
+                    }
+                    this.maybeShowStarPrompt();
+                    return true;
+                } catch (e) {
+                    this.initError = e && e.message === 'timeout'
+                        ? '读取配置超时'
+                        : '连接失败: ' + (e && e.message ? e.message : '');
+                    return false;
+                } finally {
+                    if (!preserveLoading) {
+                        this.loading = false;
                     }
                 }
-            } catch (e) {
-                this.initError = '连接失败: ' + e.message;
-            } finally {
-                if (!preserveLoading) {
-                    this.loading = false;
-                }
-            }
+            };
 
-            if (startupOk) {
-                try {
-                    await this.loadModelsForProvider(this.currentProvider);
-                } catch (_) {}
-                try {
-                    await this.loadCodexAuthProfiles();
-                } catch (_) {}
-            }
+            this._loadAllPromise = run()
+                .finally(() => {
+                    this._loadAllPromise = null;
+                });
 
-            return startupOk;
+            const result = await this._loadAllPromise;
+            if (result) {
+                Promise.resolve(this.loadModelsForProvider(this.currentProvider)).catch(() => {});
+                Promise.resolve(this.loadCodexAuthProfiles()).catch(() => {});
+            }
+            const pending = this._loadAllPendingOptions;
+            this._loadAllPendingOptions = null;
+            if (pending) {
+                return this.loadAll(pending);
+            }
+            return result;
         },
 
         async loadModelsForProvider(providerName, options = {}) {
@@ -240,48 +276,85 @@ export function createStartupClaudeMethods(options = {}) {
         },
 
         async refreshClaudeSelectionFromSettings(options = {}) {
+            if (this._refreshClaudeSelectionPromise) {
+                this._refreshClaudeSelectionPendingOptions = options;
+                return this._refreshClaudeSelectionPromise;
+            }
             const silent = !!options.silent;
             const silentModelError = !!options.silentModelError || silent;
-            try {
-                const res = await api('get-claude-settings');
-                if (res && res.error) {
+            const run = async () => {
+                const configLoadTimeoutMs = 6000;
+                const withTimeout = async (promise, ms) => {
+                    const timeoutMs = Number.isFinite(Number(ms)) ? Math.max(0, Number(ms)) : 0;
+                    if (!timeoutMs) {
+                        return promise;
+                    }
+                    let timer = null;
+                    try {
+                        return await Promise.race([
+                            promise,
+                            new Promise((_, reject) => {
+                                timer = setTimeout(() => reject(new Error('timeout')), timeoutMs);
+                            })
+                        ]);
+                    } finally {
+                        if (timer) {
+                            clearTimeout(timer);
+                        }
+                    }
+                };
+                try {
+                    const res = await withTimeout(api('get-claude-settings'), configLoadTimeoutMs);
+                    if (res && res.error) {
+                        if (!silent) {
+                            this.showMessage('读取配置失败', 'error');
+                        }
+                        return;
+                    }
+                    const matchName = this.matchClaudeConfigFromSettings((res && res.env) || {});
+                    if (matchName) {
+                        if (this.currentClaudeConfig !== matchName) {
+                            this.currentClaudeConfig = matchName;
+                        }
+                        this.refreshClaudeModelContext({ silentError: silentModelError });
+                        return;
+                    }
+                    const importedName = this.ensureClaudeConfigFromSettings((res && res.env) || {});
+                    if (importedName) {
+                        if (this.currentClaudeConfig !== importedName) {
+                            this.currentClaudeConfig = importedName;
+                        }
+                        this.refreshClaudeModelContext({ silentError: silentModelError });
+                        if (!silent) {
+                            this.showMessage(`检测到外部 Claude 配置，已自动导入：${importedName}`, 'success');
+                        }
+                        return;
+                    }
+                    this.currentClaudeConfig = '';
+                    this.currentClaudeModel = '';
+                    this.resetClaudeModelsState();
                     if (!silent) {
-                        this.showMessage('读取配置失败', 'error');
+                        const tip = res && res.exists
+                            ? '当前 Claude settings.json 与本地配置不匹配，已取消选中'
+                            : '未检测到 Claude settings.json，已取消选中';
+                        this.showMessage(tip, 'info');
                     }
-                    return;
-                }
-                const matchName = this.matchClaudeConfigFromSettings((res && res.env) || {});
-                if (matchName) {
-                    if (this.currentClaudeConfig !== matchName) {
-                        this.currentClaudeConfig = matchName;
-                    }
-                    this.refreshClaudeModelContext({ silentError: silentModelError });
-                    return;
-                }
-                const importedName = this.ensureClaudeConfigFromSettings((res && res.env) || {});
-                if (importedName) {
-                    if (this.currentClaudeConfig !== importedName) {
-                        this.currentClaudeConfig = importedName;
-                    }
-                    this.refreshClaudeModelContext({ silentError: silentModelError });
+                } catch (e) {
                     if (!silent) {
-                        this.showMessage(`检测到外部 Claude 配置，已自动导入：${importedName}`, 'success');
+                        this.showMessage(e && e.message === 'timeout' ? '读取配置超时' : '读取配置失败', 'error');
                     }
-                    return;
                 }
-                this.currentClaudeConfig = '';
-                this.currentClaudeModel = '';
-                this.resetClaudeModelsState();
-                if (!silent) {
-                    const tip = res && res.exists
-                        ? '当前 Claude settings.json 与本地配置不匹配，已取消选中'
-                        : '未检测到 Claude settings.json，已取消选中';
-                    this.showMessage(tip, 'info');
-                }
-            } catch (_) {
-                if (!silent) {
-                    this.showMessage('读取配置失败', 'error');
-                }
+            };
+
+            this._refreshClaudeSelectionPromise = Promise.resolve(run())
+                .finally(() => {
+                    this._refreshClaudeSelectionPromise = null;
+                });
+            await this._refreshClaudeSelectionPromise;
+            const pending = this._refreshClaudeSelectionPendingOptions;
+            this._refreshClaudeSelectionPendingOptions = null;
+            if (pending) {
+                return this.refreshClaudeSelectionFromSettings(pending);
             }
         },
 

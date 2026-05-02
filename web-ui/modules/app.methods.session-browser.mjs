@@ -455,6 +455,64 @@ export function createSessionBrowserMethods(options = {}) {
             await this.loadSessions();
         },
 
+        hasActiveSessionFilters() {
+            if (this.sessionFilterSource && this.sessionFilterSource !== 'all') return true;
+            if (this.sessionPathFilter) return true;
+            if (this.sessionQuery && isSessionQueryEnabled(this.sessionFilterSource)) return true;
+            if (this.sessionRoleFilter && this.sessionRoleFilter !== 'all') return true;
+            if (this.sessionTimePreset && this.sessionTimePreset !== 'all') return true;
+            return false;
+        },
+
+        getSessionFilterChips() {
+            const chips = [];
+            if (this.sessionFilterSource && this.sessionFilterSource !== 'all') {
+                const label = this.sessionFilterSource === 'codex'
+                    ? this.t('sessions.source.codex')
+                    : (this.sessionFilterSource === 'claude'
+                        ? this.t('sessions.source.claudeCode')
+                        : (this.sessionFilterSource === 'gemini'
+                            ? this.t('sessions.source.gemini')
+                            : (this.sessionFilterSource === 'codebuddy' ? this.t('sessions.source.codebuddy') : this.sessionFilterSource)));
+                chips.push({ key: 'source', title: this.t('sessions.filters.source'), value: label });
+            }
+            if (this.sessionPathFilter) {
+                chips.push({ key: 'path', title: this.t('sessions.filters.path'), value: this.sessionPathFilter });
+            }
+            if (this.sessionQuery && isSessionQueryEnabled(this.sessionFilterSource)) {
+                chips.push({ key: 'query', title: this.t('sessions.filters.keyword'), value: this.sessionQuery });
+            }
+            if (this.sessionRoleFilter && this.sessionRoleFilter !== 'all') {
+                const label = this.sessionRoleFilter === 'user'
+                    ? this.t('sessions.role.user')
+                    : (this.sessionRoleFilter === 'assistant'
+                        ? this.t('sessions.role.assistant')
+                        : (this.sessionRoleFilter === 'system' ? this.t('sessions.role.system') : this.sessionRoleFilter));
+                chips.push({ key: 'role', title: this.t('sessions.filters.role'), value: label });
+            }
+            if (this.sessionTimePreset && this.sessionTimePreset !== 'all') {
+                const label = this.sessionTimePreset === '7d'
+                    ? this.t('sessions.time.7d')
+                    : (this.sessionTimePreset === '30d'
+                        ? this.t('sessions.time.30d')
+                        : (this.sessionTimePreset === '90d' ? this.t('sessions.time.90d') : this.sessionTimePreset));
+                chips.push({ key: 'time', title: this.t('sessions.filters.time'), value: label });
+            }
+            return chips;
+        },
+
+        async clearSessionFilterChip(key) {
+            const normalized = typeof key === 'string' ? key.trim().toLowerCase() : '';
+            if (normalized === 'source') this.sessionFilterSource = 'all';
+            if (normalized === 'path') this.sessionPathFilter = '';
+            if (normalized === 'query') this.sessionQuery = '';
+            if (normalized === 'role') this.sessionRoleFilter = 'all';
+            if (normalized === 'time') this.sessionTimePreset = 'all';
+            this.persistSessionFilterCache();
+            syncSessionsFilterUrl(this);
+            await this.loadSessions();
+        },
+
         async clearSessionFilters() {
             this.sessionFilterSource = 'all';
             this.sessionPathFilter = '';
@@ -686,7 +744,8 @@ export function createSessionBrowserMethods(options = {}) {
                 const res = await api('session-plain', {
                     source: sessionSnapshot.source,
                     sessionId: sessionSnapshot.sessionId,
-                    filePath: sessionSnapshot.filePath
+                    filePath: sessionSnapshot.filePath,
+                    maxMessages: sessionSnapshot.maxMessages || 50
                 });
 
                 if (requestSeq !== this.sessionStandaloneRequestSeq) {
