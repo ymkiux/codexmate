@@ -1,0 +1,152 @@
+                <div
+                    v-show="mainTab === 'svn'"
+                    class="mode-content"
+                    id="panel-svn"
+                    role="tabpanel"
+                    aria-labelledby="tab-svn">
+                    <div class="svn-log-browser-layout">
+                        <div class="svn-log-browser-card">
+                            <div class="svn-log-browser-card-head">
+                                <div>
+                                    <div class="svn-log-browser-card-title">{{ t('plugins.svnLogBrowser.config.title') }}</div>
+                                    <div class="plugins-panel-note">{{ t('plugins.svnLogBrowser.remember') }}</div>
+                                </div>
+                                <span class="pill configured">{{ t('plugins.svnLogBrowser.config.badge') }}</span>
+                            </div>
+
+                            <label class="form-label">{{ t('plugins.svnLogBrowser.fields.url') }}</label>
+                            <input
+                                ref="svnLogBrowserUrlInput"
+                                class="form-input mono"
+                                type="text"
+                                v-model.trim="svnLogBrowserUrl"
+                                :placeholder="t('plugins.svnLogBrowser.placeholders.url')"
+                                spellcheck="false"
+                                autocomplete="off">
+
+                            <div class="svn-log-browser-cred-row">
+                                <div>
+                                    <label class="form-label">{{ t('plugins.svnLogBrowser.fields.username') }}</label>
+                                    <input
+                                        class="form-input mono"
+                                        type="text"
+                                        v-model.trim="svnLogBrowserUsername"
+                                        :placeholder="t('plugins.svnLogBrowser.placeholders.username')"
+                                        spellcheck="false"
+                                        autocomplete="username">
+                                </div>
+                                <div>
+                                    <label class="form-label">{{ t('plugins.svnLogBrowser.fields.password') }}</label>
+                                    <input
+                                        class="form-input mono"
+                                        type="password"
+                                        v-model="svnLogBrowserPassword"
+                                        :placeholder="t('plugins.svnLogBrowser.placeholders.password')"
+                                        spellcheck="false"
+                                        autocomplete="current-password">
+                                </div>
+                            </div>
+
+                            <div class="svn-log-browser-cred-actions">
+                                <label class="svn-log-browser-toggle">
+                                    <input type="checkbox" v-model="svnLogBrowserRemember" @change="persistSvnLogBrowserPrefs">
+                                    <span>{{ t('plugins.svnLogBrowser.remember') }}</span>
+                                </label>
+                            </div>
+
+                            <div class="svn-log-browser-ctrl-row">
+                                <div>
+                                    <label class="form-label">{{ t('plugins.svnLogBrowser.fields.pageSize') }}</label>
+                                    <input
+                                        class="form-input mono"
+                                        type="number"
+                                        min="1"
+                                        max="200"
+                                        v-model.trim="svnLogBrowserPageSizeInput"
+                                        @change="normalizeSvnLogBrowserPageSize">
+                                </div>
+                                <div>
+                                    <label class="form-label">{{ t('plugins.svnLogBrowser.fields.pathFilter') }}</label>
+                                    <input
+                                        class="form-input mono"
+                                        type="text"
+                                        v-model.trim="svnLogBrowserPathFilter"
+                                        :placeholder="t('plugins.svnLogBrowser.placeholders.pathFilter')"
+                                        spellcheck="false"
+                                        autocomplete="off">
+                                    <div class="plugins-panel-note">{{ t('plugins.svnLogBrowser.hints.pathFilter') }}</div>
+                                </div>
+                            </div>
+
+                            <div class="prompt-editor-actions">
+                                <button type="button" class="btn-mini" @click="loadSvnLogBrowser({ resetPage: true })" :disabled="loading || !!initError || svnLogBrowserLoading">{{ t('plugins.svnLogBrowser.actions.load') }}</button>
+                                <button type="button" class="btn-mini delete" @click="clearSvnLogBrowser" :disabled="loading || !!initError || svnLogBrowserLoading">{{ t('plugins.svnLogBrowser.actions.clear') }}</button>
+                            </div>
+
+                            <div v-if="svnLogBrowserError" class="form-hint form-error">{{ svnLogBrowserError }}</div>
+                            <div v-else-if="svnLogBrowserCacheHit !== null" class="form-hint">
+                                {{ svnLogBrowserCacheHit ? t('plugins.svnLogBrowser.cache.hit') : t('plugins.svnLogBrowser.cache.miss') }}
+                            </div>
+                        </div>
+
+                        <div class="svn-log-browser-card">
+                            <div class="svn-log-browser-card-head svn-log-browser-card-head-row">
+                                <div>
+                                    <div class="svn-log-browser-card-title">{{ t('plugins.svnLogBrowser.info.title') }}</div>
+                                    <div v-if="svnLogBrowserInfo" class="plugins-panel-note">
+                                        <span class="mono">{{ svnLogBrowserInfo.repositoryRoot }}</span>
+                                    </div>
+                                </div>
+                                <div class="prompt-editor-actions">
+                                    <button type="button" class="btn-mini" @click="loadSvnLogBrowserInfo" :disabled="loading || !!initError || svnLogBrowserLoading">{{ t('common.refresh') }}</button>
+                                </div>
+                            </div>
+
+                            <div v-if="svnLogBrowserInfo" class="svn-log-browser-info-grid">
+                                <div class="svn-log-browser-info-row">
+                                    <div class="svn-log-browser-info-key mono">path</div>
+                                    <div class="svn-log-browser-info-value mono">{{ svnLogBrowserInfo.relativePath }}</div>
+                                </div>
+                                <div class="svn-log-browser-info-row">
+                                    <div class="svn-log-browser-info-key mono">rev</div>
+                                    <div class="svn-log-browser-info-value mono">{{ svnLogBrowserInfo.revision }}</div>
+                                </div>
+                            </div>
+
+                            <div class="svn-log-browser-results-head">
+                                <input
+                                    class="form-input mono"
+                                    type="text"
+                                    v-model.trim="svnLogBrowserKeyword"
+                                    :placeholder="t('plugins.svnLogBrowser.placeholders.search')"
+                                    spellcheck="false"
+                                    autocomplete="off">
+                                <div class="svn-log-browser-pager">
+                                    <button type="button" class="btn-mini" @click="loadSvnLogBrowser({ pageDelta: -1 })" :disabled="svnLogBrowserLoading || svnLogBrowserPage <= 1">{{ t('common.prev') }}</button>
+                                    <div class="svn-log-browser-page-label mono">{{ t('plugins.svnLogBrowser.page', { page: svnLogBrowserPage }) }}</div>
+                                    <button type="button" class="btn-mini" @click="loadSvnLogBrowser({ pageDelta: 1 })" :disabled="svnLogBrowserLoading || !svnLogBrowserHasMore">{{ t('common.next') }}</button>
+                                </div>
+                            </div>
+
+                            <div v-if="svnLogBrowserLoading" class="skills-empty-state">{{ t('common.loading') }}</div>
+                            <div v-else-if="!svnLogBrowserFilteredItems.length" class="skills-empty-state">{{ t('plugins.svnLogBrowser.empty') }}</div>
+                            <div v-else class="svn-log-browser-list" role="list">
+                                <div v-for="item in svnLogBrowserFilteredItems" :key="'svn-log-' + item.revision" class="svn-log-browser-item">
+                                    <div class="svn-log-browser-item-head">
+                                        <div class="svn-log-browser-item-rev mono">r{{ item.revision }}</div>
+                                        <div class="svn-log-browser-item-author mono">{{ item.author || '—' }}</div>
+                                        <div class="svn-log-browser-item-date mono">{{ item.date || '—' }}</div>
+                                    </div>
+                                    <div class="svn-log-browser-item-message">{{ item.message || '—' }}</div>
+                                    <div v-if="item.paths && item.paths.length" class="svn-log-browser-item-paths">
+                                        <div v-for="(p, idx) in item.paths" :key="'svn-log-path-' + item.revision + '-' + idx" class="svn-log-browser-item-path mono">
+                                            <span class="svn-log-browser-item-action">{{ p.action }}</span>
+                                            <span class="svn-log-browser-item-path-text">{{ p.path }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+

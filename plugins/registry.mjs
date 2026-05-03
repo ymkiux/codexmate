@@ -1,4 +1,4 @@
-import { pluginMeta as promptTemplatesMeta } from './prompt-templates/manifest.mjs';
+import { promptTemplatesPluginMeta as promptTemplatesMeta } from './prompt-templates/manifest.mjs';
 import { loadPromptTemplatesOverview } from './prompt-templates/overview.mjs';
 
 export const pluginsRegistry = [

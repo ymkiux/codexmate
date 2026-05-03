@@ -103,9 +103,11 @@ function renderTemplate(templateText, values = {}) {
 }
 
 import { pluginsRegistry } from '../registry.mjs';
+import { createSvnLogBrowserComputed } from '../../web-ui/modules/svn-log-browser.computed.mjs';
 
 export function createPluginsComputed() {
     return {
+        ...createSvnLogBrowserComputed(),
         pluginsCatalog() {
             return pluginsRegistry.map((entry) => entry && entry.meta).filter(Boolean);
         },

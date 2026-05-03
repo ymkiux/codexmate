@@ -487,8 +487,8 @@
 }
 
 .usage-gh-heatmap {
-    --usage-heat-cell: 11px;
-    --usage-heat-gap: 3px;
+    --usage-heat-cell: 10px;
+    --usage-heat-gap: 2px;
     --usage-heat-week: calc(var(--usage-heat-cell) + var(--usage-heat-gap));
     --usage-heat-axis: 28px;
     margin-top: 6px;

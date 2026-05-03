@@ -1,6 +1,6 @@
 import { pluginOwnership } from './ownership.mjs';
 
-const baseMeta = {
+const promptTemplatesBaseMeta = {
     id: 'prompt-templates',
     title: 'Prompt Templates',
     description: 'Standardized, template-driven prompts with variables and copy/export helpers.',
@@ -8,8 +8,8 @@ const baseMeta = {
     tone: 'configured'
 };
 
-export const pluginMeta = {
-    ...baseMeta,
+export const promptTemplatesPluginMeta = {
+    ...promptTemplatesBaseMeta,
     createdBy: pluginOwnership && typeof pluginOwnership.createdBy === 'string' ? pluginOwnership.createdBy : '',
     maintainers: pluginOwnership && Array.isArray(pluginOwnership.maintainers) ? pluginOwnership.maintainers : []
 };

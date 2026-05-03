@@ -40,6 +40,8 @@ module.exports = async function testWebUiAssets(ctx) {
     );
     assert(rootPage.body.includes('id="panel-market"'), 'root web ui page should inline market panel');
     assert(rootPage.body.includes('class="modal modal-wide skills-modal"'), 'root web ui page should inline skills modal');
+    assert(rootPage.body.includes('id="tab-svn"'), 'root web ui page should include svn top tab');
+    assert(rootPage.body.includes('id="panel-svn"'), 'root web ui page should include svn panel');
     assert(rootPage.body.includes('src="/web-ui/app.js"'), 'root web ui page should point to the absolute app entry');
     assert(!rootPage.body.includes('src="web-ui/app.js"'), 'root web ui page should not use a relative app entry');
     assert(!/<!--\s*@include\s+/.test(rootPage.body), 'root web ui page should not leak include directives');
@@ -56,6 +58,8 @@ module.exports = async function testWebUiAssets(ctx) {
         bundledIndex.body.includes('src="/res/vue.global.prod.js"'),
         '/web-ui/index.html should use the production Vue browser build'
     );
+    assert(bundledIndex.body.includes('id="tab-svn"'), '/web-ui/index.html should include svn top tab');
+    assert(bundledIndex.body.includes('id="panel-svn"'), '/web-ui/index.html should include svn panel');
     assert(
         !bundledIndex.body.includes('src="/res/runtime.global.prod.js"'),
         '/web-ui/index.html should not use the runtime-only Vue build'
@@ -85,6 +89,7 @@ module.exports = async function testWebUiAssets(ctx) {
         !/(?:^|\n)\s*export\s+\*\s+from\s+['"]\.[^'"]+['"]\s*;?/.test(appEntry.body),
         'app entry should not leak split re-export directives'
     );
+    assert(appEntry.body.includes('svn-info'), 'app entry should include svn api action');
 
     const logicEntry = await getText(port, '/web-ui/logic.mjs');
     assert(logicEntry.statusCode === 200, 'logic entry should return 200');

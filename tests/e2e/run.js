@@ -29,6 +29,7 @@ const testTaskOrchestration = require('./test-task-orchestration');
 const testInvalidConfig = require('./test-invalid-config');
 const testWebUiAssets = require('./test-web-ui-assets');
 const testWebUiSessionBrowser = require('./test-web-ui-session-browser');
+const testPluginSvnLogBrowser = require('./test-plugin-svn-log-browser');
 
 async function main() {
     const realHome = os.homedir();
@@ -142,6 +143,7 @@ async function main() {
         await testTaskOrchestration(ctx);
         await testWebUiAssets(ctx);
         await testWebUiSessionBrowser(ctx);
+        await testPluginSvnLogBrowser(ctx);
 
     } finally {
         const waitForExit = new Promise((resolve) => {
