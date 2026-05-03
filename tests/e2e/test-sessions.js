@@ -3,6 +3,15 @@ const fs = require('fs');
 const { pathToFileURL } = require('url');
 const { assert } = require('./helpers');
 
+function findCodexSessionsRoot(tmpHome, filePath) {
+    const normalized = String(filePath || '');
+    const roots = [
+        path.join(tmpHome, '.codex', 'sessions'),
+        path.join(tmpHome, '.config', 'codex', 'sessions')
+    ];
+    return roots.find((root) => normalized === root || normalized.startsWith(root + path.sep)) || '';
+}
+
 module.exports = async function testSessions(ctx) {
     const { api, sessionId, tmpHome, claudeSessionId, sessionPath, claudeSessionPath, geminiSessionId, geminiSessionPath } = ctx;
     const buildTimestamp = (baseIso, offsetSeconds) => new Date(Date.parse(baseIso) + (offsetSeconds * 1000)).toISOString();
@@ -154,7 +163,9 @@ module.exports = async function testSessions(ctx) {
         assert(cloneResult.filePath && cloneResult.filePath.endsWith('.jsonl'), 'clone-session file path invalid');
         const cloneFileBase = path.basename(cloneResult.filePath);
         assert(new RegExp(`^rollout-\\d{4}-\\d{2}-\\d{2}T\\d{2}-\\d{2}-\\d{2}-${cloneResult.sessionId}\\.jsonl$`, 'i').test(cloneFileBase), 'clone-session file should use codex rollout filename');
-        assert(path.relative(path.join(tmpHome, '.codex', 'sessions'), cloneResult.filePath).split(path.sep).length === 4, 'clone-session file should live under codex date directory');
+        const cloneCodexSessionsRoot = findCodexSessionsRoot(tmpHome, cloneResult.filePath);
+        assert(cloneCodexSessionsRoot, 'clone-session file should live under a supported codex sessions root');
+        assert(path.relative(cloneCodexSessionsRoot, cloneResult.filePath).split(path.sep).length === 4, 'clone-session file should live under codex date directory');
         assert(cloneResult.filePath && require('fs').existsSync(cloneResult.filePath), 'clone-session file missing');
         cloneSessionId = cloneResult.sessionId;
         ctx.cloneSessionId = cloneResult.sessionId;

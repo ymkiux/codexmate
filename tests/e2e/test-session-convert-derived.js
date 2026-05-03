@@ -32,6 +32,15 @@ function isCodexSessionPath(tmpHome, filePath) {
         || normalized.startsWith(path.join(tmpHome, '.config', 'codex', 'sessions') + path.sep);
 }
 
+function findCodexSessionsRoot(tmpHome, filePath) {
+    const normalized = String(filePath || '');
+    const roots = [
+        path.join(tmpHome, '.codex', 'sessions'),
+        path.join(tmpHome, '.config', 'codex', 'sessions')
+    ];
+    return roots.find((root) => normalized === root || normalized.startsWith(root + path.sep)) || '';
+}
+
 function isClaudeProjectPath(tmpHome, filePath) {
     const normalized = String(filePath || '');
     return normalized.startsWith(path.join(tmpHome, '.claude', 'projects') + path.sep)
@@ -80,7 +89,9 @@ async function convertAndAssertListed(api, tmpHome, source, target, params = {},
         assert(UUID_RE.test(sessionId), 'derived codex session id should be a codex-resumable uuid');
         const cloneFileBase = path.basename(outPath);
         assert(new RegExp(`^rollout-\\d{4}-\\d{2}-\\d{2}T\\d{2}-\\d{2}-\\d{2}-${sessionId}\\.jsonl$`, 'i').test(cloneFileBase), 'derived codex session file should use codex rollout filename');
-        assert(path.relative(path.join(tmpHome, '.codex', 'sessions'), outPath).split(path.sep).length === 4, 'derived codex session file should live under codex date directory');
+        const codexSessionsRoot = findCodexSessionsRoot(tmpHome, outPath);
+        assert(codexSessionsRoot, 'derived codex session file should live under a supported codex sessions root');
+        assert(path.relative(codexSessionsRoot, outPath).split(path.sep).length === 4, 'derived codex session file should live under codex date directory');
     } else if (target === 'claude') {
         assert(isClaudeProjectPath(tmpHome, outPath), 'derived claude session path should stay inside ~/.claude/projects or ~/.config/claude/projects');
         const sessionId = res.session && typeof res.session.sessionId === 'string' ? res.session.sessionId : '';
