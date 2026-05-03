@@ -19,12 +19,18 @@ function createWebUiVm(appOptions) {
 }
 
 module.exports = async function testSessionResumeCommands(ctx) {
-    const { api, claudeSessionId, geminiSessionId, claudeSessionPath, geminiSessionPath } = ctx;
+    const { api, sessionId, claudeSessionId, geminiSessionId, claudeSessionPath, geminiSessionPath } = ctx;
 
     const helperPath = path.resolve(__dirname, '..', 'unit', 'helpers', 'web-ui-app-options.mjs');
     const { captureCurrentBundledAppOptions } = await import(pathToFileURL(helperPath).href);
     const appOptions = await captureCurrentBundledAppOptions();
     const vm = createWebUiVm(appOptions);
+
+    const codexSessions = await api('list-sessions', { source: 'codex', limit: 50, forceRefresh: true });
+    const codexEntry = (codexSessions.sessions || []).find((item) => item && item.sessionId === sessionId);
+    assert(codexEntry, 'resume e2e missing codex session entry');
+    assert(vm.isResumeCommandAvailable(codexEntry) === true, 'codex session should allow resume command');
+    assert(vm.buildResumeCommand.call({ ...vm, sessionResumeWithYolo: false }, codexEntry) === `codex resume ${sessionId}`, 'codex resume command mismatch');
 
     const claudeSessions = await api('list-sessions', { source: 'claude', limit: 50, forceRefresh: true });
     const claudeEntry = (claudeSessions.sessions || []).find((item) => item && item.sessionId === claudeSessionId);
@@ -46,4 +52,3 @@ module.exports = async function testSessionResumeCommands(ctx) {
     assert(vm.isResumeCommandAvailable(geminiNoId) === true, 'gemini should allow resume from filePath');
     assert(vm.buildResumeCommand.call({ ...vm, sessionResumeWithYolo: true }, geminiNoId) === `gemini -r ${geminiSessionId}`, 'gemini resume command should be generated from filePath');
 };
-

@@ -80,7 +80,21 @@ export function createCodexConfigMethods(options = {}) {
             }
         },
 
+        isConvertAvailable(session) {
+            if (!session) return false;
+            const source = normalizeSessionConvertSource(session && session.source ? session.source : '');
+            const target = getConvertTargetSource(source);
+            if (!source || !target) return false;
+            const sessionId = typeof session.sessionId === 'string' ? session.sessionId.trim() : '';
+            const filePath = typeof session.filePath === 'string' ? session.filePath.trim() : '';
+            return !!sessionId || !!filePath;
+        },
+
         async convertSession(session) {
+            if (!this.isConvertAvailable(session)) {
+                this.showMessage('不支持此操作', 'error');
+                return;
+            }
             const source = normalizeSessionConvertSource(session && session.source ? session.source : '');
             const target = getConvertTargetSource(source);
             if (!source || !target) {

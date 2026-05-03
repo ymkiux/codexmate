@@ -1,7 +1,21 @@
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const { pathToFileURL } = require('url');
 const { assert } = require('./helpers');
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function createWebUiVm(appOptions) {
+    const vm = {
+        ...(typeof appOptions.data === 'function' ? appOptions.data() : {}),
+        $refs: {}
+    };
+    for (const [name, fn] of Object.entries(appOptions.methods || {})) {
+        vm[name] = fn;
+    }
+    return vm;
+}
 
 function sha256File(filePath) {
     const buf = fs.readFileSync(filePath);
@@ -16,6 +30,15 @@ function isCodexSessionPath(tmpHome, filePath) {
     const normalized = String(filePath || '');
     return normalized.startsWith(path.join(tmpHome, '.codex', 'sessions') + path.sep)
         || normalized.startsWith(path.join(tmpHome, '.config', 'codex', 'sessions') + path.sep);
+}
+
+function findCodexSessionsRoot(tmpHome, filePath) {
+    const normalized = String(filePath || '');
+    const roots = [
+        path.join(tmpHome, '.codex', 'sessions'),
+        path.join(tmpHome, '.config', 'codex', 'sessions')
+    ];
+    return roots.find((root) => normalized === root || normalized.startsWith(root + path.sep)) || '';
 }
 
 function isClaudeProjectPath(tmpHome, filePath) {
@@ -53,6 +76,41 @@ function writeCodexSession(filePath, sessionId, messages, options = {}) {
     fs.writeFileSync(filePath, records.map((r) => JSON.stringify(r)).join('\n') + '\n', 'utf-8');
 }
 
+function readJsonlRecords(filePath) {
+    return fs.readFileSync(filePath, 'utf-8')
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => JSON.parse(line));
+}
+
+function assertCodexNativeMessageContent(filePath) {
+    const records = readJsonlRecords(filePath);
+    const messages = records.filter((record) => record && record.type === 'response_item' && record.payload && record.payload.type === 'message');
+    assert(messages.length > 0, 'derived codex file should contain message records');
+    for (const record of messages) {
+        const role = record.payload.role;
+        const content = record.payload.content;
+        assert(Array.isArray(content), 'derived codex message content should use native typed content array');
+        assert(content.length === 1, 'derived codex message content should contain one text item');
+        assert(content[0].type === (role === 'assistant' ? 'output_text' : 'input_text'), 'derived codex message content type mismatch');
+        assert(typeof content[0].text === 'string' && content[0].text, 'derived codex message text missing');
+    }
+}
+
+function assertClaudeNativeMessageContent(filePath) {
+    const records = readJsonlRecords(filePath);
+    assert(records.length > 0, 'derived claude file should contain message records');
+    for (const record of records) {
+        assert(record.uuid && typeof record.uuid === 'string', 'derived claude record should include uuid');
+        assert(Object.prototype.hasOwnProperty.call(record, 'parentUuid'), 'derived claude record should include parentUuid');
+        assert(record.message && record.message.role, 'derived claude message role missing');
+        const content = record.message.content;
+        assert(Array.isArray(content), 'derived claude message content should use native typed content array');
+        assert(content.length === 1 && content[0].type === 'text' && typeof content[0].text === 'string' && content[0].text, 'derived claude message text missing');
+    }
+}
+
 async function convertAndAssertListed(api, tmpHome, source, target, params = {}, options = {}) {
     const res = await api('convert-session', { source, target, ...params });
     assert(!res.error, `convert-session ${source}->${target} failed: ${res.error || ''}`);
@@ -62,8 +120,18 @@ async function convertAndAssertListed(api, tmpHome, source, target, params = {},
     assert(fs.existsSync(derivedMetaPath(outPath)), `derived ${target} meta missing`);
     if (target === 'codex') {
         assert(isCodexSessionPath(tmpHome, outPath), 'derived codex session path should stay inside ~/.codex or ~/.config/codex');
+        const sessionId = res.session && typeof res.session.sessionId === 'string' ? res.session.sessionId : '';
+        assert(UUID_RE.test(sessionId), 'derived codex session id should be a codex-resumable uuid');
+        const cloneFileBase = path.basename(outPath);
+        assert(new RegExp(`^rollout-\\d{4}-\\d{2}-\\d{2}T\\d{2}-\\d{2}-\\d{2}-${sessionId}\\.jsonl$`, 'i').test(cloneFileBase), 'derived codex session file should use codex rollout filename');
+        const codexSessionsRoot = findCodexSessionsRoot(tmpHome, outPath);
+        assert(codexSessionsRoot, 'derived codex session file should live under a supported codex sessions root');
+        assert(path.relative(codexSessionsRoot, outPath).split(path.sep).length === 4, 'derived codex session file should live under codex date directory');
     } else if (target === 'claude') {
         assert(isClaudeProjectPath(tmpHome, outPath), 'derived claude session path should stay inside ~/.claude/projects or ~/.config/claude/projects');
+        const sessionId = res.session && typeof res.session.sessionId === 'string' ? res.session.sessionId : '';
+        assert(UUID_RE.test(sessionId), 'derived claude session id should be a claude-resumable uuid');
+        assert(path.basename(outPath) === `${sessionId}.jsonl`, 'derived claude session file should use session uuid filename');
     } else {
         assert(
             outPath.startsWith(path.join(tmpHome, '.codexmate', 'sessions', 'derived', target) + path.sep),
@@ -90,28 +158,36 @@ module.exports = async function testSessionConvertDerived(ctx) {
     } = ctx;
 
     const beforeHash = sha256File(sessionPath);
+    const helperPath = path.resolve(__dirname, '..', 'unit', 'helpers', 'web-ui-app-options.mjs');
+    const { captureCurrentBundledAppOptions } = await import(pathToFileURL(helperPath).href);
+    const appOptions = await captureCurrentBundledAppOptions();
+    const vm = createWebUiVm(appOptions);
 
-    const { outPath: derivedClaudePath } = await convertAndAssertListed(api, tmpHome, 'codex', 'claude', {
+    const { res: derivedClaudeRes, outPath: derivedClaudePath } = await convertAndAssertListed(api, tmpHome, 'codex', 'claude', {
         sessionId,
         maxMessages: 'all'
     });
+    assert(vm.buildResumeCommand.call({ ...vm, sessionResumeWithYolo: false }, derivedClaudeRes.session) === `claude -r ${derivedClaudeRes.session.sessionId}`, 'codex->claude derived resume command mismatch');
 
     const detailClaude = await api('session-detail', { source: 'claude', filePath: derivedClaudePath, maxMessages: 50 });
     assert(Array.isArray(detailClaude.messages), 'session-detail(derived claude) missing messages');
     assert(detailClaude.messages.length === 2, 'session-detail(derived claude) should keep exact short length');
     assert(detailClaude.messages[0].text === 'hello', 'session-detail(derived claude) user text mismatch');
     assert(detailClaude.messages[1].text === 'world', 'session-detail(derived claude) assistant text mismatch');
+    assertClaudeNativeMessageContent(derivedClaudePath);
 
-    const { outPath: derivedCodexPath } = await convertAndAssertListed(api, tmpHome, 'claude', 'codex', {
+    const { res: derivedCodexRes, outPath: derivedCodexPath } = await convertAndAssertListed(api, tmpHome, 'claude', 'codex', {
         filePath: derivedClaudePath,
         maxMessages: 'all'
     });
+    assert(vm.buildResumeCommand.call({ ...vm, sessionResumeWithYolo: false }, derivedCodexRes.session) === `codex resume ${derivedCodexRes.session.sessionId}`, 'claude->codex derived resume command mismatch');
 
     const detailCodex = await api('session-detail', { source: 'codex', filePath: derivedCodexPath, maxMessages: 50 });
     assert(Array.isArray(detailCodex.messages), 'session-detail(derived codex) missing messages');
     assert(detailCodex.messages.length === 2, 'session-detail(derived codex) should keep exact short length');
     assert(detailCodex.messages[0].text === 'hello', 'session-detail(derived codex) user text mismatch');
     assert(detailCodex.messages[1].text === 'world', 'session-detail(derived codex) assistant text mismatch');
+    assertCodexNativeMessageContent(derivedCodexPath);
 
     const { outPath: derivedClaudePath2 } = await convertAndAssertListed(api, tmpHome, 'codex', 'claude', {
         sessionId,
@@ -139,15 +215,17 @@ module.exports = async function testSessionConvertDerived(ctx) {
 
     if (claudeSessionId && claudeSessionPath) {
         const beforeClaudeHash = sha256File(claudeSessionPath);
-        const { outPath: claudeDerivedCodexPath } = await convertAndAssertListed(api, tmpHome, 'claude', 'codex', {
+        const { res: claudeDerivedCodexRes, outPath: claudeDerivedCodexPath } = await convertAndAssertListed(api, tmpHome, 'claude', 'codex', {
             sessionId: claudeSessionId,
             maxMessages: 'all'
         });
+        assert(vm.buildResumeCommand.call({ ...vm, sessionResumeWithYolo: false }, claudeDerivedCodexRes.session) === `codex resume ${claudeDerivedCodexRes.session.sessionId}`, 'source claude->codex derived resume command mismatch');
         const detail = await api('session-detail', { source: 'codex', filePath: claudeDerivedCodexPath, maxMessages: 50 });
         const texts = (detail.messages || []).map((m) => m.text);
         assert(texts.length === 2, 'claude derived codex session should keep message count');
         assert(texts[0] === 'hello from claude code session', 'claude derived codex user text mismatch');
         assert(texts[1] === 'initialized project', 'claude derived codex assistant text mismatch');
+        assertCodexNativeMessageContent(claudeDerivedCodexPath);
         assert(sha256File(claudeSessionPath) === beforeClaudeHash, 'claude source session should remain unchanged after conversion');
     }
 

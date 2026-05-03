@@ -5173,7 +5173,12 @@ function resolveSessionFilePath(source, filePath, sessionId) {
                 files.push(...collectJsonlFiles(rootPath, 5000));
                 if (files.length >= 5000) break;
             }
-            matchedFile = files.find(item => path.basename(item, '.jsonl').toLowerCase() === targetId) || '';
+            const codexRolloutId = normalizedSource === 'codex'
+                && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(targetId);
+            matchedFile = files.find((item) => {
+                const baseName = path.basename(item, '.jsonl').toLowerCase();
+                return baseName === targetId || (codexRolloutId && baseName.endsWith(`-${targetId}`));
+            }) || '';
         }
         if (matchedFile && fs.existsSync(matchedFile)) {
             return matchedFile;
@@ -6116,23 +6121,47 @@ async function deleteSessionData(params = {}) {
 
 function generateCloneSessionId() {
     if (crypto.randomUUID) {
-        return `clone-${crypto.randomUUID()}`;
+        return crypto.randomUUID();
     }
-    const timePart = Date.now().toString(36);
-    const randomPart = crypto.randomBytes(8).toString('hex');
-    return `clone-${timePart}-${randomPart}`;
+    const bytes = crypto.randomBytes(16);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = bytes.toString('hex');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-function allocateCloneSessionTarget(dirPath) {
+function formatCodexRolloutTimestamp(value = Date.now()) {
+    const stamp = new Date(value);
+    const year = String(stamp.getFullYear());
+    const month = String(stamp.getMonth() + 1).padStart(2, '0');
+    const day = String(stamp.getDate()).padStart(2, '0');
+    const hour = String(stamp.getHours()).padStart(2, '0');
+    const minute = String(stamp.getMinutes()).padStart(2, '0');
+    const second = String(stamp.getSeconds()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hour}-${minute}-${second}`;
+}
+
+function getCodexRolloutDateDir(rootDir, value = Date.now()) {
+    const stamp = new Date(value);
+    const year = String(stamp.getFullYear());
+    const month = String(stamp.getMonth() + 1).padStart(2, '0');
+    const day = String(stamp.getDate()).padStart(2, '0');
+    return path.join(rootDir, year, month, day);
+}
+
+function allocateCloneSessionTarget(dirPath, value = Date.now()) {
+    const targetDir = getCodexRolloutDateDir(dirPath, value);
+    ensureDir(targetDir);
+    const rolloutTimestamp = formatCodexRolloutTimestamp(value);
     for (let attempt = 0; attempt < 6; attempt += 1) {
         const sessionId = generateCloneSessionId();
-        const filePath = path.join(dirPath, `${sessionId}.jsonl`);
+        const filePath = path.join(targetDir, `rollout-${rolloutTimestamp}-${sessionId}.jsonl`);
         if (!fs.existsSync(filePath)) {
             return { sessionId, filePath };
         }
     }
-    const fallbackId = `clone-${Date.now().toString(36)}-${crypto.randomBytes(8).toString('hex')}`;
-    return { sessionId: fallbackId, filePath: path.join(dirPath, `${fallbackId}.jsonl`) };
+    const fallbackId = generateCloneSessionId();
+    return { sessionId: fallbackId, filePath: path.join(targetDir, `rollout-${rolloutTimestamp}-${fallbackId}.jsonl`) };
 }
 
 function parseTimestampMs(value) {
@@ -6214,11 +6243,12 @@ async function cloneCodexSession(params = {}) {
 
     const sessionsDir = getCodexSessionsDir();
     ensureDir(sessionsDir);
-    const target = allocateCloneSessionTarget(sessionsDir);
+    const nowMs = Date.now();
+    const cloneTime = new Date(nowMs + 1);
+    const target = allocateCloneSessionTarget(sessionsDir, cloneTime);
     const newSessionId = target.sessionId;
     const newFilePath = target.filePath;
-    const offsetMs = maxTimestampMs ? (Date.now() - maxTimestampMs) : 0;
-    const cloneTime = new Date(Date.now() + 1);
+    const offsetMs = maxTimestampMs ? (nowMs - maxTimestampMs) : 0;
     const cloneIso = cloneTime.toISOString();
 
     const outputLines = [];
@@ -6332,6 +6362,53 @@ function buildSessionPlainText(messages) {
     }
 
     return lines.join('\n');
+}
+
+function buildCodexMessageContent(role, text) {
+    const normalizedRole = normalizeRole(role);
+    const contentType = normalizedRole === 'assistant' ? 'output_text' : 'input_text';
+    return [{ type: contentType, text: typeof text === 'string' ? text : '' }];
+}
+
+function buildClaudeMessageRecord({ role, text, sessionId, cwd, timestamp, uuid, parentUuid }) {
+    const normalizedRole = normalizeRole(role);
+    const safeText = typeof text === 'string' ? text : '';
+    const record = {
+        parentUuid: parentUuid || null,
+        isSidechain: false,
+        userType: 'external',
+        cwd,
+        sessionId,
+        version: 'codexmate-derived',
+        type: normalizedRole,
+        uuid,
+        timestamp
+    };
+
+    if (normalizedRole === 'assistant') {
+        record.message = {
+            id: `msg_${String(uuid || '').replace(/-/g, '')}`,
+            type: 'message',
+            role: 'assistant',
+            model: 'derived',
+            content: [{ type: 'text', text: safeText }],
+            stop_reason: 'end_turn',
+            stop_sequence: null,
+            usage: {
+                input_tokens: 0,
+                cache_creation_input_tokens: 0,
+                cache_read_input_tokens: 0,
+                output_tokens: 0
+            }
+        };
+    } else {
+        record.message = {
+            role: normalizedRole === 'system' ? 'system' : 'user',
+            content: [{ type: 'text', text: safeText }]
+        };
+    }
+
+    return record;
 }
 
 function getDerivedSessionMetaPath(filePath) {
@@ -6952,16 +7029,27 @@ async function convertSessionToDerived(params = {}) {
     }
 
     const baseSessionId = extracted.sessionId || params.sessionId || path.basename(filePath, '.jsonl');
-    const derivedSessionId = buildDerivedSessionId(baseSessionId);
+    let derivedSessionId = target === 'codex' || target === 'claude'
+        ? generateCloneSessionId()
+        : buildDerivedSessionId(baseSessionId);
     const sourceKey = buildSessionDerivedSourceKey(source, baseSessionId, filePath);
-    const outputDir = target === 'codex'
-        ? getCodexSessionsDir()
-        : (target === 'claude'
-            ? (resolveClaudeProjectDirForCwd(extracted.cwd || '') || path.join(getClaudeProjectsDir(), 'codexmate-derived'))
-            : buildDerivedSessionOutputDir(target, source, sourceKey));
+    let outputDir = target === 'claude'
+        ? (resolveClaudeProjectDirForCwd(extracted.cwd || '') || path.join(getClaudeProjectsDir(), 'codexmate-derived'))
+        : buildDerivedSessionOutputDir(target, source, sourceKey);
+    let outputPath = '';
+    if (target === 'codex') {
+        const targetSession = allocateCloneSessionTarget(getCodexSessionsDir(), Date.now());
+        derivedSessionId = targetSession.sessionId;
+        outputPath = targetSession.filePath;
+        outputDir = path.dirname(outputPath);
+    }
     ensureDir(outputDir);
-    const outputPath = path.join(outputDir, `${derivedSessionId}.jsonl`);
-    const metaPath = path.join(outputDir, `${derivedSessionId}.meta.json`);
+    if (!outputPath) {
+        outputPath = path.join(outputDir, `${derivedSessionId}.jsonl`);
+    }
+    const metaPath = outputPath.endsWith('.jsonl')
+        ? outputPath.replace(/\.jsonl$/, '.meta.json')
+        : path.join(outputDir, `${derivedSessionId}.meta.json`);
 
     const cwd = typeof extracted.cwd === 'string' ? extracted.cwd : '';
     const resolvedCwd = cwd ? path.resolve(expandHomePath(cwd)) : '';
@@ -6982,11 +7070,12 @@ async function convertSessionToDerived(params = {}) {
             lines.push(JSON.stringify({
                 type: 'response_item',
                 timestamp: toIsoTime(message.timestamp, '') || new Date(now + i).toISOString(),
-                payload: { type: 'message', role, content: text }
+                payload: { type: 'message', role, content: buildCodexMessageContent(role, text) }
             }));
         }
     } else {
         const claudeIndexPath = target === 'claude' ? path.join(outputDir, 'sessions-index.json') : '';
+        let parentUuid = null;
         for (let i = 0; i < messages.length; i += 1) {
             const message = messages[i];
             if (!message) continue;
@@ -6994,13 +7083,18 @@ async function convertSessionToDerived(params = {}) {
             if (role !== 'user' && role !== 'assistant' && role !== 'system') continue;
             const text = typeof message.text === 'string' ? message.text : '';
             if (!text) continue;
-            lines.push(JSON.stringify({
-                type: role,
-                timestamp: toIsoTime(message.timestamp, '') || new Date(now + i).toISOString(),
+            const messageUuid = generateCloneSessionId();
+            const timestamp = toIsoTime(message.timestamp, '') || new Date(now + i).toISOString();
+            lines.push(JSON.stringify(buildClaudeMessageRecord({
+                role,
+                text,
                 sessionId: derivedSessionId,
                 cwd,
-                message: { content: text }
-            }));
+                timestamp,
+                uuid: messageUuid,
+                parentUuid
+            })));
+            parentUuid = messageUuid;
         }
         if (claudeIndexPath) {
             ensureClaudeSessionsIndex(claudeIndexPath, resolvedCwd);
