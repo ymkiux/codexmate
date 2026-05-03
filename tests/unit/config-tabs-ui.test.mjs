@@ -290,10 +290,12 @@ test('config template keeps expected config tabs in top and side navigation', ()
         /:class="\['card', \{ active: currentOpenclawConfig === name \}\]"[\s\S]*@click="applyOpenclawConfig\(name\)"[\s\S]*@keydown\.enter\.self\.prevent="applyOpenclawConfig\(name\)"[\s\S]*@keydown\.space\.self\.prevent="applyOpenclawConfig\(name\)"[\s\S]*tabindex="0"[\s\S]*role="button"[\s\S]*:aria-current="currentOpenclawConfig === name \? 'true' : null"/
     );
     assert.match(html, /class="session-item-copy session-item-pin"/);
+    assert.doesNotMatch(sessionsPanel, /btn-session-clone/);
     assert.match(
         sessionsPanel,
-        /<button[\s\S]*?v-if="isCloneAvailable\(activeSession\)"[\s\S]*?class="btn-session-clone"[\s\S]*?@click="cloneSession\(activeSession\)"[\s\S]*?:disabled="!activeSession \|\| sessionsLoading \|\| sessionCloning\[getSessionExportKey\(activeSession\)\]"[\s\S]*?t\('sessions\.preview\.clone'\)[\s\S]*?<\/button>/
+        /<button[\s\S]*?class="btn-session-export"[\s\S]*?@click="convertSession\(activeSession\)"[\s\S]*?:disabled="!activeSession \|\| sessionsLoading \|\| !isConvertAvailable\(activeSession\) \|\| sessionConverting\[getSessionExportKey\(activeSession\)\]"[\s\S]*?t\('sessions\.preview\.convert'\)[\s\S]*?<\/button>/
     );
+    assert.doesNotMatch(sessionsPanel, /:disabled="true"/);
     assert.doesNotMatch(sessionsPanel, /sessionsViewMode/);
     assert.doesNotMatch(sessionsPanel, /sessionUsageSummaryCards/);
     assert.match(usagePanel, /sessionsUsageTimeRange === '7d'/);

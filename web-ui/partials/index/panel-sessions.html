@@ -207,14 +207,6 @@
                                             {{ sessionDetailLoading ? t('sessions.preview.loading') : t('sessions.preview.refresh') }}
                                         </button>
                                         <button
-                                            v-if="isCloneAvailable(activeSession)"
-                                            class="btn-session-clone"
-                                            @click="cloneSession(activeSession)"
-                                            :disabled="!activeSession || sessionsLoading || sessionCloning[getSessionExportKey(activeSession)]"
-                                            :title="t('sessions.preview.cloneTitle')">
-                                            {{ (activeSession && sessionCloning[getSessionExportKey(activeSession)]) ? t('sessions.preview.cloning') : t('sessions.preview.clone') }}
-                                        </button>
-                                        <button
                                             v-if="isDeleteAvailable(activeSession)"
                                             class="btn-session-delete"
                                             @click="deleteSession(activeSession)"
@@ -230,7 +222,7 @@
                                         <button
                                             class="btn-session-export"
                                             @click="convertSession(activeSession)"
-                                            :disabled="true">
+                                            :disabled="!activeSession || sessionsLoading || !isConvertAvailable(activeSession) || sessionConverting[getSessionExportKey(activeSession)]">
                                             {{ (activeSession && sessionConverting[getSessionExportKey(activeSession)]) ? t('sessions.preview.converting') : t('sessions.preview.convert') }}
                                         </button>
                                         <button

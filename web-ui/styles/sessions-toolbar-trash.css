@@ -248,7 +248,6 @@
 
 .btn-session-export,
 .btn-session-open,
-.btn-session-clone,
 .btn-session-refresh {
     border: 1px solid var(--color-border-soft);
     border-radius: var(--radius-sm);
@@ -305,17 +304,6 @@
     transform: none;
 }
 
-.btn-session-clone:hover {
-    border-color: var(--color-brand);
-    color: var(--color-brand);
-    transform: translateY(-1px);
-}
-
-.btn-session-clone:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none;
-}
 
 .btn-session-delete:hover {
     border-color: rgba(189, 70, 68, 0.8);
