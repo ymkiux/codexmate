@@ -76,6 +76,41 @@ function writeCodexSession(filePath, sessionId, messages, options = {}) {
     fs.writeFileSync(filePath, records.map((r) => JSON.stringify(r)).join('\n') + '\n', 'utf-8');
 }
 
+function readJsonlRecords(filePath) {
+    return fs.readFileSync(filePath, 'utf-8')
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => JSON.parse(line));
+}
+
+function assertCodexNativeMessageContent(filePath) {
+    const records = readJsonlRecords(filePath);
+    const messages = records.filter((record) => record && record.type === 'response_item' && record.payload && record.payload.type === 'message');
+    assert(messages.length > 0, 'derived codex file should contain message records');
+    for (const record of messages) {
+        const role = record.payload.role;
+        const content = record.payload.content;
+        assert(Array.isArray(content), 'derived codex message content should use native typed content array');
+        assert(content.length === 1, 'derived codex message content should contain one text item');
+        assert(content[0].type === (role === 'assistant' ? 'output_text' : 'input_text'), 'derived codex message content type mismatch');
+        assert(typeof content[0].text === 'string' && content[0].text, 'derived codex message text missing');
+    }
+}
+
+function assertClaudeNativeMessageContent(filePath) {
+    const records = readJsonlRecords(filePath);
+    assert(records.length > 0, 'derived claude file should contain message records');
+    for (const record of records) {
+        assert(record.uuid && typeof record.uuid === 'string', 'derived claude record should include uuid');
+        assert(Object.prototype.hasOwnProperty.call(record, 'parentUuid'), 'derived claude record should include parentUuid');
+        assert(record.message && record.message.role, 'derived claude message role missing');
+        const content = record.message.content;
+        assert(Array.isArray(content), 'derived claude message content should use native typed content array');
+        assert(content.length === 1 && content[0].type === 'text' && typeof content[0].text === 'string' && content[0].text, 'derived claude message text missing');
+    }
+}
+
 async function convertAndAssertListed(api, tmpHome, source, target, params = {}, options = {}) {
     const res = await api('convert-session', { source, target, ...params });
     assert(!res.error, `convert-session ${source}->${target} failed: ${res.error || ''}`);
@@ -139,6 +174,7 @@ module.exports = async function testSessionConvertDerived(ctx) {
     assert(detailClaude.messages.length === 2, 'session-detail(derived claude) should keep exact short length');
     assert(detailClaude.messages[0].text === 'hello', 'session-detail(derived claude) user text mismatch');
     assert(detailClaude.messages[1].text === 'world', 'session-detail(derived claude) assistant text mismatch');
+    assertClaudeNativeMessageContent(derivedClaudePath);
 
     const { res: derivedCodexRes, outPath: derivedCodexPath } = await convertAndAssertListed(api, tmpHome, 'claude', 'codex', {
         filePath: derivedClaudePath,
@@ -151,6 +187,7 @@ module.exports = async function testSessionConvertDerived(ctx) {
     assert(detailCodex.messages.length === 2, 'session-detail(derived codex) should keep exact short length');
     assert(detailCodex.messages[0].text === 'hello', 'session-detail(derived codex) user text mismatch');
     assert(detailCodex.messages[1].text === 'world', 'session-detail(derived codex) assistant text mismatch');
+    assertCodexNativeMessageContent(derivedCodexPath);
 
     const { outPath: derivedClaudePath2 } = await convertAndAssertListed(api, tmpHome, 'codex', 'claude', {
         sessionId,
@@ -188,6 +225,7 @@ module.exports = async function testSessionConvertDerived(ctx) {
         assert(texts.length === 2, 'claude derived codex session should keep message count');
         assert(texts[0] === 'hello from claude code session', 'claude derived codex user text mismatch');
         assert(texts[1] === 'initialized project', 'claude derived codex assistant text mismatch');
+        assertCodexNativeMessageContent(claudeDerivedCodexPath);
         assert(sha256File(claudeSessionPath) === beforeClaudeHash, 'claude source session should remain unchanged after conversion');
     }
 

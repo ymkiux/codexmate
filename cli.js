@@ -6364,6 +6364,53 @@ function buildSessionPlainText(messages) {
     return lines.join('\n');
 }
 
+function buildCodexMessageContent(role, text) {
+    const normalizedRole = normalizeRole(role);
+    const contentType = normalizedRole === 'assistant' ? 'output_text' : 'input_text';
+    return [{ type: contentType, text: typeof text === 'string' ? text : '' }];
+}
+
+function buildClaudeMessageRecord({ role, text, sessionId, cwd, timestamp, uuid, parentUuid }) {
+    const normalizedRole = normalizeRole(role);
+    const safeText = typeof text === 'string' ? text : '';
+    const record = {
+        parentUuid: parentUuid || null,
+        isSidechain: false,
+        userType: 'external',
+        cwd,
+        sessionId,
+        version: 'codexmate-derived',
+        type: normalizedRole,
+        uuid,
+        timestamp
+    };
+
+    if (normalizedRole === 'assistant') {
+        record.message = {
+            id: `msg_${String(uuid || '').replace(/-/g, '')}`,
+            type: 'message',
+            role: 'assistant',
+            model: 'derived',
+            content: [{ type: 'text', text: safeText }],
+            stop_reason: 'end_turn',
+            stop_sequence: null,
+            usage: {
+                input_tokens: 0,
+                cache_creation_input_tokens: 0,
+                cache_read_input_tokens: 0,
+                output_tokens: 0
+            }
+        };
+    } else {
+        record.message = {
+            role: normalizedRole === 'system' ? 'system' : 'user',
+            content: [{ type: 'text', text: safeText }]
+        };
+    }
+
+    return record;
+}
+
 function getDerivedSessionMetaPath(filePath) {
     if (!filePath) return '';
     const base = filePath.toLowerCase().endsWith('.jsonl')
@@ -7023,11 +7070,12 @@ async function convertSessionToDerived(params = {}) {
             lines.push(JSON.stringify({
                 type: 'response_item',
                 timestamp: toIsoTime(message.timestamp, '') || new Date(now + i).toISOString(),
-                payload: { type: 'message', role, content: text }
+                payload: { type: 'message', role, content: buildCodexMessageContent(role, text) }
             }));
         }
     } else {
         const claudeIndexPath = target === 'claude' ? path.join(outputDir, 'sessions-index.json') : '';
+        let parentUuid = null;
         for (let i = 0; i < messages.length; i += 1) {
             const message = messages[i];
             if (!message) continue;
@@ -7035,13 +7083,18 @@ async function convertSessionToDerived(params = {}) {
             if (role !== 'user' && role !== 'assistant' && role !== 'system') continue;
             const text = typeof message.text === 'string' ? message.text : '';
             if (!text) continue;
-            lines.push(JSON.stringify({
-                type: role,
-                timestamp: toIsoTime(message.timestamp, '') || new Date(now + i).toISOString(),
+            const messageUuid = generateCloneSessionId();
+            const timestamp = toIsoTime(message.timestamp, '') || new Date(now + i).toISOString();
+            lines.push(JSON.stringify(buildClaudeMessageRecord({
+                role,
+                text,
                 sessionId: derivedSessionId,
                 cwd,
-                message: { content: text }
-            }));
+                timestamp,
+                uuid: messageUuid,
+                parentUuid
+            })));
+            parentUuid = messageUuid;
         }
         if (claudeIndexPath) {
             ensureClaudeSessionsIndex(claudeIndexPath, resolvedCwd);
