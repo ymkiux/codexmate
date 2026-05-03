@@ -143,6 +143,7 @@ export function createMainTabsComputed() {
             if (this.mainTab === 'orchestration') return this.t('kicker.orchestration');
             if (this.mainTab === 'market') return this.t('kicker.market');
             if (this.mainTab === 'plugins') return this.t('kicker.plugins');
+            if (this.mainTab === 'svn') return this.t('kicker.svn');
             if (this.mainTab === 'docs') return this.t('kicker.docs');
             return this.t('kicker.settings');
         },
@@ -154,6 +155,7 @@ export function createMainTabsComputed() {
             if (this.mainTab === 'orchestration') return this.t('title.orchestration');
             if (this.mainTab === 'market') return this.t('title.market');
             if (this.mainTab === 'plugins') return this.t('title.plugins');
+            if (this.mainTab === 'svn') return this.t('title.svn');
             if (this.mainTab === 'docs') return this.t('title.docs');
             return this.t('title.settings');
         },
@@ -165,6 +167,7 @@ export function createMainTabsComputed() {
             if (this.mainTab === 'orchestration') return this.t('subtitle.orchestration');
             if (this.mainTab === 'market') return this.t('subtitle.market');
             if (this.mainTab === 'plugins') return this.t('subtitle.plugins');
+            if (this.mainTab === 'svn') return this.t('subtitle.svn');
             if (this.mainTab === 'docs') return this.t('subtitle.docs');
             return this.t('subtitle.settings');
         },

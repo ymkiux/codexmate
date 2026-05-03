@@ -6,6 +6,8 @@ import {
     getFirstPluginId,
     getPluginEntry
 } from '../registry.mjs';
+import { api } from '../../web-ui/modules/api.mjs';
+import { createSvnLogBrowserMethods } from '../../web-ui/modules/svn-log-browser.methods.mjs';
 
 const COMPOSER_VALUES_STORAGE_KEY = 'codexmate.plugins.promptTemplates.composerValues.v1';
 
@@ -81,6 +83,29 @@ function normalizePromptTemplateDraft(draft) {
 
 export function createPluginsMethods() {
     return {
+        ...createSvnLogBrowserMethods({ api }),
+        onPluginsToolPointerDown(pluginId, event) {
+            const id = typeof pluginId === 'string' ? pluginId.trim() : '';
+            if (!id) return;
+            this.pluginsRequestedId = id;
+            if (typeof this.onMainTabPointerDown === 'function') {
+                this.onMainTabPointerDown('plugins', event);
+            }
+        },
+
+        onPluginsToolClick(pluginId) {
+            const id = typeof pluginId === 'string' ? pluginId.trim() : '';
+            if (!id) return;
+            this.pluginsRequestedId = id;
+            if (typeof this.onMainTabClick === 'function') {
+                this.onMainTabClick('plugins');
+                return;
+            }
+            if (typeof this.switchMainTab === 'function') {
+                this.switchMainTab('plugins');
+            }
+        },
+
         resetPromptComposerVarValues() {
             this.promptComposerVarValuesRaw = {};
             persistComposerValuesForTemplate(this.promptComposerSelectedTemplateId, {});

@@ -82,6 +82,16 @@
                 @pointerdown="onMainTabPointerDown('plugins', $event)"
                 @click="onMainTabClick('plugins', $event)">{{ t('tab.plugins') }}</button>
             <button class="top-tab"
+                id="tab-svn"
+                role="tab"
+                data-main-tab="svn"
+                :tabindex="mainTab === 'svn' ? 0 : -1"
+                :aria-selected="mainTab === 'svn'"
+                aria-controls="panel-svn"
+                :class="{ active: isMainTabNavActive('svn') }"
+                @pointerdown="onMainTabPointerDown('svn', $event)"
+                @click="onMainTabClick('svn', $event)">{{ t('tab.svn') }}</button>
+            <button class="top-tab"
                 id="tab-settings"
                 role="tab"
                 data-main-tab="settings"
@@ -279,6 +289,23 @@
                         <div class="side-item-meta">
                             <span>{{ t('side.plugins.tools.meta') }}</span>
                             <span>{{ promptTemplatesList.length }} templates</span>
+                        </div>
+                    </button>
+                </div>
+
+                <div class="side-section" role="navigation" :aria-label="t('side.tools')">
+                    <div class="side-section-title">{{ t('side.tools') }}</div>
+                    <button
+                        id="side-tab-svn"
+                        data-main-tab="svn"
+                        :aria-current="mainTab === 'svn' ? 'page' : null"
+                        :class="['side-item', { active: isMainTabNavActive('svn') }]"
+                        @pointerdown="onMainTabPointerDown('svn', $event)"
+                        @click="onMainTabClick('svn', $event)">
+                        <div class="side-item-title">{{ t('tab.svn') }}</div>
+                        <div class="side-item-meta">
+                            <span>{{ t('side.svn.meta') }}</span>
+                            <span>{{ t('side.svn.hint') }}</span>
                         </div>
                     </button>
                 </div>

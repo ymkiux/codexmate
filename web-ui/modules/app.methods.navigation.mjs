@@ -13,6 +13,7 @@ export function createNavigationMethods(options = {}) {
         'orchestration',
         'market',
         'plugins',
+        'svn',
         'docs',
         'settings'
     ]);

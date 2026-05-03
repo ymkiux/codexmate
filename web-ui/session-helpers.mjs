@@ -1,4 +1,5 @@
 ﻿import { buildSessionListParams } from './logic.mjs';
+import { getPluginEntry } from '../plugins/registry.mjs';
 
 function clearSessionTimelineRefs(vm) {
     if (typeof vm.clearSessionTimelineRefs === 'function') {
@@ -187,10 +188,15 @@ export function switchMainTab(tab) {
         void Promise.resolve(marketOverviewLoad).catch(() => {});
     }
     if (enteringPluginsTab && typeof this.loadPluginsOverview === 'function') {
-        // Default behavior: always land on Prompt Templates + Compose when entering Plugins.
-        this.pluginsActiveId = 'prompt-templates';
-        this.promptTemplatesMode = 'compose';
+        const requested = typeof this.pluginsRequestedId === 'string' ? this.pluginsRequestedId.trim() : '';
+        this.pluginsRequestedId = '';
+        const requestedEntry = requested ? getPluginEntry(requested) : null;
+        const targetPluginId = requestedEntry ? requested : 'prompt-templates';
+        this.pluginsActiveId = targetPluginId;
         this.promptComposerPickerVisible = false;
+        if (targetPluginId === 'prompt-templates') {
+            this.promptTemplatesMode = 'compose';
+        }
         let pluginsLoad = null;
         try {
             pluginsLoad = this.loadPluginsOverview({ silent: true });
@@ -198,6 +204,19 @@ export function switchMainTab(tab) {
             pluginsLoad = null;
         }
         void Promise.resolve(pluginsLoad).catch(() => {});
+    }
+    if (nextTab === 'svn') {
+        if (typeof this.restoreSvnLogBrowserPrefs === 'function') {
+            this.restoreSvnLogBrowserPrefs();
+        }
+        if (typeof this.$nextTick === 'function') {
+            this.$nextTick(() => {
+                const input = this.$refs && this.$refs.svnLogBrowserUrlInput
+                    ? this.$refs.svnLogBrowserUrlInput
+                    : null;
+                if (input && typeof input.focus === 'function') input.focus();
+            });
+        }
     }
     if (nextTab === 'config' && this.configMode === 'claude') {
         const expectedTab = nextTab;

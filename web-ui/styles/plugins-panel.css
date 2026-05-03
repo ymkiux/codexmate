@@ -507,8 +507,182 @@
     box-shadow: 0 0 0 1px rgba(196, 69, 54, 0.18);
 }
 
+.svn-log-browser-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+    gap: var(--spacing-sm);
+    align-items: start;
+}
+
+.svn-log-browser-card {
+    border: 1px solid rgba(160, 145, 130, 0.18);
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.62);
+    padding: 12px;
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+}
+
+.svn-log-browser-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.svn-log-browser-card-head-row {
+    align-items: center;
+}
+
+.svn-log-browser-card-title {
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-secondary);
+    color: var(--color-text-secondary);
+}
+
+.svn-log-browser-cred-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.svn-log-browser-ctrl-row {
+    display: grid;
+    grid-template-columns: minmax(0, 140px) minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+}
+
+.svn-log-browser-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--font-size-caption);
+    color: var(--color-text-secondary);
+}
+
+.svn-log-browser-results-head {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 6px;
+}
+
+.svn-log-browser-results-head .form-input {
+    flex: 1;
+    min-width: 220px;
+}
+
+.svn-log-browser-pager {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.svn-log-browser-page-label {
+    font-size: var(--font-size-caption);
+    color: var(--color-text-tertiary);
+}
+
+.svn-log-browser-info-grid {
+    display: grid;
+    gap: 6px;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(160, 145, 130, 0.18);
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.svn-log-browser-info-row {
+    display: grid;
+    grid-template-columns: minmax(44px, 64px) minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+}
+
+.svn-log-browser-info-key {
+    color: var(--color-text-tertiary);
+}
+
+.svn-log-browser-info-value {
+    color: var(--color-text-secondary);
+    overflow-wrap: anywhere;
+}
+
+.svn-log-browser-list {
+    display: grid;
+    gap: 12px;
+}
+
+.svn-log-browser-item {
+    padding: 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(160, 145, 130, 0.18);
+    background: rgba(255, 255, 255, 0.72);
+    display: grid;
+    gap: 8px;
+}
+
+.svn-log-browser-item-head {
+    display: grid;
+    grid-template-columns: minmax(54px, 80px) minmax(0, 1fr) minmax(110px, 160px);
+    gap: 10px;
+    align-items: center;
+}
+
+.svn-log-browser-item-rev {
+    color: var(--color-text-secondary);
+    font-weight: var(--font-weight-secondary);
+}
+
+.svn-log-browser-item-author,
+.svn-log-browser-item-date {
+    color: var(--color-text-tertiary);
+    font-size: var(--font-size-caption);
+}
+
+.svn-log-browser-item-message {
+    color: var(--color-text-secondary);
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.svn-log-browser-item-paths {
+    display: grid;
+    gap: 4px;
+}
+
+.svn-log-browser-item-path {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+    font-size: var(--font-size-caption);
+    color: var(--color-text-tertiary);
+}
+
+.svn-log-browser-item-action {
+    color: var(--color-text-secondary);
+}
+
+.svn-log-browser-item-path-text {
+    overflow-wrap: anywhere;
+}
+
 @media (max-width: 980px) {
     .plugins-layout {
+        grid-template-columns: 1fr;
+    }
+    .svn-log-browser-layout {
+        grid-template-columns: 1fr;
+    }
+    .svn-log-browser-cred-row {
+        grid-template-columns: 1fr;
+    }
+    .svn-log-browser-item-head {
         grid-template-columns: 1fr;
     }
     .prompt-templates-grid {

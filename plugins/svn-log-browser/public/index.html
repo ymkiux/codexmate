@@ -1,0 +1,691 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SVN 日志浏览器</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;600;700&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css" rel="stylesheet" />
+    <style>
+      :root {
+        --bg: #0f0f10;
+        --panel: #141416;
+        --panel-2: #1a1a1d;
+        --text: #f2f2f3;
+        --muted: #a7a7ad;
+        --muted-2: #6d6d74;
+        --border: rgba(255, 255, 255, 0.12);
+        --border-2: rgba(255, 255, 255, 0.18);
+        --danger: #ff6b6b;
+        --ok: #7ee787;
+        --shadow: 0 18px 45px rgba(0, 0, 0, 0.35);
+        --radius: 14px;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        --sans: "Space Grotesk", "Noto Sans SC", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        font-family: var(--sans);
+        background: radial-gradient(circle at 20% -10%, rgba(255, 255, 255, 0.06), transparent 50%),
+          radial-gradient(circle at 90% 10%, rgba(255, 255, 255, 0.05), transparent 55%),
+          var(--bg);
+        color: var(--text);
+        line-height: 1.45;
+      }
+
+      .wrap {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 22px 16px 42px;
+      }
+
+      .top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 14px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .brand-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+        flex-shrink: 0;
+      }
+
+      .brand h1 {
+        margin: 0;
+        font-size: 16px;
+        letter-spacing: 0.01em;
+      }
+
+      .brand p {
+        margin: 2px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .panel {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03));
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 16px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 14px;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 120px 1fr;
+        gap: 10px;
+        align-items: center;
+        margin: 10px 0;
+      }
+
+      .label {
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      input[type="text"], input[type="password"], input[type="number"] {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: rgba(0, 0, 0, 0.35);
+        color: var(--text);
+        outline: none;
+        font-family: inherit;
+      }
+
+      input::placeholder { color: var(--muted-2); }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text);
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 12px;
+      }
+
+      .btn:hover { border-color: var(--border-2); }
+      .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+      .btn.primary {
+        background: rgba(255, 255, 255, 0.12);
+      }
+
+      .btn.ghost {
+        background: transparent;
+      }
+
+      .check {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .check input { transform: translateY(1px); }
+
+      details summary {
+        cursor: pointer;
+        list-style: none;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: rgba(0, 0, 0, 0.24);
+      }
+
+      details summary::-webkit-details-marker { display: none; }
+
+      details .details-body {
+        margin-top: 10px;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: rgba(0, 0, 0, 0.24);
+      }
+
+      .kv {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--muted);
+        word-break: break-word;
+      }
+
+      .kv strong {
+        color: var(--text);
+        font-weight: 700;
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin: 14px 0;
+        flex-wrap: wrap;
+      }
+
+      .search {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 260px;
+        flex: 1 1 260px;
+      }
+
+      .pager {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .pill {
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: rgba(0, 0, 0, 0.22);
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 12px;
+      }
+
+      .item {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: rgba(0, 0, 0, 0.22);
+        padding: 14px;
+      }
+
+      .item-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .rev {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .meta {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        min-width: 0;
+      }
+
+      .meta span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--muted);
+        min-width: 0;
+      }
+
+      .meta .author {
+        max-width: 260px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .msg {
+        margin: 10px 0 0;
+        white-space: pre-wrap;
+        font-size: 13px;
+        color: var(--text);
+      }
+
+      .paths {
+        margin-top: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .path-row {
+        display: grid;
+        grid-template-columns: 26px 1fr;
+        gap: 10px;
+        align-items: start;
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 26px;
+        height: 20px;
+        border-radius: 6px;
+        font-weight: 700;
+        border: 1px solid var(--border);
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .tag.A { color: var(--ok); }
+      .tag.D { color: var(--danger); }
+
+      .toast {
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        min-width: 280px;
+        max-width: 420px;
+        padding: 12px 14px;
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        background: rgba(0, 0, 0, 0.68);
+        color: var(--text);
+        box-shadow: var(--shadow);
+        display: none;
+      }
+
+      .toast.show { display: block; }
+      .toast .title { font-weight: 800; font-size: 12px; }
+      .toast .body { margin-top: 4px; font-size: 12px; color: var(--muted); word-break: break-word; }
+
+      @media (max-width: 920px) {
+        .grid { grid-template-columns: 1fr; }
+        .row { grid-template-columns: 1fr; gap: 6px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="top">
+        <div class="brand">
+          <div class="brand-icon"><i class="ri-git-repository-line"></i></div>
+          <div style="min-width:0">
+            <h1>SVN 日志浏览器</h1>
+            <p id="subtitle">输入仓库 URL，直接通过 WebDAV 拉取日志</p>
+          </div>
+        </div>
+        <div class="pill" id="status-pill">未连接</div>
+      </div>
+
+      <div class="grid">
+        <div class="panel">
+          <div class="row">
+            <div class="label">URL</div>
+            <input id="url" type="text" placeholder="https://example.com/svn/repo/trunk" autocomplete="off" />
+          </div>
+          <div class="row">
+            <div class="label">用户名</div>
+            <input id="username" type="text" placeholder="可留空" autocomplete="username" />
+          </div>
+          <div class="row">
+            <div class="label">密码</div>
+            <input id="password" type="password" placeholder="可留空" autocomplete="current-password" />
+          </div>
+          <div class="check">
+            <input id="remember" type="checkbox" />
+            <label for="remember">记住凭证（localStorage）</label>
+          </div>
+
+          <details id="config">
+            <summary>
+              <span style="display:flex;align-items:center;gap:8px"><i class="ri-settings-3-line"></i>配置</span>
+              <span class="pill" id="config-summary">分页与过滤</span>
+            </summary>
+            <div class="details-body">
+              <div class="row">
+                <div class="label">每页</div>
+                <input id="pageSize" type="number" min="1" max="200" value="25" />
+              </div>
+              <div class="row">
+                <div class="label">路径过滤</div>
+                <input id="pathFilter" type="text" placeholder="留空则用 URL 推导" autocomplete="off" />
+              </div>
+              <div class="kv">
+                <div><strong>提示</strong>：路径过滤只影响本页展示。</div>
+              </div>
+            </div>
+          </details>
+
+          <div class="actions">
+            <button class="btn primary" id="btn-load"><i class="ri-download-2-line"></i>获取日志</button>
+            <button class="btn ghost" id="btn-clear"><i class="ri-delete-bin-6-line"></i>清空</button>
+          </div>
+        </div>
+
+        <div class="panel" style="display:flex;flex-direction:column;gap:10px;min-height:220px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+            <div style="font-weight:800">仓库信息</div>
+            <div class="pill" id="cache-pill">缓存：无</div>
+          </div>
+          <div class="kv" id="info">
+            <div><strong>repositoryRoot</strong>：-</div>
+            <div><strong>relativePath</strong>：-</div>
+            <div><strong>revision</strong>：-</div>
+            <div><strong>baselineCollection</strong>：-</div>
+          </div>
+          <div class="kv" style="margin-top:auto;color:var(--muted-2)">
+            <div>仅支持 http/https SVN（WebDAV PROPFIND/REPORT）</div>
+            <div>请求与凭证在本地浏览器与本地服务间流转</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:14px">
+        <div class="toolbar">
+          <div class="search">
+            <i class="ri-search-line" style="color:var(--muted)"></i>
+            <input id="search" type="text" placeholder="当前页搜索：revision / author / message / path" autocomplete="off" />
+          </div>
+          <div class="pager">
+            <button class="btn" id="btn-prev"><i class="ri-arrow-left-s-line"></i>上一页</button>
+            <span class="pill" id="page-pill">第 1 页</span>
+            <button class="btn" id="btn-next">下一页<i class="ri-arrow-right-s-line"></i></button>
+          </div>
+        </div>
+        <div class="list" id="list"></div>
+        <div class="kv" id="empty" style="margin-top:12px;color:var(--muted);display:none">暂无数据</div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast">
+      <div class="title" id="toast-title"></div>
+      <div class="body" id="toast-body"></div>
+    </div>
+
+    <script>
+      const el = (id) => document.getElementById(id);
+
+      const STORAGE_KEY = 'svnLogBrowserCreds';
+      const state = {
+        page: 1,
+        pageSize: 25,
+        cache: false,
+        info: null,
+        items: [],
+        filtered: []
+      };
+
+      function showToast(title, body) {
+        el('toast-title').textContent = title || '';
+        el('toast-body').textContent = body || '';
+        el('toast').classList.add('show');
+        setTimeout(() => el('toast').classList.remove('show'), 4500);
+      }
+
+      function setBusy(busy) {
+        el('btn-load').disabled = busy;
+        el('btn-prev').disabled = busy || state.page <= 1;
+        el('btn-next').disabled = busy || state.items.length < state.pageSize;
+        el('status-pill').textContent = busy ? '加载中' : (state.info ? '已连接' : '未连接');
+      }
+
+      function loadCreds() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          const parsed = raw ? JSON.parse(raw) : null;
+          if (!parsed) return;
+          el('url').value = parsed.url || '';
+          el('username').value = parsed.username || '';
+          el('password').value = parsed.password || '';
+          el('remember').checked = true;
+        } catch (err) {}
+      }
+
+      function saveCreds() {
+        if (!el('remember').checked) {
+          localStorage.removeItem(STORAGE_KEY);
+          return;
+        }
+        const payload = {
+          url: el('url').value || '',
+          username: el('username').value || '',
+          password: el('password').value || ''
+        };
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        } catch (err) {}
+      }
+
+      async function postJson(url, payload) {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload || {})
+        });
+        let data = {};
+        try {
+          data = await res.json();
+        } catch (err) {}
+        if (!res.ok) {
+          const msg = data && data.error ? data.error : `http ${res.status}`;
+          throw new Error(msg);
+        }
+        return data;
+      }
+
+      function normalizeNeedle(text) {
+        return String(text || '').trim().toLowerCase();
+      }
+
+      function applySearch() {
+        const needle = normalizeNeedle(el('search').value);
+        if (!needle) {
+          state.filtered = state.items.slice();
+          render();
+          return;
+        }
+        state.filtered = state.items.filter((item) => {
+          const fields = [
+            String(item.revision || ''),
+            item.author || '',
+            item.date || '',
+            item.message || '',
+            Array.isArray(item.paths) ? item.paths.map((p) => `${p.action} ${p.path}`).join(' ') : ''
+          ].join('\n').toLowerCase();
+          return fields.includes(needle);
+        });
+        render();
+      }
+
+      function applyPathFilter(items) {
+        const raw = normalizeNeedle(el('pathFilter').value);
+        if (!raw) return items;
+        const needle = raw.startsWith('/') ? raw : `/${raw}`;
+        return items.filter((item) => Array.isArray(item.paths) && item.paths.some((p) => p && typeof p.path === 'string' && (p.path === needle || p.path.startsWith(needle + '/'))));
+      }
+
+      function renderInfo(info, cached) {
+        el('cache-pill').textContent = cached ? '缓存：命中' : '缓存：未命中';
+        if (!info) {
+          el('info').innerHTML = '<div><strong>repositoryRoot</strong>：-</div><div><strong>relativePath</strong>：-</div><div><strong>revision</strong>：-</div><div><strong>baselineCollection</strong>：-</div>';
+          return;
+        }
+        el('info').innerHTML = [
+          `<div><strong>repositoryRoot</strong>：${info.repositoryRoot || '-'}</div>`,
+          `<div><strong>relativePath</strong>：${info.relativePath || '-'}</div>`,
+          `<div><strong>revision</strong>：${info.revision || '-'}</div>`,
+          `<div><strong>baselineCollection</strong>：${info.baselineCollection || '-'}</div>`
+        ].join('');
+      }
+
+      function render() {
+        el('page-pill').textContent = `第 ${state.page} 页`;
+        el('empty').style.display = state.filtered.length ? 'none' : 'block';
+        const list = el('list');
+        list.innerHTML = '';
+        for (const item of state.filtered) {
+          const container = document.createElement('div');
+          container.className = 'item';
+          const author = item.author || '-';
+          const date = item.date || '-';
+          const message = item.message || '';
+          const paths = Array.isArray(item.paths) ? item.paths : [];
+          container.innerHTML = [
+            '<div class="item-head">',
+            `  <div class="rev">r${item.revision}</div>`,
+            '  <div class="meta">',
+            `    <span class="author" title="${author}"><i class="ri-user-3-line"></i>${author}</span>`,
+            `    <span title="${date}"><i class="ri-time-line"></i>${date}</span>`,
+            '  </div>',
+            '</div>',
+            `<div class="msg">${message ? escapeHtml(message) : '<span style="color:var(--muted-2)">（无日志信息）</span>'}</div>`,
+            paths.length ? `<div class="paths">${paths.map(renderPath).join('')}</div>` : '<div class="paths" style="color:var(--muted-2)">（无路径变更）</div>'
+          ].join('');
+          list.appendChild(container);
+        }
+        setBusy(false);
+      }
+
+      function renderPath(p) {
+        const action = p.action || '?';
+        const text = `${p.path || ''}`;
+        return `<div class="path-row"><span class="tag ${action}">${action}</span><span title="${text}">${escapeHtml(text)}</span></div>`;
+      }
+
+      function escapeHtml(value) {
+        const text = String(value || '');
+        return text
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/\"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      async function fetchInfo() {
+        const url = el('url').value.trim();
+        const username = el('username').value.trim();
+        const password = el('password').value;
+        const data = await postJson('/api/svn/info', { url, username, password });
+        state.info = data.info || null;
+        state.cache = !!data.cached;
+        renderInfo(state.info, state.cache);
+      }
+
+      async function fetchLogs() {
+        saveCreds();
+        state.pageSize = Math.max(1, Math.min(200, Number(el('pageSize').value || 25) || 25));
+        el('pageSize').value = String(state.pageSize);
+        const url = el('url').value.trim();
+        const username = el('username').value.trim();
+        const password = el('password').value;
+        setBusy(true);
+        await fetchInfo();
+        const data = await postJson('/api/svn/logs', { url, username, password, page: state.page, pageSize: state.pageSize });
+        const items = Array.isArray(data.items) ? data.items : [];
+        state.items = applyPathFilter(items);
+        state.filtered = state.items.slice();
+        applySearch();
+      }
+
+      function clearAll() {
+        state.info = null;
+        state.items = [];
+        state.filtered = [];
+        state.page = 1;
+        el('search').value = '';
+        renderInfo(null, false);
+        render();
+      }
+
+      el('btn-load').addEventListener('click', async () => {
+        try {
+          await fetchLogs();
+        } catch (err) {
+          setBusy(false);
+          showToast('请求失败', err && err.message ? err.message : String(err));
+        }
+      });
+
+      el('btn-clear').addEventListener('click', () => clearAll());
+      el('search').addEventListener('input', () => applySearch());
+      el('remember').addEventListener('change', () => saveCreds());
+
+      el('btn-prev').addEventListener('click', async () => {
+        if (state.page <= 1) return;
+        state.page -= 1;
+        try {
+          await fetchLogs();
+        } catch (err) {
+          state.page += 1;
+          showToast('翻页失败', err && err.message ? err.message : String(err));
+        }
+      });
+
+      el('btn-next').addEventListener('click', async () => {
+        state.page += 1;
+        try {
+          await fetchLogs();
+        } catch (err) {
+          state.page -= 1;
+          showToast('翻页失败', err && err.message ? err.message : String(err));
+        }
+      });
+
+      loadCreds();
+      render();
+      renderInfo(null, false);
+    </script>
+  </body>
+</html>
+

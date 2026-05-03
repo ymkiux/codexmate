@@ -76,6 +76,10 @@ const {
     executeTaskPlan
 } = require('./lib/task-orchestrator');
 const {
+    getSvnInfo,
+    getSvnLogs
+} = require('./lib/svn-webdav');
+const {
     readAutomationConfig,
     matchAutomationRule,
     buildAutomationEventKey,
@@ -9992,6 +9996,54 @@ function createWebServer({ htmlPath, assetsDir, webDir, host, port, openBrowser 
                                     } else {
                                         result = { models: res.models || [], source: 'remote' };
                                     }
+                                }
+                            }
+                            break;
+                        case 'svn-info':
+                            {
+                                const rawUrl = params && typeof params.url === 'string' ? params.url : '';
+                                const remoteAddr = req && req.socket ? req.socket.remoteAddress : '';
+                                const requesterIsLoopback = !remoteAddr
+                                    || remoteAddr === '127.0.0.1'
+                                    || remoteAddr === '::1'
+                                    || remoteAddr === '::ffff:127.0.0.1';
+                                if (!requesterIsLoopback) {
+                                    try {
+                                        const parsedUrl = new URL(rawUrl);
+                                        if (isPrivateNetworkHost(parsedUrl.hostname || '')) {
+                                            result = { error: 'Refusing to access private network svn url from non-loopback request' };
+                                            break;
+                                        }
+                                    } catch (_) {}
+                                }
+                                try {
+                                    result = await getSvnInfo(params || {});
+                                } catch (e) {
+                                    result = { error: e && e.message ? String(e.message) : 'svn info failed', status: e && e.status ? e.status : undefined };
+                                }
+                            }
+                            break;
+                        case 'svn-logs':
+                            {
+                                const rawUrl = params && typeof params.url === 'string' ? params.url : '';
+                                const remoteAddr = req && req.socket ? req.socket.remoteAddress : '';
+                                const requesterIsLoopback = !remoteAddr
+                                    || remoteAddr === '127.0.0.1'
+                                    || remoteAddr === '::1'
+                                    || remoteAddr === '::ffff:127.0.0.1';
+                                if (!requesterIsLoopback) {
+                                    try {
+                                        const parsedUrl = new URL(rawUrl);
+                                        if (isPrivateNetworkHost(parsedUrl.hostname || '')) {
+                                            result = { error: 'Refusing to access private network svn url from non-loopback request' };
+                                            break;
+                                        }
+                                    } catch (_) {}
+                                }
+                                try {
+                                    result = await getSvnLogs(params || {});
+                                } catch (e) {
+                                    result = { error: e && e.message ? String(e.message) : 'svn logs failed', status: e && e.status ? e.status : undefined };
                                 }
                             }
                             break;

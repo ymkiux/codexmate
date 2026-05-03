@@ -49,9 +49,10 @@ function generatePluginsRegistrySource() {
     for (const folder of folders) {
         const camel = toCamelCase(folder);
         const pascal = toPascalCase(folder);
+        const manifestExport = `${camel}PluginMeta`;
         const metaName = `${camel}Meta`;
         const loadName = `load${pascal}Overview`;
-        imports.push(`import { pluginMeta as ${metaName} } from './${folder}/manifest.mjs';`);
+        imports.push(`import { ${manifestExport} as ${metaName} } from './${folder}/manifest.mjs';`);
         imports.push(`import { ${loadName} } from './${folder}/overview.mjs';`);
         entries.push(`    { id: ${metaName}.id, meta: ${metaName}, loadOverview: ${loadName} }`);
     }
@@ -94,4 +95,3 @@ module.exports = {
     generatePluginsRegistrySource,
     writePluginsRegistry
 };
-
