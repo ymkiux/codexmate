@@ -6982,16 +6982,27 @@ async function convertSessionToDerived(params = {}) {
     }
 
     const baseSessionId = extracted.sessionId || params.sessionId || path.basename(filePath, '.jsonl');
-    const derivedSessionId = buildDerivedSessionId(baseSessionId);
+    let derivedSessionId = target === 'codex' || target === 'claude'
+        ? generateCloneSessionId()
+        : buildDerivedSessionId(baseSessionId);
     const sourceKey = buildSessionDerivedSourceKey(source, baseSessionId, filePath);
-    const outputDir = target === 'codex'
-        ? getCodexSessionsDir()
-        : (target === 'claude'
-            ? (resolveClaudeProjectDirForCwd(extracted.cwd || '') || path.join(getClaudeProjectsDir(), 'codexmate-derived'))
-            : buildDerivedSessionOutputDir(target, source, sourceKey));
+    let outputDir = target === 'claude'
+        ? (resolveClaudeProjectDirForCwd(extracted.cwd || '') || path.join(getClaudeProjectsDir(), 'codexmate-derived'))
+        : buildDerivedSessionOutputDir(target, source, sourceKey);
+    let outputPath = '';
+    if (target === 'codex') {
+        const targetSession = allocateCloneSessionTarget(getCodexSessionsDir(), Date.now());
+        derivedSessionId = targetSession.sessionId;
+        outputPath = targetSession.filePath;
+        outputDir = path.dirname(outputPath);
+    }
     ensureDir(outputDir);
-    const outputPath = path.join(outputDir, `${derivedSessionId}.jsonl`);
-    const metaPath = path.join(outputDir, `${derivedSessionId}.meta.json`);
+    if (!outputPath) {
+        outputPath = path.join(outputDir, `${derivedSessionId}.jsonl`);
+    }
+    const metaPath = outputPath.endsWith('.jsonl')
+        ? outputPath.replace(/\.jsonl$/, '.meta.json')
+        : path.join(outputDir, `${derivedSessionId}.meta.json`);
 
     const cwd = typeof extracted.cwd === 'string' ? extracted.cwd : '';
     const resolvedCwd = cwd ? path.resolve(expandHomePath(cwd)) : '';
